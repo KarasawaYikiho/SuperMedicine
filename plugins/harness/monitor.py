@@ -5,8 +5,9 @@ from pathlib import Path
 from typing import Any
 
 class AgentMonitor:
-    def __init__(self, audit_log_path: Path):
+    def __init__(self, audit_log_path: Path, anomaly_threshold: int = 100):
         self._audit_log = Path(audit_log_path)
+        self.anomaly_threshold = anomaly_threshold
     def get_permission_audit(self, agent_id: str | None = None) -> list[dict[str, Any]]:
         if not self._audit_log.exists(): return []
         entries = []
@@ -26,4 +27,4 @@ class AgentMonitor:
         for e in entries:
             aid = e.get("agent_id", "unknown")
             counts[aid] = counts.get(aid, 0) + 1
-        return [{"agent_id": aid, "count": c, "type": "high_frequency"} for aid, c in counts.items() if c > 100]
+        return [{"agent_id": aid, "count": c, "type": "high_frequency"} for aid, c in counts.items() if c > self.anomaly_threshold]
