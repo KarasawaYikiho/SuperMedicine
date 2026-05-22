@@ -1,0 +1,1 @@
+{"name": "supermedicine", "version": "0.1.0", "description": "Modular medical research Agent", "type": "plugin", "entry": "adapter.py"}

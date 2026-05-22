@@ -1,0 +1,14 @@
+name: "rag-interface"
+version: "0.1.0"
+type: "rag"
+description: "RAG 检索接口（空实现，用户自行添加 Provider）"
+provides:
+  - "rag.query"
+  - "rag.context.store"
+  - "rag.context.retrieve"
+provider:
+  type: "custom"
+  api_endpoint: ""
+  api_key_env: ""
+  embedding_model: ""
+  vector_store: ""

@@ -1,0 +1,21 @@
+{
+  "name": "supermedicine",
+  "version": "0.1.0",
+  "description": "Modular medical research Agent with RAG and Harness",
+  "platforms": {
+    "claude-code": {"type": "skill+subagent", "entry": "adapters/claude-code/SKILL.md"},
+    "opencode": {"type": "plugin", "entry": "adapters/opencode/plugin.json"},
+    "standalone": {"type": "cli", "entry": "adapters/standalone/cli.py", "requirements": "requirements.txt"}
+  },
+  "dependencies": {"python": ">=3.10", "r": ">=4.3 (optional)"},
+  "plugins": {
+    "required": ["rag-interface", "harness-core", "standards-base"],
+    "optional": ["tools-python-stats", "tools-r-survival"]
+  },
+  "install_steps": [
+    {"step": "clone", "command": "git clone https://github.com/KarasawaYikiho/SuperMedicine.git"},
+    {"step": "install_deps", "command": "pip install -r requirements.txt"},
+    {"step": "detect_platform", "script": "install.py --detect"},
+    {"step": "setup_config", "script": "install.py --init"}
+  ]
+}
