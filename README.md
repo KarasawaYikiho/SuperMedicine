@@ -1,5 +1,7 @@
 # SuperMedicine
 
+![Version](https://img.shields.io/badge/version-0.1.0--beta-blue)
+
 Modular medical research Agent framework with RAG and Harness.
 
 ## Features
