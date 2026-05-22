@@ -28,4 +28,9 @@ class EventBus:
             self._subscriptions[sub.topic] = [s for s in self._subscriptions[sub.topic] if s.token != token]
     def publish(self, topic: str, event: dict[str, Any]) -> None:
         for sub in self._subscriptions.get(topic, []):
-            sub.handler(event)
+            try:
+                sub.handler(event)
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning("EventBus handler error for topic '%s': %s", topic, e)

@@ -21,3 +21,21 @@ class TestEventBus:
         bus.unsubscribe(token)
         bus.publish("t", {"data": "x"})
         assert len(received) == 0
+
+    def test_handler_exception_isolation(self):
+        """验证一个 handler 异常不影响其他 handler"""
+        bus = EventBus()
+        received = []
+
+        def good_handler(event):
+            received.append("good")
+
+        def bad_handler(event):
+            raise RuntimeError("handler error")
+
+        bus.subscribe("test", good_handler)
+        bus.subscribe("test", bad_handler)
+        bus.subscribe("test", good_handler)
+
+        bus.publish("test", {"data": 1})
+        assert len(received) == 2
