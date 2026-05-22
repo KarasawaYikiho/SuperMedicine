@@ -170,10 +170,27 @@ class CLI:
                     # DISPATCH → RUNNING
                     sm.transition(TaskState.RUNNING)
                     history.append(str(sm.state))
-                    # 在 RUNNING 阶段获取可用插件
-                    plugins_list = self._kernel.plugin_registry.discover()
-                    plugin_names = [p.name for p in plugins_list]
-                    checkpoint.save(self.agent_id, step=2, state=str(sm.state), result={"plugins": plugin_names})
+                    plugins = self._kernel.plugin_registry.discover()
+                    plugin_names = [p.name for p in plugins]
+
+                    # LLM 集成（使用约束 prompt）
+                    llm_response = None
+                    try:
+                        from core.llm_client import create_llm_client
+                        llm = create_llm_client("openrouter")
+                        messages = [
+                            {"role": "system", "content": constraint_prefix},
+                            {"role": "user", "content": f"Task: {task.get('description', str(task))}\nAvailable plugins: {', '.join(plugin_names)}"},
+                        ]
+                        llm_response = llm.chat(messages)
+                    except Exception:
+                        llm_response = {"content": "", "note": "LLM not available (OPENROUTER_API_KEY not set or network error)"}
+
+                    checkpoint.save(self.agent_id, step=2, data={
+                        "state": str(sm.state),
+                        "plugins": plugin_names,
+                        "llm_response": llm_response,
+                    })
 
                     # RUNNING → VERIFYING
                     sm.transition(TaskState.VERIFYING)
