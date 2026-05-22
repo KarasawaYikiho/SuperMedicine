@@ -20,6 +20,13 @@ class Kernel:
         plugins_dir: Path | None = None,
         policies_dir: Path | None = None,
     ):
+        import os
+        # SM_CONFIG 环境变量覆盖配置路径
+        if config_path is None:
+            env_config = os.environ.get("SM_CONFIG")
+            if env_config:
+                config_path = Path(env_config)
+
         self._config_path = config_path or Path(".supermedicine/config.yaml")
         self._plugins_dir = plugins_dir or Path("plugins")
         self._policies_dir = policies_dir or Path(".supermedicine/policies")
