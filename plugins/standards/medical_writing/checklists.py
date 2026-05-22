@@ -1,67 +1,48 @@
-"""医学写作规范检查清单"""
+"""医学写作规范检查清单 — CONSORT 和 STROBE"""
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
+
+from .checklist_base import ChecklistBase, ChecklistItemBase
 
 
 @dataclass
-class ChecklistItem:
-    """检查清单条目"""
-    id: str
-    section: str
-    item: str
-    description: str
+class ChecklistItem(ChecklistItemBase):
+    """检查清单条目（扩展基类，增加 required 字段）"""
     required: bool = True
 
 
-@dataclass
-class Checklist:
-    """规范检查清单"""
-    name: str
-    version: str
-    items: list[ChecklistItem] = field(default_factory=list)
+class Checklist(ChecklistBase):
+    """规范检查清单（继承 ChecklistBase）"""
+    
+    def __init__(self, name: str, version: str, items: list[ChecklistItem]):
+        # 从 ChecklistItem 中提取关键词填充到基类的 keywords 字段
+        base_items = []
+        for item in items:
+            base_items.append(ChecklistItemBase(
+                id=item.id,
+                section=item.section,
+                item=item.item,
+                description=item.description,
+                keywords=[item.item, item.section],  # 从 item 和 section 生成关键词
+            ))
+        super().__init__(name=name, version=version, items=base_items)
+        # 保存原始 ChecklistItem 列表用于计算 required_missing
+        self._raw_items = items
 
     def check(self, text: str) -> dict[str, Any]:
-        """检查文本是否符合规范"""
-        results = []
-        for item in self.items:
-            # 简单的关键词匹配检查
-            found = self._check_item(text, item)
-            results.append({
-                "item_id": item.id,
-                "section": item.section,
-                "item": item.item,
-                "found": found,
-                "required": item.required,
-            })
-
-        total = len(results)
-        found = sum(1 for r in results if r["found"])
-        required_missing = [
-            r for r in results if r["required"] and not r["found"]
-        ]
-
-        return {
-            "standard": self.name,
-            "version": self.version,
-            "total_items": total,
-            "found_items": found,
-            "compliance_rate": round(found / total * 100, 1) if total > 0 else 0,
-            "required_missing": required_missing,
-            "details": results,
-        }
-
-    def _check_item(self, text: str, item: ChecklistItem) -> bool:
-        """检查单个条目"""
-        text_lower = text.lower()
-        # 根据条目类型进行关键词匹配
-        keywords = self._get_keywords(item)
-        return any(kw.lower() in text_lower for kw in keywords)
-
-    def _get_keywords(self, item: ChecklistItem) -> list[str]:
-        """获取条目关键词"""
-        return [item.item, item.section]
+        """检查文本是否符合规范（重写以添加 required_missing 字段）"""
+        result = super().check(text)
+        
+        # 计算 required_missing（原 checklists.py 独有逻辑）
+        required_missing = []
+        for i, detail in enumerate(result["details"]):
+            if i < len(self._raw_items) and self._raw_items[i].required and not detail["found"]:
+                required_missing.append(detail)
+        result["required_missing"] = required_missing
+        
+        return result
 
 
 def get_consort_checklist() -> Checklist:

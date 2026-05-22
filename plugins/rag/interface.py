@@ -1,18 +1,41 @@
-"""RAG 插件接口 — 空实现"""
+"""RAG 检索接口定义"""
 from __future__ import annotations
-from abc import ABC, abstractmethod
+
 from typing import Any
 
-class RAGProvider(ABC):
-    @abstractmethod
-    def query(self, query: str, scope: str = "literature") -> dict[str, Any]: ...
-    @abstractmethod
-    def store_context(self, key: str, value: Any) -> None: ...
-    @abstractmethod
-    def retrieve_context(self, key: str) -> Any | None: ...
+
+class RAGProvider:
+    """RAG Provider 接口"""
+
+    def query(self, query_text: str, top_k: int = 5) -> list[dict[str, Any]]:
+        """检索相关文献"""
+        raise NotImplementedError
+
+    def store_context(self, key: str, data: Any) -> None:
+        """存储上下文"""
+        raise NotImplementedError
+
+    def retrieve_context(self, key: str) -> Any | None:
+        """获取上下文"""
+        raise NotImplementedError
+
 
 class EmptyRAGProvider(RAGProvider):
-    def query(self, query: str, scope: str = "literature") -> dict[str, Any]:
-        return {"results": [], "warning": "RAG provider not configured"}
-    def store_context(self, key: str, value: Any) -> None: pass
-    def retrieve_context(self, key: str) -> Any | None: return None
+    """空 RAG Provider — 内存存储上下文，无实际检索"""
+
+    def __init__(self):
+        self._context: dict[str, Any] = {}
+
+    def query(self, query_text: str, top_k: int = 5) -> list[dict[str, Any]]:
+        return []
+
+    def store_context(self, key: str, data: Any) -> None:
+        self._context[key] = data
+
+    def retrieve_context(self, key: str) -> Any | None:
+        return self._context.get(key)
+
+
+from .local_provider import LocalRAGProvider
+
+__all__ = ["RAGProvider", "EmptyRAGProvider", "LocalRAGProvider"]

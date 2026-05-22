@@ -8,7 +8,7 @@ from typing import Any
 @dataclass
 class ChecklistItemBase:
     """检查条目基类"""
-    id: int
+    id: int | str
     section: str
     item: str
     description: str
