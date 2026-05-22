@@ -17,12 +17,12 @@ class ChecklistItemBase:
 
 class ChecklistBase:
     """规范检查清单基类"""
-    
+
     def __init__(self, name: str, version: str, items: list[ChecklistItemBase]):
         self.name = name
         self.version = version
         self.items = items
-    
+
     def check(self, text: str) -> dict[str, Any]:
         """检查文本是否符合规范"""
         results = []

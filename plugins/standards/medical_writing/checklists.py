@@ -15,7 +15,7 @@ class ChecklistItem(ChecklistItemBase):
 
 class Checklist(ChecklistBase):
     """规范检查清单（继承 ChecklistBase）"""
-    
+
     def __init__(self, name: str, version: str, items: list[ChecklistItem]):
         # 从 ChecklistItem 中提取关键词填充到基类的 keywords 字段
         base_items = []
@@ -34,14 +34,14 @@ class Checklist(ChecklistBase):
     def check(self, text: str) -> dict[str, Any]:
         """检查文本是否符合规范（重写以添加 required_missing 字段）"""
         result = super().check(text)
-        
+
         # 计算 required_missing（原 checklists.py 独有逻辑）
         required_missing = []
         for i, detail in enumerate(result["details"]):
             if i < len(self._raw_items) and self._raw_items[i].required and not detail["found"]:
                 required_missing.append(detail)
         result["required_missing"] = required_missing
-        
+
         return result
 
 

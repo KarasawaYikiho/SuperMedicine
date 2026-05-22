@@ -5,11 +5,11 @@ from __future__ import annotations
 def format_authors(authors: list[str], max_authors: int = 6) -> str:
     """
     格式化作者列表
-    
+
     Args:
         authors: 作者列表，每个元素为 "名 姓" 格式
         max_authors: 最大作者数量，超过则使用 "et al"
-    
+
     Returns:
         格式化后的作者字符串
     """
