@@ -74,3 +74,41 @@ class TestAgentMonitor:
         # alpha 有 150 条 > 100 阈值，应被检测到
         assert len(anomalies) > 0
         assert any(a["agent_id"] == "alpha" for a in anomalies)
+
+
+from plugins.harness.monitor import AgentPerformanceMonitor
+
+
+class TestAgentPerformanceMonitor:
+    """测试 AgentPerformanceMonitor"""
+
+    def test_record_and_stats(self, tmp_path):
+        """验证记录和统计"""
+        log_path = tmp_path / "perf.jsonl"
+        monitor = AgentPerformanceMonitor(log_path)
+        monitor.record("alpha", "task-1", 150.0, True, 1)
+        monitor.record("alpha", "task-2", 200.0, False, 2)
+        monitor.record("beta", "task-3", 100.0, True, 0)
+
+        stats = monitor.get_stats()
+        assert "alpha" in stats
+        assert stats["alpha"]["total"] == 2
+        assert stats["alpha"]["success_rate"] == 50.0
+        assert stats["alpha"]["total_retries"] == 3
+        assert "beta" in stats
+        assert stats["beta"]["success_rate"] == 100.0
+
+    def test_detect_failure_patterns(self, tmp_path):
+        """验证失败模式检测"""
+        log_path = tmp_path / "perf.jsonl"
+        monitor = AgentPerformanceMonitor(log_path)
+        # 连续 3 次失败
+        for i in range(3):
+            monitor.record("alpha", f"task-{i}", 100.0, False, 0)
+        # 1 次成功
+        monitor.record("alpha", "task-ok", 100.0, True, 0)
+
+        failures = monitor.detect_failure_patterns()
+        assert len(failures) == 1
+        assert failures[0]["agent_id"] == "alpha"
+        assert failures[0]["consecutive_failures"] == 3
