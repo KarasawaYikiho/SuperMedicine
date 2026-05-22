@@ -23,7 +23,7 @@ r = [
 ]
 
 [project.scripts]
-supermedicine = "cli:main"
+supermedicine = "Cli:main"
 
 [tool.setuptools.packages.find]
 include = ["core*", "permission*", "agents*", "plugins*", "adapters*"]
