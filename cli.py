@@ -140,6 +140,24 @@ class CLI:
                     audit_log=audit_log,
                 )
 
+                # 生成 Prompt 层约束（双约束机制生效）
+                from permission.prompt_generator import PromptGenerator
+                prompt_gen = PromptGenerator()
+                policy = perm_engine._policies.get(self.agent_id)
+                allowed_actions = []
+                denied_actions = []
+                if policy:
+                    allowed_actions = [f"{a.action}:{a.scope}" for a in policy.allowed]
+                    denied_actions = [f"{a.action}:{a.scope}" for a in policy.denied]
+
+                constraint_prefix = prompt_gen.generate_prefix(
+                    agent_id=self.agent_id,
+                    role=self.role,
+                    allowed_actions=allowed_actions,
+                    denied_actions=denied_actions,
+                )
+                rejection_templates = prompt_gen.generate_rejection_templates(role=self.role)
+
                 try:
                     # PLANNING → DISPATCH
                     perm_result = perm_engine.check(self.agent_id, "plan", "task")
@@ -178,6 +196,8 @@ class CLI:
                     "history": history,
                     "plugins": plugin_names if 'plugin_names' in dir() else [],
                     "checkpoint_dir": str(self._checkpoint_dir),
+                    "constraint_prompt": constraint_prefix,
+                    "rejection_templates": rejection_templates,
                 }
 
         agent_ids = ["alpha", "beta", "gamma", "delta"]
