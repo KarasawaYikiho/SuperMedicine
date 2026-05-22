@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # 添加项目根目录到路径
 sys.path.insert(0, str(Path(__file__).parent))
@@ -27,31 +30,31 @@ class CLI:
         )
         (config_dir / "agents").mkdir(exist_ok=True)
         (config_dir / "plugins").mkdir(exist_ok=True)
-        print(f"项目已初始化: {config_dir}")
+        logger.info(f"项目已初始化: {config_dir}")
 
     def status(self) -> None:
         """显示项目状态"""
-        print("SuperMedicine v0.1.0")
-        print("=" * 40)
+        logger.info("SuperMedicine v0.1.0")
+        logger.info("=" * 40)
 
         # 检查配置
         config_dir = Path.cwd() / ".supermedicine"
         if config_dir.exists():
-            print("[OK] 项目配置已初始化")
+            logger.info("[OK] 项目配置已初始化")
         else:
-            print("[FAIL] 项目配置未初始化 (运行 'supermedicine init')")
+            logger.info("[FAIL] 项目配置未初始化 (运行 'supermedicine init')")
 
         # 检查插件
         plugins_dir = Path(__file__).parent / "plugins"
         if plugins_dir.exists():
             plugin_count = len(list(plugins_dir.rglob("plugin.yaml")))
-            print(f"[OK] 发现 {plugin_count} 个插件")
+            logger.info(f"[OK] 发现 {plugin_count} 个插件")
 
         # 检查测试
         tests_dir = Path(__file__).parent / "tests"
         if tests_dir.exists():
             test_count = len(list(tests_dir.glob("test_*.py")))
-            print(f"[OK] 发现 {test_count} 个测试模块")
+            logger.info(f"[OK] 发现 {test_count} 个测试模块")
 
     def test(self) -> None:
         """运行测试"""
@@ -72,9 +75,9 @@ class CLI:
         # 确定项目根目录
         project_dir = Path.cwd()
 
-        print(f"SuperMedicine v0.1.0 — 任务执行")
-        print(f"任务: {task}")
-        print("=" * 50)
+        logger.info(f"SuperMedicine v0.1.0 — 任务执行")
+        logger.info(f"任务: {task}")
+        logger.info("=" * 50)
 
         # 初始化 Kernel（集成 PermissionEngine）
         policies_dir = project_dir / ".supermedicine" / "policies"
@@ -87,18 +90,18 @@ class CLI:
         )
 
         if verbose:
-            print(f"[OK] Kernel 已初始化")
-            print(f"     Config: {kernel._config_path}")
-            print(f"     Plugins: {kernel._plugins_dir}")
-            print(f"     Policies: {kernel._policies_dir}")
-            print(f"     PermissionEngine: 已激活")
+            logger.info(f"[OK] Kernel 已初始化")
+            logger.info(f"     Config: {kernel._config_path}")
+            logger.info(f"     Plugins: {kernel._plugins_dir}")
+            logger.info(f"     Policies: {kernel._policies_dir}")
+            logger.info(f"     PermissionEngine: 已激活")
 
         # 发现插件
         plugins = kernel.plugin_registry.discover()
-        print(f"[OK] 已发现 {len(plugins)} 个插件")
+        logger.info(f"[OK] 已发现 {len(plugins)} 个插件")
         if verbose:
             for p in plugins:
-                print(f"     - {p.name} ({p.meta.type})")
+                logger.info(f"     - {p.name} ({p.meta.type})")
 
         # 初始化 Orchestrator
         orchestrator = Orchestrator()
@@ -117,26 +120,27 @@ class CLI:
         for aid in agent_ids:
             orchestrator.register_agent(CLIAgent(aid, role=f"{aid}_cli"))
 
-        print(f"[OK] 已注册 {len(agent_ids)} 个 Agent: {', '.join(agent_ids)}")
+        logger.info(f"[OK] 已注册 {len(agent_ids)} 个 Agent: {', '.join(agent_ids)}")
 
         # 派发任务到 Orchestrator
-        print(f"\n[→] 派发任务: {task}")
+        logger.info(f"\n[→] 派发任务: {task}")
         task_payload = {"action": "execute", "description": task}
 
         for aid in agent_ids:
             try:
                 result = orchestrator.dispatch(aid, task_payload)
                 if verbose:
-                    print(f"     {aid}: {result.get('status', 'unknown')}")
+                    logger.info(f"     {aid}: {result.get('status', 'unknown')}")
             except Exception as e:
                 if verbose:
-                    print(f"     {aid}: 错误 — {e}")
+                    logger.info(f"     {aid}: 错误 — {e}")
 
-        print(f"\n[OK] 任务已派发到全部 {len(agent_ids)} 个 Agent")
-        print(f"提示: 完整的 LLM 后端集成将在后续版本中支持")
+        logger.info(f"\n[OK] 任务已派发到全部 {len(agent_ids)} 个 Agent")
+        logger.info(f"提示: 完整的 LLM 后端集成将在后续版本中支持")
 
 
 def main():
+    logging.basicConfig(level=logging.INFO, format='%(message)s')
     parser = argparse.ArgumentParser(
         prog="supermedicine",
         description="SuperMedicine - 模块化医学科研 Agent 框架",
