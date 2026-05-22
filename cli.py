@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
-import tempfile
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -72,7 +71,6 @@ class CLI:
         from core.kernel import Kernel
         from agents.orchestrator import Orchestrator
         from agents.base_agent import BaseAgent
-        import tempfile
 
         # 确定项目根目录
         project_dir = Path.cwd()
@@ -103,7 +101,7 @@ class CLI:
         logger.info("[OK] 已发现 %d 个插件", len(plugins))
         if verbose:
             for p in plugins:
-                logger.info("     - %s (%s)", p.name, p.meta.type)
+                logger.info("     - %s (%s)", p.name, p.type)
 
         # 初始化 Orchestrator
         orchestrator = Orchestrator()

@@ -17,9 +17,14 @@ class PermissionEngine:
         for f in self._policy_dir.glob("*.yaml"):
             with open(f, encoding="utf-8") as fh:
                 data = yaml.safe_load(fh)
-            if data and "agent_id" in data:
-                policy = PermissionPolicy.from_dict(data)
-                self._policies[policy.agent_id] = policy
+            if data is None:
+                continue
+            # Support both single dict and list of policies
+            policies = data if isinstance(data, list) else [data]
+            for item in policies:
+                if item and "agent_id" in item:
+                    policy = PermissionPolicy.from_dict(item)
+                    self._policies[policy.agent_id] = policy
     def check(self, agent_id: str, action: str, resource: str) -> PermissionResult:
         if agent_id not in self._policies:
             self._audit.log(agent_id=agent_id, action=action, resource=resource, result="DENIED", reason="unknown_agent")

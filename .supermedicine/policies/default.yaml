@@ -6,6 +6,10 @@
   security_level: "standard"
   permissions:
     allowed:
+      - action: "execute"
+        scope: "*"
+      - action: "plan"
+        scope: "*"
       - action: "read"
         scope: "*"
       - action: "skill_load"
@@ -32,6 +36,10 @@
   security_level: "elevated"
   permissions:
     allowed:
+      - action: "execute"
+        scope: "*"
+      - action: "plan"
+        scope: "*"
       - action: "read"
         scope: "*"
       - action: "tool_call"
@@ -58,6 +66,10 @@
   security_level: "standard"
   permissions:
     allowed:
+      - action: "execute"
+        scope: "*"
+      - action: "plan"
+        scope: "*"
       - action: "read"
         scope: "*"
       - action: "write"
