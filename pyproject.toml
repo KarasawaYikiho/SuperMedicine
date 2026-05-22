@@ -20,6 +20,9 @@ r = [
     "rpy2>=3.5",
 ]
 
+[project.scripts]
+supermedicine = "cli:main"
+
 [tool.setuptools.packages.find]
 include = ["core*", "permission*", "agents*", "plugins*", "adapters*"]
 
