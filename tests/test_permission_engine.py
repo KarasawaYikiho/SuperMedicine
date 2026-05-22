@@ -1,4 +1,3 @@
-import pytest
 import yaml
 from permission.engine import PermissionEngine
 from permission.policy import PermissionResult

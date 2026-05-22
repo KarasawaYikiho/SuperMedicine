@@ -1,4 +1,3 @@
-import pytest
 from permission.prompt_generator import PromptGenerator
 
 class TestPromptGenerator:

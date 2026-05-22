@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -14,9 +13,9 @@ except ImportError:
     _HAS_RPY2 = False
     logger.debug("rpy2 not installed — using pure Python survival analysis fallback")
 
-from .kaplan_meier import kaplan_meier, KMResult
-from .logrank import logrank_test, LogRankResult
-from .cox_model import cox_ph, CoxResult
+from .kaplan_meier import kaplan_meier
+from .logrank import logrank_test
+from .cox_model import cox_ph
 
 
 def km_tool(times: list[float], events: list[int]) -> dict:

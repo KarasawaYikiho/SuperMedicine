@@ -1,5 +1,4 @@
 """SessionManager 测试"""
-import pytest
 from core.session_manager import SessionManager, Session
 
 

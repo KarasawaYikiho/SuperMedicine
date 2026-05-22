@@ -1,4 +1,3 @@
-import pytest
 from plugins.standards.medical_writing.prisma import PRISMAChecklist
 
 

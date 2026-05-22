@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import math
-from typing import Any
 
 
 def descriptive(data: list[float]) -> dict[str, float]:

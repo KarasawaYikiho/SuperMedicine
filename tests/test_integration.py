@@ -1,7 +1,5 @@
 """集成测试 — 端到端科研流程"""
-import pytest
 import yaml
-from pathlib import Path
 
 from core.kernel import Kernel
 from agents.orchestrator import Orchestrator

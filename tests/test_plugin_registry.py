@@ -1,7 +1,6 @@
-import pytest
 import yaml
 from core.plugin_registry import PluginRegistry
-from plugins.base_plugin import BasePlugin, PluginMeta
+from plugins.base_plugin import BasePlugin
 
 class TestPluginRegistry:
     def _create_plugin(self, tmp_path, name="test-plugin"):

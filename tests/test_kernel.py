@@ -1,4 +1,3 @@
-import pytest
 import yaml
 from core.kernel import Kernel
 

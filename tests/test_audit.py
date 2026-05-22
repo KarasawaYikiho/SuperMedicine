@@ -1,5 +1,4 @@
 import json
-import pytest
 from permission.audit import AuditLogger
 
 class TestAuditLogger:

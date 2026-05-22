@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 from core.config_center import ConfigCenter
 from core.event_bus import EventBus

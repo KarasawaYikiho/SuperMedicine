@@ -1,4 +1,3 @@
-import pytest
 from agents.checkpoint import CheckpointManager
 
 class TestCheckpointManager:

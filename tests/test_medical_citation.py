@@ -1,4 +1,3 @@
-import pytest
 from plugins.standards.medical_citation.ama_format import AMAFormatter, JournalArticle, Book
 from plugins.standards.medical_citation.vancouver_format import VancouverFormatter
 

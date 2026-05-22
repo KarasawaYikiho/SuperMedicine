@@ -75,7 +75,7 @@ class CLI:
         # 确定项目根目录
         project_dir = Path.cwd()
 
-        logger.info(f"SuperMedicine v0.1.0 — 任务执行")
+        logger.info("SuperMedicine v0.1.0 — 任务执行")
         logger.info(f"任务: {task}")
         logger.info("=" * 50)
 
@@ -90,11 +90,11 @@ class CLI:
         )
 
         if verbose:
-            logger.info(f"[OK] Kernel 已初始化")
+            logger.info("[OK] Kernel 已初始化")
             logger.info(f"     Config: {kernel._config_path}")
             logger.info(f"     Plugins: {kernel._plugins_dir}")
             logger.info(f"     Policies: {kernel._policies_dir}")
-            logger.info(f"     PermissionEngine: 已激活")
+            logger.info("     PermissionEngine: 已激活")
 
         # 发现插件
         plugins = kernel.plugin_registry.discover()
@@ -136,7 +136,7 @@ class CLI:
                     logger.info(f"     {aid}: 错误 — {e}")
 
         logger.info(f"\n[OK] 任务已派发到全部 {len(agent_ids)} 个 Agent")
-        logger.info(f"提示: 完整的 LLM 后端集成将在后续版本中支持")
+        logger.info("提示: 完整的 LLM 后端集成将在后续版本中支持")
 
 
 def main():

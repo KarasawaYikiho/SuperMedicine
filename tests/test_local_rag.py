@@ -1,4 +1,3 @@
-import pytest
 from plugins.rag.local_provider import LocalRAGProvider
 
 

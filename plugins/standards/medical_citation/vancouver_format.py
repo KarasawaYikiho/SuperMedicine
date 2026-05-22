@@ -1,7 +1,6 @@
 """Vancouver 引用格式"""
 from __future__ import annotations
 
-from dataclasses import dataclass
 
 from .utils import format_authors
 

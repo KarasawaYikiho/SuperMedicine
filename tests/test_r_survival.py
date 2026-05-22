@@ -1,4 +1,3 @@
-import pytest
 from plugins.tools.r_survival.kaplan_meier import kaplan_meier
 from plugins.tools.r_survival.logrank import logrank_test
 from plugins.tools.r_survival.cox_model import cox_ph

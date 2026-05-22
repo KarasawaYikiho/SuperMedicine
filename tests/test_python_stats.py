@@ -1,4 +1,3 @@
-import pytest
 from plugins.tools.python_stats.main import descriptive, ttest, anova, regression
 
 

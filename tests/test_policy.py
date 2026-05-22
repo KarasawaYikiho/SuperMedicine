@@ -1,4 +1,3 @@
-import pytest
 from permission.policy import PermissionPolicy, PermissionResult
 
 class TestPermissionPolicy:
