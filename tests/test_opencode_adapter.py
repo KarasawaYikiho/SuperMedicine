@@ -182,3 +182,42 @@ class TestAgentsExist:
             assert agent_path.exists(), f"Missing agent file: {agent_file}"
             content = agent_path.read_text(encoding="utf-8")
             assert len(content) > 0, f"Empty agent file: {agent_file}"
+
+
+from agents.orchestrator import Orchestrator
+from agents.base_agent import BaseAgent
+
+
+class DummyEchoAgent(BaseAgent):
+    def __init__(self, agent_id, role="test"):
+        super().__init__(agent_id, role)
+
+    def execute(self, task):
+        return {"agent": self.agent_id, "echo": task, "status": "ok"}
+
+
+class TestOpenCodeRealDispatch:
+    """测试真实 dispatch（有 orchestrator）"""
+
+    def test_dispatch_with_orchestrator(self):
+        """有 orchestrator 时执行真实 dispatch"""
+        orch = Orchestrator()
+        orch.register_agent(DummyEchoAgent("alpha", "test"))
+        adapter = OpenCodeAdapter(orch)
+
+        result = adapter.subagent_dispatch("alpha", {"action": "test", "data": 42})
+        assert result["status"] == "ok"
+        assert result["echo"]["data"] == 42
+
+    def test_dispatch_unknown_agent(self):
+        """未知 agent 返回 error"""
+        orch = Orchestrator()
+        adapter = OpenCodeAdapter(orch)
+        result = adapter.subagent_dispatch("unknown", {"action": "test"})
+        assert result["status"] == "error"
+
+    def test_dispatch_without_orchestrator(self):
+        """无 orchestrator 时降级但不 crash"""
+        adapter = OpenCodeAdapter()
+        result = adapter.subagent_dispatch("alpha", {"action": "test"})
+        assert result["agent_id"] == "alpha"

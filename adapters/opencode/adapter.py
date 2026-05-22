@@ -18,6 +18,9 @@ class OpenCodeAdapter(BaseAdapter):
     - subagent_dispatch → 派发到 OpenCode 子代理 (Brain → Planner → Coder → Tester)
     """
 
+    def __init__(self, orchestrator=None):
+        self._orchestrator = orchestrator
+
     # Agent ID → OpenCode 角色映射
     AGENT_ROLE_MAP = {
         "alpha": "Brain/Planner",
@@ -183,9 +186,26 @@ class OpenCodeAdapter(BaseAdapter):
     def subagent_dispatch(self, agent_id: str, task: dict[str, Any]) -> dict[str, Any]:
         """派发任务到 OpenCode 子代理
 
-        根据 agent_id 查找对应的 Agent 定义文件，
-        生成包含任务描述和 Agent 上下文的派发结果。
+        有 orchestrator 时执行真实 dispatch，否则降级到文件查找模式。
         """
+        # 真实 dispatch（需要 orchestrator）
+        if self._orchestrator is not None:
+            try:
+                return self._orchestrator.dispatch(agent_id, task)
+            except KeyError:
+                return {
+                    "agent_id": agent_id,
+                    "status": "error",
+                    "message": f"Unknown agent: {agent_id}",
+                }
+            except Exception as e:
+                return {
+                    "agent_id": agent_id,
+                    "status": "error",
+                    "message": str(e),
+                }
+
+        # 降级路径（无 orchestrator）
         adapter_dir = Path(__file__).parent
         agent_path = adapter_dir / "agents" / f"{agent_id}.md"
         if not agent_path.exists():
