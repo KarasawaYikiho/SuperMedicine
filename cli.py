@@ -115,7 +115,7 @@ class CLI:
 
         agent_ids = ["alpha", "beta", "gamma", "delta"]
         for aid in agent_ids:
-            orchestrator.register_agent(aid, CLIAgent(aid))
+            orchestrator.register_agent(aid, CLIAgent(aid, role=f"{aid}_cli"))
 
         print(f"[OK] 已注册 {len(agent_ids)} 个 Agent: {', '.join(agent_ids)}")
 
