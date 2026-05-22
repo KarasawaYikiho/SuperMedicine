@@ -18,11 +18,22 @@ class PermissionRule:
 
 @dataclass
 class HardLimits:
-    max_file_size: str = "10MB"
-    max_execution_time: str = "300s"
-    max_memory: str = "512MB"
-    network_access: bool = False
-    external_api: bool = False
+    max_file_size: int = 0
+    max_execution_time: int = 0
+    max_memory: int = 0
+    network_access: bool = True
+    external_api: bool = True
+
+    def items(self):
+        """返回非零/非默认的限制项"""
+        return [
+            (k, v) for k, v in (
+                ("max_file_size", self.max_file_size),
+                ("max_execution_time", self.max_execution_time),
+                ("max_memory", self.max_memory),
+            ) if v > 0
+        ]
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> HardLimits:
         return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
