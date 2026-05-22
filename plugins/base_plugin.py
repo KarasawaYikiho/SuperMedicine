@@ -25,6 +25,12 @@ class BasePlugin:
     def meta(self) -> PluginMeta: return self._meta
     @property
     def name(self) -> str: return self._meta.name
-    def execute(self, action: str, params: dict[str, Any]) -> dict[str, Any]:
-        raise NotImplementedError(f"Plugin {self.name} does not implement execute()")
+    def execute(self, action: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        """执行插件动作（子类可重写）"""
+        return {
+            "status": "not_implemented",
+            "action": action,
+            "plugin": self.name,
+            "message": f"Plugin '{self.name}' has no custom execute() implementation. Override in subclass.",
+        }
     def health_check(self) -> bool: return True
