@@ -9,6 +9,8 @@ import pytest
 
 from adapters.opencode.adapter import OpenCodeAdapter
 from adapters.base_adapter import BaseAdapter
+from agents.orchestrator import Orchestrator
+from agents.base_agent import BaseAgent
 
 
 @pytest.fixture
@@ -182,10 +184,6 @@ class TestAgentsExist:
             assert agent_path.exists(), f"Missing agent file: {agent_file}"
             content = agent_path.read_text(encoding="utf-8")
             assert len(content) > 0, f"Empty agent file: {agent_file}"
-
-
-from agents.orchestrator import Orchestrator
-from agents.base_agent import BaseAgent
 
 
 class DummyEchoAgent(BaseAgent):
