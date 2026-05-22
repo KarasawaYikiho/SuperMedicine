@@ -7,3 +7,6 @@ build/
 *.egg
 .supermedicine/
 !.supermedicine/policies/default.yaml
+.coverage
+coverage.xml
+htmlcov/
