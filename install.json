@@ -8,7 +8,7 @@
   },
   "dependencies": {"python": ">=3.10", "r": ">=4.3 (optional)"},
   "plugins": {
-    "required": ["rag-interface", "harness-core", "standards-base"],
+    "required": ["rag-interface", "harness-core", "medical-writing", "medical-citation"],
     "optional": ["tools-python-stats", "tools-r-survival"]
   },
   "install_steps": [
