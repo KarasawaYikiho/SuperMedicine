@@ -42,21 +42,21 @@ class CLI:
         # 检查配置
         config_dir = Path.cwd() / ".supermedicine"
         if config_dir.exists():
-            print("✓ 项目配置已初始化")
+            print("[OK] 项目配置已初始化")
         else:
-            print("✗ 项目配置未初始化 (运行 'supermedicine init')")
+            print("[FAIL] 项目配置未初始化 (运行 'supermedicine init')")
 
         # 检查插件
         plugins_dir = Path(__file__).parent / "plugins"
         if plugins_dir.exists():
             plugin_count = len(list(plugins_dir.rglob("plugin.yaml")))
-            print(f"✓ 发现 {plugin_count} 个插件")
+            print(f"[OK] 发现 {plugin_count} 个插件")
 
         # 检查测试
         tests_dir = Path(__file__).parent / "tests"
         if tests_dir.exists():
             test_count = len(list(tests_dir.glob("test_*.py")))
-            print(f"✓ 发现 {test_count} 个测试模块")
+            print(f"[OK] 发现 {test_count} 个测试模块")
 
     def test(self) -> None:
         """运行测试"""
