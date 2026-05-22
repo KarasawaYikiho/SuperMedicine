@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 
-from plugins.harness.monitor import AgentMonitor
+from plugins.harness.monitor import AgentMonitor, AgentPerformanceMonitor
 
 
 class TestAgentMonitor:
@@ -74,9 +74,6 @@ class TestAgentMonitor:
         # alpha 有 150 条 > 100 阈值，应被检测到
         assert len(anomalies) > 0
         assert any(a["agent_id"] == "alpha" for a in anomalies)
-
-
-from plugins.harness.monitor import AgentPerformanceMonitor
 
 
 class TestAgentPerformanceMonitor:

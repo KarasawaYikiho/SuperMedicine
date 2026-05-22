@@ -1,8 +1,7 @@
 """LLM 客户端测试"""
 from __future__ import annotations
 
-import json
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from core.llm_client import create_llm_client
 from core.llm_providers.openrouter import OpenRouterClient
@@ -30,12 +29,6 @@ class TestOpenRouterClient:
 
     def test_chat_mock_response(self):
         """模拟 API 响应"""
-        mock_response = {
-            "choices": [{"message": {"content": "Hello, I am Claude."}}],
-            "model": "anthropic/claude-3.5-sonnet",
-            "usage": {"prompt_tokens": 5, "completion_tokens": 10},
-        }
-
         client = OpenRouterClient(api_key="test-key")
         with patch.object(client, '_request', return_value={
             "content": "Hello, I am Claude.",

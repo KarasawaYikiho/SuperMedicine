@@ -1,4 +1,4 @@
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from plugins.rag.local_provider import LocalRAGProvider
 from plugins.rag.pubmed_provider import PubmedRAGProvider
