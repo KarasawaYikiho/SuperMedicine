@@ -1,0 +1,88 @@
+# SuperMedicine 默认权限策略
+# 每个 Agent 按角色授予合理权限
+
+- agent_id: "alpha"
+  role: "analyst"
+  security_level: "standard"
+  permissions:
+    allowed:
+      - action: "read"
+        scope: "*"
+      - action: "skill_load"
+        scope: "*"
+      - action: "tool_call"
+        scope: "bash"
+      - action: "tool_call"
+        scope: "read"
+      - action: "tool_call"
+        scope: "glob"
+      - action: "tool_call"
+        scope: "grep"
+    denied:
+      - action: "write"
+        scope: "*"
+      - action: "publish"
+        scope: "*"
+    hard_limits:
+      max_files_per_session: 100
+      max_tool_calls_per_minute: 30
+
+- agent_id: "beta"
+  role: "reviewer"
+  security_level: "elevated"
+  permissions:
+    allowed:
+      - action: "read"
+        scope: "*"
+      - action: "tool_call"
+        scope: "*"
+      - action: "skill_load"
+        scope: "*"
+      - action: "write"
+        scope: "*.py"
+      - action: "write"
+        scope: "*.md"
+    denied:
+      - action: "write"
+        scope: "*.yaml"
+      - action: "write"
+        scope: "*.jsonl"
+      - action: "publish"
+        scope: "*"
+    hard_limits:
+      max_files_per_session: 200
+      max_tool_calls_per_minute: 60
+
+- agent_id: "gamma"
+  role: "writer"
+  security_level: "standard"
+  permissions:
+    allowed:
+      - action: "read"
+        scope: "*"
+      - action: "write"
+        scope: "*"
+      - action: "tool_call"
+        scope: "read"
+      - action: "tool_call"
+        scope: "write"
+      - action: "tool_call"
+        scope: "edit"
+    denied:
+      - action: "publish"
+        scope: "*"
+    hard_limits:
+      max_files_per_session: 150
+      max_tool_calls_per_minute: 40
+
+- agent_id: "delta"
+  role: "orchestrator"
+  security_level: "admin"
+  permissions:
+    allowed:
+      - action: "*"
+        scope: "*"
+    denied: []
+    hard_limits:
+      max_files_per_session: 500
+      max_tool_calls_per_minute: 100
