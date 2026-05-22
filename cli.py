@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+import tempfile
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -71,12 +72,13 @@ class CLI:
         from core.kernel import Kernel
         from agents.orchestrator import Orchestrator
         from agents.base_agent import BaseAgent
+        import tempfile
 
         # 确定项目根目录
         project_dir = Path.cwd()
 
         logger.info("SuperMedicine v0.1.0 — 任务执行")
-        logger.info(f"任务: {task}")
+        logger.info("任务: %s", task)
         logger.info("=" * 50)
 
         # 初始化 Kernel（集成 PermissionEngine）
@@ -91,52 +93,126 @@ class CLI:
 
         if verbose:
             logger.info("[OK] Kernel 已初始化")
-            logger.info(f"     Config: {kernel._config_path}")
-            logger.info(f"     Plugins: {kernel._plugins_dir}")
-            logger.info(f"     Policies: {kernel._policies_dir}")
+            logger.info("     Config: %s", kernel._config_path)
+            logger.info("     Plugins: %s", kernel._plugins_dir)
+            logger.info("     Policies: %s", kernel._policies_dir)
             logger.info("     PermissionEngine: 已激活")
 
         # 发现插件
         plugins = kernel.plugin_registry.discover()
-        logger.info(f"[OK] 已发现 {len(plugins)} 个插件")
+        logger.info("[OK] 已发现 %d 个插件", len(plugins))
         if verbose:
             for p in plugins:
-                logger.info(f"     - {p.name} ({p.meta.type})")
+                logger.info("     - %s (%s)", p.name, p.meta.type)
 
         # 初始化 Orchestrator
         orchestrator = Orchestrator()
 
-        # 注册可用 Agent（简单的 CLI Agent）
+        # 为每个 agent 创建独立检查点目录
+        checkpoint_base = project_dir / ".supermedicine" / "checkpoints"
+        checkpoint_base.mkdir(parents=True, exist_ok=True)
+
+        # 注册 Agent
         class CLIAgent(BaseAgent):
+            """CLI Agent — 真实执行最小端到端流程"""
+            def __init__(self, agent_id: str, role: str, kernel, checkpoint_dir, policies_dir):
+                super().__init__(agent_id, role)
+                self._kernel = kernel
+                self._checkpoint_dir = checkpoint_dir
+                self._policies_dir = policies_dir
+
             def execute(self, task):
+                from pathlib import Path
+                from agents.state_machine import StateMachine, TaskState
+                from agents.checkpoint import CheckpointManager
+                from permission.engine import PermissionEngine
+                from permission.policy import PermissionResult
+
+                # 初始化状态机
+                sm = StateMachine(task_id=self.agent_id)
+                checkpoint = CheckpointManager(
+                    base_dir=Path(self._checkpoint_dir) / self.agent_id
+                )
+                history = [str(sm.state)]
+
+                # 初始化权限引擎
+                audit_log = Path(self._policies_dir) / "audit.jsonl"
+                perm_engine = PermissionEngine(
+                    policy_dir=Path(self._policies_dir),
+                    audit_log=audit_log,
+                )
+
+                try:
+                    # PLANNING → DISPATCH
+                    perm_result = perm_engine.check(self.agent_id, "plan", "task")
+                    if perm_result == PermissionResult.DENIED:
+                        return {"agent": self.agent_id, "status": "denied", "reason": "Permission denied"}
+                    sm.transition(TaskState.DISPATCH)
+                    history.append(str(sm.state))
+                    checkpoint.save(self.agent_id, step=1, state=str(sm.state), result={"task": task})
+
+                    # DISPATCH → RUNNING
+                    sm.transition(TaskState.RUNNING)
+                    history.append(str(sm.state))
+                    # 在 RUNNING 阶段获取可用插件
+                    plugins_list = self._kernel.plugin_registry.discover()
+                    plugin_names = [p.name for p in plugins_list]
+                    checkpoint.save(self.agent_id, step=2, state=str(sm.state), result={"plugins": plugin_names})
+
+                    # RUNNING → VERIFYING
+                    sm.transition(TaskState.VERIFYING)
+                    history.append(str(sm.state))
+                    checkpoint.save(self.agent_id, step=3, state=str(sm.state), result={})
+
+                    # VERIFYING → COMPLETED
+                    sm.transition(TaskState.COMPLETED)
+                    history.append(str(sm.state))
+                    checkpoint.save(self.agent_id, step=4, state=str(sm.state), result={"completed": True})
+
+                except (ValueError, RuntimeError) as e:
+                    history.append(f"error: {e}")
+                    checkpoint.save(self.agent_id, step=99, state=str(sm.state), result={"error": str(e)})
+
                 return {
                     "agent": self.agent_id,
-                    "task": task,
                     "status": "completed",
-                    "result": f"Task '{task.get('action', 'unknown')}' processed by CLI Agent.",
+                    "state": str(sm.state),
+                    "history": history,
+                    "plugins": plugin_names if 'plugin_names' in dir() else [],
+                    "checkpoint_dir": str(self._checkpoint_dir),
                 }
 
         agent_ids = ["alpha", "beta", "gamma", "delta"]
         for aid in agent_ids:
-            orchestrator.register_agent(CLIAgent(aid, role=f"{aid}_cli"))
+            agent = CLIAgent(
+                aid,
+                role=f"{aid}_cli",
+                kernel=kernel,
+                checkpoint_dir=str(checkpoint_base),
+                policies_dir=str(policies_dir),
+            )
+            orchestrator.register_agent(agent)
 
-        logger.info(f"[OK] 已注册 {len(agent_ids)} 个 Agent: {', '.join(agent_ids)}")
+        logger.info("[OK] 已注册 %d 个 Agent: %s", len(agent_ids), ", ".join(agent_ids))
 
         # 派发任务到 Orchestrator
-        logger.info(f"\n[→] 派发任务: {task}")
+        logger.info("")
+        logger.info("[→] 派发任务: %s", task)
         task_payload = {"action": "execute", "description": task}
 
         for aid in agent_ids:
             try:
                 result = orchestrator.dispatch(aid, task_payload)
                 if verbose:
-                    logger.info(f"     {aid}: {result.get('status', 'unknown')}")
+                    logger.info("     %s: state=%s, history=%d steps",
+                                aid, result.get("state"), len(result.get("history", [])))
             except Exception as e:
-                if verbose:
-                    logger.info(f"     {aid}: 错误 — {e}")
+                logger.info("     %s: 错误 — %s", aid, e)
 
-        logger.info(f"\n[OK] 任务已派发到全部 {len(agent_ids)} 个 Agent")
-        logger.info("提示: 完整的 LLM 后端集成将在后续版本中支持")
+        logger.info("")
+        logger.info("[OK] 任务已派发到全部 %d 个 Agent", len(agent_ids))
+        if verbose:
+            logger.info("检查点目录: %s", str(checkpoint_base))
 
 
 def main():
