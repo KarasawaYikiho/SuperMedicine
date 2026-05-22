@@ -4,8 +4,7 @@
   "description": "Modular medical research Agent with RAG and Harness",
   "platforms": {
     "claude-code": {"type": "skill+subagent", "entry": "adapters/claude-code/SKILL.md"},
-    "opencode": {"type": "plugin", "entry": "adapters/opencode/plugin.json"},
-    "standalone": {"type": "cli", "entry": "adapters/standalone/cli.py", "requirements": "requirements.txt"}
+    "opencode": {"type": "plugin", "entry": "adapters/opencode/plugin.json"}
   },
   "dependencies": {"python": ">=3.10", "r": ">=4.3 (optional)"},
   "plugins": {
