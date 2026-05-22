@@ -1,5 +1,18 @@
-"""R 生存分析工具插件入口"""
+"""R 生存分析工具入口"""
 from __future__ import annotations
+
+import logging
+from typing import Any
+
+logger = logging.getLogger(__name__)
+
+# Optional R backend — rpy2 may not be installed
+try:
+    import rpy2  # noqa: F401
+    _HAS_RPY2 = True
+except ImportError:
+    _HAS_RPY2 = False
+    logger.debug("rpy2 not installed — using pure Python survival analysis fallback")
 
 from .kaplan_meier import kaplan_meier, KMResult
 from .logrank import logrank_test, LogRankResult
