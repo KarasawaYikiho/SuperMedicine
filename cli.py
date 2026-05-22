@@ -67,7 +67,6 @@ class CLI:
 
     def run(self, task: str, verbose: bool = False) -> None:
         """执行任务 — 初始化全组件栈并派发到 Orchestrator"""
-        from pathlib import Path
         from core.kernel import Kernel
         from agents.orchestrator import Orchestrator
         from agents.base_agent import BaseAgent
@@ -120,7 +119,6 @@ class CLI:
                 self._policies_dir = policies_dir
 
             def execute(self, task):
-                from pathlib import Path
                 from agents.state_machine import StateMachine, TaskState
                 from agents.checkpoint import CheckpointManager
                 from permission.engine import PermissionEngine

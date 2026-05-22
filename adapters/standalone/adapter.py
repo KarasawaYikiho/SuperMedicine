@@ -1,8 +1,6 @@
-"""Standalone 适配器 — 自包含实现"""
+"""Standalone 适配器 — 自包含实现，工具方法继承自 BaseAdapter"""
 from __future__ import annotations
 
-import re
-import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -36,73 +34,6 @@ class StandaloneAdapter(BaseAdapter):
             return {"status": "ok", "tool": tool_id, "result": result}
         except Exception as e:
             return {"status": "error", "tool": tool_id, "result": str(e)}
-
-    def _tool_bash(self, params: dict[str, Any]) -> str:
-        cmd = params.get("command", "")
-        timeout = params.get("timeout", 30)
-        try:
-            r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
-            return r.stdout or r.stderr
-        except subprocess.TimeoutExpired:
-            return f"Timeout after {timeout}s"
-
-    def _tool_read(self, params: dict[str, Any]) -> str:
-        fp = Path(params.get("filePath", ""))
-        if not fp.exists():
-            return f"Not found: {fp}"
-        try:
-            return fp.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
-            return fp.read_text(encoding="latin-1")
-
-    def _tool_write(self, params: dict[str, Any]) -> str:
-        fp = Path(params.get("filePath", ""))
-        content = params.get("content", "")
-        fp.parent.mkdir(parents=True, exist_ok=True)
-        fp.write_text(content, encoding="utf-8")
-        return f"Written {len(content)} bytes to {fp}"
-
-    def _tool_edit(self, params: dict[str, Any]) -> str:
-        fp = Path(params.get("filePath", ""))
-        old = params.get("oldString", "")
-        new = params.get("newString", "")
-        replace_all = params.get("replaceAll", False)
-        if not fp.exists():
-            return f"Not found: {fp}"
-        content = fp.read_text(encoding="utf-8")
-        if replace_all:
-            content = content.replace(old, new)
-        else:
-            count = content.count(old)
-            if count == 0:
-                return "oldString not found"
-            if count > 1:
-                return f"Found {count} matches, use replaceAll"
-            content = content.replace(old, new, 1)
-        fp.write_text(content, encoding="utf-8")
-        return f"Edited {fp}"
-
-    def _tool_glob(self, params: dict[str, Any]) -> str:
-        pattern = params.get("pattern", "**/*")
-        base = Path(params.get("path", "."))
-        matches = sorted(base.rglob(pattern))
-        return "\n".join(str(m) for m in matches[:200])
-
-    def _tool_grep(self, params: dict[str, Any]) -> str:
-        pattern = params.get("pattern", "")
-        base = Path(params.get("path", "."))
-        include = params.get("include", "*")
-        results = []
-        for fp in base.rglob(include):
-            if not fp.is_file():
-                continue
-            try:
-                for i, line in enumerate(fp.read_text(encoding="utf-8").splitlines(), 1):
-                    if re.search(pattern, line):
-                        results.append(f"{fp}:{i}: {line.strip()[:120]}")
-            except Exception:
-                continue
-        return "\n".join(results[:100])
 
     def _tool_skill(self, params: dict[str, Any]) -> str:
         return self.skill_load(params.get("name", ""))

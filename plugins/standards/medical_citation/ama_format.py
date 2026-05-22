@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .utils import format_authors
+from .utils import format_authors, format_journal_base, format_book_base
 
 
 @dataclass
@@ -33,23 +33,9 @@ class AMAFormatter:
     """AMA（American Medical Association）引用格式化器"""
 
     def format_journal(self, article: JournalArticle) -> str:
-        """格式化期刊文章"""
-        authors = format_authors(article.authors)
-        citation = f"{authors}. {article.title}. {article.journal}. {article.year};{article.volume}"
-        if article.issue:
-            citation += f"({article.issue})"
-        if article.pages:
-            citation += f":{article.pages}"
-        citation += "."
-        if article.doi:
-            citation += f" doi:{article.doi}"
-        return citation
+        """格式化期刊文章（含 DOI）"""
+        return format_journal_base(article, include_doi=True)
 
     def format_book(self, book: Book) -> str:
         """格式化书籍"""
-        authors = format_authors(book.authors)
-        citation = f"{authors}. {book.title}."
-        if book.edition:
-            citation += f" {book.edition} ed."
-        citation += f" {book.publisher}; {book.year}."
-        return citation
+        return format_book_base(book)
