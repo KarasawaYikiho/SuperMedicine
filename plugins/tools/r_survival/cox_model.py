@@ -76,14 +76,14 @@ def cox_ph(
                     w = exp_bx[j] / sum_exp_bx
                     for k in range(n_covs):
                         weighted_x[k] += w * covariates[k][i]
-                        for l in range(n_covs):
-                            weighted_xx[k][l] += w * covariates[k][i] * covariates[l][i]
+                        for m in range(n_covs):
+                            weighted_xx[k][m] += w * covariates[k][i] * covariates[m][i]
 
                 # 更新梯度和 Hessian
                 for k in range(n_covs):
                     gradient[k] += covariates[k][idx] - weighted_x[k]
-                    for l in range(n_covs):
-                        hessian[k][l] += weighted_xx[k][l] - weighted_x[k] * weighted_x[l]
+                    for m in range(n_covs):
+                        hessian[k][m] += weighted_xx[k][m] - weighted_x[k] * weighted_x[m]
 
         # Newton-Raphson 更新
         # 简化：使用梯度下降

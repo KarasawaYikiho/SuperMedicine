@@ -7,8 +7,10 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 def detect_platform() -> str:
-    if Path.home().joinpath(".claude").exists(): return "claude-code"
-    if Path.home().joinpath(".config", "opencode").exists(): return "opencode"
+    if Path.home().joinpath(".claude").exists():
+        return "claude-code"
+    if Path.home().joinpath(".config", "opencode").exists():
+        return "opencode"
     return "standalone"
 
 def init_config(project_dir: Path) -> None:
@@ -27,8 +29,13 @@ def main():
     parser.add_argument("--detect", action="store_true", help="Detect platform")
     parser.add_argument("--init", action="store_true", help="Initialize config")
     args = parser.parse_args()
-    if args.detect: logger.info(f"Detected platform: {detect_platform()}"); return
-    if args.init: init_config(Path.cwd()); return
+    if args.detect:
+        logger.info(f"Detected platform: {detect_platform()}")
+        return
+    if args.init:
+        init_config(Path.cwd())
+        return
     parser.print_help()
 
-if __name__ == "__main__": main()
+if __name__ == "__main__":
+    main()

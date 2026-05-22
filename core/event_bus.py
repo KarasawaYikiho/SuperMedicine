@@ -17,7 +17,8 @@ class EventBus:
     def subscribe(self, topic: str, handler: Callable[[dict[str, Any]], None]) -> str:
         token = str(uuid4())
         sub = Subscription(token=token, topic=topic, handler=handler)
-        if topic not in self._subscriptions: self._subscriptions[topic] = []
+        if topic not in self._subscriptions:
+            self._subscriptions[topic] = []
         self._subscriptions[topic].append(sub)
         self._token_map[token] = sub
         return token

@@ -17,14 +17,19 @@ class CheckpointManager:
         return step_dir
     def load(self, task_id: str, step: int) -> dict[str, Any] | None:
         status_file = self._base_dir / task_id / f"step-{step}" / "status.json"
-        if not status_file.exists(): return None
-        with open(status_file, encoding="utf-8") as f: return json.load(f)
+        if not status_file.exists():
+            return None
+        with open(status_file, encoding="utf-8") as f:
+            return json.load(f)
     def get_latest_step(self, task_id: str) -> int | None:
         task_dir = self._base_dir / task_id
-        if not task_dir.exists(): return None
+        if not task_dir.exists():
+            return None
         steps = []
         for d in task_dir.iterdir():
             if d.is_dir() and d.name.startswith("step-"):
-                try: steps.append(int(d.name.split("-")[1]))
-                except ValueError: continue
+                try:
+                    steps.append(int(d.name.split("-")[1]))
+                except ValueError:
+                    continue
         return max(steps) if steps else None

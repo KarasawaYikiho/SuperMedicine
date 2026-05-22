@@ -12,9 +12,11 @@ class PermissionEngine:
         self._policies: dict[str, PermissionPolicy] = {}
         self._load_policies()
     def _load_policies(self) -> None:
-        if not self._policy_dir.exists(): return
+        if not self._policy_dir.exists():
+            return
         for f in self._policy_dir.glob("*.yaml"):
-            with open(f, encoding="utf-8") as fh: data = yaml.safe_load(fh)
+            with open(f, encoding="utf-8") as fh:
+                data = yaml.safe_load(fh)
             if data and "agent_id" in data:
                 policy = PermissionPolicy.from_dict(data)
                 self._policies[policy.agent_id] = policy

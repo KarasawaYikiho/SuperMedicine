@@ -9,12 +9,14 @@ class AgentMonitor:
         self._audit_log = Path(audit_log_path)
         self.anomaly_threshold = anomaly_threshold
     def get_permission_audit(self, agent_id: str | None = None) -> list[dict[str, Any]]:
-        if not self._audit_log.exists(): return []
+        if not self._audit_log.exists():
+            return []
         entries = []
         with open(self._audit_log, encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
-                if not line: continue
+                if not line:
+                    continue
                 entry = json.loads(line)
                 if agent_id is None or entry.get("agent_id") == agent_id:
                     entries.append(entry)

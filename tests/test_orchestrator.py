@@ -12,12 +12,16 @@ class DummyAgent(BaseAgent):
 
 class TestOrchestrator:
     def test_register_and_list(self):
-        orch = Orchestrator(); orch.register_agent(DummyAgent("a", "r"))
+        orch = Orchestrator()
+        orch.register_agent(DummyAgent("a", "r"))
         assert len(orch.list_agents()) == 1
     def test_dispatch(self):
-        orch = Orchestrator(); agent = DummyAgent("a", "r"); orch.register_agent(agent)
+        orch = Orchestrator()
+        agent = DummyAgent("a", "r")
+        orch.register_agent(agent)
         result = orch.dispatch("a", {"action": "test"})
         assert result["status"] == "ok" and len(agent.executed) == 1
     def test_dispatch_unknown_raises(self):
         orch = Orchestrator()
-        with pytest.raises(KeyError): orch.dispatch("unknown", {})
+        with pytest.raises(KeyError):
+            orch.dispatch("unknown", {})
