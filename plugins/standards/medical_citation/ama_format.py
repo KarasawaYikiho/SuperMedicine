@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .utils import format_authors
+
 
 @dataclass
 class JournalArticle:
@@ -32,7 +34,7 @@ class AMAFormatter:
 
     def format_journal(self, article: JournalArticle) -> str:
         """格式化期刊文章"""
-        authors = self._format_authors_ama(article.authors)
+        authors = format_authors(article.authors)
         citation = f"{authors}. {article.title}. {article.journal}. {article.year};{article.volume}"
         if article.issue:
             citation += f"({article.issue})"
@@ -45,26 +47,9 @@ class AMAFormatter:
 
     def format_book(self, book: Book) -> str:
         """格式化书籍"""
-        authors = self._format_authors_ama(book.authors)
+        authors = format_authors(book.authors)
         citation = f"{authors}. {book.title}."
         if book.edition:
             citation += f" {book.edition} ed."
         citation += f" {book.publisher}; {book.year}."
         return citation
-
-    def _format_authors_ama(self, authors: list[str]) -> str:
-        """AMA 作者格式：姓 名首字母"""
-        formatted = []
-        for author in authors:
-            parts = author.split()
-            if len(parts) >= 2:
-                last = parts[-1]
-                initials = "".join(p[0].upper() for p in parts[:-1])
-                formatted.append(f"{last} {initials}")
-            else:
-                formatted.append(author)
-
-        if len(formatted) <= 6:
-            return ", ".join(formatted)
-        else:
-            return ", ".join(formatted[:6]) + ", et al"
