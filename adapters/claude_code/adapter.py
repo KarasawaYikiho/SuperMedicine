@@ -14,7 +14,7 @@ class ClaudeCodeAdapter(BaseAdapter):
         return {
             "status": "coming_soon",
             "tool": tool_id,
-            "message": "Claude Code adapter is not yet implemented. Coming in a future release.",
+            "message": "Claude Code Adapter is not Yet Implemented. Coming in a Future Release.",
         }
 
     def skill_load(self, skill_name: str) -> str:
@@ -24,5 +24,5 @@ class ClaudeCodeAdapter(BaseAdapter):
         return {
             "agent_id": agent_id,
             "status": "coming_soon",
-            "message": "Claude Code subagent dispatch is not yet implemented. Coming in a future release.",
+            "message": "Claude Code Subagent Dispatch is not Yet Implemented. Coming in a Future Release.",
         }

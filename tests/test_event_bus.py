@@ -23,7 +23,7 @@ class TestEventBus:
         assert len(received) == 0
 
     def test_handler_exception_isolation(self):
-        """验证一个 handler 异常不影响其他 handler"""
+        """验证一个 Handler 异常不影响其他 Handler"""
         bus = EventBus()
         received = []
 
@@ -31,7 +31,7 @@ class TestEventBus:
             received.append("good")
 
         def bad_handler(event):
-            raise RuntimeError("handler error")
+            raise RuntimeError("Handler Error")
 
         bus.subscribe("test", good_handler)
         bus.subscribe("test", bad_handler)

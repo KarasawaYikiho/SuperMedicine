@@ -60,7 +60,7 @@ class OpenCodeAdapter(BaseAdapter):
             return {"status": "error", "tool": tool_id, "result": str(e)}
 
     def _tool_bash(self, params: dict[str, Any]) -> str:
-        """执行 shell 命令"""
+        """执行 Shell 命令"""
         command = params.get("command", "")
         workdir = params.get("workdir", ".")
         timeout = params.get("timeout", 30)
@@ -128,7 +128,7 @@ class OpenCodeAdapter(BaseAdapter):
         pattern = params.get("pattern", "**/*")
         base_path = Path(params.get("path", "."))
         matches = sorted(base_path.rglob(pattern))
-        return "\n".join(str(m) for m in matches[:200])  # limit to 200
+        return "\n".join(str(m) for m in matches[:200])  # Limit to 200
 
     def _tool_grep(self, params: dict[str, Any]) -> str:
         """内容搜索（正则）"""
@@ -146,7 +146,7 @@ class OpenCodeAdapter(BaseAdapter):
                         results.append(f"{file_path}:{i}: {line.strip()[:120]}")
             except (UnicodeDecodeError, OSError):
                 continue
-        return "\n".join(results[:100])  # limit to 100 matches
+        return "\n".join(results[:100])  # Limit to 100 Matches
 
     def _tool_skill(self, params: dict[str, Any]) -> str:
         """加载技能（委托给 skill_load）"""
@@ -188,7 +188,7 @@ class OpenCodeAdapter(BaseAdapter):
 
         有 orchestrator 时执行真实 dispatch，否则降级到文件查找模式。
         """
-        # 真实 dispatch（需要 orchestrator）
+        # 真实 Dispatch（需要 Orchestrator）
         if self._orchestrator is not None:
             try:
                 return self._orchestrator.dispatch(agent_id, task)
@@ -205,7 +205,7 @@ class OpenCodeAdapter(BaseAdapter):
                     "message": str(e),
                 }
 
-        # 降级路径（无 orchestrator）
+        # 降级路径（无 Orchestrator）
         adapter_dir = Path(__file__).parent
         agent_path = adapter_dir / "agents" / f"{agent_id}.md"
         if not agent_path.exists():
@@ -233,6 +233,6 @@ class OpenCodeAdapter(BaseAdapter):
             "task": task,
             "plan": {
                 "workflow": "Brain → Planner → Coder → Tester",
-                "agent_context": agent_context[:500],  # truncate for response
+                "agent_context": agent_context[:500],  # Truncate for Response
             },
         }

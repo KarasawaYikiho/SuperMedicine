@@ -7,7 +7,7 @@ from typing import Any
 
 
 class CheckpointVerifier:
-    """检查点验证器 — 复用 agents/checkpoint.py 的 CheckpointManager"""
+    """检查点验证器 — 复用 Agents/Checkpoint.Py 的 CheckpointManager"""
 
     def __init__(self, checkpoint_dir: Path):
         self._checkpoint_dir = Path(checkpoint_dir)

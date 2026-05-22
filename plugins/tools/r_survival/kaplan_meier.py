@@ -38,7 +38,7 @@ def kaplan_meier(times: list[float], events: list[int]) -> KMResult:
         KMResult 包含生存曲线数据点和中位生存时间
     """
     if len(times) != len(events):
-        raise ValueError("times 和 events 长度必须相同")
+        raise ValueError("Times 和 Events 长度必须相同")
     if len(times) == 0:
         raise ValueError("数据不能为空")
 
@@ -85,7 +85,7 @@ def kaplan_meier(times: list[float], events: list[int]) -> KMResult:
             if at_risk - d > 0:
                 greenwood_var += d / (at_risk * (at_risk - d))
 
-        # 置信区间（log-log 变换）
+        # 置信区间（Log-Log 变换）
         se = math.sqrt(greenwood_var) * survival_prob if greenwood_var > 0 else 0
         ci_lower = max(0, survival_prob - 1.96 * se)
         ci_upper = min(1, survival_prob + 1.96 * se)

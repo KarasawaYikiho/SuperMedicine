@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from .checklist_base import ChecklistBase, ChecklistItemBase
 
-# Backward compatibility alias
+# Backward Compatibility Alias
 STARDItem = ChecklistItemBase
 
 

@@ -28,7 +28,7 @@ class TestPermissionEngineWithPolicies:
     """测试 PermissionEngine 加载策略文件"""
 
     def test_load_default_policy(self, tmp_path):
-        """验证加载 default.yaml 策略文件"""
+        """验证加载 Default.YAML 策略文件"""
         policy_dir = tmp_path / "policies"
         policy_dir.mkdir()
         audit_log = tmp_path / "audit.jsonl"
@@ -48,13 +48,13 @@ class TestPermissionEngineWithPolicies:
         (policy_dir / "test.yaml").write_text(yaml.dump(policy), encoding="utf-8")
 
         engine = PermissionEngine(policy_dir=policy_dir, audit_log=audit_log)
-        # 已知 agent 应通过
+        # 已知 Agent 应通过
         result = engine.check("test_agent", "read", "file.txt")
         assert result == PermissionResult.ALLOWED
         # 被拒绝的操作
         result = engine.check("test_agent", "write", "file.txt")
         assert result == PermissionResult.DENIED
-        # 未知 agent 应拒绝
+        # 未知 Agent 应拒绝
         result = engine.check("unknown", "read", "file.txt")
         assert result == PermissionResult.DENIED
 
@@ -96,7 +96,7 @@ class TestPermissionEngineWithPolicies:
         assert result == PermissionResult.DENIED
 
     def test_hard_limits_no_context(self, tmp_path):
-        """无 context 时 hard_limits 不影响"""
+        """无 Context 时 Hard_Limits 不影响"""
         import yaml
         policy_dir = tmp_path / "policies"
         policy_dir.mkdir()

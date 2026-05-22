@@ -23,7 +23,7 @@ class TestClaudeCodeAdapter:
         adapter = ClaudeCodeAdapter()
         result = adapter.tool_call("bash", {"command": "test"})
         assert result["status"] == "coming_soon"
-        assert "not yet implemented" in result["message"]
+        assert "not yet implemented" in result["message"].lower()
 
     def test_skill_load_returns_coming_soon(self):
         """验证 skill_load 返回 Coming Soon 标识"""

@@ -121,7 +121,7 @@ class StandaloneAdapter(BaseAdapter):
         return f"Skill not found: {skill_name}"
 
     def subagent_dispatch(self, agent_id: str, task: dict[str, Any]) -> dict[str, Any]:
-        """进程内模拟 dispatch"""
+        """进程内模拟 Dispatch"""
         return {
             "agent_id": agent_id,
             "status": "dispatched",

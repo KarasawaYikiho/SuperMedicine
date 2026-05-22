@@ -20,7 +20,7 @@ class PermissionEngine:
                 data = yaml.safe_load(fh)
             if data is None:
                 continue
-            # Support both single dict and list of policies
+            # Support both Single Dict and List of Policies
             policies = data if isinstance(data, list) else [data]
             for item in policies:
                 if item and "agent_id" in item:
@@ -53,7 +53,7 @@ class PermissionEngine:
                                    result="DENIED", reason=reason)
                     return PermissionResult.DENIED
 
-        # 检查 allowed/denied 规则
+        # 检查 Allowed/Denied 规则
         result = policy.check(action, resource)
         reason = "whitelist_match" if result == PermissionResult.ALLOWED else "blacklist_match_or_default_deny"
         self._audit.log(agent_id=agent_id, action=action, resource=resource,

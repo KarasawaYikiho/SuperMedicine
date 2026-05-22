@@ -64,7 +64,7 @@ def cox_ph(
                     if times[i] >= times[idx]
                 ]
 
-                # 计算 exp(beta * x)
+                # 计算 Exp(Beta * X)
                 exp_bx = [_exp_dot(beta, covariates, i) for i in risk_set]
                 sum_exp_bx = sum(exp_bx)
 
@@ -140,7 +140,7 @@ def cox_ph(
 
 
 def _exp_dot(beta: list[float], covariates: list[list[float]], idx: int) -> float:
-    """计算 exp(beta . x)"""
+    """计算 Exp(Beta . X)"""
     dot = sum(b * covariates[k][idx] for k, b in enumerate(beta))
     return math.exp(dot)
 

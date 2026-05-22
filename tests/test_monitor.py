@@ -60,9 +60,9 @@ class TestAgentMonitor:
         assert all(d["result"] == "DENIED" for d in denied)
 
     def test_detect_anomalies_high_frequency(self, tmp_path):
-        """检测高频异常 — 超过 100 条同 agent 日志"""
+        """检测高频异常 — 超过 100 条同 Agent 日志"""
         audit_path = tmp_path / "audit.jsonl"
-        # 创建 150 条来自 alpha 的日志
+        # 创建 150 条来自 Alpha 的日志
         entries = [
             {"agent_id": "alpha", "action": "read", "result": "ALLOWED", "timestamp": f"2024-01-01T00:{i:02d}:00Z"}
             for i in range(150)
@@ -71,7 +71,7 @@ class TestAgentMonitor:
 
         monitor = AgentMonitor(audit_log_path=audit_path)
         anomalies = monitor.detect_anomalies()
-        # alpha 有 150 条 > 100 阈值，应被检测到
+        # Alpha 有 150 条 > 100 阈值，应被检测到
         assert len(anomalies) > 0
         assert any(a["agent_id"] == "alpha" for a in anomalies)
 

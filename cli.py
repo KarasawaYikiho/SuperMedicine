@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/Usr/Bin/Env Python3
 """SuperMedicine CLI 入口"""
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ class CLI:
         if config_dir.exists():
             logger.info("[OK] 项目配置已初始化")
         else:
-            logger.info("[FAIL] 项目配置未初始化 (运行 'supermedicine init')")
+            logger.info("[FAIL] 项目配置未初始化 (运行 'Supermedicine Init')")
 
         # 检查插件
         plugins_dir = Path(__file__).parent / "plugins"
@@ -106,7 +106,7 @@ class CLI:
         # 初始化 Orchestrator
         orchestrator = Orchestrator()
 
-        # 为每个 agent 创建独立检查点目录
+        # 为每个 Agent 创建独立检查点目录
         checkpoint_base = project_dir / ".supermedicine" / "checkpoints"
         checkpoint_base.mkdir(parents=True, exist_ok=True)
 
@@ -173,7 +173,7 @@ class CLI:
                     plugins = self._kernel.plugin_registry.discover()
                     plugin_names = [p.name for p in plugins]
 
-                    # LLM 集成（使用约束 prompt）
+                    # LLM 集成（使用约束 Prompt）
                     llm_response = None
                     try:
                         from core.llm_client import create_llm_client
@@ -258,17 +258,17 @@ def main():
     )
     subparsers = parser.add_subparsers(dest="command")
 
-    # init 命令
+    # Init 命令
     init_parser = subparsers.add_parser("init", help="初始化项目")
     init_parser.add_argument("--dir", type=str, default=".", help="项目目录")
 
-    # status 命令
+    # Status 命令
     subparsers.add_parser("status", help="显示项目状态")
 
-    # test 命令
+    # Test 命令
     subparsers.add_parser("test", help="运行测试")
 
-    # run 命令
+    # Run 命令
     run_parser = subparsers.add_parser("run", help="执行任务")
     run_parser.add_argument("task", type=str, help="任务描述")
     run_parser.add_argument("--verbose", action="store_true", help="详细输出")

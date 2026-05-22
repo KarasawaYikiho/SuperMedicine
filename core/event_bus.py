@@ -33,4 +33,4 @@ class EventBus:
             except Exception as e:
                 import logging
                 logger = logging.getLogger(__name__)
-                logger.warning("EventBus handler error for topic '%s': %s", topic, e)
+                logger.warning("EventBus Handler Error for Topic '%s': %s", topic, e)

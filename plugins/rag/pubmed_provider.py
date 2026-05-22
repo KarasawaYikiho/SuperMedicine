@@ -36,12 +36,12 @@ class PubmedRAGProvider(RAGProvider):
             {"results": [...], "relevance_scores": [...], "source_metadata": [...]}
         """
         try:
-            # Step 1: esearch — 获取匹配的 PubMed IDs
+            # Step 1: Esearch — 获取匹配的 PubMed IDs
             ids = self._search(query_text, top_k)
             if not ids:
                 return {"results": [], "relevance_scores": [], "source_metadata": []}
 
-            # Step 2: efetch — 获取摘要和元数据
+            # Step 2: Efetch — 获取摘要和元数据
             articles = self._fetch(ids)
 
             results = []
@@ -69,7 +69,7 @@ class PubmedRAGProvider(RAGProvider):
             return {"results": [], "relevance_scores": [], "source_metadata": []}
 
     def _search(self, query: str, max_results: int) -> list[str]:
-        """esearch: 检索 PubMed IDs"""
+        """Esearch: 检索 PubMed IDs"""
         params = {
             "db": "pubmed",
             "term": query,
@@ -84,7 +84,7 @@ class PubmedRAGProvider(RAGProvider):
         return data.get("esearchresult", {}).get("idlist", [])
 
     def _fetch(self, ids: list[str]) -> list[dict[str, Any]]:
-        """efetch: 获取文献摘要和元数据"""
+        """Efetch: 获取文献摘要和元数据"""
         params = {
             "db": "pubmed",
             "id": ",".join(ids),

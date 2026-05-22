@@ -40,7 +40,7 @@ class TestOpenRouterClient:
             assert result["model"] == "anthropic/claude-3.5-sonnet"
 
     def test_complete_mock_response(self):
-        """模拟 complete 调用"""
+        """模拟 Complete 调用"""
         client = OpenRouterClient(api_key="test-key")
         with patch.object(client, '_request', return_value={
             "content": "Response text",
@@ -61,7 +61,7 @@ class TestLLMFactory:
         assert client.model == "test-model"
 
     def test_create_unsupported(self):
-        """不支持的 provider 抛出 ValueError"""
+        """不支持的 Provider 抛出 ValueError"""
         try:
             create_llm_client("unsupported")
             assert False, "Should have raised ValueError"

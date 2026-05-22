@@ -1,4 +1,4 @@
-"""共享 pytest fixtures"""
+"""共享 Pytest Fixtures"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -9,7 +9,7 @@ import yaml
 
 @pytest.fixture
 def sample_config_yaml(tmp_path) -> Path:
-    """创建含基本配置的 config.yaml，返回文件路径"""
+    """创建含基本配置的 Config.YAML，返回文件路径"""
     config_path = tmp_path / "config.yaml"
     config_path.write_text(yaml.dump({"project": "test", "debug": True}), encoding="utf-8")
     return config_path
@@ -17,7 +17,7 @@ def sample_config_yaml(tmp_path) -> Path:
 
 @pytest.fixture
 def sample_policy_dir(tmp_path) -> Path:
-    """创建含默认策略文件的 policies 目录，返回目录路径"""
+    """创建含默认策略文件的 Policies 目录，返回目录路径"""
     policy_dir = tmp_path / "policies"
     policy_dir.mkdir()
     policy_data = {
@@ -44,7 +44,7 @@ def sample_policy_dir(tmp_path) -> Path:
 
 @pytest.fixture
 def sample_plugin_dir(tmp_path) -> Path:
-    """创建含 plugin.yaml 的插件目录，返回目录路径"""
+    """创建含 Plugin.YAML 的插件目录，返回目录路径"""
     plugin_dir = tmp_path / "plugins" / "test-plugin"
     plugin_dir.mkdir(parents=True)
     plugin_yaml = {
@@ -59,7 +59,7 @@ def sample_plugin_dir(tmp_path) -> Path:
 
 @pytest.fixture
 def empty_audit_log(tmp_path) -> Path:
-    """返回空 audit log 文件路径"""
+    """返回空 Audit Log 文件路径"""
     log_path = tmp_path / "audit.jsonl"
     log_path.write_text("", encoding="utf-8")
     return log_path

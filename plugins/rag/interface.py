@@ -7,7 +7,7 @@ class RAGProvider:
     """RAG Provider 接口"""
 
     def query(self, query_text: str, top_k: int = 5) -> dict[str, Any]:
-        """检索相关文献，返回 {"results": [...], "relevance_scores": [...], "source_metadata": [...]}"""
+        """检索相关文献，返回 {"Results": [...], "Relevance_Scores": [...], "Source_Metadata": [...]}"""
         raise NotImplementedError
 
     def store_context(self, key: str, data: Any) -> None:

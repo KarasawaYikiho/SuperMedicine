@@ -6,7 +6,7 @@ class TestSession:
     """测试 Session 类"""
 
     def test_session_set_get(self):
-        """验证 Session.set() / Session.get() 读写正确"""
+        """验证 Session.Set() / Session.Get() 读写正确"""
         session = Session("test-session-id")
         session.set("key1", "value1")
         session.set("key2", 42)
@@ -24,7 +24,7 @@ class TestSessionManager:
     """测试 SessionManager 类"""
 
     def test_create(self):
-        """验证 create() 返回 Session 对象且有唯一 session_id"""
+        """验证 Create() 返回 Session 对象且有唯一 Session_ID"""
         manager = SessionManager()
         session = manager.create()
         assert session is not None
@@ -33,7 +33,7 @@ class TestSessionManager:
         assert len(session.session_id) > 0
 
     def test_get_existing(self):
-        """验证 get() 返回已创建的 session"""
+        """验证 Get() 返回已创建的 Session"""
         manager = SessionManager()
         session = manager.create()
         found = manager.get(session.session_id)
@@ -42,12 +42,12 @@ class TestSessionManager:
         assert found.session_id == session.session_id
 
     def test_get_nonexistent(self):
-        """验证 get() 对不存在的 session_id 返回 None"""
+        """验证 Get() 对不存在的 Session_ID 返回 None"""
         manager = SessionManager()
         assert manager.get("nonexistent-id") is None
 
     def test_multiple_sessions_isolation(self):
-        """验证创建多个 session 互相隔离"""
+        """验证创建多个 Session 互相隔离"""
         manager = SessionManager()
         s1 = manager.create()
         s2 = manager.create()
@@ -70,11 +70,11 @@ class TestSessionTTL:
 
         manager = SessionManager(ttl_seconds=60)
 
-        # 创建 session 并伪造创建时间为 2 分钟前
+        # 创建 Session 并伪造创建时间为 2 分钟前
         s = manager.create()
         s.created_at = datetime.now(timezone.utc) - timedelta(seconds=120)
 
-        # 创建另一个 session，时间为现在
+        # 创建另一个 Session，时间为现在
         s2 = manager.create()
 
         cleaned = manager.cleanup_expired()

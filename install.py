@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/Usr/Bin/Env Python3
 """SuperMedicine 安装脚本"""
 import argparse
 import logging
@@ -25,9 +25,9 @@ def init_config(project_dir: Path) -> None:
 
 def main():
     logging.basicConfig(level=logging.INFO, format='%(message)s')
-    parser = argparse.ArgumentParser(description="SuperMedicine installer")
-    parser.add_argument("--detect", action="store_true", help="Detect platform")
-    parser.add_argument("--init", action="store_true", help="Initialize config")
+    parser = argparse.ArgumentParser(description="SuperMedicine Installer")
+    parser.add_argument("--detect", action="store_true", help="Detect Platform")
+    parser.add_argument("--init", action="store_true", help="Initialize Config")
     args = parser.parse_args()
     if args.detect:
         logger.info(f"Detected platform: {detect_platform()}")

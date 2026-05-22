@@ -28,7 +28,7 @@ class ConfigCenter:
         return self._config.get(key, default)
 
     def set(self, key: str, value: Any) -> None:
-        """设置配置值（仅修改内存，不自动持久化，需调用 save() 写入文件）"""
+        """设置配置值（仅修改内存，不自动持久化，需调用 Save() 写入文件）"""
         self._config[key] = value
 
     def save(self) -> None:

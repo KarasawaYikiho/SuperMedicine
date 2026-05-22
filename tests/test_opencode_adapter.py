@@ -36,14 +36,14 @@ class TestToolCall:
     """测试 tool_call 方法"""
 
     def test_tool_call_bash(self, adapter):
-        """验证 tool_call 能处理 bash 工具调用"""
+        """验证 Tool_Call 能处理 Bash 工具调用"""
         result = adapter.tool_call("bash", {"command": "echo hello"})
         assert result["status"] == "ok"
         assert result["tool"] == "bash"
         assert "hello" in result["result"]
 
     def test_tool_call_read_write(self, adapter):
-        """验证 read/write 工具调用在临时目录中正确工作"""
+        """验证 Read/Write 工具调用在临时目录中正确工作"""
         with tempfile.TemporaryDirectory() as tmpdir:
             file_path = Path(tmpdir) / "test.txt"
             # Write
@@ -68,17 +68,17 @@ class TestToolCall:
         assert "Unsupported" in result["result"]
 
     def test_tool_call_glob(self, adapter):
-        """验证 glob 工具调用"""
+        """验证 Glob 工具调用"""
         result = adapter.tool_call("glob", {
             "pattern": "*.py",
             "path": str(Path(__file__).parent.parent / "cli.py").rsplit("\\", 1)[0] if "\\" in str(Path(__file__).parent.parent) else str(Path(__file__).parent.parent),
         })
         assert result["status"] == "ok"
-        # Should find at least cli.py
+        # Should Find at Least CLI.Py
         assert len(result["result"]) > 0
 
     def test_tool_call_grep(self, adapter):
-        """验证 grep 工具调用"""
+        """验证 Grep 工具调用"""
         adapter_dir = Path(__file__).parent.parent
         result = adapter.tool_call("grep", {
             "pattern": "class OpenCodeAdapter",
@@ -97,7 +97,7 @@ class TestSkillLoad:
         content = adapter.skill_load("rag-query")
         assert content is not None
         assert len(content) > 0
-        # Should contain markdown content
+        # Should Contain Markdown Content
         assert "rag" in content.lower() or "RAG" in content or "rag-query" in content.lower()
 
     def test_skill_load_invalid(self, adapter):
@@ -119,10 +119,10 @@ class TestSubagentDispatch:
 
 
 class TestPluginJson:
-    """测试 plugin.json 完整性"""
+    """测试 Plugin.JSON 完整性"""
 
     def test_plugin_json_valid(self):
-        """验证 plugin.json 可被 json 解析且包含所有必填字段"""
+        """验证 Plugin.JSON 可被 JSON 解析且包含所有必填字段"""
         plugin_path = Path(__file__).parent.parent / "adapters" / "opencode" / "plugin.json"
         assert plugin_path.exists(), "plugin.json not found"
 
@@ -133,24 +133,24 @@ class TestPluginJson:
         for field in required_fields:
             assert field in data, f"Missing required field: {field}"
 
-        # Check permissions
+        # Check Permissions
         assert "tools" in data["permissions"]
         assert len(data["permissions"]["tools"]) >= 8
 
-        # Check skills
+        # Check Skills
         assert "skills" in data
         assert len(data["skills"]) == 6
 
-        # Check agents
+        # Check Agents
         assert "agents" in data
         assert len(data["agents"]) == 4
 
 
 class TestSkillsExist:
-    """测试所有 SKILL.md 文件存在"""
+    """测试所有 SKILL.Md 文件存在"""
 
     def test_all_skills_exist(self):
-        """验证 6 个 SKILL.md 文件存在"""
+        """验证 6 个 SKILL.Md 文件存在"""
         skills_dir = Path(__file__).parent.parent / "adapters" / "opencode" / "skills"
         expected_skills = [
             "rag-query.md",
@@ -195,10 +195,10 @@ class DummyEchoAgent(BaseAgent):
 
 
 class TestOpenCodeRealDispatch:
-    """测试真实 dispatch（有 orchestrator）"""
+    """测试真实 Dispatch（有 Orchestrator）"""
 
     def test_dispatch_with_orchestrator(self):
-        """有 orchestrator 时执行真实 dispatch"""
+        """有 Orchestrator 时执行真实 Dispatch"""
         orch = Orchestrator()
         orch.register_agent(DummyEchoAgent("alpha", "test"))
         adapter = OpenCodeAdapter(orch)
@@ -208,14 +208,14 @@ class TestOpenCodeRealDispatch:
         assert result["echo"]["data"] == 42
 
     def test_dispatch_unknown_agent(self):
-        """未知 agent 返回 error"""
+        """未知 Agent 返回 Error"""
         orch = Orchestrator()
         adapter = OpenCodeAdapter(orch)
         result = adapter.subagent_dispatch("unknown", {"action": "test"})
         assert result["status"] == "error"
 
     def test_dispatch_without_orchestrator(self):
-        """无 orchestrator 时降级但不 crash"""
+        """无 Orchestrator 时降级但不 Crash"""
         adapter = OpenCodeAdapter()
         result = adapter.subagent_dispatch("alpha", {"action": "test"})
         assert result["agent_id"] == "alpha"

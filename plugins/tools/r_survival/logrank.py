@@ -1,4 +1,4 @@
-"""Log-rank 检验"""
+"""Log-Rank 检验"""
 from __future__ import annotations
 
 import math
@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 @dataclass
 class LogRankResult:
-    """Log-rank 检验结果"""
+    """Log-Rank 检验结果"""
     statistic: float
     p_value: float
     df: int

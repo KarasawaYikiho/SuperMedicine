@@ -9,13 +9,13 @@ from .cox_model import cox_ph
 
 logger = logging.getLogger(__name__)
 
-# Optional R backend — rpy2 may not be installed
+# Optional R Backend — Rpy2 may not be Installed
 try:
-    import rpy2  # noqa: F401
+    import rpy2  # Noqa: F401
     _HAS_RPY2 = True
 except ImportError:
     _HAS_RPY2 = False
-    logger.debug("rpy2 not installed — using pure Python survival analysis fallback")
+    logger.debug("Rpy2 not Installed — Using Pure Python Survival Analysis Fallback")
 
 
 def km_tool(times: list[float], events: list[int]) -> dict:
@@ -46,7 +46,7 @@ def logrank_tool(
     times2: list[float],
     events2: list[int],
 ) -> dict:
-    """Log-rank 检验工具接口"""
+    """Log-Rank 检验工具接口"""
     result = logrank_test(times1, events1, times2, events2)
     return {
         "statistic": result.statistic,

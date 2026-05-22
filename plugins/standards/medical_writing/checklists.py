@@ -9,7 +9,7 @@ from .checklist_base import ChecklistBase, ChecklistItemBase
 
 @dataclass
 class ChecklistItem(ChecklistItemBase):
-    """检查清单条目（扩展基类，增加 required 字段）"""
+    """检查清单条目（扩展基类，增加 Required 字段）"""
     required: bool = True
 
 
@@ -17,7 +17,7 @@ class Checklist(ChecklistBase):
     """规范检查清单（继承 ChecklistBase）"""
 
     def __init__(self, name: str, version: str, items: list[ChecklistItem]):
-        # 从 ChecklistItem 中提取关键词填充到基类的 keywords 字段
+        # 从 ChecklistItem 中提取关键词填充到基类的 Keywords 字段
         base_items = []
         for item in items:
             base_items.append(ChecklistItemBase(
@@ -25,7 +25,7 @@ class Checklist(ChecklistBase):
                 section=item.section,
                 item=item.item,
                 description=item.description,
-                keywords=[item.item, item.section],  # 从 item 和 section 生成关键词
+                keywords=[item.item, item.section],  # 从 Item 和 Section 生成关键词
             ))
         super().__init__(name=name, version=version, items=base_items)
         # 保存原始 ChecklistItem 列表用于计算 required_missing
@@ -35,7 +35,7 @@ class Checklist(ChecklistBase):
         """检查文本是否符合规范（重写以添加 required_missing 字段）"""
         result = super().check(text)
 
-        # 计算 required_missing（原 checklists.py 独有逻辑）
+        # 计算 Required_Missing（原 Checklists.Py 独有逻辑）
         required_missing = []
         for i, detail in enumerate(result["details"]):
             if i < len(self._raw_items) and self._raw_items[i].required and not detail["found"]:

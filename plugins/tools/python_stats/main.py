@@ -31,7 +31,7 @@ def descriptive(data: list[float]) -> dict[str, float]:
 
 
 def ttest(group1: list[float], group2: list[float]) -> dict[str, float]:
-    """独立样本 t 检验（Welch's t-test）"""
+    """独立样本 T 检验（Welch'S T-Test）"""
     n1, n2 = len(group1), len(group2)
     if n1 < 2 or n2 < 2:
         return {"statistic": 0, "p_value": 1.0, "error": "样本量不足"}
