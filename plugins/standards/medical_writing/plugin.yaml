@@ -10,6 +10,9 @@ provides:
     description: "STROBE 观察性研究报告规范"
   - id: "standard.prisma"
     description: "PRISMA 系统综述报告规范"
+  - id: "standard.stard"
+    description: "STARD 2015 诊断准确性研究报告规范"
 
 references:
   - "references/consort-checklist.md"
+  - "references/stard-checklist.md"
