@@ -41,10 +41,12 @@ class StateMachine:
         valid = VALID_TRANSITIONS.get(self._state, [])
         if new_state not in valid:
             raise ValueError(f"Invalid transition: {self._state.value} -> {new_state.value}")
+        # 从 RETRY 状态尝试再次 DISPATCH 时检查重试次数
+        if self._state == TaskState.RETRY and new_state == TaskState.DISPATCH:
+            if self._retry_count >= self._max_retries:
+                raise RuntimeError(f"Max retries ({self._max_retries}) exceeded")
         if new_state == TaskState.RETRY:
             self._retry_count += 1
-            if self._retry_count > self._max_retries:
-                raise RuntimeError(f"Max retries ({self._max_retries}) exceeded")
         old_state = self._state
         self._state = new_state
         self._history.append({"from": old_state.value, "to": new_state.value, "retry_count": self._retry_count})

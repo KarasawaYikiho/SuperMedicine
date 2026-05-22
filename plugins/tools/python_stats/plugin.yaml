@@ -1,0 +1,18 @@
+name: "python-stats"
+version: "0.1.0"
+type: "tool"
+language: "python"
+description: "Python 统计分析工具集"
+
+provides:
+  - id: "stats.descriptive"
+    description: "描述性统计"
+  - id: "stats.ttest"
+    description: "独立样本 t 检验"
+  - id: "stats.anova"
+    description: "单因素方差分析"
+  - id: "stats.regression"
+    description: "线性回归"
+
+entry: "main.py"
+test: "tests/"
