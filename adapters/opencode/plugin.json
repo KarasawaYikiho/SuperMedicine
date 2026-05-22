@@ -1,1 +1,42 @@
-{"name": "supermedicine", "version": "0.1.0", "description": "Modular medical research Agent", "type": "plugin", "entry": "adapter.py"}
+{
+  "name": "supermedicine",
+  "version": "0.1.0",
+  "description": "Modular medical research Agent framework with RAG, Harness, statistical analysis, and medical writing standards",
+  "author": "SuperMedicine contributors",
+  "license": "MIT",
+  "type": "plugin",
+  "entry": "adapter.py",
+  "homepage": "https://github.com/KarasawaYikiho/SuperMedicine",
+  "platform": {
+    "name": "opencode",
+    "min_version": "0.1.0"
+  },
+  "permissions": {
+    "tools": ["bash", "read", "write", "edit", "glob", "grep", "skill", "task"],
+    "description": "Required for file I/O, code execution, skill loading, and subagent dispatch"
+  },
+  "skills": [
+    "skills/rag-query.md",
+    "skills/harness-monitor.md",
+    "skills/medical-writing.md",
+    "skills/medical-citation.md",
+    "skills/python-stats.md",
+    "skills/r-survival.md"
+  ],
+  "agents": [
+    "agents/alpha-analyst.md",
+    "agents/beta-reviewer.md",
+    "agents/gamma-writer.md",
+    "agents/delta-orchestrator.md"
+  ],
+  "capabilities": [
+    "rag_query",
+    "harness_monitor",
+    "medical_check",
+    "stats_analysis",
+    "survival_analysis",
+    "citation_format",
+    "permission_audit",
+    "multi_agent_orchestration"
+  ]
+}
