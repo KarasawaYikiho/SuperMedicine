@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 
-from .utils import format_authors, format_journal_base, format_book_base
+from .utils import format_journal_base, format_book_base
 
 
 class VancouverFormatter:
