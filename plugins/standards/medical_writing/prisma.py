@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass
@@ -53,7 +54,7 @@ class PRISMAChecklist:
             PRISMAItem(27, "其他", "注册与协议", "提供注册信息", ["PROSPERO", "注册", "protocol"]),
         ]
 
-    def check(self, text: str) -> dict[str, any]:
+    def check(self, text: str) -> dict[str, Any]:
         """检查文本是否符合 PRISMA 规范"""
         results = []
         text_lower = text.lower()

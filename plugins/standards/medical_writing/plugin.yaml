@@ -8,7 +8,7 @@ provides:
     description: "CONSORT 随机对照试验报告规范"
   - id: "standard.strobe"
     description: "STROBE 观察性研究报告规范"
-  - id: "standard.prism"
+  - id: "standard.prisma"
     description: "PRISMA 系统综述报告规范"
 
 references:

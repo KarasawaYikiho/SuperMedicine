@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass
@@ -53,7 +54,7 @@ class STARDChecklist:
             STARDItem(27, "其他", "资助", "提供资助信息", ["资助", "funding"]),
         ]
 
-    def check(self, text: str) -> dict[str, any]:
+    def check(self, text: str) -> dict[str, Any]:
         """检查文本是否符合 STARD 规范"""
         results = []
         text_lower = text.lower()
