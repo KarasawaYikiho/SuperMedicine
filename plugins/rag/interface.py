@@ -3,9 +3,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from .local_provider import LocalRAGProvider
-
-
 class RAGProvider:
     """RAG Provider 接口"""
 
@@ -38,4 +35,4 @@ class EmptyRAGProvider(RAGProvider):
         return self._context.get(key)
 
 
-__all__ = ["RAGProvider", "EmptyRAGProvider", "LocalRAGProvider"]
+__all__ = ["RAGProvider", "EmptyRAGProvider"]
