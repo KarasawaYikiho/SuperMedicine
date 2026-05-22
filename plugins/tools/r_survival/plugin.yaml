@@ -1,0 +1,15 @@
+name: "r-survival"
+version: "0.1.0"
+type: "tool"
+language: "python"
+description: "R 生存分析工具集（Python 模拟）"
+
+provides:
+  - id: "r.survival.km"
+    description: "Kaplan-Meier 生存曲线估计"
+  - id: "r.survival.logrank"
+    description: "Log-rank 检验"
+  - id: "r.survival.cox"
+    description: "Cox 比例风险模型"
+
+entry: "main.py"
