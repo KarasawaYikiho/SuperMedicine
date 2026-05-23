@@ -5,8 +5,13 @@ dist/
 build/
 .eggs/
 *.egg
-.supermedicine/
+.supermedicine/*
+!.supermedicine/policies/
+.supermedicine/policies/*
 !.supermedicine/policies/default.yaml
 .coverage
 coverage.xml
 htmlcov/
+.pytest-tmp/
+.pytest_cache/
+.ruff_cache/

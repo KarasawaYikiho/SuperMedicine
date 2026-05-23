@@ -7,24 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0-beta] — 2026-05-22
 
+### Release readiness
+- Aligned CI/local quality gate around pytest, ruff, and a dependency-light packaging smoke check.
+- Documented final regression and release checklist covering permissions, CLI, plugins, Claude adapter, RAG, prototype medical statistics boundaries, medical writing/citation constraints, checkpoint/orchestration, security/privacy, and Git upload hygiene.
+
 ### Added
 - P0 dual-layer Permission Engine with code + prompt constraints and one-vote veto
 - Plugin-based architecture with 6 plugins: RAG, Harness, Python Stats, R Survival, Medical Writing, Medical Citation
 - Multi-Agent orchestration with state machine (7 states) and checkpoint persistence
-- OpenCode platform adapter with full implementation (8 native tool mappings)
-- Claude Code platform adapter (Coming Soon mode)
+- OpenCode platform adapter integration path with 8 native tool mappings
+- Minimal Claude Code platform adapter with permission-checked local CLI invocation when `claude` is available, plus structured unavailable/error responses
 - CLI with init/status/test/run commands
 - Medical reporting standards: CONSORT (23 items), STROBE (22 items), PRISMA (27 items), STARD (27 items)
 - Citation formatting: AMA and Vancouver styles
-- Statistical analysis: descriptive stats, t-test, ANOVA, linear regression (Python)
-- Survival analysis: Kaplan-Meier, log-rank test, Cox PH model (Python fallback)
+- Prototype statistics interface contracts for descriptive stats, t-test, ANOVA, and linear regression paths
+- Prototype survival-analysis interface contracts for Kaplan-Meier, log-rank test, and Cox PH paths
 - TF-IDF based local RAG provider with Chinese/English tokenization
 - Agent monitoring with permission audit and anomaly detection
 - Environment variable configuration support (SM_* prefix)
 - GitHub Actions CI with Python 3.10/3.11/3.12 matrix
 
 ### Fixed
-- Claude Code adapter: replaced NotImplementedError stubs with Coming Soon responses
+- Claude Code adapter: replaced NotImplementedError stubs with minimal capabilities/runtime-status/local-invoke paths and structured unavailable/error responses
 - BasePlugin.execute(): returns safe default instead of crashing
 - Kernel: integrated PermissionEngine at initialization (P0 security layer now active)
 - CLI run command: initializes full component stack instead of Beta placeholder
@@ -36,7 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Type annotations: dict[str, any] → dict[str, Any] in prisma.py and stard.py
 
 ### Changed
-- Replaced print() with logging.getLogger() in cli.py and install.py
+- Replaced print() with logging.getLogger() in Cli.py and Install.py
 - Made AgentMonitor anomaly threshold configurable (was hardcoded to 100)
 - Extracted duplicate author formatting code into medical_citation/utils.py
 - Extracted duplicate checklist checking into medical_writing/checklist_base.py

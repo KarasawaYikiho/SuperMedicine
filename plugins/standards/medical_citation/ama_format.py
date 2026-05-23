@@ -1,32 +1,7 @@
 """AMA 引用格式"""
 from __future__ import annotations
 
-from dataclasses import dataclass
-
-from .utils import format_journal_base, format_book_base
-
-
-@dataclass
-class JournalArticle:
-    """期刊文章"""
-    authors: list[str]
-    title: str
-    journal: str
-    year: int
-    volume: str
-    issue: str = ""
-    pages: str = ""
-    doi: str = ""
-
-
-@dataclass
-class Book:
-    """书籍"""
-    authors: list[str]
-    title: str
-    publisher: str
-    year: int
-    edition: str = ""
+from .utils import Book, JournalArticle, format_book_base, format_journal_base
 
 
 class AMAFormatter:

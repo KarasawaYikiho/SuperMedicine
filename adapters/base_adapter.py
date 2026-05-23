@@ -8,8 +8,42 @@ from pathlib import Path
 from typing import Any
 
 
+SENSITIVE_VALUE_PATTERNS = (
+    re.compile(r"(?i)(api[_-]?key|token|secret|password|credential)\s*[:=]\s*([^\s,;&]+)"),
+    re.compile(r"(?i)(bearer\s+)([A-Za-z0-9._~+\-/=]+)"),
+)
+
+
+def redact_sensitive(value: Any) -> Any:
+    """Return a copy of value with common secret-like payloads redacted."""
+    if isinstance(value, dict):
+        redacted: dict[Any, Any] = {}
+        for key, item in value.items():
+            key_text = str(key).lower()
+            if key_text.endswith("_env"):
+                redacted[key] = item
+            elif any(marker in key_text for marker in ("api_key", "apikey", "token", "secret", "password", "credential")):
+                redacted[key] = "[REDACTED]" if item not in (None, "") else item
+            else:
+                redacted[key] = redact_sensitive(item)
+        return redacted
+    if isinstance(value, list):
+        return [redact_sensitive(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(redact_sensitive(item) for item in value)
+    if isinstance(value, str):
+        text = value
+        for pattern in SENSITIVE_VALUE_PATTERNS:
+            text = pattern.sub(lambda match: f"{match.group(1)}=[REDACTED]", text)
+        return text
+    return value
+
+
 class BaseAdapter(ABC):
     """平台适配器基类 — 提供共享工具方法实现"""
+
+    DEFAULT_TIMEOUT_SECONDS = 30
+    MAX_TIMEOUT_SECONDS = 120
 
     @property
     @abstractmethod
@@ -30,7 +64,7 @@ class BaseAdapter(ABC):
         """执行 Shell 命令"""
         command = params.get("command", "")
         workdir = params.get("workdir", ".")
-        timeout = params.get("timeout", 30)
+        timeout = self._normalize_timeout(params.get("timeout"), self.DEFAULT_TIMEOUT_SECONDS)
         try:
             result = subprocess.run(
                 command, shell=True, capture_output=True, text=True,
@@ -39,6 +73,36 @@ class BaseAdapter(ABC):
             return result.stdout or result.stderr
         except subprocess.TimeoutExpired:
             return f"Command timed out after {timeout}s"
+
+    def _normalize_timeout(self, requested: Any, default: int | float | None = None) -> float:
+        """Clamp timeout values to a practical adapter-wide range."""
+        fallback = self.DEFAULT_TIMEOUT_SECONDS if default is None else default
+        try:
+            timeout = float(fallback if requested is None else requested)
+        except (TypeError, ValueError):
+            timeout = float(fallback)
+        if timeout <= 0:
+            timeout = float(fallback)
+        return min(timeout, float(self.MAX_TIMEOUT_SECONDS))
+
+    def _resource_error(
+        self,
+        *,
+        status: str,
+        resource: str,
+        message: str,
+        retryable: bool = False,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Build a structured, redacted adapter resource/security error."""
+        return {
+            "status": status,
+            "resource": resource,
+            "error": redact_sensitive(message),
+            "error_code": status,
+            "retryable": retryable,
+            "metadata": redact_sensitive(metadata or {}),
+        }
 
     def _tool_read(self, params: dict[str, Any]) -> str:
         """读取文件内容"""

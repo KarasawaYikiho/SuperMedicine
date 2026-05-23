@@ -1,6 +1,11 @@
+import json
 from unittest.mock import patch
 
-from plugins.rag.local_provider import LocalRAGProvider
+import yaml
+
+from permission.engine import PermissionEngine
+from plugins.rag.interface import RAGProviderConfig
+from plugins.rag.local_provider import LocalRAGProvider, MockExternalVectorStoreProvider
 from plugins.rag.pubmed_provider import PubmedRAGProvider
 
 
@@ -14,6 +19,9 @@ class TestLocalRAGProvider:
         result = provider.query("心血管疾病")
         assert len(result["results"]) > 0
         assert result["relevance_scores"][0] > 0
+        assert result["items"][0]["id"] is not None
+        assert "score" in result["items"][0]
+        assert "snippet" in result["items"][0]
 
     def test_empty_query(self, tmp_path):
         provider = LocalRAGProvider(tmp_path)
@@ -43,6 +51,8 @@ class TestPubmedRAGProvider:
             assert result["results"] == []
             assert result["relevance_scores"] == []
             assert result["source_metadata"] == []
+            assert result["status"] == "error"
+            assert result["errors"][0]["code"] == "connection_error"
 
     def test_query_with_mock_results(self):
         """模拟 API 返回结果"""
@@ -85,6 +95,8 @@ class TestPubmedRAGProvider:
         assert result["source_metadata"][0]["title"] == "Test Article 1"
         assert result["relevance_scores"][0] == 1.0
         assert result["relevance_scores"][1] == 0.95
+        assert result["items"][0]["id"] == "12345"
+        assert result["items"][0]["source"] == "PubMed"
 
     def test_context_store_retrieve(self):
         """验证上下文存取"""
@@ -100,3 +112,142 @@ class TestPubmedRAGProvider:
             result = provider.query("no results query")
             assert result["results"] == []
             assert result["source_metadata"] == []
+
+    def test_pubmed_external_query_permission_denied_before_http(self, tmp_path):
+        """PubMed external HTTP access is policy-gated when an engine is supplied."""
+        policies = tmp_path / "policies"
+        policies.mkdir()
+        (policies / PermissionEngine.DEFAULT_POLICY_FILENAME).write_text(yaml.dump({
+            "agent_id": "alpha",
+            "role": "restricted",
+            "permissions": {"allowed": [], "denied": [{"action": "rag.external.query", "scope": "*"}]},
+        }))
+        engine = PermissionEngine(policies, tmp_path / "audit.jsonl")
+        provider = PubmedRAGProvider(permission_engine=engine, agent_id="alpha")
+
+        with patch.object(provider, '_search', side_effect=AssertionError("HTTP path should not run")):
+            result = provider.query("blocked")
+
+        assert result["status"] == "denied"
+        assert result["errors"][0]["code"] == "permission_denied"
+        assert result["metadata"]["security"]["permission_checked"] is True
+
+
+class TestMockExternalVectorStoreProvider:
+    """External vector-store contract backend tests."""
+
+    def test_configured_backend_connects_and_queries_stable_shape(self):
+        config = RAGProviderConfig(
+            provider_type="external_vector",
+            endpoint="mock://vector-store",
+            index_name="medical-literature",
+            namespace="tests",
+            api_key_env="SM_RAG_API_KEY",
+        )
+        provider = MockExternalVectorStoreProvider(
+            config,
+            records=[
+                {
+                    "id": "doc-1",
+                    "title": "Hypertension review",
+                    "source": "mock-index",
+                    "text": "hypertension diabetes cardiovascular risk",
+                    "metadata": {"year": 2024},
+                },
+                {
+                    "id": "doc-2",
+                    "title": "Oncology review",
+                    "source": "mock-index",
+                    "text": "immunotherapy oncology cancer",
+                },
+            ],
+        )
+
+        connection = provider.connect()
+        assert connection["status"] == "connected"
+        result = provider.query("hypertension cardiovascular", top_k=1)
+
+        assert result["status"] == "success"
+        assert result["provider"] == "mock-external-vector-store"
+        assert len(result["items"]) == 1
+        assert result["items"][0]["id"] == "doc-1"
+        assert result["items"][0]["title"] == "Hypertension review"
+        assert result["items"][0]["score"] > 0
+        assert result["items"][0]["snippet"] == "hypertension diabetes cardiovascular risk"
+        assert result["results"] == ["hypertension diabetes cardiovascular risk"]
+
+    def test_missing_config_is_structured_error(self):
+        provider = MockExternalVectorStoreProvider(RAGProviderConfig(provider_type="external_vector"))
+
+        result = provider.query("anything")
+
+        assert result["status"] == "error"
+        assert result["items"] == []
+        assert result["errors"][0]["code"] == "configuration_error"
+        assert "endpoint" in result["errors"][0]["details"]["missing"]
+        assert "index_name" in result["errors"][0]["details"]["missing"]
+
+    def test_connection_failure_is_structured_error(self):
+        provider = MockExternalVectorStoreProvider(
+            RAGProviderConfig(endpoint="mock://connection-error", index_name="idx")
+        )
+
+        result = provider.query("anything")
+
+        assert result["status"] == "error"
+        assert result["errors"][0]["code"] == "connection_error"
+        assert result["errors"][0]["retryable"] is True
+
+    def test_timeout_and_empty_results_are_observable(self):
+        timeout_provider = MockExternalVectorStoreProvider(
+            RAGProviderConfig(endpoint="mock://vector-store", index_name="idx", timeout_seconds=0),
+            records=[{"id": "doc-1", "text": "content"}],
+        )
+        timeout_result = timeout_provider.query("content")
+        assert timeout_result["status"] == "error"
+        assert timeout_result["errors"][0]["code"] == "query_timeout"
+
+        empty_provider = MockExternalVectorStoreProvider(
+            RAGProviderConfig(endpoint="mock://vector-store", index_name="idx")
+        )
+        empty_result = empty_provider.query("content")
+        assert empty_result["status"] == "success"
+        assert empty_result["items"] == []
+        assert empty_result["errors"] == []
+
+    def test_resource_error_for_excessive_timeout(self):
+        provider = MockExternalVectorStoreProvider(
+            RAGProviderConfig(endpoint="mock://vector-store", index_name="idx", timeout_seconds=121)
+        )
+
+        result = provider.query("content")
+
+        assert result["status"] == "error"
+        assert result["errors"][0]["code"] == "resource_error"
+        assert result["errors"][0]["details"]["max_timeout_seconds"] == 120
+
+    def test_rag_payloads_redact_raw_secret_values(self):
+        sensitive_key = "api" + "_" + "key"
+        token_key = "tok" + "en"
+        password_key = "pass" + "word"
+        raw_value = "redaction" + "-" + "payload"
+        nested_value = "nested" + "-" + "payload"
+        record_value = "record" + "-" + "payload"
+        provider = MockExternalVectorStoreProvider(
+            RAGProviderConfig(
+                endpoint="mock://vector-store",
+                index_name="idx",
+                api_key_env="SM_RAG_API_KEY",
+                metadata={sensitive_key: raw_value, "nested": {token_key: nested_value}},
+            ),
+            records=[{"id": "doc-1", "text": f"{sensitive_key}={record_value} content", "metadata": {password_key: raw_value}}],
+        )
+
+        result = provider.query("content")
+        serialized = json.dumps(result, ensure_ascii=False)
+
+        assert raw_value not in serialized
+        assert nested_value not in serialized
+        assert record_value not in serialized
+        assert "SM_RAG_API_KEY" in serialized
+        assert "[REDACTED]" in serialized

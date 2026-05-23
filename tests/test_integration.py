@@ -1,4 +1,5 @@
 """集成测试 — 端到端科研流程"""
+import shutil
 import yaml
 
 from core.kernel import Kernel
@@ -34,6 +35,10 @@ class TestIntegration:
         (tmp_path / "config.yaml").write_text(yaml.dump({"project": "test"}))
         (tmp_path / "plugins").mkdir()
         (tmp_path / "policies").mkdir()
+        shutil.copyfile(
+            PermissionEngine.default_policy_path(),
+            tmp_path / "policies" / PermissionEngine.DEFAULT_POLICY_FILENAME,
+        )
         kernel = Kernel(
             config_path=tmp_path / "config.yaml",
             plugins_dir=tmp_path / "plugins",
@@ -160,3 +165,103 @@ class TestIntegration:
         loaded = cp.load("analysis-001", step=1)
         assert loaded is not None
         assert loaded["result"]["ttest"]["p_value"] < 0.05
+
+    def test_kernel_execute_task_success_with_medical_boundary(self):
+        kernel = Kernel()
+        result = kernel.execute_task("smoke medical task")
+        assert result["status"] == "success"
+        assert result["plugin"] == "python-stats"
+        assert result["action"] == "stats.descriptive"
+        assert result["output"]["count"] == 5
+        assert result["error"] is None
+        assert "contract_version" in result["metadata"]
+        assert "not production/clinical medical advice" in result["medical_boundary"]
+        assert "no production-grade statistical guarantee" in result["statistics_boundary"]
+
+    def test_kernel_execute_task_permission_denied(self, tmp_path):
+        (tmp_path / "config.yaml").write_text(yaml.dump({"project": "test"}))
+        policies = tmp_path / "policies"
+        policies.mkdir()
+        (policies / PermissionEngine.DEFAULT_POLICY_FILENAME).write_text(yaml.dump({
+            "agent_id": "alpha",
+            "role": "restricted",
+            "permissions": {"allowed": [], "denied": [{"action": "execute", "scope": "*"}]},
+        }))
+        kernel = Kernel(
+            config_path=tmp_path / "config.yaml",
+            plugins_dir="plugins",
+            policies_dir=policies,
+        )
+        result = kernel.execute_task("smoke medical task")
+        assert result["status"] == "denied"
+        assert result["output"] is None
+        assert result["error"] == "Permission denied by canonical policy chain."
+        assert result["reason"] == "Permission denied by canonical policy chain."
+
+    def test_kernel_execute_task_missing_plugin(self):
+        kernel = Kernel()
+        result = kernel.execute_task(
+            "smoke medical task",
+            plugin_name="missing-plugin",
+            action="stats.descriptive",
+        )
+        assert result["status"] == "missing_plugin"
+        assert result["plugin"] == "missing-plugin"
+        assert result["output"] is None
+        assert result["error"] == "Plugin not found: missing-plugin"
+
+    def test_kernel_execute_task_plugin_error(self):
+        kernel = Kernel()
+        result = kernel.execute_task(
+            "smoke medical task",
+            plugin_name="python-stats",
+            action="stats.unsupported",
+        )
+        assert result["status"] == "plugin_error"
+        assert "Unsupported python-stats action" in result["error"]
+        assert result["output"] is None
+        assert "medical_boundary" in result["metadata"]
+
+    def test_kernel_execute_task_survival_plugin_path(self):
+        kernel = Kernel()
+        result = kernel.execute_task("medical survival task")
+        assert result["status"] == "success"
+        assert result["plugin"] == "r-survival"
+        assert result["action"] == "r.survival.km"
+        assert "total_subjects" in result["output"]
+        assert "not production/clinical medical advice" in result["medical_boundary"]
+
+    def test_kernel_execute_task_invalid_plugin_input_is_structured_error(self):
+        kernel = Kernel()
+        result = kernel.execute_task(
+            "smoke medical task",
+            plugin_name="python-stats",
+            action="stats.descriptive",
+            params={"data": ["not-a-number"]},
+        )
+        assert result["status"] == "plugin_error"
+        assert result["output"] is None
+        assert "Invalid python-stats input" in result["error"]
+
+    def test_kernel_records_checkpoint_for_plugin_error(self, tmp_path):
+        (tmp_path / "config.yaml").write_text(yaml.dump({"project": "test"}))
+        policies = tmp_path / "policies"
+        policies.mkdir()
+        shutil.copyfile(
+            PermissionEngine.default_policy_path(),
+            policies / PermissionEngine.DEFAULT_POLICY_FILENAME,
+        )
+        kernel = Kernel(config_path=tmp_path / "config.yaml", plugins_dir="plugins", policies_dir=policies)
+        result = kernel.execute_task(
+            "smoke medical task",
+            plugin_name="python-stats",
+            action="stats.descriptive",
+            params={"data": ["not-a-number"], "api_key": "secret"},
+        )
+        assert result["status"] == "plugin_error"
+        task_dirs = list((tmp_path / "checkpoints").iterdir())
+        assert task_dirs
+        latest = CheckpointManager(tmp_path / "checkpoints").load_latest(task_dirs[0].name)
+        assert latest["state"] == "failed"
+        assert latest["recoverable"] is False
+        assert latest["not_recoverable_reason"] == "Plugin returned an error status."

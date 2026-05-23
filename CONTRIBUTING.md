@@ -20,10 +20,12 @@ Requirements: Python >= 3.10, Git
 
 ## Code Style
 
-We use **ruff** for linting and formatting:
+We use **ruff** for linting and formatting. Run the local quality gate documented
+in [README.md](README.md#local-quality-gate-and-release-checklist) before
+submitting changes.
 
 ```bash
-ruff check --select=E,F,W --ignore=E501 .
+# Optional local cleanup/formatting aid
 ruff check --fix .
 ```
 
@@ -51,7 +53,7 @@ pytest tests/ --cov=. --cov-report=term
 Rules:
 - New features require tests
 - Bug fixes require regression tests
-- All 137 tests must pass before submitting a PR
+- The full regression suite must pass before submitting a PR
 - Use `tmp_path` fixture for temporary file tests
 
 ## Pull Request Process
@@ -59,8 +61,8 @@ Rules:
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/my-feature`
 3. Make your changes with clear, atomic commits
-4. Ensure all tests pass: `pytest tests/ -v`
-5. Ensure lint passes: `ruff check --select=E,F,W --ignore=E501 .`
+4. Run the local quality gate documented in [README.md](README.md#local-quality-gate-and-release-checklist)
+5. Review repository/upload hygiene using the README release checklist before staging files
 6. Push and open a Pull Request against `master`
 7. PR description should explain what and why
 

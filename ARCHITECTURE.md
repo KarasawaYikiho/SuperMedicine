@@ -8,7 +8,7 @@ SuperMedicine uses a **microkernel + multi-agent orchestration** architecture. T
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│                         CLI (cli.py)                             │
+│                         CLI (Cli.py)                             │
 │                   init / status / test / run                     │
 └──────────────────────────────┬───────────────────────────────────┘
                                │
@@ -136,15 +136,15 @@ Plugins are language-agnostic modules discovered through `plugin.yaml` manifests
 plugins/
 ├── base_plugin.py          # BasePlugin + PluginMeta
 ├── rag/                    # RAG retrieval
-│   ├── interface.py        #   RAGProvider, EmptyRAGProvider
-│   ├── local_provider.py   #   TF-IDF based local search
+│   ├── interface.py        #   RAGProvider, config, stable result/errors
+│   ├── local_provider.py   #   TF-IDF local search + mock external vector store
 │   └── plugin.yaml
 ├── harness/                # Quality monitoring
 │   ├── monitor.py          #   AgentMonitor (audit, anomaly detection)
 │   └── plugin.yaml
 ├── tools/
-│   ├── python_stats/       # Descriptive stats, t-test, ANOVA, regression
-│   └── r_survival/         # Kaplan-Meier, log-rank, Cox PH
+│   ├── python_stats/       # Prototype interface/test contracts only
+│   └── r_survival/         # Prototype interface/test contracts only
 └── standards/
     ├── medical_writing/    # CONSORT, STROBE, PRISMA, STARD checklists
     └── medical_citation/   # AMA, Vancouver formatters
@@ -161,6 +161,28 @@ provides:
     description: "..."
 ```
 
+### RAG provider contract
+
+The RAG layer supports local, PubMed, and external database/vector-index
+semantics through `RAGProviderConfig` and `RAGProvider`. Query output is stable:
+`status`, `provider`, `items`, `errors`, and backward-compatible
+`results`/`relevance_scores`/`source_metadata` aliases. Result items expose
+`id`, `title` or `source`, `score`, and `snippet` where available. Structured
+errors distinguish missing configuration, connection failure, and query timeout.
+Secrets are referenced by environment variable name (`api_key_env`) rather than
+stored in code or repository configuration. `MockExternalVectorStoreProvider`
+provides external-vector-store behavior without requiring a live service.
+
+### Medical statistics boundary
+
+`plugins/tools/python_stats` and `plugins/tools/r_survival` currently define a
+minimal, deterministic interface contract for plugin execution and tests. The
+implementations are prototype paths: they are not production-grade,
+clinical-grade, regulatory-grade, or medical decision-support statistics. Plugin
+results carry `metadata.medical_boundary`, `metadata.statistics_boundary`, and a
+`metadata.contract.stage` of `prototype-interface-tests-only` to keep this
+boundary explicit at runtime.
+
 ## Layer 5: Platform Adapters (`adapters/`)
 
 Adapters bridge SuperMedicine to AI coding assistant platforms.
@@ -173,16 +195,67 @@ Adapters bridge SuperMedicine to AI coding assistant platforms.
 | `skill_load(skill_name)` | `str` | Load skill definition |
 | `subagent_dispatch(agent_id, task)` | `dict` | Dispatch to sub-agent |
 
-### OpenCode Adapter — Production Ready
-- 8 native tool mappings: bash, read, write, edit, glob, grep, skill, task
-- 6 skill files: rag-query, harness-monitor, medical-writing, medical-citation, python-stats, r-survival
-- 4 agent definitions: alpha-analyst, beta-reviewer, gamma-writer, delta-orchestrator
-- Full plugin.json metadata with permissions, capabilities, and tool declarations
+### OpenCode Adapter — Implemented Integration Path
+- Native tool mappings for bash, read, write, edit, glob, grep, skill, and task
+- Skill/agent metadata for RAG, Harness, medical writing/citation, and prototype statistics workflows
+- Plugin metadata with permissions, capabilities, and tool declarations
+- Execution remains subject to SuperMedicine permission checks where actions cross execution or external-resource boundaries
 
-### Claude Code Adapter — Coming Soon
-- Safe degradation: all methods return "coming_soon" structured responses
-- SKILL.md with complete capability reference
-- Ready for full implementation when Claude Code sub-agent API matures
+### Claude Code Adapter — Minimal Available
+- Registration/discovery metadata via `ClaudeCodeAdapter.registration`
+- Structured capabilities via `tool_call("claude.capabilities", ...)`
+- Runtime discovery via `tool_call("claude.runtime_status", ...)`
+- Contract-compatible CLI invocation path via `tool_call("claude.invoke", ...)` when a local `claude` runtime is on PATH
+- All adapter actions are checked through the canonical `.supermedicine/policies/default.yaml` `PermissionEngine` path before execution
+- Explicit unavailable/error states for missing runtime, timeouts, runtime errors, unsupported tools, and native sub-agent dispatch, with timeout/resource metadata and sensitive-value redaction
+- Current limits: not a full Claude Code sub-agent bridge; native skill loading and native sub-agent dispatch are not claimed as supported
+
+### Standalone and CLI execution
+
+The CLI initializes the Kernel for `init`, `status`, `test`, and `run` paths. The
+`run` command uses the real component stack rather than a placeholder-only path,
+including plugin discovery and permission-gated execution where applicable.
+
+## Safety and resource metadata
+
+High-risk calls use a minimal, dependency-free safety model:
+
+- Adapter execution is permission-checked and returns structured
+  `error_code`/`retryable`/`metadata.resource` values for timeout,
+  unavailable, and runtime failures.
+- RAG providers identify local vs external resources, expose timeout and
+  connection/config/resource failures as structured errors, and redact common
+  secret-like payloads while preserving environment-variable secret references.
+- Kernel plugin execution is the production permission entrypoint. Results carry
+  `metadata.resource` and `metadata.security` so callers can audit whether a
+  plugin path was permission-gated.
+- The default policy explicitly declares mock external RAG access and keeps
+  general network/external API use disabled for standard alpha/gamma roles.
+
+## Medical writing and citation constraints
+
+Medical writing support provides reporting-checklist and citation-formatting
+constraints only. CONSORT, STROBE, PRISMA, and STARD helpers can identify missing
+checklist items, and AMA/Vancouver helpers format citation strings. These modules
+do not validate clinical correctness, evidence quality, or regulatory compliance;
+all manuscript content and references require qualified human review.
+
+## Repository hygiene
+
+Git uploads should contain only necessary project files. Do not include `Docs/`,
+`Superpower`, `superpower`, external skill packages, or non-essential generated
+documentation artifacts in this repository. Before release upload, also exclude
+generated `build/`, `dist/`, `*.egg-info`, `__pycache__`, `.pytest_cache`,
+`.pytest-tmp`, runtime checkpoint directories, and any local configuration that
+contains secrets or private endpoints.
+
+## Quality gate
+
+The minimal CI/local release gate is intentionally dependency-light and is kept
+canonical in [README.md](README.md#local-quality-gate-and-release-checklist).
+
+Static type checking is not a required gate unless the project intentionally adds
+a dedicated mypy or pyright configuration.
 
 ## Data Flow
 

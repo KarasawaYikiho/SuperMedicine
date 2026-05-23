@@ -1,7 +1,59 @@
-"""Python 统计分析工具实现"""
+"""Python statistics plugin prototype.
+
+Current contract: this module exposes deterministic interface/test paths for
+basic statistics actions. The implementations are intentionally lightweight and
+must not be described as production-grade, clinical-grade, or regulatory-grade
+statistics.
+"""
 from __future__ import annotations
 
 import math
+from typing import Any
+
+from plugins.base_plugin import plugin_result
+
+
+MEDICAL_BOUNDARY = (
+    "Current-stage SuperMedicine output: prototype/interface test path only; "
+    "not production/clinical medical advice and not clinical-grade statistics; "
+    "requires expert review before any research, regulatory, or clinical use."
+)
+
+STATISTICS_BOUNDARY = (
+    "Current phase provides interfaces, deterministic contract tests, and "
+    "prototype calculations only; no production-grade or clinical-grade "
+    "statistical accuracy is promised; no production-grade statistical guarantee."
+)
+
+ACTION_CONTRACTS: dict[str, dict[str, Any]] = {
+    "stats.descriptive": {
+        "required_params": {"data": "list[number]"},
+        "output_fields": ["count", "mean", "std", "min", "max", "median"],
+        "prototype": True,
+    },
+    "stats.ttest": {
+        "required_params": {"group1": "list[number]", "group2": "list[number]"},
+        "output_fields": ["statistic", "p_value", "effect_size"],
+        "prototype": True,
+    },
+    "stats.anova": {
+        "required_params": {"groups": "list[list[number]]"},
+        "output_fields": ["f_statistic", "p_value", "df_between", "df_within"],
+        "prototype": True,
+    },
+    "stats.regression": {
+        "required_params": {"x": "list[number]", "y": "list[number]", "same_length": True},
+        "output_fields": ["slope", "intercept", "r_squared", "n"],
+        "prototype": True,
+    },
+}
+
+DEFAULT_PARAMS: dict[str, dict[str, Any]] = {
+    "stats.descriptive": {"data": [1, 2, 3, 4, 5]},
+    "stats.ttest": {"group1": [1, 2, 3, 4, 5], "group2": [2, 3, 4, 5, 6]},
+    "stats.anova": {"groups": [[1, 2, 3], [2, 3, 4]]},
+    "stats.regression": {"x": [1, 2, 3, 4, 5], "y": [2, 4, 6, 8, 10]},
+}
 
 
 def descriptive(data: list[float]) -> dict[str, float]:
@@ -131,6 +183,86 @@ def regression(x: list[float], y: list[float]) -> dict[str, float]:
         "r_squared": round(r_squared, 4),
         "n": n,
     }
+
+
+def execute(
+    action: str,
+    params: dict[str, Any] | None = None,
+    context: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """真实执行 Python 统计插件动作（当前阶段接口，不承诺生产级统计）。"""
+    params = params or {}
+    metadata = {
+        "medical_boundary": MEDICAL_BOUNDARY,
+        "statistics_boundary": STATISTICS_BOUNDARY,
+        "resource": "local-python-statistics",
+        "contract": {
+            "stage": "prototype-interface-tests-only",
+            "actions": ACTION_CONTRACTS,
+            "default_params_are_smoke_test_fixtures": True,
+        },
+        "audit": {"interface_only": True, "prototype_path": True, "context_keys": sorted((context or {}).keys())},
+    }
+    try:
+        if action == "stats.descriptive":
+            data = _param_or_default(params, action, "data")
+            result = descriptive(_as_float_list(data, "data"))
+        elif action == "stats.ttest":
+            group1 = _param_or_default(params, action, "group1")
+            group2 = _param_or_default(params, action, "group2")
+            result = ttest(_as_float_list(group1, "group1"), _as_float_list(group2, "group2"))
+        elif action == "stats.anova":
+            groups = _param_or_default(params, action, "groups")
+            result = anova(*_as_float_groups(groups, "groups"))
+        elif action == "stats.regression":
+            x = _as_float_list(_param_or_default(params, action, "x"), "x")
+            y = _as_float_list(_param_or_default(params, action, "y"), "y")
+            if len(x) != len(y):
+                raise ValueError("x and y must have the same length")
+            result = regression(x, y)
+        else:
+            return plugin_result(
+                status="plugin_error",
+                plugin="python-stats",
+                action=action,
+                error=f"Unsupported python-stats action: {action}",
+                metadata=metadata,
+            )
+    except (TypeError, ValueError, ZeroDivisionError) as exc:
+        return plugin_result(
+            status="plugin_error",
+            plugin="python-stats",
+            action=action,
+            error=f"Invalid python-stats input: {exc}",
+            metadata=metadata,
+        )
+
+    return plugin_result(
+        status="success",
+        plugin="python-stats",
+        action=action,
+        output=result,
+        metadata=metadata,
+    )
+
+
+def _param_or_default(params: dict[str, Any], action: str, key: str) -> Any:
+    """Return explicit input or smoke-test fixture input for compatibility."""
+    if key in params:
+        return params[key]
+    return DEFAULT_PARAMS[action][key]
+
+
+def _as_float_list(value: Any, name: str) -> list[float]:
+    if not isinstance(value, list):
+        raise ValueError(f"{name} must be a list of numbers")
+    return [float(item) for item in value]
+
+
+def _as_float_groups(value: Any, name: str) -> list[list[float]]:
+    if not isinstance(value, list):
+        raise ValueError(f"{name} must be a list of numeric lists")
+    return [_as_float_list(group, f"{name}[{index}]") for index, group in enumerate(value)]
 
 
 def _normal_cdf(z: float) -> float:

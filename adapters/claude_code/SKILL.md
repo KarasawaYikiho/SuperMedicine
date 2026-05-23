@@ -68,21 +68,21 @@ SuperMedicine uses a microkernel + multi-agent orchestration pattern:
 git clone https://github.com/KarasawaYikiho/SuperMedicine.git
 cd SuperMedicine
 pip install -e ".[dev]"
-python install.py --init
-python cli.py status
+python Install.py --init
+python Cli.py status
 ```
 
 ## Quick Start
 
 ```bash
 # Check project status
-python cli.py status
+python Cli.py status
 
 # Run a research task
-python cli.py run "analyze clinical trial data with survival analysis"
+python Cli.py run "analyze clinical trial data with survival analysis"
 
 # Run all tests
-python cli.py test
+python Cli.py test
 ```
 
 ## Permissions

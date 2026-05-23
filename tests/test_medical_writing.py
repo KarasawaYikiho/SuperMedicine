@@ -1,4 +1,6 @@
 from plugins.standards.medical_writing.checklists import get_consort_checklist, get_strobe_checklist
+from plugins.standards.medical_writing.checklist_base import MedicalClaim
+from plugins.standards.medical_citation.utils import CitationSource, JournalArticle
 
 
 class TestConsortChecklist:
@@ -19,6 +21,58 @@ class TestConsortChecklist:
         checklist = get_consort_checklist()
         result = checklist.check("")
         assert result["found_items"] == 0
+
+    def test_medical_claims_are_classified_and_review_message_present(self):
+        checklist = get_consort_checklist()
+        claims = [
+            MedicalClaim("治疗有效", "fact", "src-1"),
+            MedicalClaim("结果可能提示获益", "inference"),
+            MedicalClaim("建议进行人工复核", "suggestion"),
+            MedicalClaim("局限性包括样本量较小", "limitation"),
+        ]
+        sources = {
+            "src-1": CitationSource(
+                "src-1",
+                JournalArticle(["John Smith"], "Trial", "JAMA", 2024, "331"),
+            )
+        }
+
+        result = checklist.check("随机对照试验", claims=claims, sources=sources)
+
+        claim_types = {claim["claim_type"] for claim in result["claim_annotations"]}
+        assert {"fact", "inference", "suggestion", "limitation"}.issubset(claim_types)
+        assert result["citation_errors"] == []
+        assert "not clinical advice" in result["human_review_message"]
+
+    def test_missing_citation_for_medical_fact_returns_error_without_fabrication(self):
+        checklist = get_consort_checklist()
+        claims = [MedicalClaim("该治疗有效并降低死亡风险", "fact")]
+
+        result = checklist.check("随机对照试验", claims=claims, sources={})
+
+        assert result["citation_errors"][0]["status"] == "error"
+        assert result["source_states"][0]["source_id"] is None
+        assert "not generated" in result["citation_errors"][0]["message"]
+
+    def test_invalid_source_returns_error(self):
+        checklist = get_consort_checklist()
+        claims = [MedicalClaim("诊断特异度为90%", "fact", "bad-src")]
+        sources = {"bad-src": CitationSource("bad-src", "Retracted record", valid=False)}
+
+        result = checklist.check("随机对照试验", claims=claims, sources=sources)
+
+        assert result["citation_errors"][0]["source_id"] == "bad-src"
+        assert result["citation_errors"][0]["status"] == "error"
+
+    def test_low_confidence_source_returns_observable_warning(self):
+        checklist = get_consort_checklist()
+        claims = [MedicalClaim("治疗有效", "fact", "low-src")]
+        sources = {"low-src": CitationSource("low-src", "Unverified source", confidence=0.4)}
+
+        result = checklist.check("随机对照试验", claims=claims, sources=sources)
+
+        assert result["citation_warnings"][0]["source_id"] == "low-src"
+        assert result["source_states"][0]["confidence"] == 0.4
 
 
 class TestStrobeChecklist:

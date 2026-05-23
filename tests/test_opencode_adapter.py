@@ -71,7 +71,7 @@ class TestToolCall:
         """验证 Glob 工具调用"""
         result = adapter.tool_call("glob", {
             "pattern": "*.py",
-            "path": str(Path(__file__).parent.parent / "cli.py").rsplit("\\", 1)[0] if "\\" in str(Path(__file__).parent.parent) else str(Path(__file__).parent.parent),
+            "path": str(Path(__file__).parent.parent / "Cli.py").rsplit("\\", 1)[0] if "\\" in str(Path(__file__).parent.parent) else str(Path(__file__).parent.parent),
         })
         assert result["status"] == "ok"
         # Should Find at Least CLI.Py

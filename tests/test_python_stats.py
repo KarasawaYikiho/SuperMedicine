@@ -1,4 +1,16 @@
-from plugins.tools.python_stats.main import descriptive, ttest, anova, regression
+from plugins.tools.python_stats.main import execute, descriptive, ttest, anova, regression
+
+
+def assert_prototype_contract(result, action):
+    assert result["status"] == "success"
+    assert result["plugin"] == "python-stats"
+    assert result["action"] == action
+    assert result["error"] is None
+    assert result["metadata"]["audit"]["interface_only"] is True
+    assert result["metadata"]["audit"]["prototype_path"] is True
+    assert result["metadata"]["contract"]["stage"] == "prototype-interface-tests-only"
+    assert result["metadata"]["contract"]["actions"][action]["prototype"] is True
+    assert "no production-grade or clinical-grade" in result["metadata"]["statistics_boundary"]
 
 
 class TestDescriptive:
@@ -47,3 +59,24 @@ class TestRegression:
         assert result["slope"] == 2.0
         assert result["intercept"] == 0.0
         assert result["r_squared"] == 1.0
+
+
+class TestPythonStatsContract:
+    def test_descriptive_execute_contract_is_deterministic_prototype(self):
+        result = execute("stats.descriptive", {"data": [1, 2, 3, 4, 5]}, {"caller": "test"})
+        assert_prototype_contract(result, "stats.descriptive")
+        assert result["output"] == {"count": 5, "mean": 3.0, "std": 1.5811, "min": 1.0, "max": 5.0, "median": 3.0}
+
+    def test_regression_rejects_mismatched_input_with_structured_error(self):
+        result = execute("stats.regression", {"x": [1, 2, 3], "y": [2, 4]})
+        assert result["status"] == "plugin_error"
+        assert result["output"] is None
+        assert "Invalid python-stats input" in result["error"]
+        assert result["metadata"]["contract"]["stage"] == "prototype-interface-tests-only"
+
+    def test_unsupported_action_returns_structured_error_with_boundary(self):
+        result = execute("stats.missing", {})
+        assert result["status"] == "plugin_error"
+        assert result["output"] is None
+        assert "Unsupported python-stats action" in result["error"]
+        assert "not production/clinical medical advice" in result["metadata"]["medical_boundary"]

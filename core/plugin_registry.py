@@ -5,6 +5,12 @@ import yaml
 from plugins.base_plugin import BasePlugin, PluginMeta
 
 class PluginRegistry:
+    """Discovers plugin metadata and returns BasePlugin contract adapters.
+
+    Registry only discovers and instantiates plugins. It does not execute plugins
+    or check permissions; production execution must flow through Kernel so the
+    canonical PermissionEngine path cannot be bypassed accidentally by CLI code.
+    """
     def __init__(self, plugins_dir: Path):
         self._plugins_dir = Path(plugins_dir)
         self._metas: dict[str, PluginMeta] = {}

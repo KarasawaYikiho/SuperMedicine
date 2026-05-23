@@ -15,7 +15,7 @@ class TestPermissionEngine:
         engine = self._make_engine(tmp_path, {"agent_id": "a", "role": "r", "permissions": {"allowed": [], "denied": [{"action": "delete", "scope": "*"}]}})
         assert engine.check("a", "delete", "file") == PermissionResult.DENIED
     def test_check_unknown_agent(self, tmp_path):
-        engine = self._make_engine(tmp_path, {})
+        engine = self._make_engine(tmp_path, [])
         assert engine.check("unknown", "read", "file") == PermissionResult.DENIED
     def test_audit_log_written(self, tmp_path):
         engine = self._make_engine(tmp_path, {"agent_id": "a", "role": "r", "permissions": {"allowed": [{"action": "read", "scope": "*"}], "denied": []}})

@@ -1,4 +1,8 @@
-"""Log-Rank 检验"""
+"""Log-rank prototype test implementation.
+
+Interface boundary: deterministic test fixture path only. This implementation is
+not a production-grade, clinical-grade, or regulatory survival analysis engine.
+"""
 from __future__ import annotations
 
 import math
@@ -35,6 +39,10 @@ def logrank_test(
     """
     if len(times1) != len(events1) or len(times2) != len(events2):
         raise ValueError("时间和事件列表长度必须相同")
+    if not times1 or not times2:
+        raise ValueError("每组数据不能为空")
+    if any(event not in (0, 1) for event in events1 + events2):
+        raise ValueError("事件指示必须只包含 0 或 1")
 
     n1 = len(times1)
     n2 = len(times2)

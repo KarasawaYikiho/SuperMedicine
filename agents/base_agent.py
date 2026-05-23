@@ -11,5 +11,7 @@ class BaseAgent(ABC):
     def agent_id(self) -> str: return self._agent_id
     @property
     def role(self) -> str: return self._role
+    def describe_state(self) -> dict[str, Any]:
+        return {"agent_id": self._agent_id, "role": self._role, "status": "registered"}
     @abstractmethod
     def execute(self, task: dict[str, Any]) -> dict[str, Any]: ...

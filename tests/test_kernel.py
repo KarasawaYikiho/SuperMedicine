@@ -1,11 +1,17 @@
+import shutil
 import yaml
 from core.kernel import Kernel
+from permission.engine import PermissionEngine
 
 class TestKernel:
     def _create_kernel(self, tmp_path):
         (tmp_path / "config.yaml").write_text(yaml.dump({"project": "test"}))
         (tmp_path / "plugins").mkdir()
         (tmp_path / "policies").mkdir()
+        shutil.copyfile(
+            PermissionEngine.default_policy_path(),
+            tmp_path / "policies" / PermissionEngine.DEFAULT_POLICY_FILENAME,
+        )
         return Kernel(config_path=tmp_path / "config.yaml", plugins_dir=tmp_path / "plugins", policies_dir=tmp_path / "policies")
     def test_init(self, tmp_path):
         assert self._create_kernel(tmp_path) is not None

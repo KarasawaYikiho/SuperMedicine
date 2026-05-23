@@ -1,5 +1,6 @@
 from plugins.standards.medical_citation.ama_format import AMAFormatter, JournalArticle, Book
 from plugins.standards.medical_citation.vancouver_format import VancouverFormatter
+from plugins.standards.medical_citation.utils import CitationSource, validate_source_id
 
 
 class TestAMAFormatter:
@@ -50,3 +51,38 @@ class TestVancouverFormatter:
         result = formatter.format_journal(article)
         assert "Smith J" in result
         assert "JAMA" in result
+
+
+class TestCitationAccuracy:
+    def test_formatter_models_are_shared(self):
+        article = JournalArticle(
+            authors=["John Smith"],
+            title="Cardiovascular Risk Factors",
+            journal="JAMA",
+            year=2024,
+            volume="331",
+        )
+
+        assert AMAFormatter().format_journal(article)
+        assert VancouverFormatter().format_journal(article)
+
+    def test_missing_source_id_is_error_and_does_not_generate_citation(self):
+        result = validate_source_id(None, {})
+
+        assert result.status == "error"
+        assert result.source_id is None
+        assert "not generated" in result.message
+
+    def test_unknown_source_id_is_error(self):
+        result = validate_source_id("unknown", {})
+
+        assert result.status == "error"
+        assert "Unknown source_id" in result.message
+
+    def test_low_confidence_source_is_warning(self):
+        sources = {"src-1": CitationSource("src-1", "Reference", confidence=0.5)}
+
+        result = validate_source_id("src-1", sources)
+
+        assert result.status == "warning"
+        assert result.confidence == 0.5

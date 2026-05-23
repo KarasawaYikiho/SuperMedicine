@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
+import shutil
 import sys
 from pathlib import Path
 
@@ -23,6 +25,8 @@ class CLI:
 
     def init(self, project_dir: Path) -> None:
         """初始化项目"""
+        from permission.engine import PermissionEngine
+
         config_dir = project_dir / ".supermedicine"
         config_dir.mkdir(exist_ok=True)
         (config_dir / "config.yaml").write_text(
@@ -30,6 +34,12 @@ class CLI:
         )
         (config_dir / "agents").mkdir(exist_ok=True)
         (config_dir / "plugins").mkdir(exist_ok=True)
+        policies_dir = config_dir / "policies"
+        policies_dir.mkdir(exist_ok=True)
+        target_policy = policies_dir / PermissionEngine.DEFAULT_POLICY_FILENAME
+        source_policy = PermissionEngine.default_policy_path(Path(__file__).parent)
+        if not target_policy.exists():
+            shutil.copyfile(source_policy, target_policy)
         logger.info(f"项目已初始化: {config_dir}")
 
     def status(self) -> None:
@@ -65,11 +75,10 @@ class CLI:
         )
         sys.exit(result.returncode)
 
-    def run(self, task: str, verbose: bool = False) -> None:
-        """执行任务 — 初始化全组件栈并派发到 Orchestrator"""
+    def run(self, task: str, verbose: bool = False, plugin: str | None = None, action: str | None = None) -> dict:
+        """执行任务 — 真实执行用户任务与医疗插件"""
         from core.kernel import Kernel
-        from agents.orchestrator import Orchestrator
-        from agents.base_agent import BaseAgent
+        from permission.engine import PermissionEngine
 
         # 确定项目根目录
         project_dir = Path.cwd()
@@ -80,7 +89,12 @@ class CLI:
 
         # 初始化 Kernel（集成 PermissionEngine）
         policies_dir = project_dir / ".supermedicine" / "policies"
-        policies_dir.mkdir(parents=True, exist_ok=True)
+        default_policy = policies_dir / PermissionEngine.DEFAULT_POLICY_FILENAME
+        if not default_policy.exists():
+            raise FileNotFoundError(
+                f"默认权限策略不存在: {default_policy}. 请先运行 'supermedicine init' "
+                "或恢复仓库中的 .supermedicine/policies/default.yaml。"
+            )
 
         kernel = Kernel(
             config_path=project_dir / ".supermedicine" / "config.yaml",
@@ -94,6 +108,7 @@ class CLI:
             logger.info("     Plugins: %s", kernel._plugins_dir)
             logger.info("     Policies: %s", kernel._policies_dir)
             logger.info("     PermissionEngine: 已激活")
+            logger.info("     Checkpoints: %s", kernel.checkpoint_manager.base_dir)
 
         # 发现插件
         plugins = kernel.plugin_registry.discover()
@@ -102,150 +117,18 @@ class CLI:
             for p in plugins:
                 logger.info("     - %s (%s)", p.name, p.type)
 
-        # 初始化 Orchestrator
-        orchestrator = Orchestrator()
-
-        # 为每个 Agent 创建独立检查点目录
-        checkpoint_base = project_dir / ".supermedicine" / "checkpoints"
-        checkpoint_base.mkdir(parents=True, exist_ok=True)
-
-        # 注册 Agent
-        class CLIAgent(BaseAgent):
-            """CLI Agent — 真实执行最小端到端流程"""
-            def __init__(self, agent_id: str, role: str, kernel, checkpoint_dir, policies_dir):
-                super().__init__(agent_id, role)
-                self._kernel = kernel
-                self._checkpoint_dir = checkpoint_dir
-                self._policies_dir = policies_dir
-
-            def execute(self, task):
-                from agents.state_machine import StateMachine, TaskState
-                from agents.checkpoint import CheckpointManager
-                from permission.engine import PermissionEngine
-                from permission.policy import PermissionResult
-
-                # 初始化状态机
-                sm = StateMachine(task_id=self.agent_id)
-                checkpoint = CheckpointManager(
-                    base_dir=Path(self._checkpoint_dir) / self.agent_id
-                )
-                history = [str(sm.state)]
-
-                # 初始化权限引擎
-                audit_log = Path(self._policies_dir) / "audit.jsonl"
-                perm_engine = PermissionEngine(
-                    policy_dir=Path(self._policies_dir),
-                    audit_log=audit_log,
-                )
-
-                # 生成 Prompt 层约束（双约束机制生效）
-                from permission.prompt_generator import PromptGenerator
-                prompt_gen = PromptGenerator()
-                policy = perm_engine._policies.get(self.agent_id)
-                allowed_actions = []
-                denied_actions = []
-                if policy:
-                    allowed_actions = [f"{a.action}:{a.scope}" for a in policy.allowed]
-                    denied_actions = [f"{a.action}:{a.scope}" for a in policy.denied]
-
-                constraint_prefix = prompt_gen.generate_prefix(
-                    agent_id=self.agent_id,
-                    role=self.role,
-                    allowed_actions=allowed_actions,
-                    denied_actions=denied_actions,
-                )
-                rejection_templates = prompt_gen.generate_rejection_templates(role=self.role)
-
-                try:
-                    # PLANNING → DISPATCH
-                    perm_result = perm_engine.check(self.agent_id, "plan", "task")
-                    if perm_result == PermissionResult.DENIED:
-                        return {"agent": self.agent_id, "status": "denied", "reason": "Permission denied"}
-                    sm.transition(TaskState.DISPATCH)
-                    history.append(str(sm.state))
-                    checkpoint.save(self.agent_id, step=1, state=str(sm.state), result={"task": task})
-
-                    # DISPATCH → RUNNING
-                    sm.transition(TaskState.RUNNING)
-                    history.append(str(sm.state))
-                    plugins = self._kernel.plugin_registry.discover()
-                    plugin_names = [p.name for p in plugins]
-
-                    # LLM 集成（使用约束 Prompt）
-                    llm_response = None
-                    try:
-                        from core.llm_client import create_llm_client
-                        llm = create_llm_client("openrouter")
-                        messages = [
-                            {"role": "system", "content": constraint_prefix},
-                            {"role": "user", "content": f"Task: {task.get('description', str(task))}\nAvailable plugins: {', '.join(plugin_names)}"},
-                        ]
-                        llm_response = llm.chat(messages)
-                    except Exception:
-                        llm_response = {"content": "", "note": "LLM not available (OPENROUTER_API_KEY not set or network error)"}
-
-                    checkpoint.save(self.agent_id, step=2, data={
-                        "state": str(sm.state),
-                        "plugins": plugin_names,
-                        "llm_response": llm_response,
-                    })
-
-                    # RUNNING → VERIFYING
-                    sm.transition(TaskState.VERIFYING)
-                    history.append(str(sm.state))
-                    checkpoint.save(self.agent_id, step=3, state=str(sm.state), result={})
-
-                    # VERIFYING → COMPLETED
-                    sm.transition(TaskState.COMPLETED)
-                    history.append(str(sm.state))
-                    checkpoint.save(self.agent_id, step=4, state=str(sm.state), result={"completed": True})
-
-                except (ValueError, RuntimeError) as e:
-                    history.append(f"error: {e}")
-                    checkpoint.save(self.agent_id, step=99, state=str(sm.state), result={"error": str(e)})
-
-                return {
-                    "agent": self.agent_id,
-                    "status": "completed",
-                    "state": str(sm.state),
-                    "history": history,
-                    "plugins": plugin_names if 'plugin_names' in dir() else [],
-                    "checkpoint_dir": str(self._checkpoint_dir),
-                    "constraint_prompt": constraint_prefix,
-                    "rejection_templates": rejection_templates,
-                }
-
-        agent_ids = ["alpha", "beta", "gamma", "delta"]
-        for aid in agent_ids:
-            agent = CLIAgent(
-                aid,
-                role=f"{aid}_cli",
-                kernel=kernel,
-                checkpoint_dir=str(checkpoint_base),
-                policies_dir=str(policies_dir),
-            )
-            orchestrator.register_agent(agent)
-
-        logger.info("[OK] 已注册 %d 个 Agent: %s", len(agent_ids), ", ".join(agent_ids))
-
-        # 派发任务到 Orchestrator
-        logger.info("")
-        logger.info("[→] 派发任务: %s", task)
-        task_payload = {"action": "execute", "description": task}
-
-        for aid in agent_ids:
-            try:
-                result = orchestrator.dispatch(aid, task_payload)
-                if verbose:
-                    logger.info("     %s: state=%s, history=%d steps",
-                                aid, result.get("state"), len(result.get("history", [])))
-            except Exception as e:
-                logger.info("     %s: 错误 — %s", aid, e)
-
-        logger.info("")
-        logger.info("[OK] 任务已派发到全部 %d 个 Agent", len(agent_ids))
+        result = kernel.execute_task(task, plugin_name=plugin, action=action)
         if verbose:
-            logger.info("检查点目录: %s", str(checkpoint_base))
+            logger.info(
+                "[STATE] agent=%s task=%s plugin=%s action=%s status=%s",
+                result.get("agent", "alpha"),
+                result.get("task", task),
+                result.get("plugin"),
+                result.get("action"),
+                result.get("status"),
+            )
+        logger.info(json.dumps(result, ensure_ascii=False, indent=2))
+        return result
 
 
 def main():
@@ -270,6 +153,8 @@ def main():
     run_parser = subparsers.add_parser("run", help="执行任务")
     run_parser.add_argument("task", type=str, help="任务描述")
     run_parser.add_argument("--verbose", action="store_true", help="详细输出")
+    run_parser.add_argument("--plugin", type=str, default=None, help="指定插件名称")
+    run_parser.add_argument("--action", type=str, default=None, help="指定插件动作")
 
     args = parser.parse_args()
     cli = CLI()
@@ -282,7 +167,7 @@ def main():
         cli.test()
     elif args.command == "run":
         verbose = getattr(args, 'verbose', False)
-        cli.run(args.task, verbose=verbose)
+        cli.run(args.task, verbose=verbose, plugin=args.plugin, action=args.action)
     else:
         parser.print_help()
 

@@ -53,3 +53,18 @@ class TestStateMachine:
             sm.transition(TaskState.RETRY)
         with pytest.raises(RuntimeError):
             sm.transition(TaskState.DISPATCH)
+
+    def test_history_has_explicit_status_and_timestamp(self):
+        sm = StateMachine(task_id="t")
+        sm.transition(TaskState.DISPATCH, status="selected")
+        assert sm.history[-1]["status"] == "selected"
+        assert sm.history[-1]["task_id"] == "t"
+        assert "timestamp" in sm.history[-1]
+
+    def test_snapshot_reports_recoverability(self):
+        sm = StateMachine(task_id="t")
+        assert sm.snapshot()["recoverable"] is True
+        sm.transition(TaskState.DISPATCH)
+        sm.transition(TaskState.RUNNING)
+        sm.transition(TaskState.FAILED)
+        assert sm.snapshot()["recoverable"] is False

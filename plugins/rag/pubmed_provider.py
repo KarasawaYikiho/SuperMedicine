@@ -2,13 +2,16 @@
 from __future__ import annotations
 
 import json
-import urllib.request
-import urllib.parse
 import urllib.error
+import urllib.parse
+import urllib.request
 import xml.etree.ElementTree as ET
 from typing import Any
 
-from .interface import RAGProvider
+from permission.engine import PermissionEngine
+from permission.policy import PermissionResult
+
+from .interface import RAGConnectionError, RAGProvider, RAGQueryTimeoutError, make_rag_result
 
 
 class PubmedRAGProvider(RAGProvider):
@@ -19,11 +22,32 @@ class PubmedRAGProvider(RAGProvider):
     """
 
     BASE_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
+    provider_name = "pubmed"
 
-    def __init__(self, email: str = "supermedicine@example.com", tool: str = "supermedicine"):
+    def __init__(
+        self,
+        email: str = "supermedicine@example.com",
+        tool: str = "supermedicine",
+        timeout_seconds: float = 10.0,
+        permission_engine: PermissionEngine | None = None,
+        agent_id: str = "beta",
+    ):
         self._email = email
         self._tool = tool
+        self._timeout_seconds = max(1.0, min(float(timeout_seconds), 120.0))
+        self._permission_engine = permission_engine
+        self._agent_id = agent_id
         self._context: dict[str, Any] = {}
+
+    def connect(self) -> dict[str, Any]:
+        return {
+            "status": "configured",
+            "provider": self.provider_name,
+            "metadata": {
+                "resource": {"kind": "external_api", "endpoint": self.BASE_URL, "timeout_seconds": self._timeout_seconds},
+                "security": {"external_resource": True, "authentication": "none"},
+            },
+        }
 
     def query(self, query_text: str, top_k: int = 5) -> dict[str, Any]:
         """检索 PubMed 文献
@@ -35,38 +59,51 @@ class PubmedRAGProvider(RAGProvider):
         Returns:
             {"results": [...], "relevance_scores": [...], "source_metadata": [...]}
         """
+        denied = self._permission_denied()
+        if denied is not None:
+            return denied
+
         try:
             # Step 1: Esearch — 获取匹配的 PubMed IDs
             ids = self._search(query_text, top_k)
             if not ids:
-                return {"results": [], "relevance_scores": [], "source_metadata": []}
+                return make_rag_result([], provider=self.provider_name, metadata={"query": query_text, "top_k": top_k, **self.connect()["metadata"]})
 
             # Step 2: Efetch — 获取摘要和元数据
             articles = self._fetch(ids)
 
-            results = []
-            scores = []
-            metadata = []
+            items = []
             for i, article in enumerate(articles):
-                results.append(article.get("abstract", ""))
-                scores.append(1.0 - i * 0.05)  # 按返回顺序递减
-                metadata.append({
+                metadata = {
                     "pmid": article.get("pmid", ""),
                     "title": article.get("title", ""),
                     "authors": article.get("authors", ""),
                     "journal": article.get("journal", ""),
                     "year": article.get("year", ""),
                     "doi": article.get("doi", ""),
-                })
+                }
+                items.append(
+                    {
+                        "id": article.get("pmid", ""),
+                        "title": article.get("title", ""),
+                        "source": "PubMed",
+                        "score": round(1.0 - i * 0.05, 4),
+                        "snippet": article.get("abstract", ""),
+                        **metadata,
+                        "metadata": metadata,
+                    }
+                )
 
-            return {
-                "results": results,
-                "relevance_scores": scores,
-                "source_metadata": metadata,
-            }
-        except Exception:
-            # API 调用失败时返回空结果
-            return {"results": [], "relevance_scores": [], "source_metadata": []}
+            return make_rag_result(items, provider=self.provider_name, metadata={"query": query_text, "top_k": top_k, **self.connect()["metadata"]})
+        except TimeoutError as exc:
+            error = RAGQueryTimeoutError("PubMed query timed out.", retryable=True, details={"cause": str(exc)})
+            return make_rag_result([], provider=self.provider_name, status="error", errors=[error.to_dict()], metadata={"query": query_text, "top_k": top_k, **self.connect()["metadata"]})
+        except (urllib.error.URLError, OSError) as exc:
+            error = RAGConnectionError("PubMed connection failed.", retryable=True, details={"cause": str(exc)})
+            return make_rag_result([], provider=self.provider_name, status="error", errors=[error.to_dict()], metadata={"query": query_text, "top_k": top_k, **self.connect()["metadata"]})
+        except Exception as exc:
+            error = RAGConnectionError("PubMed provider failed.", retryable=True, details={"cause": str(exc)})
+            return make_rag_result([], provider=self.provider_name, status="error", errors=[error.to_dict()], metadata={"query": query_text, "top_k": top_k, **self.connect()["metadata"]})
 
     def _search(self, query: str, max_results: int) -> list[str]:
         """Esearch: 检索 PubMed IDs"""
@@ -177,14 +214,52 @@ class PubmedRAGProvider(RAGProvider):
     def _get_json(self, url: str) -> dict[str, Any]:
         """HTTP GET 并解析 JSON"""
         req = urllib.request.Request(url)
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=self._timeout_seconds) as resp:
             return json.loads(resp.read().decode("utf-8"))
 
     def _get_text(self, url: str) -> str:
         """HTTP GET 返回文本"""
         req = urllib.request.Request(url)
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=self._timeout_seconds) as resp:
             return resp.read().decode("utf-8")
+
+    def _permission_denied(self) -> dict[str, Any] | None:
+        """Check optional policy gate before PubMed external HTTP access."""
+        if self._permission_engine is None:
+            return None
+
+        resource = "https://eutils.ncbi.nlm.nih.gov/*"
+        result = self._permission_engine.check(
+            self._agent_id,
+            "rag.external.query",
+            resource,
+            context={
+                "provider": self.provider_name,
+                "requires_network": True,
+                "requires_external_api": True,
+                "timeout_seconds": self._timeout_seconds,
+            },
+        )
+        if result == PermissionResult.ALLOWED:
+            return None
+
+        return make_rag_result(
+            [],
+            provider=self.provider_name,
+            status="denied",
+            errors=[
+                {
+                    "code": "permission_denied",
+                    "message": "PubMed external HTTP access denied by permission policy.",
+                    "retryable": False,
+                    "details": {"action": "rag.external.query", "resource": resource},
+                }
+            ],
+            metadata={
+                "resource": {"kind": "external_api", "endpoint": self.BASE_URL, "timeout_seconds": self._timeout_seconds},
+                "security": {"external_resource": True, "permission": "denied", "permission_checked": True},
+            },
+        )
 
     def store_context(self, key: str, data: Any) -> None:
         self._context[key] = data

@@ -2,16 +2,16 @@
 from __future__ import annotations
 
 
-from .utils import format_journal_base, format_book_base
+from .utils import Book, JournalArticle, format_book_base, format_journal_base
 
 
 class VancouverFormatter:
     """Vancouver（ICMJE）引用格式化器"""
 
-    def format_journal(self, article) -> str:
+    def format_journal(self, article: JournalArticle) -> str:
         """格式化期刊文章"""
         return format_journal_base(article)
 
-    def format_book(self, book) -> str:
+    def format_book(self, book: Book) -> str:
         """格式化书籍"""
         return format_book_base(book)

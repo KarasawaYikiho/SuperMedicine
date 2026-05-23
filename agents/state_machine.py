@@ -1,5 +1,6 @@
 """长任务状态机"""
 from __future__ import annotations
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
@@ -11,6 +12,9 @@ class TaskState(Enum):
     RETRY = "retry"
     COMPLETED = "completed"
     FAILED = "failed"
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 VALID_TRANSITIONS: dict[TaskState, list[TaskState]] = {
     TaskState.PLANNING: [TaskState.DISPATCH],
@@ -28,7 +32,7 @@ class StateMachine:
         self._state = TaskState.PLANNING
         self._max_retries = max_retries
         self._retry_count = 0
-        self._history: list[dict[str, Any]] = []
+        self._history: list[dict[str, Any]] = [{"task_id": task_id, "from": None, "to": self._state.value, "status": "initialized", "retry_count": 0, "timestamp": _utc_now()}]
     @property
     def task_id(self) -> str: return self._task_id
     @property
@@ -37,7 +41,7 @@ class StateMachine:
     def retry_count(self) -> int: return self._retry_count
     @property
     def history(self) -> list[dict[str, Any]]: return self._history.copy()
-    def transition(self, new_state: TaskState) -> None:
+    def transition(self, new_state: TaskState, *, status: str | None = None, details: dict[str, Any] | None = None) -> None:
         valid = VALID_TRANSITIONS.get(self._state, [])
         if new_state not in valid:
             raise ValueError(f"Invalid transition: {self._state.value} -> {new_state.value}")
@@ -49,4 +53,26 @@ class StateMachine:
             self._retry_count += 1
         old_state = self._state
         self._state = new_state
-        self._history.append({"from": old_state.value, "to": new_state.value, "retry_count": self._retry_count})
+        self._history.append({
+            "task_id": self._task_id,
+            "from": old_state.value,
+            "to": new_state.value,
+            "status": status or new_state.value,
+            "retry_count": self._retry_count,
+            "timestamp": _utc_now(),
+            "details": details or {},
+        })
+
+    def can_resume(self) -> bool:
+        return self._state not in {TaskState.COMPLETED, TaskState.FAILED}
+
+    def snapshot(self) -> dict[str, Any]:
+        return {
+            "task_id": self._task_id,
+            "state": self._state.value,
+            "status": self._state.value,
+            "retry_count": self._retry_count,
+            "max_retries": self._max_retries,
+            "recoverable": self.can_resume(),
+            "history": self.history,
+        }

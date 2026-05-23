@@ -3,7 +3,10 @@ from __future__ import annotations
 import fnmatch
 from dataclasses import dataclass, field
 from enum import Enum
+from pathlib import Path
 from typing import Any
+
+DEFAULT_POLICY_RELATIVE_PATH = Path(".supermedicine") / "policies" / "default.yaml"
 
 class PermissionResult(Enum):
     ALLOWED = "allowed"

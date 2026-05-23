@@ -1,4 +1,8 @@
-"""Kaplan-Meier 生存曲线估计"""
+"""Kaplan-Meier prototype survival curve estimator.
+
+Interface boundary: deterministic test fixture path only. This implementation is
+not a production-grade, clinical-grade, or regulatory survival analysis engine.
+"""
 from __future__ import annotations
 
 import math
@@ -41,6 +45,8 @@ def kaplan_meier(times: list[float], events: list[int]) -> KMResult:
         raise ValueError("Times 和 Events 长度必须相同")
     if len(times) == 0:
         raise ValueError("数据不能为空")
+    if any(event not in (0, 1) for event in events):
+        raise ValueError("Events 必须只包含 0 或 1")
 
     n = len(times)
 

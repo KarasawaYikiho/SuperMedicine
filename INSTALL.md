@@ -15,7 +15,7 @@
 git clone https://github.com/KarasawaYikiho/SuperMedicine.git
 cd SuperMedicine
 pip install -e ".[dev]"
-python install.py --init
+python Install.py --init
 ```
 
 ## Step-by-Step Installation
@@ -41,7 +41,7 @@ pip install -e ".[dev]"
 ### 3. Initialize Project
 
 ```bash
-python install.py --init
+python Install.py --init
 ```
 
 This creates the `.supermedicine/` directory with configuration and plugin settings.
@@ -59,7 +59,7 @@ Required for Kaplan-Meier, log-rank test, and Cox proportional hazards analysis.
 Run the status command to check everything is working:
 
 ```bash
-python cli.py status
+python Cli.py status
 ```
 
 Expected output shows:
@@ -71,7 +71,7 @@ Expected output shows:
 Run the test suite:
 
 ```bash
-python cli.py test
+python Cli.py test
 # or directly:
 pytest tests/ -v
 ```
@@ -101,7 +101,7 @@ pip install rpy2
 Ensure you are in the SuperMedicine directory:
 ```bash
 cd SuperMedicine
-python cli.py status
+python Cli.py status
 ```
 Or install in development mode:
 ```bash

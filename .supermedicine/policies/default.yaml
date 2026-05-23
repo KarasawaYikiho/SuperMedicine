@@ -1,5 +1,6 @@
 # SuperMedicine 默认权限策略
 # 每个 Agent 按角色授予合理权限
+# 插件执行必须经由 Kernel -> PermissionEngine 的 execute/action 策略路径。
 
 - agent_id: "alpha"
   role: "analyst"
@@ -12,6 +13,14 @@
         scope: "*"
       - action: "read"
         scope: "*"
+      - action: "rag.query"
+        scope: "*"
+      - action: "rag.context.store"
+        scope: "*"
+      - action: "rag.context.retrieve"
+        scope: "*"
+      - action: "rag.external.query"
+        scope: "mock://*"
       - action: "skill_load"
         scope: "*"
       - action: "tool_call"
@@ -22,6 +31,12 @@
         scope: "glob"
       - action: "tool_call"
         scope: "grep"
+      - action: "tool_call"
+        scope: "claude.capabilities"
+      - action: "tool_call"
+        scope: "claude.runtime_status"
+      - action: "tool_call"
+        scope: "claude.invoke"
     denied:
       - action: "write"
         scope: "*"
@@ -30,6 +45,8 @@
     hard_limits:
       max_files_per_session: 100
       max_tool_calls_per_minute: 30
+      network_access: false
+      external_api: false
 
 - agent_id: "beta"
   role: "reviewer"
@@ -42,6 +59,14 @@
         scope: "*"
       - action: "read"
         scope: "*"
+      - action: "rag.query"
+        scope: "*"
+      - action: "rag.context.store"
+        scope: "*"
+      - action: "rag.context.retrieve"
+        scope: "*"
+      - action: "rag.external.query"
+        scope: "https://eutils.ncbi.nlm.nih.gov/*"
       - action: "tool_call"
         scope: "*"
       - action: "skill_load"
@@ -60,6 +85,8 @@
     hard_limits:
       max_files_per_session: 200
       max_tool_calls_per_minute: 60
+      network_access: true
+      external_api: true
 
 - agent_id: "gamma"
   role: "writer"
@@ -72,6 +99,14 @@
         scope: "*"
       - action: "read"
         scope: "*"
+      - action: "rag.query"
+        scope: "*"
+      - action: "rag.context.store"
+        scope: "*"
+      - action: "rag.context.retrieve"
+        scope: "*"
+      - action: "rag.external.query"
+        scope: "mock://*"
       - action: "write"
         scope: "*"
       - action: "tool_call"
@@ -86,6 +121,8 @@
     hard_limits:
       max_files_per_session: 150
       max_tool_calls_per_minute: 40
+      network_access: false
+      external_api: false
 
 - agent_id: "delta"
   role: "orchestrator"

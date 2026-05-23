@@ -4,7 +4,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from .checklist_base import ChecklistBase, ChecklistItemBase
+from plugins.standards.medical_citation.utils import CitationSource
+
+from .checklist_base import ChecklistBase, ChecklistItemBase, MedicalClaim
 
 
 @dataclass
@@ -31,9 +33,14 @@ class Checklist(ChecklistBase):
         # 保存原始 ChecklistItem 列表用于计算 required_missing
         self._raw_items = items
 
-    def check(self, text: str) -> dict[str, Any]:
+    def check(
+        self,
+        text: str,
+        claims: list[MedicalClaim] | None = None,
+        sources: dict[str, CitationSource] | None = None,
+    ) -> dict[str, Any]:
         """检查文本是否符合规范（重写以添加 required_missing 字段）"""
-        result = super().check(text)
+        result = super().check(text, claims=claims, sources=sources)
 
         # 计算 Required_Missing（原 Checklists.Py 独有逻辑）
         required_missing = []
