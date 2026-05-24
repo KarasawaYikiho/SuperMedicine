@@ -37,13 +37,13 @@ jobs:
         shell: pwsh
         run: |
           $pytestTemp = Join-Path $env:RUNNER_TEMP "pytest-repo-hygiene"
-          python -m pytest tests/test_repo_hygiene.py -q -p no:cacheprovider --basetemp="$pytestTemp"
+          python -m pytest tests/test_repo_hygiene.py -q --override-ini addopts= -p no:cacheprovider --basetemp $pytestTemp
 
       - name: Test suite
         shell: pwsh
         run: |
           $pytestTemp = Join-Path $env:RUNNER_TEMP "pytest-full-suite"
-          python -m pytest tests/ -v --tb=short -p no:cacheprovider --basetemp="$pytestTemp"
+          python -m pytest tests/ -v --tb=short --override-ini addopts= -p no:cacheprovider --basetemp $pytestTemp
 
       - name: Wheel smoke
         shell: pwsh
