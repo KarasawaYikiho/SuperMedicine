@@ -172,6 +172,8 @@ class ClaudeCodeAdapter(BaseAdapter):
                 cwd=str(self._project_dir),
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=timeout,
             )
         except subprocess.TimeoutExpired:
@@ -211,7 +213,7 @@ class ClaudeCodeAdapter(BaseAdapter):
         }
 
     def _permission_denied(self, agent_id: str, action: str, resource: str) -> dict[str, Any] | None:
-        engine = self._get_permission_engine()
+        engine = self._get_permission_engine_or_error()
         if isinstance(engine, dict):
             return engine
         result = engine.check(
@@ -239,7 +241,7 @@ class ClaudeCodeAdapter(BaseAdapter):
             },
         }
 
-    def _get_permission_engine(self) -> PermissionEngine | dict[str, Any]:
+    def _get_permission_engine_or_error(self) -> PermissionEngine | dict[str, Any]:
         if self._permission_engine is not None:
             return self._permission_engine
         policy_dir = self._project_dir / DEFAULT_POLICY_RELATIVE_PATH.parent

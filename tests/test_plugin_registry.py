@@ -6,7 +6,7 @@ class TestPluginRegistry:
     def _create_plugin(self, tmp_path, name="test-plugin"):
         d = tmp_path / name
         d.mkdir(parents=True)
-        (d / "plugin.yaml").write_text(yaml.dump({"name": name, "version": "0.1.0", "type": "tool", "provides": ["test.action"]}))
+        (d / "plugin.yaml").write_text(yaml.dump({"name": name, "version": "0.1.0", "type": "tool", "provides": ["test.action"]}), encoding="utf-8")
         return d
     def test_discover(self, tmp_path):
         self._create_plugin(tmp_path, "a")
@@ -32,7 +32,8 @@ class TestPluginRegistry:
         d = self._create_plugin(tmp_path, "entry-plugin")
         (d / "main.py").write_text(
             "def execute(action, params):\n"
-            "    return {'status': 'success', 'action': action, 'result': params}\n"
+            "    return {'status': 'success', 'action': action, 'result': params}\n",
+            encoding="utf-8",
         )
         r = PluginRegistry(tmp_path)
         r.discover()
@@ -44,7 +45,7 @@ class TestPluginRegistry:
 
     def test_python_entry_missing_execute_returns_plugin_error(self, tmp_path):
         d = self._create_plugin(tmp_path, "bad-entry-plugin")
-        (d / "main.py").write_text("VALUE = 1\n")
+        (d / "main.py").write_text("VALUE = 1\n", encoding="utf-8")
         r = PluginRegistry(tmp_path)
         r.discover()
         result = r.get("bad-entry-plugin").execute("demo.action", {})
@@ -56,7 +57,8 @@ class TestPluginRegistry:
         d = self._create_plugin(tmp_path, "faulty-entry-plugin")
         (d / "main.py").write_text(
             "def execute(action, params, context=None):\n"
-            "    raise RuntimeError('boom')\n"
+            "    raise RuntimeError('boom')\n",
+            encoding="utf-8",
         )
         r = PluginRegistry(tmp_path)
         r.discover()

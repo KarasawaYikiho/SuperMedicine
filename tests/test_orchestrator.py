@@ -1,4 +1,6 @@
 import pytest
+from typing import Any
+
 from agents.orchestrator import Orchestrator
 from agents.base_agent import BaseAgent
 from agents.checkpoint import CheckpointManager
@@ -6,13 +8,13 @@ from agents.checkpoint import CheckpointManager
 class DummyAgent(BaseAgent):
     def __init__(self, agent_id: str, role: str):
         super().__init__(agent_id, role)
-        self.executed = []
-    def execute(self, task: dict) -> dict:
+        self.executed: list[dict[str, Any]] = []
+    def execute(self, task: dict[str, Any]) -> dict[str, Any]:
         self.executed.append(task)
         return {"status": "ok", "agent": self.agent_id}
 
 class FailingAgent(BaseAgent):
-    def execute(self, task: dict) -> dict:
+    def execute(self, task: dict[str, Any]) -> dict[str, Any]:
         raise RuntimeError("agent boom")
 
 class TestOrchestrator:

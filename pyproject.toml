@@ -29,13 +29,26 @@ supermedicine = "Cli:main"
 [tool.setuptools]
 py-modules = ["Cli", "Install"]
 
+[tool.setuptools.package-data]
+permission = ["default_policy.yaml"]
+
 [tool.setuptools.packages.find]
 include = ["core*", "permission*", "agents*", "plugins*", "adapters*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-addopts = "--basetemp=.pytest-tmp"
+addopts = "-p no:cacheprovider"
+
+[tool.mypy]
+exclude = "^build/"
+
+[[tool.mypy.overrides]]
+module = [
+    "rpy2",
+    "rpy2.*",
+]
+ignore_missing_imports = true
 
 [tool.coverage.run]
 source = ["."]

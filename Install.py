@@ -20,7 +20,10 @@ def init_config(project_dir: Path) -> None:
     config_dir.mkdir(exist_ok=True)
     config_file = config_dir / "config.yaml"
     if not config_file.exists():
-        config_file.write_text("# SuperMedicine 配置\nproject_name: supermedicine\nversion: 0.1.0\n")
+        config_file.write_text(
+            "# SuperMedicine 配置\nproject_name: supermedicine\nversion: 0.1.0\n",
+            encoding="utf-8",
+        )
     (config_dir / "agents").mkdir(exist_ok=True)
     (config_dir / "plugins").mkdir(exist_ok=True)
     ensure_default_policy(project_dir, Path(__file__).parent)

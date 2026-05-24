@@ -85,9 +85,13 @@ def _execute_citation(action: str, params: dict[str, Any]) -> dict[str, Any]:
     validation = validate_source_id(source_id, sources)
     if validation.status == "error":
         raise ValueError(validation.message)
+    if validation.source_id is None:
+        raise ValueError(validation.message)
 
     source = sources[validation.source_id]
     reference = source.reference
+    if not isinstance(reference, (JournalArticle, Book)):
+        raise ValueError("source reference must be structured journal or book metadata")
     reference_type = _reference_type(reference)
     formatter = AMAFormatter() if action == "standard.citation.ama" else VancouverFormatter()
     citation_format = "AMA" if action == "standard.citation.ama" else "Vancouver"

@@ -27,9 +27,10 @@ class CLI:
         from permission.policy import ensure_default_policy
 
         config_dir = project_dir / ".supermedicine"
-        config_dir.mkdir(exist_ok=True)
+        config_dir.mkdir(parents=True, exist_ok=True)
         (config_dir / "config.yaml").write_text(
-            "# SuperMedicine 配置\nproject_name: supermedicine\nversion: 0.1.0\n"
+            "# SuperMedicine 配置\nproject_name: supermedicine\nversion: 0.1.0\n",
+            encoding="utf-8",
         )
         (config_dir / "agents").mkdir(exist_ok=True)
         (config_dir / "plugins").mkdir(exist_ok=True)

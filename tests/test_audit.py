@@ -7,7 +7,7 @@ class TestAuditLogger:
         logger = AuditLogger(log_file)
         logger.log(agent_id="test-agent", action="tool.execute", resource="python/stats", result="DENIED", reason="blacklist_match")
         assert log_file.exists()
-        entry = json.loads(log_file.read_text().strip())
+        entry = json.loads(log_file.read_text(encoding="utf-8").strip())
         assert entry["agent_id"] == "test-agent"
         assert entry["result"] == "DENIED"
         assert "timestamp" in entry
@@ -16,4 +16,4 @@ class TestAuditLogger:
         logger = AuditLogger(log_file)
         logger.log(agent_id="a1", action="act1", resource="r1", result="ALLOWED", reason="whitelist")
         logger.log(agent_id="a2", action="act2", resource="r2", result="DENIED", reason="default_deny")
-        assert len(log_file.read_text().strip().split("\n")) == 2
+        assert len(log_file.read_text(encoding="utf-8").strip().split("\n")) == 2

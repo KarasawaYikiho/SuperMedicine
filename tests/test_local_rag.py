@@ -23,7 +23,7 @@ def _pubmed_engine_for(agent_id: str, allowed: bool) -> PermissionEngine:
         "agent_id": agent_id,
         "role": "rag-test",
         "permissions": permissions,
-    }))
+    }), encoding="utf-8")
     return PermissionEngine(policy_dir, policy_dir / "audit.jsonl")
 
 
@@ -160,7 +160,7 @@ class TestPubmedRAGProvider:
             "agent_id": "alpha",
             "role": "restricted",
             "permissions": {"allowed": [], "denied": [{"action": "rag.external.query", "scope": "*"}]},
-        }))
+        }), encoding="utf-8")
         engine = PermissionEngine(policies, tmp_path / "audit.jsonl")
         provider = PubmedRAGProvider(permission_engine=engine, agent_id="alpha")
 

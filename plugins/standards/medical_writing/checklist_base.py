@@ -135,7 +135,7 @@ class ChecklistBase:
         sources: dict[str, CitationSource] | None = None,
     ) -> dict[str, Any]:
         """检查文本是否符合规范"""
-        results = []
+        results: list[dict[str, Any]] = []
         text_lower = text.lower()
 
         for item in self.items:
@@ -148,14 +148,14 @@ class ChecklistBase:
             })
 
         total = len(results)
-        found = sum(1 for r in results if r["found"])
+        found_items = sum(1 for r in results if r["found"])
 
         result = {
             "standard": self.name,
             "version": self.version,
             "total_items": total,
-            "found_items": found,
-            "compliance_rate": round(found / total * 100, 1) if total > 0 else 0,
+            "found_items": found_items,
+            "compliance_rate": round(found_items / total * 100, 1) if total > 0 else 0,
             "details": results,
         }
         result.update(enforce_medical_accuracy(claims, sources, text=text))

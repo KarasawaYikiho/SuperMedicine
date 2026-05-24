@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from agents.checkpoint import CheckpointManager
 from core.config_center import ConfigCenter
@@ -144,7 +144,7 @@ class Kernel:
             selected_plugin, selected_action = self._select_plugin_action(task)
 
         if selected_plugin is None or selected_action is None:
-            result = {
+            result: dict[str, Any] = {
                 "status": "failure",
                 "task": task,
                 "error": "No executable medical/statistics plugin action matched the task.",
@@ -235,7 +235,7 @@ class Kernel:
             self._checkpoint_task(task_id=task_id, agent_id=agent_id, state="failed", task=task, plugin=selected_plugin, action=selected_action, error=result["error"], recoverable=False, not_recoverable_reason="Plugin raised an exception; manual review required before retry.")
             return result
 
-        metadata = plugin_result.get("metadata") if isinstance(plugin_result.get("metadata"), dict) else {}
+        metadata = cast(dict[str, Any], plugin_result.get("metadata")) if isinstance(plugin_result.get("metadata"), dict) else {}
         if "medical_boundary" not in metadata:
             metadata["medical_boundary"] = plugin_result.get("medical_boundary", MEDICAL_BOUNDARY)
         if "statistics_boundary" not in metadata and plugin_result.get("statistics_boundary"):

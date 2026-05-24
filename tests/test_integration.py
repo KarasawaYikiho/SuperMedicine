@@ -1,6 +1,8 @@
 """集成测试 — 端到端科研流程"""
 import json
 import shutil
+from pathlib import Path
+
 import yaml
 import pytest
 
@@ -23,7 +25,7 @@ class MockAgent(BaseAgent):
 
     def __init__(self, agent_id: str, role: str):
         super().__init__(agent_id, role)
-        self.executed = []
+        self.executed: list[dict[str, Any]] = []
 
     def execute(self, task: dict[str, Any]) -> dict[str, Any]:
         self.executed.append(task)
@@ -49,17 +51,54 @@ class TestIntegration:
 
         assert target_policy.read_text(encoding="utf-8") == custom_policy
 
+    def test_default_policy_falls_back_to_packaged_resource_when_source_tree_missing(self, tmp_path):
+        """安装后的包缺少源码树 .supermedicine 时，应从包资源创建同一默认策略。"""
+        expected_policy = PermissionEngine.default_policy_path().read_text(encoding="utf-8")
+        installed_like_root = tmp_path / "site-packages"
+        project_dir = tmp_path / "project"
+        installed_like_root.mkdir()
+        project_dir.mkdir()
+
+        from permission.policy import ensure_default_policy
+
+        created_policy = ensure_default_policy(project_dir, installed_like_root)
+
+        assert created_policy == default_policy_path(project_dir)
+        assert created_policy.read_text(encoding="utf-8") == expected_policy
+
     def test_cli_init_and_install_init_create_same_default_policy(self, tmp_path):
         """CLI init 与 Install.py --init 应生成同一份 canonical 默认策略。"""
-        cli_project = tmp_path / "cli"
+        cli_project = tmp_path / "cli" / "nonexistent-project"
         install_project = tmp_path / "install"
-        cli_project.mkdir()
         install_project.mkdir()
 
         CLI().init(cli_project)
         init_config(install_project)
 
+        assert (cli_project / ".supermedicine").is_dir()
         assert default_policy_path(cli_project).read_text(encoding="utf-8") == default_policy_path(install_project).read_text(encoding="utf-8")
+
+    def test_init_paths_write_unicode_config_with_explicit_utf8(self, tmp_path, monkeypatch):
+        """初始化入口写入含中文的配置时不应依赖平台默认编码。"""
+        original_write_text = Path.write_text
+
+        def reject_default_encoding_for_unicode(self, data, *args, **kwargs):
+            encoding = kwargs.get("encoding")
+            if encoding is None and any(ord(char) > 127 for char in data):
+                raise UnicodeEncodeError("charmap", data, 0, len(data), "character maps to <undefined>")
+            return original_write_text(self, data, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "write_text", reject_default_encoding_for_unicode)
+
+        install_project = tmp_path / "install"
+        cli_project = tmp_path / "cli"
+        install_project.mkdir()
+        cli_project.mkdir()
+
+        init_config(install_project)
+        CLI().init(cli_project)
+
+        assert default_policy_path(install_project).read_text(encoding="utf-8") == default_policy_path(cli_project).read_text(encoding="utf-8")
 
     def test_cli_resolves_params_json_object(self):
         params = _resolve_run_params('{"source_id":"src-1","sources":{"src-1":{"title":"T"}}}', None)
@@ -132,7 +171,7 @@ class TestIntegration:
     def test_full_workflow(self, tmp_path):
         """测试完整工作流程：初始化 → 权限检查 → 任务分派 → 检查点"""
         # 1. 初始化内核
-        (tmp_path / "config.yaml").write_text(yaml.dump({"project": "test"}))
+        (tmp_path / "config.yaml").write_text(yaml.dump({"project": "test"}), encoding="utf-8")
         (tmp_path / "plugins").mkdir()
         (tmp_path / "policies").mkdir()
         shutil.copyfile(
@@ -155,7 +194,7 @@ class TestIntegration:
                 "denied": [],
             },
         }
-        (tmp_path / "policies" / "analyst.yaml").write_text(yaml.dump(policy_data))
+        (tmp_path / "policies" / "analyst.yaml").write_text(yaml.dump(policy_data), encoding="utf-8")
         engine = PermissionEngine(
             policy_dir=tmp_path / "policies",
             audit_log=tmp_path / "audit.log",
@@ -279,14 +318,14 @@ class TestIntegration:
         assert "no production-grade statistical guarantee" in result["statistics_boundary"]
 
     def test_kernel_execute_task_permission_denied(self, tmp_path):
-        (tmp_path / "config.yaml").write_text(yaml.dump({"project": "test"}))
+        (tmp_path / "config.yaml").write_text(yaml.dump({"project": "test"}), encoding="utf-8")
         policies = tmp_path / "policies"
         policies.mkdir()
         (policies / PermissionEngine.DEFAULT_POLICY_FILENAME).write_text(yaml.dump({
             "agent_id": "alpha",
             "role": "restricted",
             "permissions": {"allowed": [], "denied": [{"action": "execute", "scope": "*"}]},
-        }))
+        }), encoding="utf-8")
         kernel = Kernel(
             config_path=tmp_path / "config.yaml",
             plugins_dir="plugins",
@@ -344,7 +383,7 @@ class TestIntegration:
         assert "Invalid python-stats input" in result["error"]
 
     def test_kernel_executes_rag_interface_manifest_plugin_without_external_service(self, tmp_path):
-        (tmp_path / "config.yaml").write_text(yaml.dump({"project": "test"}))
+        (tmp_path / "config.yaml").write_text(yaml.dump({"project": "test"}), encoding="utf-8")
         policies = tmp_path / "policies"
         policies.mkdir()
         shutil.copyfile(
@@ -398,7 +437,7 @@ class TestIntegration:
                 "denied": [],
                 "hard_limits": {"network_access": True, "external_api": True},
             },
-        }))
+        }), encoding="utf-8")
         engine = PermissionEngine(policies, tmp_path / "audit.jsonl")
 
         result = execute(
@@ -427,7 +466,7 @@ class TestIntegration:
         checkpoint_step = tmp_path / "checkpoints" / "task-1" / "step-1"
         checkpoint_step.mkdir(parents=True)
         (checkpoint_step / "status.json").write_text(json.dumps({"state": "completed"}), encoding="utf-8")
-        (tmp_path / "config.yaml").write_text(yaml.dump({"project": "test"}))
+        (tmp_path / "config.yaml").write_text(yaml.dump({"project": "test"}), encoding="utf-8")
         policies = tmp_path / "policies"
         policies.mkdir()
         shutil.copyfile(
@@ -500,7 +539,7 @@ class TestIntegration:
         assert "Invalid medical-citation input" in result["error"]
 
     def test_kernel_records_checkpoint_for_plugin_error(self, tmp_path):
-        (tmp_path / "config.yaml").write_text(yaml.dump({"project": "test"}))
+        (tmp_path / "config.yaml").write_text(yaml.dump({"project": "test"}), encoding="utf-8")
         policies = tmp_path / "policies"
         policies.mkdir()
         shutil.copyfile(

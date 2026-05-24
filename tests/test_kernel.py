@@ -6,7 +6,7 @@ from permission.prompt_generator import PromptGenerator
 
 class TestKernel:
     def _create_kernel(self, tmp_path):
-        (tmp_path / "config.yaml").write_text(yaml.dump({"project": "test"}))
+        (tmp_path / "config.yaml").write_text(yaml.dump({"project": "test"}), encoding="utf-8")
         (tmp_path / "plugins").mkdir()
         (tmp_path / "policies").mkdir()
         shutil.copyfile(

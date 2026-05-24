@@ -82,7 +82,7 @@ def descriptive(data: list[float]) -> dict[str, float]:
     }
 
 
-def ttest(group1: list[float], group2: list[float]) -> dict[str, float]:
+def ttest(group1: list[float], group2: list[float]) -> dict[str, float | str]:
     """独立样本 T 检验（Welch'S T-Test）"""
     n1, n2 = len(group1), len(group2)
     if n1 < 2 or n2 < 2:
@@ -114,7 +114,7 @@ def ttest(group1: list[float], group2: list[float]) -> dict[str, float]:
     }
 
 
-def anova(*groups: list[float]) -> dict[str, float]:
+def anova(*groups: list[float]) -> dict[str, float | str]:
     """单因素方差分析"""
     k = len(groups)
     if k < 2:
@@ -128,7 +128,7 @@ def anova(*groups: list[float]) -> dict[str, float]:
     ss_between = sum(len(g) * (sum(g) / len(g) - grand_mean) ** 2 for g in groups)
 
     # 组内平方和
-    ss_within = 0
+    ss_within = 0.0
     for g in groups:
         g_mean = sum(g) / len(g)
         ss_within += sum((x - g_mean) ** 2 for x in g)
@@ -154,7 +154,7 @@ def anova(*groups: list[float]) -> dict[str, float]:
     }
 
 
-def regression(x: list[float], y: list[float]) -> dict[str, float]:
+def regression(x: list[float], y: list[float]) -> dict[str, float | str]:
     """简单线性回归"""
     n = len(x)
     if n < 2 or len(y) < 2:
@@ -209,7 +209,7 @@ def execute(
     try:
         if action == "stats.descriptive":
             data = _param_or_default(params, action, "data")
-            result = descriptive(_as_float_list(data, "data"))
+            result: dict[str, Any] = descriptive(_as_float_list(data, "data"))
         elif action == "stats.ttest":
             group1 = _param_or_default(params, action, "group1")
             group2 = _param_or_default(params, action, "group2")

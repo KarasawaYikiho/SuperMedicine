@@ -85,7 +85,7 @@ class TestClaudeCodeAdapter:
         _write_policy(tmp_path)
         monkeypatch.setattr("adapters.claude_code.adapter.shutil.which", lambda command: "/usr/bin/claude")
 
-        def fake_run(command, cwd, capture_output, text, timeout):
+        def fake_run(command, cwd, capture_output, text, encoding, errors, timeout):
             return subprocess.CompletedProcess(command, 0, stdout="mock claude output", stderr="")
 
         monkeypatch.setattr("adapters.claude_code.adapter.subprocess.run", fake_run)
@@ -98,7 +98,7 @@ class TestClaudeCodeAdapter:
         _write_policy(tmp_path)
         monkeypatch.setattr("adapters.claude_code.adapter.shutil.which", lambda command: "/usr/bin/claude")
 
-        def fake_run(command, cwd, capture_output, text, timeout):
+        def fake_run(command, cwd, capture_output, text, encoding, errors, timeout):
             raise subprocess.TimeoutExpired(command, timeout)
 
         monkeypatch.setattr("adapters.claude_code.adapter.subprocess.run", fake_run)
@@ -126,7 +126,7 @@ class TestClaudeCodeAdapter:
         assert prompt_payload not in str(dry_run)
         assert "[REDACTED]" in str(dry_run)
 
-        def fake_run(command, cwd, capture_output, text, timeout):
+        def fake_run(command, cwd, capture_output, text, encoding, errors, timeout):
             return subprocess.CompletedProcess(command, 1, stdout="", stderr=f"{token_label}={runtime_payload} failed")
 
         monkeypatch.setattr("adapters.claude_code.adapter.subprocess.run", fake_run)

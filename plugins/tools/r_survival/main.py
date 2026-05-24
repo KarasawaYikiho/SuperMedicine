@@ -73,6 +73,10 @@ R_BACKEND_REQUEST_VALUES = {"r", "rpy2", "survival"}
 PYTHON_BACKEND_REQUEST_VALUES = {"python", "pure_python", "fallback"}
 
 
+def _optional_int(value: Any) -> int | None:
+    return int(value) if value is not None else None
+
+
 def _r_backend_imports() -> tuple[Any, Any, Any, Any, Any]:
     """Import rpy2/R dependencies lazily so Python-only installs still work."""
     from rpy2 import robjects
@@ -236,9 +240,9 @@ def km_tool_r(times: list[float], events: list[int]) -> dict[str, Any]:
                 "survival_prob": float(survival),
                 "confidence_lower": _none_if_r_missing(lower_values[index]),
                 "confidence_upper": _none_if_r_missing(upper_values[index]),
-                "at_risk": int(n_risk_values[index]) if n_risk_values[index] is not None else None,
-                "events": int(n_event_values[index]) if n_event_values[index] is not None else None,
-                "censored": int(n_censor_values[index]) if n_censor_values[index] is not None else None,
+                "at_risk": _optional_int(n_risk_values[index]),
+                "events": _optional_int(n_event_values[index]),
+                "censored": _optional_int(n_censor_values[index]),
             }
             for index, (time, survival) in enumerate(zip(time_values, surv_values))
         ],
