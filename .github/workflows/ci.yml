@@ -35,11 +35,15 @@ jobs:
 
       - name: Repository hygiene checks
         shell: pwsh
-        run: python -m pytest tests/test_repo_hygiene.py -q
+        run: |
+          $pytestTemp = Join-Path $env:RUNNER_TEMP "pytest-repo-hygiene"
+          python -m pytest tests/test_repo_hygiene.py -q -p no:cacheprovider --basetemp="$pytestTemp"
 
       - name: Test suite
         shell: pwsh
-        run: python -m pytest tests/ -v --tb=short
+        run: |
+          $pytestTemp = Join-Path $env:RUNNER_TEMP "pytest-full-suite"
+          python -m pytest tests/ -v --tb=short -p no:cacheprovider --basetemp="$pytestTemp"
 
       - name: Wheel smoke
         shell: pwsh
