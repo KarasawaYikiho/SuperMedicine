@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from adapters.base_adapter import BaseAdapter
+from permission.engine import PermissionEngine
 
 
 class OpenCodeAdapter(BaseAdapter):
@@ -16,7 +17,14 @@ class OpenCodeAdapter(BaseAdapter):
     - subagent_dispatch → 派发到 OpenCode 子代理 (Brain → Planner → Coder → Tester)
     """
 
-    def __init__(self, orchestrator=None):
+    def __init__(
+        self,
+        orchestrator=None,
+        permission_engine: PermissionEngine | None = None,
+        project_dir: Path | None = None,
+        default_agent_id: str = "beta",
+    ):
+        super().__init__(permission_engine=permission_engine, project_dir=project_dir, default_agent_id=default_agent_id)
         self._orchestrator = orchestrator
 
     # Agent ID → OpenCode 角色映射
@@ -48,14 +56,12 @@ class OpenCodeAdapter(BaseAdapter):
             "skill": self._tool_skill,
             "task": self._tool_task,
         }
-        handler = tool_handlers.get(tool_id)
-        if handler is None:
-            return {"status": "error", "tool": tool_id, "result": f"Unsupported tool: {tool_id}"}
-        try:
-            result = handler(params)
-            return {"status": "ok", "tool": tool_id, "result": result}
-        except Exception as e:
-            return {"status": "error", "tool": tool_id, "result": str(e)}
+        return self._execute_permissioned_tool_call(
+            tool_id=tool_id,
+            params=params,
+            handlers=tool_handlers,
+            unsupported_message=f"Unsupported tool: {tool_id}",
+        )
 
     def _tool_skill(self, params: dict[str, Any]) -> str:
         """加载技能（委托给 skill_load）"""

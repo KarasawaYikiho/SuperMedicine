@@ -117,3 +117,28 @@ class TestPermissionEngineWithPolicies:
         engine = PermissionEngine(policy_dir=policy_dir, audit_log=audit_log)
         result = engine.check("limited_agent", "read", "file.txt")
         assert result == PermissionResult.ALLOWED
+
+    def test_external_api_hard_limit_denies_before_allow_rule(self, tmp_path):
+        policy_dir = tmp_path / "policies"
+        policy_dir.mkdir()
+        audit_log = tmp_path / "audit.jsonl"
+        policy = {
+            "agent_id": "no_external",
+            "role": "tester",
+            "permissions": {
+                "allowed": [{"action": "rag.external.query", "scope": "https://eutils.ncbi.nlm.nih.gov/*"}],
+                "denied": [],
+                "hard_limits": {"network_access": False, "external_api": False},
+            },
+        }
+        (policy_dir / "test.yaml").write_text(yaml.dump(policy), encoding="utf-8")
+        engine = PermissionEngine(policy_dir=policy_dir, audit_log=audit_log)
+
+        result = engine.check(
+            "no_external",
+            "rag.external.query",
+            "https://eutils.ncbi.nlm.nih.gov/*",
+            context={"requires_network": True, "requires_external_api": True},
+        )
+
+        assert result == PermissionResult.DENIED

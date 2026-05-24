@@ -103,6 +103,8 @@ def _checklist_for_action(action: str):
 def _base_metadata(context: dict[str, Any]) -> dict[str, Any]:
     return {
         "medical_boundary": MEDICAL_BOUNDARY,
+        "not_for_clinical_advice": True,
+        "requires_human_review": True,
         "human_review_message": HUMAN_REVIEW_MESSAGE,
         "resource": {"kind": "standard", "plugin": PLUGIN_NAME},
         "security": {"permission_entrypoint": "kernel", "permission_checked": bool(context)},

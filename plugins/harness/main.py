@@ -14,7 +14,7 @@ PLUGIN_NAME = "harness-core"
 ACTION_CONTRACTS: dict[str, dict[str, Any]] = {
     "harness.integration.checkpoint": {
         "required_params": {"checkpoint_dir": "str", "task_id": "str"},
-        "output_fields": ["task_id", "total_steps", "steps", "missing_steps", "complete"],
+        "output_fields": ["task_id", "total_steps", "steps", "missing_steps", "complete", "structurally_complete", "final_state_success", "warnings"],
     },
     "harness.integration.checkpoint_all": {
         "required_params": {"checkpoint_dir": "str"},
@@ -23,26 +23,26 @@ ACTION_CONTRACTS: dict[str, dict[str, Any]] = {
     "harness.monitor.permission_audit": {
         "required_params": {"audit_log_path": "str"},
         "optional_params": {"agent_id": "str"},
-        "output_fields": ["entries", "total"],
+        "output_fields": ["entries", "total", "warnings"],
     },
     "harness.monitor.denied_actions": {
         "required_params": {"audit_log_path": "str"},
-        "output_fields": ["entries", "total"],
+        "output_fields": ["entries", "total", "warnings"],
     },
     "harness.monitor.anomaly": {
         "required_params": {"audit_log_path": "str"},
         "optional_params": {"anomaly_threshold": "int"},
-        "output_fields": ["anomalies", "total"],
+        "output_fields": ["anomalies", "total", "warnings"],
     },
     "harness.monitor.performance": {
         "required_params": {"performance_log_path": "str"},
         "optional_params": {"agent_id": "str"},
-        "output_fields": ["stats"],
+        "output_fields": ["stats", "warnings"],
     },
     "harness.monitor.failure_patterns": {
         "required_params": {"performance_log_path": "str"},
         "optional_params": {"agent_id": "str"},
-        "output_fields": ["failures", "total"],
+        "output_fields": ["failures", "total", "warnings"],
     },
 }
 
@@ -113,35 +113,40 @@ def _execute_checkpoint_all(params: dict[str, Any]) -> dict[str, Any]:
 def _execute_permission_audit(params: dict[str, Any]) -> dict[str, Any]:
     audit_log_path = _required_path(params, "audit_log_path")
     agent_id = _optional_str(params, "agent_id")
-    entries = AgentMonitor(audit_log_path).get_permission_audit(agent_id=agent_id)
-    return {"entries": entries, "total": len(entries)}
+    monitor = AgentMonitor(audit_log_path)
+    entries = monitor.get_permission_audit(agent_id=agent_id)
+    return {"entries": entries, "total": len(entries), "warnings": monitor.warnings}
 
 
 def _execute_denied_actions(params: dict[str, Any]) -> dict[str, Any]:
     audit_log_path = _required_path(params, "audit_log_path")
-    entries = AgentMonitor(audit_log_path).get_denied_actions()
-    return {"entries": entries, "total": len(entries)}
+    monitor = AgentMonitor(audit_log_path)
+    entries = monitor.get_denied_actions()
+    return {"entries": entries, "total": len(entries), "warnings": monitor.warnings}
 
 
 def _execute_anomaly(params: dict[str, Any]) -> dict[str, Any]:
     audit_log_path = _required_path(params, "audit_log_path")
     threshold = _optional_positive_int(params, "anomaly_threshold", default=100)
-    anomalies = AgentMonitor(audit_log_path, anomaly_threshold=threshold).detect_anomalies()
-    return {"anomalies": anomalies, "total": len(anomalies)}
+    monitor = AgentMonitor(audit_log_path, anomaly_threshold=threshold)
+    anomalies = monitor.detect_anomalies()
+    return {"anomalies": anomalies, "total": len(anomalies), "warnings": monitor.warnings}
 
 
 def _execute_performance(params: dict[str, Any]) -> dict[str, Any]:
     performance_log_path = _required_path(params, "performance_log_path")
     agent_id = _optional_str(params, "agent_id")
-    stats = AgentPerformanceMonitor(performance_log_path).get_stats(agent_id=agent_id)
-    return {"stats": stats}
+    monitor = AgentPerformanceMonitor(performance_log_path, create_parent=False)
+    stats = monitor.get_stats(agent_id=agent_id)
+    return {"stats": stats, "warnings": monitor.warnings}
 
 
 def _execute_failure_patterns(params: dict[str, Any]) -> dict[str, Any]:
     performance_log_path = _required_path(params, "performance_log_path")
     agent_id = _optional_str(params, "agent_id")
-    failures = AgentPerformanceMonitor(performance_log_path).detect_failure_patterns(agent_id=agent_id)
-    return {"failures": failures, "total": len(failures)}
+    monitor = AgentPerformanceMonitor(performance_log_path, create_parent=False)
+    failures = monitor.detect_failure_patterns(agent_id=agent_id)
+    return {"failures": failures, "total": len(failures), "warnings": monitor.warnings}
 
 
 def _base_metadata(context: dict[str, Any]) -> dict[str, Any]:
@@ -157,6 +162,8 @@ def _required_path(params: dict[str, Any], key: str) -> Path:
     value = params.get(key)
     if not isinstance(value, (str, Path)) or not str(value):
         raise ValueError(f"{key} must be a non-empty path string")
+    if isinstance(value, str) and any(ch in value for ch in "\x00\r\n"):
+        raise ValueError(f"{key} must not contain control characters")
     return Path(value)
 
 

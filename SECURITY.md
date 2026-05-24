@@ -2,12 +2,12 @@
 
 ## Security Model
 
-SuperMedicine uses a **dual-layer permission engine** (P0 priority) to enforce security:
+SuperMedicine uses a **runtime permission engine plus prompt-context guidance** (P0 priority) to manage security:
 
 1. **Code Layer** (`permission/policy.py`) — Hard enforcement via fnmatch-based rules with deny-override-allow logic
-2. **Prompt Layer** (`permission/prompt_generator.py`) — Context-aware soft constraints injected into agent context
+2. **Prompt Context Layer** (`permission/prompt_generator.py`) — Advisory, context-aware soft constraints injected into agent context
 
-Both layers must approve; any single denial blocks the action (one-vote veto).
+Only the code-layer `PermissionEngine.check()` path performs runtime allow/deny decisions and writes audit records. The prompt context layer does **not** currently run inside `Kernel` as an additional runtime veto; it generates safety text and rejection templates for agent context.
 
 ## Permission Configuration
 

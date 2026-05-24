@@ -29,6 +29,8 @@ class TestCheckpointVerifier:
         verifier = CheckpointVerifier(tmp_path)
         result = verifier.verify("task-1")
         assert result["complete"] is True
+        assert result["structurally_complete"] is True
+        assert result["final_state_success"] is True
         assert result["total_steps"] == 4
         assert result["missing_steps"] == []
 
@@ -45,7 +47,44 @@ class TestCheckpointVerifier:
         verifier = CheckpointVerifier(tmp_path)
         result = verifier.verify("task-2")
         assert result["complete"] is False
+        assert result["structurally_complete"] is False
+        assert result["final_state_success"] is False
         assert 3 in result["missing_steps"]
+
+    def test_verify_structural_complete_distinct_from_final_state_success(self, tmp_path):
+        """Sequential checkpoints can be structurally complete before final completion."""
+        task_dir = tmp_path / "task-running"
+        for step in range(1, 3):
+            step_dir = task_dir / f"step-{step}"
+            step_dir.mkdir(parents=True)
+            (step_dir / "status.json").write_text(
+                json.dumps({"state": "running"}), encoding="utf-8"
+            )
+
+        verifier = CheckpointVerifier(tmp_path)
+        result = verifier.verify("task-running")
+
+        assert result["complete"] is True
+        assert result["structurally_complete"] is True
+        assert result["final_state_success"] is False
+
+    def test_verify_malformed_status_is_warning_not_crash(self, tmp_path):
+        """Malformed checkpoint status files are observable and mark structure incomplete."""
+        task_dir = tmp_path / "task-bad"
+        good_step = task_dir / "step-1"
+        bad_step = task_dir / "step-2"
+        good_step.mkdir(parents=True)
+        bad_step.mkdir(parents=True)
+        (good_step / "status.json").write_text(json.dumps({"state": "completed"}), encoding="utf-8")
+        (bad_step / "status.json").write_text("{not-json", encoding="utf-8")
+
+        verifier = CheckpointVerifier(tmp_path)
+        result = verifier.verify("task-bad")
+
+        assert result["complete"] is False
+        assert result["structurally_complete"] is False
+        assert result["final_state_success"] is True
+        assert result["warnings"][0]["code"] == "malformed_json"
 
     def test_verify_all(self, tmp_path):
         """验证所有任务"""

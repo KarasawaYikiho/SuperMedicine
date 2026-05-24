@@ -1,6 +1,11 @@
 # SuperMedicine
 
-![Version](https://img.shields.io/badge/version-0.1.0--beta-blue)
+![Version](https://img.shields.io/badge/version-Beta0.2.0-blue)
+
+Release-ready label: `Beta0.2.0`. Python package metadata uses `0.2.0b0`
+because PEP 440 packaging validation rejects `Beta0.2.0` as a Python project
+version. No tag, release, publish, or upload has been created by this release
+readiness update.
 
 Modular medical research agent framework with RAG, plugin execution, and
 permission-gated orchestration.
@@ -8,18 +13,20 @@ permission-gated orchestration.
 ## Features
 
 - **Modular Architecture** — Microkernel + multi-Agent orchestration with plugin system
-- **P0 Permission Engine** — Dual-layer (code + prompt) permission constraints with one-vote veto
+- **P0 Permission Engine** — Code-layer runtime permission constraints with prompt-context safety guidance
 - **Plugin Ecosystem** — RAG retrieval, Harness monitoring, prototype Python/R statistics interfaces, medical writing standards
 - **Cross-Platform** — OpenCode and standalone adapters, plus a minimal permission-checked Claude Code adapter with real local CLI invocation when `claude` is available
 - **Medical Standards** — CONSORT, STROBE, PRISMA, STARD reporting checklists; AMA/Vancouver citation formatting constraints
 
 ## Medical statistics boundary
 
-The current `python-stats` and `r-survival` plugins are interface/prototype test
-paths only. They provide stable input/output contracts and deterministic smoke
-fixtures for development tests, but SuperMedicine does not promise
-production-grade, clinical-grade, regulatory-grade, or decision-support
-statistical accuracy. Outputs require qualified expert review before any
+The current `python-stats` and `r-survival` plugins provide stable input/output
+contracts and deterministic smoke fixtures for development tests, but
+SuperMedicine does not promise production-grade, clinical-grade,
+regulatory-grade, or decision-support statistical accuracy. `r-survival` uses a
+pure-Python fallback by default and formally supports an optional R/rpy2 backend
+for Kaplan-Meier, log-rank, and Cox PH actions when local R and the R `survival`
+package are available. Outputs require qualified expert review before any
 research, regulatory, or clinical use.
 
 ## RAG external database/vector index integration
@@ -105,7 +112,10 @@ pytest tests/ -v
 
 Release readiness review:
 
-- Confirm permission policies and audit behavior still enforce one-vote vetoes.
+- Treat `Beta0.2.0` as the GitHub/release-ready label. Python packaging
+  metadata intentionally uses the PEP 440 fallback `0.2.0b0`.
+
+- Confirm permission policies and audit behavior still enforce runtime vetoes through `PermissionEngine.check()`.
 - Exercise the CLI `init`, `status`, `test`, and `run` paths in an initialized workspace.
 - Confirm plugin discovery and execution remain permission-gated.
 - Confirm Claude Code adapter paths report capabilities, runtime status, timeout,

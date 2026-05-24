@@ -59,7 +59,7 @@ def execute(
 
     try:
         if action == "rag.query":
-            output = _execute_query(params)
+            output = _execute_query(params, context)
         elif action == "rag.context.store":
             output = _execute_context_store(params)
         elif action == "rag.context.retrieve":
@@ -100,26 +100,31 @@ def execute(
     )
 
 
-def _execute_query(params: dict[str, Any]) -> dict[str, Any]:
+def _execute_query(params: dict[str, Any], context: dict[str, Any] | None = None) -> dict[str, Any]:
+    context = context or {}
     query = _required_str(params, "query")
     top_k = _top_k(params.get("top_k", 5))
     provider_name = str(params.get("provider") or params.get("provider_type") or "local").lower()
 
     if provider_name in {"local", "local-tfidf"}:
-        provider = LocalRAGProvider(_storage_dir(params))
+        local_provider = LocalRAGProvider(_storage_dir(params))
         documents = params.get("documents", DEFAULT_DOCUMENTS)
-        _seed_local_documents(provider, documents)
-        return provider.query(query, top_k=top_k, scope=str(params.get("scope", "literature")))
+        _seed_local_documents(local_provider, documents)
+        return local_provider.query(query, top_k=top_k, scope=str(params.get("scope", "literature")))
 
     if provider_name in {"mock", "mock_external", "mock-external-vector-store", "external_vector"}:
         config = _provider_config(params)
         records = _records_from_params(params)
-        provider = MockExternalVectorStoreProvider(config, records=records)
-        return provider.query(query, top_k=top_k)
+        mock_provider = MockExternalVectorStoreProvider(config, records=records)
+        return mock_provider.query(query, top_k=top_k)
 
     if provider_name == "pubmed":
-        provider = PubmedRAGProvider(timeout_seconds=float(params.get("timeout_seconds", 10.0)))
-        return provider.query(query, top_k=top_k)
+        pubmed_provider = PubmedRAGProvider(
+            timeout_seconds=float(params.get("timeout_seconds", 10.0)),
+            permission_engine=context.get("permission_engine"),
+            agent_id=_explicit_agent_id(params, context),
+        )
+        return pubmed_provider.query(query, top_k=top_k)
 
     raise ValueError(f"provider must be one of local, mock_external, or pubmed; got {provider_name!r}")
 
@@ -141,11 +146,12 @@ def _execute_context_retrieve(params: dict[str, Any]) -> dict[str, Any]:
 
 
 def _base_metadata(context: dict[str, Any]) -> dict[str, Any]:
+    audit_context_keys = sorted(key for key in context.keys() if key != "permission_engine")
     return {
         "resource": {"kind": "rag", "plugin": PLUGIN_NAME},
         "security": {"permission_entrypoint": "kernel", "permission_checked": bool(context)},
         "contract": {"actions": ACTION_CONTRACTS, "provider_contract": "RAGProvider"},
-        "audit": {"context_keys": sorted(context.keys())},
+        "audit": {"context_keys": audit_context_keys},
     }
 
 
@@ -177,6 +183,8 @@ def _seed_local_documents(provider: LocalRAGProvider, documents: Any) -> None:
 
 
 def _provider_config(params: dict[str, Any]) -> RAGProviderConfig:
+    provider_metadata = params.get("provider_metadata")
+    metadata: dict[str, Any] = provider_metadata if isinstance(provider_metadata, dict) else {}
     return RAGProviderConfig(
         provider_type="external_vector",
         endpoint=str(params.get("endpoint") or "mock://vector-store"),
@@ -184,7 +192,7 @@ def _provider_config(params: dict[str, Any]) -> RAGProviderConfig:
         namespace=params.get("namespace"),
         api_key_env=params.get("api_key_env"),
         timeout_seconds=float(params.get("timeout_seconds", 10.0)),
-        metadata=params.get("provider_metadata") if isinstance(params.get("provider_metadata"), dict) else {},
+        metadata=metadata,
     )
 
 
@@ -215,6 +223,13 @@ def _top_k(value: Any) -> int:
     if top_k < 1:
         raise ValueError("top_k must be >= 1")
     return top_k
+
+
+def _explicit_agent_id(params: dict[str, Any], context: dict[str, Any]) -> str | None:
+    agent_id = context.get("agent_id") if "agent_id" in context else params.get("agent_id")
+    if agent_id is None:
+        return None
+    return str(agent_id)
 
 
 def _first_error_message(output: dict[str, Any]) -> str | None:

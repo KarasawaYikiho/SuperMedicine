@@ -1,6 +1,6 @@
 {
   "name": "supermedicine",
-  "version": "0.1.0",
+  "version": "Beta0.2.0",
   "description": "Modular medical research Agent with RAG and Harness",
   "platforms": {
     "claude-code": {"type": "skill+subagent", "entry": "adapters/claude_code/SKILL.md"},

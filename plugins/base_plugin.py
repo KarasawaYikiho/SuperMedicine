@@ -186,7 +186,8 @@ class BasePlugin:
         """Normalize legacy plugin result dictionaries to the stable contract shape."""
         status = result.get("status") or "success"
         output = result.get("output", result.get("result"))
-        metadata = result.get("metadata") if isinstance(result.get("metadata"), dict) else {}
+        raw_metadata = result.get("metadata")
+        metadata: dict[str, Any] = raw_metadata if isinstance(raw_metadata, dict) else {}
         for key in ("medical_boundary", "statistics_boundary", "audit", "resource", "security"):
             if key in result and key not in metadata:
                 metadata[key] = result[key]

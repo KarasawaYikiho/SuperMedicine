@@ -4,8 +4,29 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
+import pytest
+import yaml
+
 from adapters.standalone.adapter import StandaloneAdapter
 from adapters.base_adapter import BaseAdapter
+from permission.engine import PermissionEngine
+
+
+def _adapter_with_policy(tmp_path: Path, *, allowed: list[dict[str, str]], denied: list[dict[str, str]] | None = None, agent_id: str = "alpha") -> StandaloneAdapter:
+    policy_dir = tmp_path / ".supermedicine" / "policies"
+    policy_dir.mkdir(parents=True)
+    (policy_dir / PermissionEngine.DEFAULT_POLICY_FILENAME).write_text(yaml.dump({
+        "agent_id": agent_id,
+        "role": "standalone-test",
+        "permissions": {"allowed": allowed, "denied": denied or []},
+    }), encoding="utf-8")
+    engine = PermissionEngine(policy_dir, policy_dir / "audit.jsonl")
+    return StandaloneAdapter(permission_engine=engine, project_dir=tmp_path, default_agent_id=agent_id)
+
+
+@pytest.fixture
+def permissive_adapter(tmp_path: Path) -> StandaloneAdapter:
+    return _adapter_with_policy(tmp_path, allowed=[{"action": "tool_call", "scope": "*"}])
 
 
 class TestStandaloneAdapter:
@@ -26,8 +47,8 @@ class TestStandaloneAdapter:
         assert "hello" in result["result"]
 
     def test_tool_call_read_write(self):
-        adapter = StandaloneAdapter()
         with tempfile.TemporaryDirectory() as td:
+            adapter = StandaloneAdapter(project_dir=Path(td))
             fp = Path(td) / "test.txt"
             w = adapter.tool_call("write", {"filePath": str(fp), "content": "test content"})
             assert w["status"] == "ok"
@@ -44,6 +65,65 @@ class TestStandaloneAdapter:
         adapter = StandaloneAdapter()
         result = adapter.tool_call("nonexistent", {})
         assert result["status"] == "error"
+
+    def test_denied_edit_returns_before_file_mutation(self, tmp_path):
+        target = tmp_path / "blocked.txt"
+        target.write_text("old", encoding="utf-8")
+        adapter = _adapter_with_policy(tmp_path, allowed=[], denied=[{"action": "tool_call", "scope": "*"}])
+
+        result = adapter.tool_call("edit", {"filePath": str(target), "oldString": "old", "newString": "new"})
+
+        assert result["status"] == "denied"
+        assert target.read_text(encoding="utf-8") == "old"
+
+    def test_allowed_read_with_explicit_policy(self, tmp_path):
+        target = tmp_path / "allowed.txt"
+        target.write_text("readable", encoding="utf-8")
+        adapter = _adapter_with_policy(tmp_path, allowed=[{"action": "tool_call", "scope": str(target)}])
+
+        result = adapter.tool_call("read", {"filePath": str(target)})
+
+        assert result["status"] == "ok"
+        assert "readable" in result["result"]
+
+    def test_filesystem_tools_deny_paths_outside_project_root(self, permissive_adapter, tmp_path):
+        outside_dir = tmp_path.parent / f"{tmp_path.name}-outside"
+        outside_file = outside_dir / "blocked.txt"
+        assert not outside_file.exists()
+
+        write_result = permissive_adapter.tool_call("write", {"filePath": str(outside_file), "content": "blocked"})
+        read_result = permissive_adapter.tool_call("read", {"filePath": str(outside_file)})
+        glob_result = permissive_adapter.tool_call("glob", {"path": str(outside_dir), "pattern": "*"})
+        grep_result = permissive_adapter.tool_call("grep", {"path": str(outside_dir), "pattern": "blocked"})
+
+        assert write_result["status"] == "denied"
+        assert write_result["error_code"] == "sandbox_denied"
+        assert not outside_file.exists()
+        assert read_result["status"] == "denied"
+        assert glob_result["status"] == "denied"
+        assert grep_result["status"] == "denied"
+
+    def test_edit_does_not_mutate_outside_project_root(self, permissive_adapter, tmp_path):
+        outside_dir = tmp_path.parent / f"{tmp_path.name}-outside-edit"
+        outside_dir.mkdir(exist_ok=True)
+        outside_file = outside_dir / "blocked.txt"
+        outside_file.write_text("old", encoding="utf-8")
+
+        result = permissive_adapter.tool_call("edit", {"filePath": str(outside_file), "oldString": "old", "newString": "new"})
+
+        assert result["status"] == "denied"
+        assert result["error_code"] == "sandbox_denied"
+        assert outside_file.read_text(encoding="utf-8") == "old"
+
+    def test_bash_permission_denied_before_execution(self, tmp_path):
+        marker = tmp_path / "should_not_exist.txt"
+        adapter = _adapter_with_policy(tmp_path, allowed=[], denied=[{"action": "tool_call", "scope": "bash"}])
+
+        result = adapter.tool_call("bash", {"command": f"python -c \"from pathlib import Path; Path(r'{marker}').write_text('ran')\"", "workdir": str(tmp_path)})
+
+        assert result["status"] == "denied"
+        assert result["resource"] == "bash"
+        assert not marker.exists()
 
     def test_skill_load(self):
         adapter = StandaloneAdapter()

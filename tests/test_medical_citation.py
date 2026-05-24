@@ -114,6 +114,10 @@ class TestMedicalCitationPluginEntry:
         assert result["status"] == "success"
         assert result["plugin"] == "medical-citation"
         assert result["action"] == "standard.citation.ama"
+        assert result["metadata"]["requires_human_review"] is True
+        assert result["metadata"]["not_for_clinical_advice"] is True
+        assert result["output"]["requires_human_review"] is True
+        assert result["output"]["not_for_clinical_advice"] is True
         assert "Smith J" in result["output"]["citation"]
         assert "doi:10.1001/jama.2024.1234" in result["output"]["citation"]
 

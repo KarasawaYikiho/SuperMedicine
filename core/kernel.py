@@ -70,7 +70,12 @@ class Kernel:
 
     @property
     def permission_engine(self) -> PermissionEngine:
-        """P0 权限引擎 — 双重约束（代码层 + Prompt 层），一票否决制"""
+        """P0 运行时权限引擎。
+
+        Kernel execution is hard-gated by PermissionEngine.check() against the
+        code-layer policy and hard_limits. PromptGenerator is advisory/context
+        generation only and is not invoked here as a runtime veto layer.
+        """
         return self._permission_engine
 
     @property
@@ -163,10 +168,17 @@ class Kernel:
             "agent_id": agent_id,
             "plugin": selected_plugin,
             "action": selected_action,
+            "permission_engine": self._permission_engine,
             "policy_path": str(self._policies_dir / self._permission_engine.DEFAULT_POLICY_FILENAME),
             "resource": {"kind": "plugin", "plugin": selected_plugin, "action": selected_action},
             "security": {"permission_entrypoint": "kernel", "permission_checked": True},
         }
+        if selected_plugin == "rag-interface" and selected_action == "rag.query":
+            provider_name = str((params or {}).get("provider") or (params or {}).get("provider_type") or "local").lower()
+            if provider_name == "pubmed":
+                execution_context["requires_network"] = True
+                execution_context["requires_external_api"] = True
+                execution_context["external_resource"] = "https://eutils.ncbi.nlm.nih.gov/*"
 
         permission = self._permission_engine.check(
             agent_id,

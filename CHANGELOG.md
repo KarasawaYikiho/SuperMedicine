@@ -5,6 +5,20 @@ All notable changes to SuperMedicine will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Beta0.2.0] — release-ready, unreleased
+
+### Added
+- Formal optional R/rpy2 backend support for `r-survival` Kaplan-Meier,
+  log-rank, and Cox PH actions, with structured unavailable responses when rpy2,
+  local R, or the R `survival` package is missing.
+
+### Release readiness
+- Set the GitHub/release-ready label to `Beta0.2.0` without creating a tag,
+  release, publish, or upload.
+- Audited Python packaging metadata for the same label; packaging validation
+  rejects `Beta0.2.0` because `project.version` must be PEP 440, so Python
+  metadata uses fallback version `0.2.0b0`.
+
 ## [0.1.0-beta] — 2026-05-22
 
 ### Release readiness

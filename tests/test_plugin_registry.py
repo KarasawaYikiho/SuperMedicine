@@ -155,8 +155,26 @@ class TestPluginRegistry:
         assert result["plugin"] == "harness-core"
         assert result["action"] == "harness.integration.checkpoint"
         assert result["output"]["complete"] is True
+        assert result["output"]["structurally_complete"] is True
+        assert result["output"]["final_state_success"] is True
+        assert result["output"]["warnings"] == []
         assert result["output"]["total_steps"] == 1
         assert result["metadata"]["contract"]["actions"]
+
+    def test_harness_core_monitor_malformed_jsonl_returns_warnings(self, tmp_path):
+        audit_log = tmp_path / "audit.jsonl"
+        audit_log.write_text('{"agent_id":"alpha","result":"DENIED"}\n{not-json\n', encoding="utf-8")
+        r = PluginRegistry("plugins")
+        r.discover()
+
+        result = r.get("harness-core").execute(
+            "harness.monitor.permission_audit",
+            {"audit_log_path": str(audit_log)},
+        )
+
+        assert result["status"] == "success"
+        assert result["output"]["total"] == 1
+        assert result["output"]["warnings"][0]["code"] == "malformed_json"
 
     def test_harness_core_invalid_input_is_structured_plugin_error(self):
         r = PluginRegistry("plugins")

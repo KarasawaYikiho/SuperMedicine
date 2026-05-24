@@ -16,11 +16,14 @@ or clinical use.
 - Cox proportional hazards model — multivariate survival regression
 
 ## Prerequisites
-The plugin exposes a pure-Python fallback. Optional R bridge support requires
-R >= 4.3 and rpy2 Python package:
+The plugin exposes a pure-Python fallback. Optional formal R backend support
+requires R >= 4.3, the R `survival` package, and rpy2 Python package:
 ```bash
-pip install rpy2
+pip install -e ".[r]"
+R -e "install.packages('survival', repos='https://cran.r-project.org')"
 ```
+Request the R backend by passing `"backend": "r"`; unavailable R dependencies
+return a structured `plugin_unavailable` result.
 
 ## Usage
 ```python

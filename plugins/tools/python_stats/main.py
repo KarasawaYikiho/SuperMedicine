@@ -195,6 +195,9 @@ def execute(
     metadata = {
         "medical_boundary": MEDICAL_BOUNDARY,
         "statistics_boundary": STATISTICS_BOUNDARY,
+        "prototype_only": True,
+        "not_for_clinical_decision": True,
+        "requires_human_review": True,
         "resource": "local-python-statistics",
         "contract": {
             "stage": "prototype-interface-tests-only",

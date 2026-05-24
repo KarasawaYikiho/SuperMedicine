@@ -107,12 +107,16 @@ def _execute_citation(action: str, params: dict[str, Any]) -> dict[str, Any]:
         "citation": citation,
         "validation": citation_state_from_validation(validation),
         "medical_boundary": MEDICAL_BOUNDARY,
+        "not_for_clinical_advice": True,
+        "requires_human_review": True,
     }
 
 
 def _base_metadata(context: dict[str, Any]) -> dict[str, Any]:
     return {
         "medical_boundary": MEDICAL_BOUNDARY,
+        "not_for_clinical_advice": True,
+        "requires_human_review": True,
         "resource": {"kind": "standard", "plugin": PLUGIN_NAME},
         "security": {"permission_entrypoint": "kernel", "permission_checked": bool(context)},
         "contract": {"actions": ACTION_CONTRACTS, "provider_contract": "medical-citation-formatters"},

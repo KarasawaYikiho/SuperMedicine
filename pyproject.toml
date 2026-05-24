@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "supermedicine"
-version = "0.1.0"
+version = "0.2.0b0"
 description = "Modular medical research Agent with RAG and Harness"
 requires-python = ">=3.10"
 dependencies = [
@@ -17,14 +17,17 @@ dev = [
     "pytest-cov>=4.0",
     "ruff>=0.4.0",
 ]
-# Optional: for future R backend integration
-# (currently all survival analysis uses pure Python fallback)
+# Optional formal R/rpy2 survival backend. Also requires a local R installation
+# with the R survival package available.
 r = [
     "rpy2>=3.5",
 ]
 
 [project.scripts]
 supermedicine = "Cli:main"
+
+[tool.setuptools]
+py-modules = ["Cli", "Install"]
 
 [tool.setuptools.packages.find]
 include = ["core*", "permission*", "agents*", "plugins*", "adapters*"]

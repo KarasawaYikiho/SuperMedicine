@@ -2,7 +2,7 @@
 
 ## Overview
 
-SuperMedicine uses a **microkernel + multi-agent orchestration** architecture. The microkernel (Kernel) integrates all core subsystems, while plugins and agents extend functionality through well-defined interfaces. A P0 dual-layer permission engine enforces security constraints at both code and prompt levels.
+SuperMedicine uses a **microkernel + multi-agent orchestration** architecture. The microkernel (Kernel) integrates all core subsystems, while plugins and agents extend functionality through well-defined interfaces. A P0 runtime permission engine enforces code-layer policy checks, while prompt-layer helpers provide advisory context generation.
 
 ## Architecture Diagram
 
@@ -22,8 +22,8 @@ SuperMedicine uses a **microkernel + multi-agent orchestration** architecture. T
 │                                                                  │
 │  ┌──────────────────┐  ┌──────────────────────────────────┐     │
 │  │ SessionManager   │  │ PermissionEngine (P0)            │     │
-│  │ (UUID sessions)  │  │ Code-layer + Prompt-layer        │     │
-│  └──────────────────┘  │ One-vote Veto → JSONL Audit      │     │
+│  │ (UUID sessions)  │  │ Code-layer runtime veto          │     │
+│  └──────────────────┘  │ Policy/HardLimits → JSONL Audit  │     │
 │                        └──────────────────────────────────┘     │
 └──────────────────────────────┬───────────────────────────────────┘
                                │
@@ -67,24 +67,26 @@ The Kernel is the central coordinator. All subsystems are instantiated and wired
 
 ## Layer 2: Permission System (`permission/`)
 
-The permission system enforces a **dual-layer constraint model**:
+The permission system has a **runtime enforcement path plus an advisory prompt-context path**:
 
 ```
 Action Request
      │
-     ├──► Code Layer (PermissionPolicy)
+     ├──► Runtime Code Layer (PermissionEngine → PermissionPolicy)
      │    - fnmatch-based rule matching
      │    - deny-override-allow logic
+     │    - hard_limits checks where context is supplied
      │    - hard enforcement
      │
-     ├──► Prompt Layer (PromptGenerator)
+     ├──► Prompt Context Layer (PromptGenerator)
      │    - dynamic safety prefix generation
      │    - deny template injection into agent context
-     │    - context-aware soft constraints
+     │    - context-aware soft constraints only
+     │    - not currently invoked by Kernel as a runtime veto
      │
      ▼
-  Both must PASS → Action allowed
-  Any DENY → Action blocked + AuditLogger records
+  Runtime PermissionEngine ALLOWED → Action may proceed
+  Runtime PermissionEngine DENIED → Action blocked + AuditLogger records
 ```
 
 ### Components
@@ -290,7 +292,7 @@ Orchestrator.dispatch(task)
 ## Design Principles
 
 1. **Functional Preservation** — No existing function behavior is ever changed without explicit approval
-2. **Dual-Layer Security** — Permission constraints enforced at both code and prompt levels simultaneously
+2. **Permission Safety** — Runtime permission constraints are enforced by the code-layer PermissionEngine; PromptGenerator provides advisory agent-context constraints and is not a Kernel veto layer
 3. **Checkpoint Resilience** — Long-running tasks can be interrupted and resumed without data loss
 4. **Plugin Extensibility** — New capabilities added through plugin.yaml manifests, not core code changes
 5. **Platform Agnostic** — Core logic is independent of any specific AI coding platform

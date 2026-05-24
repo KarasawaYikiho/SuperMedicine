@@ -1,5 +1,6 @@
 from plugins.standards.medical_writing.checklists import get_consort_checklist, get_strobe_checklist
 from plugins.standards.medical_writing.checklist_base import MedicalClaim
+from plugins.standards.medical_writing.main import execute
 from plugins.standards.medical_citation.utils import CitationSource, JournalArticle
 
 
@@ -87,3 +88,13 @@ class TestStrobeChecklist:
         result = checklist.check(text)
         assert result["standard"] == "STROBE"
         assert result["total_items"] > 0
+
+
+class TestMedicalWritingPluginSafetyMetadata:
+    def test_execute_includes_machine_readable_review_and_advice_boundaries(self):
+        result = execute("standard.consort", {"text": "随机对照试验采用结构化摘要"})
+
+        assert result["status"] == "success"
+        assert result["metadata"]["requires_human_review"] is True
+        assert result["metadata"]["not_for_clinical_advice"] is True
+        assert result["output"]["human_review_message"]

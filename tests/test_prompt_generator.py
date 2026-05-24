@@ -8,3 +8,9 @@ class TestPromptGenerator:
     def test_generate_rejection_templates(self):
         templates = PromptGenerator().generate_rejection_templates("r")
         assert "code_execution" in templates and "privilege_escalation" in templates
+
+    def test_prompt_generator_is_context_generation_only(self):
+        gen = PromptGenerator()
+        assert not hasattr(gen, "check")
+        assert not hasattr(gen, "authorize")
+        assert not hasattr(gen, "enforce")

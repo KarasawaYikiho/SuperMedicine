@@ -29,6 +29,7 @@ class ClaudeCodeAdapter(BaseAdapter):
         runtime_command: str = "claude",
         timeout_seconds: int = 30,
     ):
+        super().__init__(permission_engine=permission_engine, project_dir=project_dir, default_agent_id=default_agent_id)
         self._project_dir = Path.cwd() if project_dir is None else Path(project_dir)
         self._default_agent_id = default_agent_id
         self._runtime_command = runtime_command

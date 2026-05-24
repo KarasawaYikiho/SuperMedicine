@@ -2,8 +2,9 @@
 import json
 import shutil
 import yaml
+import pytest
 
-from Cli import CLI
+from Cli import CLI, _resolve_run_params
 from Install import init_config
 from core.kernel import Kernel
 from agents.orchestrator import Orchestrator
@@ -59,6 +60,74 @@ class TestIntegration:
         init_config(install_project)
 
         assert default_policy_path(cli_project).read_text(encoding="utf-8") == default_policy_path(install_project).read_text(encoding="utf-8")
+
+    def test_cli_resolves_params_json_object(self):
+        params = _resolve_run_params('{"source_id":"src-1","sources":{"src-1":{"title":"T"}}}', None)
+
+        assert params == {"source_id": "src-1", "sources": {"src-1": {"title": "T"}}}
+
+    def test_cli_resolves_params_file_object(self, tmp_path):
+        params_file = tmp_path / "params.json"
+        params_file.write_text(json.dumps({"query": "hypertension", "top_k": 1}), encoding="utf-8")
+
+        params = _resolve_run_params(None, str(params_file))
+
+        assert params == {"query": "hypertension", "top_k": 1}
+
+    def test_cli_rejects_both_params_sources(self, tmp_path):
+        params_file = tmp_path / "params.json"
+        params_file.write_text("{}", encoding="utf-8")
+
+        with pytest.raises(ValueError, match="cannot be used together"):
+            _resolve_run_params("{}", str(params_file))
+
+    def test_cli_rejects_invalid_params_json(self):
+        with pytest.raises(ValueError, match="valid JSON"):
+            _resolve_run_params("{not-json", None)
+
+    def test_cli_rejects_non_object_params_json(self):
+        with pytest.raises(ValueError, match="JSON object"):
+            _resolve_run_params("[]", None)
+
+    def test_cli_run_passes_structured_params_to_citation_plugin(self, monkeypatch):
+        captured = {}
+
+        class FakeRegistry:
+            def discover(self):
+                return []
+
+        class FakeCheckpointManager:
+            base_dir = "checkpoints"
+
+        class FakeKernel:
+            def __init__(self, *args, **kwargs):
+                self._config_path = kwargs["config_path"]
+                self._plugins_dir = kwargs["plugins_dir"]
+                self._policies_dir = kwargs["policies_dir"]
+                self.plugin_registry = FakeRegistry()
+                self.checkpoint_manager = FakeCheckpointManager()
+
+            def execute_task(self, task, plugin_name=None, action=None, params=None):
+                captured.update({"task": task, "plugin_name": plugin_name, "action": action, "params": params})
+                return {"status": "success", "task": task, "plugin": plugin_name, "action": action, "output": {}}
+
+        monkeypatch.setattr("core.kernel.Kernel", FakeKernel)
+
+        params = {"source_id": "src-1", "sources": {"src-1": {"title": "Cardiovascular Risk Factors"}}}
+        result = CLI().run(
+            "AMA citation task",
+            plugin="medical-citation",
+            action="standard.citation.ama",
+            params=params,
+        )
+
+        assert result["status"] == "success"
+        assert captured == {
+            "task": "AMA citation task",
+            "plugin_name": "medical-citation",
+            "action": "standard.citation.ama",
+            "params": params,
+        }
 
     def test_full_workflow(self, tmp_path):
         """测试完整工作流程：初始化 → 权限检查 → 任务分派 → 检查点"""
@@ -306,6 +375,41 @@ class TestIntegration:
         assert result["action"] == "rag.query"
         assert result["output"]["items"][0]["source"] == "kernel-local-rag"
         assert result["output"]["errors"] == []
+
+    def test_rag_pubmed_manifest_denies_without_permission_context_before_http(self):
+        from plugins.rag.main import execute
+
+        result = execute("rag.query", {"provider": "pubmed", "query": "hypertension", "top_k": 1})
+
+        assert result["status"] == "plugin_error"
+        assert result["output"]["status"] == "denied"
+        assert result["output"]["errors"][0]["code"] == "permission_engine_required"
+
+    def test_rag_pubmed_manifest_denies_without_agent_identity_before_http(self, tmp_path):
+        from plugins.rag.main import execute
+
+        policies = tmp_path / "policies"
+        policies.mkdir()
+        (policies / PermissionEngine.DEFAULT_POLICY_FILENAME).write_text(yaml.dump({
+            "agent_id": "alpha",
+            "role": "rag-test",
+            "permissions": {
+                "allowed": [{"action": "rag.external.query", "scope": "https://eutils.ncbi.nlm.nih.gov/*"}],
+                "denied": [],
+                "hard_limits": {"network_access": True, "external_api": True},
+            },
+        }))
+        engine = PermissionEngine(policies, tmp_path / "audit.jsonl")
+
+        result = execute(
+            "rag.query",
+            {"provider": "pubmed", "query": "hypertension", "top_k": 1},
+            {"permission_engine": engine},
+        )
+
+        assert result["status"] == "plugin_error"
+        assert result["output"]["status"] == "denied"
+        assert result["output"]["errors"][0]["code"] == "agent_identity_required"
 
     def test_kernel_rag_interface_invalid_input_is_structured_plugin_error(self):
         kernel = Kernel()

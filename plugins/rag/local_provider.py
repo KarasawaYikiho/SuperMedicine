@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -22,6 +23,7 @@ class LocalRAGProvider(RAGProvider):
     """基于本地文件的 RAG Provider"""
 
     provider_name = "local-tfidf"
+    _SAFE_CONTEXT_KEY = re.compile(r"^[A-Za-z0-9_.-]+$")
 
     def __init__(self, storage_dir: Path):
         self._storage_dir = Path(storage_dir)
@@ -96,17 +98,36 @@ class LocalRAGProvider(RAGProvider):
 
     def store_context(self, key: str, value: Any) -> None:
         """存储项目上下文"""
-        context_file = self._context_dir / f"{key}.json"
+        context_file = self._context_file_for_key(key)
         with open(context_file, "w", encoding="utf-8") as f:
             json.dump(value, f, ensure_ascii=False, indent=2)
 
     def retrieve_context(self, key: str) -> Any | None:
         """检索项目上下文"""
-        context_file = self._context_dir / f"{key}.json"
+        context_file = self._context_file_for_key(key)
         if not context_file.exists():
             return None
         with open(context_file, encoding="utf-8") as f:
             return json.load(f)
+
+    def _context_file_for_key(self, key: str) -> Path:
+        """Return a context JSON path for a restricted safe key.
+
+        Context keys become filenames under ``self._context_dir``.  Restricting
+        them to a conservative filename subset preserves existing safe keys such
+        as ``project_1`` while preventing path traversal, absolute paths, drive
+        prefixes, and separator tricks from escaping the context directory.
+        """
+        if not isinstance(key, str) or not key:
+            raise ValueError("context key must be a non-empty string")
+        if key in {".", ".."} or not self._SAFE_CONTEXT_KEY.fullmatch(key):
+            raise ValueError("context key must contain only letters, numbers, underscore, dash, or dot")
+
+        context_root = self._context_dir.resolve()
+        context_file = (self._context_dir / f"{key}.json").resolve()
+        if context_file.parent != context_root:
+            raise ValueError("context key resolves outside the local RAG context directory")
+        return context_file
 
     def _tokenize(self, text: str) -> list[str]:
         """简单分词，支持中英文混合"""
@@ -166,20 +187,20 @@ class MockExternalVectorStoreProvider(RAGProvider):
             return {"status": "error", "provider": self.provider_name, "errors": [exc.to_dict()], "metadata": {"resource": self.config.resource_metadata()}}
 
         if self.config.endpoint == "mock://connection-error":
-            exc = RAGConnectionError(
+            connection_error = RAGConnectionError(
                 "Mock vector store connection failed.",
                 retryable=True,
                 details={"endpoint": self.config.endpoint, "timeout_seconds": self.config.timeout_seconds},
             )
-            return {"status": "error", "provider": self.provider_name, "errors": [exc.to_dict()], "metadata": {"resource": self.config.resource_metadata()}}
+            return {"status": "error", "provider": self.provider_name, "errors": [connection_error.to_dict()], "metadata": {"resource": self.config.resource_metadata()}}
 
         if self.config.timeout_seconds > 120:
-            exc = RAGResourceError(
+            resource_error = RAGResourceError(
                 "Mock vector store timeout exceeds resource policy.",
                 retryable=False,
                 details={"timeout_seconds": self.config.timeout_seconds, "max_timeout_seconds": 120},
             )
-            return {"status": "error", "provider": self.provider_name, "errors": [exc.to_dict()], "metadata": {"resource": self.config.resource_metadata()}}
+            return {"status": "error", "provider": self.provider_name, "errors": [resource_error.to_dict()], "metadata": {"resource": self.config.resource_metadata()}}
 
         self._connected = True
         return {
@@ -194,11 +215,13 @@ class MockExternalVectorStoreProvider(RAGProvider):
     def query(self, query_text: str, top_k: int = 5) -> dict[str, Any]:
         connection = self.connect() if not self._connected else {"status": "connected"}
         if connection.get("status") != "connected":
+            raw_errors = connection.get("errors")
+            errors: list[dict[str, Any]] | None = raw_errors if isinstance(raw_errors, list) else None
             return make_rag_result(
                 [],
                 provider=self.provider_name,
                 status="error",
-                errors=connection.get("errors", []),
+                errors=errors,
                 metadata={"query": query_text, "top_k": top_k, "resource": self.config.resource_metadata()},
             )
 

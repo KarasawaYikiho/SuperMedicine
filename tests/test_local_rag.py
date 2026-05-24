@@ -1,4 +1,6 @@
 import json
+import tempfile
+from pathlib import Path
 from unittest.mock import patch
 
 import yaml
@@ -7,6 +9,22 @@ from permission.engine import PermissionEngine
 from plugins.rag.interface import RAGProviderConfig
 from plugins.rag.local_provider import LocalRAGProvider, MockExternalVectorStoreProvider
 from plugins.rag.pubmed_provider import PubmedRAGProvider
+
+
+def _pubmed_engine_for(agent_id: str, allowed: bool) -> PermissionEngine:
+    policy_dir = Path(tempfile.mkdtemp()) / "policies"
+    policy_dir.mkdir()
+    permissions = {
+        "allowed": [{"action": "rag.external.query", "scope": "https://eutils.ncbi.nlm.nih.gov/*"}] if allowed else [],
+        "denied": [] if allowed else [{"action": "rag.external.query", "scope": "*"}],
+        "hard_limits": {"network_access": True, "external_api": True},
+    }
+    (policy_dir / PermissionEngine.DEFAULT_POLICY_FILENAME).write_text(yaml.dump({
+        "agent_id": agent_id,
+        "role": "rag-test",
+        "permissions": permissions,
+    }))
+    return PermissionEngine(policy_dir, policy_dir / "audit.jsonl")
 
 
 class TestLocalRAGProvider:
@@ -35,6 +53,27 @@ class TestLocalRAGProvider:
         assert result is not None
         assert result["name"] == "test"
 
+    def test_context_key_rejects_path_traversal(self, tmp_path):
+        provider = LocalRAGProvider(tmp_path)
+
+        for key in ("../escape", "..\\escape", "/tmp/escape", "C:\\escape", "nested/key"):
+            try:
+                provider.store_context(key, {"blocked": True})
+                assert False, f"unsafe key should be rejected: {key}"
+            except ValueError:
+                pass
+
+        assert not (tmp_path / "escape.json").exists()
+
+    def test_context_key_retrieve_rejects_path_traversal(self, tmp_path):
+        provider = LocalRAGProvider(tmp_path)
+
+        try:
+            provider.retrieve_context("../escape")
+            assert False, "unsafe key should be rejected"
+        except ValueError:
+            pass
+
     def test_context_not_found(self, tmp_path):
         provider = LocalRAGProvider(tmp_path)
         assert provider.retrieve_context("nonexistent") is None
@@ -45,7 +84,7 @@ class TestPubmedRAGProvider:
 
     def test_query_empty_result_on_failure(self):
         """API 失败时返回空结果"""
-        provider = PubmedRAGProvider()
+        provider = PubmedRAGProvider(permission_engine=_pubmed_engine_for("alpha", True), agent_id="alpha")
         with patch.object(provider, '_search', side_effect=Exception("network error")):
             result = provider.query("test query")
             assert result["results"] == []
@@ -56,7 +95,7 @@ class TestPubmedRAGProvider:
 
     def test_query_with_mock_results(self):
         """模拟 API 返回结果"""
-        provider = PubmedRAGProvider()
+        provider = PubmedRAGProvider(permission_engine=_pubmed_engine_for("alpha", True), agent_id="alpha")
 
         # Mock _search 返回一些 PMIDs
         mock_ids = ["12345", "67890"]
@@ -107,7 +146,7 @@ class TestPubmedRAGProvider:
 
     def test_empty_search(self):
         """空搜索结果"""
-        provider = PubmedRAGProvider()
+        provider = PubmedRAGProvider(permission_engine=_pubmed_engine_for("alpha", True), agent_id="alpha")
         with patch.object(provider, '_search', return_value=[]):
             result = provider.query("no results query")
             assert result["results"] == []
@@ -131,6 +170,25 @@ class TestPubmedRAGProvider:
         assert result["status"] == "denied"
         assert result["errors"][0]["code"] == "permission_denied"
         assert result["metadata"]["security"]["permission_checked"] is True
+
+    def test_pubmed_external_query_requires_permission_engine_before_http(self):
+        provider = PubmedRAGProvider()
+
+        with patch.object(provider, '_search', side_effect=AssertionError("HTTP path should not run")):
+            result = provider.query("blocked")
+
+        assert result["status"] == "denied"
+        assert result["errors"][0]["code"] == "permission_engine_required"
+
+    def test_pubmed_external_query_requires_agent_identity_before_http(self):
+        provider = PubmedRAGProvider(permission_engine=_pubmed_engine_for("alpha", True))
+
+        with patch.object(provider, '_search', side_effect=AssertionError("HTTP path should not run")):
+            result = provider.query("blocked")
+
+        assert result["status"] == "denied"
+        assert result["errors"][0]["code"] == "agent_identity_required"
+        assert result["metadata"]["security"]["permission_checked"] is False
 
 
 class TestMockExternalVectorStoreProvider:

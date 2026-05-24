@@ -2,6 +2,7 @@ import shutil
 import yaml
 from core.kernel import Kernel
 from permission.engine import PermissionEngine
+from permission.prompt_generator import PromptGenerator
 
 class TestKernel:
     def _create_kernel(self, tmp_path):
@@ -21,3 +22,9 @@ class TestKernel:
         assert self._create_kernel(tmp_path).plugin_registry is not None
     def test_event_bus(self, tmp_path):
         assert self._create_kernel(tmp_path).event_bus is not None
+
+    def test_kernel_permission_engine_is_runtime_gate_not_prompt_generator(self, tmp_path):
+        kernel = self._create_kernel(tmp_path)
+
+        assert isinstance(kernel.permission_engine, PermissionEngine)
+        assert not isinstance(kernel.permission_engine, PromptGenerator)

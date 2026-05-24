@@ -8,6 +8,9 @@ def assert_prototype_contract(result, action):
     assert result["error"] is None
     assert result["metadata"]["audit"]["interface_only"] is True
     assert result["metadata"]["audit"]["prototype_path"] is True
+    assert result["metadata"]["prototype_only"] is True
+    assert result["metadata"]["not_for_clinical_decision"] is True
+    assert result["metadata"]["requires_human_review"] is True
     assert result["metadata"]["contract"]["stage"] == "prototype-interface-tests-only"
     assert result["metadata"]["contract"]["actions"][action]["prototype"] is True
     assert "no production-grade or clinical-grade" in result["metadata"]["statistics_boundary"]

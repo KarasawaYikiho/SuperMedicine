@@ -5,10 +5,19 @@ from pathlib import Path
 from typing import Any
 
 from adapters.base_adapter import BaseAdapter
+from permission.engine import PermissionEngine
 
 
 class StandaloneAdapter(BaseAdapter):
     """Standalone 平台适配器 — 无需外部 AI 平台即可运行"""
+
+    def __init__(
+        self,
+        permission_engine: PermissionEngine | None = None,
+        project_dir: Path | None = None,
+        default_agent_id: str = "beta",
+    ):
+        super().__init__(permission_engine=permission_engine, project_dir=project_dir, default_agent_id=default_agent_id)
 
     @property
     def platform_name(self) -> str:
@@ -26,14 +35,12 @@ class StandaloneAdapter(BaseAdapter):
             "skill": self._tool_skill,
             "task": self._tool_task,
         }
-        handler = handlers.get(tool_id)
-        if handler is None:
-            return {"status": "error", "tool": tool_id, "result": f"Unsupported: {tool_id}"}
-        try:
-            result = handler(params)
-            return {"status": "ok", "tool": tool_id, "result": result}
-        except Exception as e:
-            return {"status": "error", "tool": tool_id, "result": str(e)}
+        return self._execute_permissioned_tool_call(
+            tool_id=tool_id,
+            params=params,
+            handlers=handlers,
+            unsupported_message=f"Unsupported: {tool_id}",
+        )
 
     def _tool_skill(self, params: dict[str, Any]) -> str:
         return self.skill_load(params.get("name", ""))

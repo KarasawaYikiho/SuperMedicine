@@ -44,6 +44,22 @@ class TestAgentMonitor:
         alpha_entries = monitor.get_permission_audit(agent_id="alpha")
         assert len(alpha_entries) == 2
 
+    def test_get_permission_audit_skips_malformed_jsonl_with_warnings(self, tmp_path):
+        """Malformed audit JSONL lines are observable and do not crash reads."""
+        audit_path = tmp_path / "audit.jsonl"
+        audit_path.write_text(
+            json.dumps({"agent_id": "alpha", "action": "read", "result": "ALLOWED"})
+            + "\n{not-json\n[]\n",
+            encoding="utf-8",
+        )
+
+        monitor = AgentMonitor(audit_log_path=audit_path)
+        entries = monitor.get_permission_audit()
+
+        assert len(entries) == 1
+        assert entries[0]["agent_id"] == "alpha"
+        assert [warning["code"] for warning in monitor.warnings] == ["malformed_json", "non_object_json"]
+
     def test_get_denied_actions(self, tmp_path):
         """过滤出 DENIED 条目"""
         audit_path = tmp_path / "audit.jsonl"
@@ -94,6 +110,23 @@ class TestAgentPerformanceMonitor:
         assert stats["alpha"]["total_retries"] == 3
         assert "beta" in stats
         assert stats["beta"]["success_rate"] == 100.0
+
+    def test_get_stats_skips_malformed_and_invalid_jsonl_with_warnings(self, tmp_path):
+        """Malformed performance JSONL lines are observable and do not crash stats."""
+        log_path = tmp_path / "perf.jsonl"
+        valid = {"agent_id": "alpha", "task_id": "task-1", "duration_ms": 150.0, "success": True, "retries": 1}
+        missing = {"agent_id": "beta", "duration_ms": 100.0, "success": False}
+        log_path.write_text(
+            "\n".join([json.dumps(valid), "{not-json", json.dumps([]), json.dumps(missing)]) + "\n",
+            encoding="utf-8",
+        )
+
+        monitor = AgentPerformanceMonitor(log_path)
+        stats = monitor.get_stats()
+
+        assert stats["alpha"]["total"] == 1
+        assert "beta" not in stats
+        assert {warning["code"] for warning in monitor.warnings} == {"malformed_json", "non_object_json", "missing_fields"}
 
     def test_detect_failure_patterns(self, tmp_path):
         """验证失败模式检测"""

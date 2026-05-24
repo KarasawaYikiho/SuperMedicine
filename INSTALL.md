@@ -52,7 +52,12 @@ This creates the `.supermedicine/` directory with configuration and plugin setti
 pip install -e ".[r]"
 ```
 
-Required for Kaplan-Meier, log-rank test, and Cox proportional hazards analysis.
+This installs rpy2. You must also install local R and the R `survival` package.
+When available, request the R backend with `backend="r"` in r-survival action
+parameters. If rpy2, R, or `survival` is unavailable, requested R backend calls
+return a structured `plugin_unavailable` result instead of silently using R.
+Without `backend="r"`, the plugin keeps using the deterministic pure-Python
+fallback path.
 
 ## Verify Installation
 
@@ -92,9 +97,10 @@ python -m venv .venv --without-pip
 ```
 
 ### R survival tools not working
-Install R >= 4.3 and the rpy2 package:
+Install R >= 4.3, the rpy2 package, and R's `survival` package:
 ```bash
-pip install rpy2
+pip install -e ".[r]"
+R -e "install.packages('survival', repos='https://cran.r-project.org')"
 ```
 
 ### CLI command not found

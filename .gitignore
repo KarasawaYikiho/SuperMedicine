@@ -1,17 +1,26 @@
+# Python bytecode/cache artifacts
 __pycache__/
 *.py[cod]
-*.egg-info/
+
+# Packaging/build artifacts
 dist/
 build/
+*.egg-info/
 .eggs/
 *.egg
-.supermedicine/*
-!.supermedicine/policies/
-.supermedicine/policies/*
-!.supermedicine/policies/default.yaml
+
+# Test/lint/type-check/coverage artifacts
+.pytest_cache/
+.pytest-tmp/
+.ruff_cache/
+.mypy_cache/
 .coverage
 coverage.xml
 htmlcov/
-.pytest-tmp/
-.pytest_cache/
-.ruff_cache/
+
+# SuperMedicine runtime artifacts
+.supermedicine/policies/audit.jsonl
+.supermedicine/checkpoints/
+
+# Local-only planning notes
+/Planning/NextSteps.md

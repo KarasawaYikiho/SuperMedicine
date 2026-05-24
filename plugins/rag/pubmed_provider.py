@@ -30,7 +30,7 @@ class PubmedRAGProvider(RAGProvider):
         tool: str = "supermedicine",
         timeout_seconds: float = 10.0,
         permission_engine: PermissionEngine | None = None,
-        agent_id: str = "beta",
+        agent_id: str | None = None,
     ):
         self._email = email
         self._tool = tool
@@ -96,14 +96,14 @@ class PubmedRAGProvider(RAGProvider):
 
             return make_rag_result(items, provider=self.provider_name, metadata={"query": query_text, "top_k": top_k, **self.connect()["metadata"]})
         except TimeoutError as exc:
-            error = RAGQueryTimeoutError("PubMed query timed out.", retryable=True, details={"cause": str(exc)})
-            return make_rag_result([], provider=self.provider_name, status="error", errors=[error.to_dict()], metadata={"query": query_text, "top_k": top_k, **self.connect()["metadata"]})
+            timeout_error = RAGQueryTimeoutError("PubMed query timed out.", retryable=True, details={"cause": str(exc)})
+            return make_rag_result([], provider=self.provider_name, status="error", errors=[timeout_error.to_dict()], metadata={"query": query_text, "top_k": top_k, **self.connect()["metadata"]})
         except (urllib.error.URLError, OSError) as exc:
-            error = RAGConnectionError("PubMed connection failed.", retryable=True, details={"cause": str(exc)})
-            return make_rag_result([], provider=self.provider_name, status="error", errors=[error.to_dict()], metadata={"query": query_text, "top_k": top_k, **self.connect()["metadata"]})
+            connection_error = RAGConnectionError("PubMed connection failed.", retryable=True, details={"cause": str(exc)})
+            return make_rag_result([], provider=self.provider_name, status="error", errors=[connection_error.to_dict()], metadata={"query": query_text, "top_k": top_k, **self.connect()["metadata"]})
         except Exception as exc:
-            error = RAGConnectionError("PubMed provider failed.", retryable=True, details={"cause": str(exc)})
-            return make_rag_result([], provider=self.provider_name, status="error", errors=[error.to_dict()], metadata={"query": query_text, "top_k": top_k, **self.connect()["metadata"]})
+            provider_error = RAGConnectionError("PubMed provider failed.", retryable=True, details={"cause": str(exc)})
+            return make_rag_result([], provider=self.provider_name, status="error", errors=[provider_error.to_dict()], metadata={"query": query_text, "top_k": top_k, **self.connect()["metadata"]})
 
     def _search(self, query: str, max_results: int) -> list[str]:
         """Esearch: 检索 PubMed IDs"""
@@ -226,14 +226,51 @@ class PubmedRAGProvider(RAGProvider):
     def _permission_denied(self) -> dict[str, Any] | None:
         """Check optional policy gate before PubMed external HTTP access."""
         if self._permission_engine is None:
-            return None
+            return make_rag_result(
+                [],
+                provider=self.provider_name,
+                status="denied",
+                errors=[
+                    {
+                        "code": "permission_engine_required",
+                        "message": "PubMed external HTTP access requires an explicit permission engine and policy context.",
+                        "retryable": False,
+                        "details": {"action": "rag.external.query", "resource": "https://eutils.ncbi.nlm.nih.gov/*"},
+                    }
+                ],
+                metadata={
+                    "resource": {"kind": "external_api", "endpoint": self.BASE_URL, "timeout_seconds": self._timeout_seconds},
+                    "security": {"external_resource": True, "permission": "denied", "permission_checked": False},
+                },
+            )
+
+        if not isinstance(self._agent_id, str) or not self._agent_id.strip():
+            return make_rag_result(
+                [],
+                provider=self.provider_name,
+                status="denied",
+                errors=[
+                    {
+                        "code": "agent_identity_required",
+                        "message": "PubMed external HTTP access requires an explicit agent identity for permission checks.",
+                        "retryable": False,
+                        "details": {"action": "rag.external.query", "resource": "https://eutils.ncbi.nlm.nih.gov/*"},
+                    }
+                ],
+                metadata={
+                    "resource": {"kind": "external_api", "endpoint": self.BASE_URL, "timeout_seconds": self._timeout_seconds},
+                    "security": {"external_resource": True, "permission": "denied", "permission_checked": False},
+                },
+            )
 
         resource = "https://eutils.ncbi.nlm.nih.gov/*"
         result = self._permission_engine.check(
-            self._agent_id,
+            self._agent_id.strip(),
             "rag.external.query",
             resource,
             context={
+                "action": "rag.external.query",
+                "resource": {"kind": "external_api", "provider": self.provider_name, "endpoint": self.BASE_URL},
                 "provider": self.provider_name,
                 "requires_network": True,
                 "requires_external_api": True,

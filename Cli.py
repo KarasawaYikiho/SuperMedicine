@@ -69,7 +69,14 @@ class CLI:
         )
         sys.exit(result.returncode)
 
-    def run(self, task: str, verbose: bool = False, plugin: str | None = None, action: str | None = None) -> dict:
+    def run(
+        self,
+        task: str,
+        verbose: bool = False,
+        plugin: str | None = None,
+        action: str | None = None,
+        params: dict | None = None,
+    ) -> dict:
         """执行任务 — 真实执行用户任务与医疗插件"""
         from core.kernel import Kernel
         from permission.engine import PermissionEngine
@@ -111,7 +118,7 @@ class CLI:
             for p in plugins:
                 logger.info("     - %s (%s)", p.name, p.type)
 
-        result = kernel.execute_task(task, plugin_name=plugin, action=action)
+        result = kernel.execute_task(task, plugin_name=plugin, action=action, params=params)
         if verbose:
             logger.info(
                 "[STATE] agent=%s task=%s plugin=%s action=%s status=%s",
@@ -123,6 +130,42 @@ class CLI:
             )
         logger.info(json.dumps(result, ensure_ascii=False, indent=2))
         return result
+
+
+def _load_params_json(raw_json: str) -> dict:
+    """Parse structured plugin params from a JSON object string."""
+    try:
+        params = json.loads(raw_json)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"--params-json must be valid JSON: {exc.msg}") from exc
+
+    if not isinstance(params, dict):
+        raise ValueError("plugin params must be a JSON object")
+    return params
+
+
+def _load_params_file(path: str) -> dict:
+    """Read structured plugin params from a JSON object file."""
+    params_path = Path(path)
+    try:
+        raw_json = params_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise ValueError(f"--params-file could not be read: {exc}") from exc
+    try:
+        return _load_params_json(raw_json)
+    except ValueError as exc:
+        raise ValueError(f"--params-file {params_path}: {exc}") from exc
+
+
+def _resolve_run_params(params_json: str | None, params_file: str | None) -> dict | None:
+    """Resolve optional structured params for the run command."""
+    if params_json and params_file:
+        raise ValueError("--params-json and --params-file cannot be used together")
+    if params_json:
+        return _load_params_json(params_json)
+    if params_file:
+        return _load_params_file(params_file)
+    return None
 
 
 def main():
@@ -149,6 +192,8 @@ def main():
     run_parser.add_argument("--verbose", action="store_true", help="详细输出")
     run_parser.add_argument("--plugin", type=str, default=None, help="指定插件名称")
     run_parser.add_argument("--action", type=str, default=None, help="指定插件动作")
+    run_parser.add_argument("--params-json", type=str, default=None, help="JSON 对象格式的插件参数")
+    run_parser.add_argument("--params-file", type=str, default=None, help="包含 JSON 对象插件参数的文件路径")
 
     args = parser.parse_args()
     cli = CLI()
@@ -161,7 +206,11 @@ def main():
         cli.test()
     elif args.command == "run":
         verbose = getattr(args, 'verbose', False)
-        cli.run(args.task, verbose=verbose, plugin=args.plugin, action=args.action)
+        try:
+            params = _resolve_run_params(args.params_json, args.params_file)
+        except ValueError as exc:
+            run_parser.error(str(exc))
+        cli.run(args.task, verbose=verbose, plugin=args.plugin, action=args.action, params=params)
     else:
         parser.print_help()
 
