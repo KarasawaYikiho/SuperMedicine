@@ -4,7 +4,7 @@ from pathlib import Path
 import yaml
 from .audit import AuditLogger
 from typing import Any
-from .policy import DEFAULT_POLICY_RELATIVE_PATH, PermissionPolicy, PermissionResult
+from .policy import DEFAULT_POLICY_RELATIVE_PATH, PermissionPolicy, PermissionResult, default_policy_path
 
 
 class PermissionPolicyLoadError(RuntimeError):
@@ -22,8 +22,7 @@ class PermissionEngine:
     @classmethod
     def default_policy_path(cls, project_dir: Path | None = None) -> Path:
         """Return the canonical tracked default permission policy path."""
-        root = Path.cwd() if project_dir is None else Path(project_dir)
-        return root / DEFAULT_POLICY_RELATIVE_PATH
+        return default_policy_path(project_dir)
 
     def _load_policies(self) -> None:
         if not self._policy_dir.exists():

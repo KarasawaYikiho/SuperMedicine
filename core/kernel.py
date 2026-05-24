@@ -273,6 +273,24 @@ class Kernel:
             return "python-stats", "stats.anova"
         if "regression" in normalized or "回归" in normalized:
             return "python-stats", "stats.regression"
+        if "rag" in normalized or "retrieval" in normalized or "检索" in normalized:
+            return "rag-interface", "rag.query"
+        if "harness" in normalized or "checkpoint" in normalized or "monitor" in normalized or "检查点" in normalized or "监控" in normalized:
+            return "harness-core", "harness.integration.checkpoint"
+        if "consort" in normalized or "随机对照" in normalized:
+            return "medical-writing", "standard.consort"
+        if "strobe" in normalized or "观察性" in normalized:
+            return "medical-writing", "standard.strobe"
+        if "prisma" in normalized or "系统综述" in normalized or "meta分析" in normalized or "meta-analysis" in normalized:
+            return "medical-writing", "standard.prisma"
+        if "stard" in normalized or "诊断准确性" in normalized:
+            return "medical-writing", "standard.stard"
+        if "vancouver" in normalized:
+            return "medical-citation", "standard.citation.vancouver"
+        if "ama" in normalized or "citation" in normalized or "引用" in normalized:
+            return "medical-citation", "standard.citation.ama"
+        if "medical writing" in normalized or "checklist" in normalized or "写作规范" in normalized or "检查清单" in normalized:
+            return "medical-writing", "standard.consort"
         if "medical" in normalized or "stats" in normalized or "统计" in normalized:
             return "python-stats", "stats.descriptive"
         return "python-stats", "stats.descriptive"

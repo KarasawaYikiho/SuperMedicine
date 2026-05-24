@@ -1,14 +1,17 @@
 """集成测试 — 端到端科研流程"""
+import json
 import shutil
 import yaml
 
+from Cli import CLI
+from Install import init_config
 from core.kernel import Kernel
 from agents.orchestrator import Orchestrator
 from agents.base_agent import BaseAgent
 from agents.state_machine import StateMachine, TaskState
 from agents.checkpoint import CheckpointManager
 from permission.engine import PermissionEngine
-from permission.policy import PermissionResult
+from permission.policy import PermissionResult, default_policy_path
 from plugins.tools.python_stats.main import descriptive, ttest, regression
 from plugins.standards.medical_writing.checklists import get_consort_checklist
 from typing import Any
@@ -28,6 +31,34 @@ class MockAgent(BaseAgent):
 
 class TestIntegration:
     """端到端集成测试"""
+
+    def test_install_init_creates_canonical_default_policy_without_overwrite(self, tmp_path):
+        """Install.py --init 应创建默认策略，并在重复初始化时保留用户策略。"""
+        expected_policy = PermissionEngine.default_policy_path().read_text(encoding="utf-8")
+
+        init_config(tmp_path)
+
+        target_policy = default_policy_path(tmp_path)
+        assert target_policy.exists()
+        assert target_policy.read_text(encoding="utf-8") == expected_policy
+
+        custom_policy = "# user customized policy\n"
+        target_policy.write_text(custom_policy, encoding="utf-8")
+        init_config(tmp_path)
+
+        assert target_policy.read_text(encoding="utf-8") == custom_policy
+
+    def test_cli_init_and_install_init_create_same_default_policy(self, tmp_path):
+        """CLI init 与 Install.py --init 应生成同一份 canonical 默认策略。"""
+        cli_project = tmp_path / "cli"
+        install_project = tmp_path / "install"
+        cli_project.mkdir()
+        install_project.mkdir()
+
+        CLI().init(cli_project)
+        init_config(install_project)
+
+        assert default_policy_path(cli_project).read_text(encoding="utf-8") == default_policy_path(install_project).read_text(encoding="utf-8")
 
     def test_full_workflow(self, tmp_path):
         """测试完整工作流程：初始化 → 权限检查 → 任务分派 → 检查点"""
@@ -242,6 +273,127 @@ class TestIntegration:
         assert result["status"] == "plugin_error"
         assert result["output"] is None
         assert "Invalid python-stats input" in result["error"]
+
+    def test_kernel_executes_rag_interface_manifest_plugin_without_external_service(self, tmp_path):
+        (tmp_path / "config.yaml").write_text(yaml.dump({"project": "test"}))
+        policies = tmp_path / "policies"
+        policies.mkdir()
+        shutil.copyfile(
+            PermissionEngine.default_policy_path(),
+            policies / PermissionEngine.DEFAULT_POLICY_FILENAME,
+        )
+        kernel = Kernel(config_path=tmp_path / "config.yaml", plugins_dir="plugins", policies_dir=policies)
+
+        result = kernel.execute_task(
+            "rag retrieval task",
+            params={
+                "query": "hypertension cardiovascular",
+                "top_k": 1,
+                "storage_dir": str(tmp_path / "rag"),
+                "documents": [
+                    {
+                        "id": "doc-1",
+                        "title": "Hypertension review",
+                        "source": "kernel-local-rag",
+                        "text": "hypertension diabetes cardiovascular risk",
+                    }
+                ],
+            },
+        )
+
+        assert result["status"] == "success"
+        assert result["plugin"] == "rag-interface"
+        assert result["action"] == "rag.query"
+        assert result["output"]["items"][0]["source"] == "kernel-local-rag"
+        assert result["output"]["errors"] == []
+
+    def test_kernel_rag_interface_invalid_input_is_structured_plugin_error(self):
+        kernel = Kernel()
+        result = kernel.execute_task(
+            "rag retrieval task",
+            plugin_name="rag-interface",
+            action="rag.query",
+            params={"query": ""},
+        )
+        assert result["status"] == "plugin_error"
+        assert result["output"] is None
+        assert "Invalid rag-interface input" in result["error"]
+
+    def test_kernel_executes_harness_core_manifest_plugin(self, tmp_path):
+        checkpoint_step = tmp_path / "checkpoints" / "task-1" / "step-1"
+        checkpoint_step.mkdir(parents=True)
+        (checkpoint_step / "status.json").write_text(json.dumps({"state": "completed"}), encoding="utf-8")
+        (tmp_path / "config.yaml").write_text(yaml.dump({"project": "test"}))
+        policies = tmp_path / "policies"
+        policies.mkdir()
+        shutil.copyfile(
+            PermissionEngine.default_policy_path(),
+            policies / PermissionEngine.DEFAULT_POLICY_FILENAME,
+        )
+        kernel = Kernel(config_path=tmp_path / "config.yaml", plugins_dir="plugins", policies_dir=policies)
+
+        result = kernel.execute_task(
+            "harness checkpoint task",
+            params={"checkpoint_dir": str(tmp_path / "checkpoints"), "task_id": "task-1"},
+        )
+
+        assert result["status"] == "success"
+        assert result["plugin"] == "harness-core"
+        assert result["action"] == "harness.integration.checkpoint"
+        assert result["output"]["complete"] is True
+
+    def test_kernel_harness_core_invalid_input_is_structured_plugin_error(self):
+        kernel = Kernel()
+        result = kernel.execute_task(
+            "harness checkpoint task",
+            plugin_name="harness-core",
+            action="harness.integration.checkpoint",
+            params={"task_id": "task-1"},
+        )
+
+        assert result["status"] == "plugin_error"
+        assert result["output"] is None
+        assert "Invalid harness-core input" in result["error"]
+
+    def test_kernel_executes_medical_citation_manifest_plugin(self):
+        kernel = Kernel()
+        result = kernel.execute_task(
+            "AMA citation task",
+            params={
+                "source_id": "src-1",
+                "sources": {
+                    "src-1": {
+                        "reference_type": "journal",
+                        "authors": ["John Smith", "Jane Doe"],
+                        "title": "Cardiovascular Risk Factors",
+                        "journal": "JAMA",
+                        "year": 2024,
+                        "volume": "331",
+                        "issue": "5",
+                        "pages": "401-410",
+                        "doi": "10.1001/jama.2024.1234",
+                    }
+                },
+            },
+        )
+
+        assert result["status"] == "success"
+        assert result["plugin"] == "medical-citation"
+        assert result["action"] == "standard.citation.ama"
+        assert "Smith J" in result["output"]["citation"]
+
+    def test_kernel_medical_citation_invalid_input_is_structured_plugin_error(self):
+        kernel = Kernel()
+        result = kernel.execute_task(
+            "AMA citation task",
+            plugin_name="medical-citation",
+            action="standard.citation.ama",
+            params={"source_id": "missing", "sources": {}},
+        )
+
+        assert result["status"] == "plugin_error"
+        assert result["output"] is None
+        assert "Invalid medical-citation input" in result["error"]
 
     def test_kernel_records_checkpoint_for_plugin_error(self, tmp_path):
         (tmp_path / "config.yaml").write_text(yaml.dump({"project": "test"}))

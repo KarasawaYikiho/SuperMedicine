@@ -78,3 +78,136 @@ class TestPluginRegistry:
             assert result["metadata"]["audit"]["prototype_path"] is True
             assert result["metadata"]["contract"]["stage"] == "prototype-interface-tests-only"
             assert "not clinical-grade statistics" in result["metadata"]["medical_boundary"]
+
+    def test_rag_interface_manifest_actions_execute_with_stable_shape(self, tmp_path):
+        r = PluginRegistry("plugins")
+        metas = r.discover()
+        meta = r.get_meta("rag-interface")
+        assert meta is not None
+        assert meta.name in [item.name for item in metas]
+        assert {item["id"] for item in meta.provides} == {"rag.query", "rag.context.store", "rag.context.retrieve"}
+
+        result = r.get("rag-interface").execute(
+            "rag.query",
+            {
+                "query": "hypertension cardiovascular",
+                "top_k": 1,
+                "storage_dir": str(tmp_path / "rag"),
+                "documents": [
+                    {
+                        "id": "doc-1",
+                        "title": "Hypertension review",
+                        "source": "local-test-index",
+                        "text": "hypertension diabetes cardiovascular risk",
+                    }
+                ],
+            },
+        )
+
+        assert result["status"] == "success"
+        assert result["plugin"] == "rag-interface"
+        assert result["action"] == "rag.query"
+        output = result["output"]
+        assert output["status"] == "success"
+        assert output["items"][0]["source"] == "local-test-index"
+        assert output["items"][0]["title"] == "Hypertension review"
+        assert "score" in output["items"][0]
+        assert "snippet" in output["items"][0]
+        assert output["errors"] == []
+        assert "metadata" in output
+
+    def test_rag_interface_invalid_input_is_structured_plugin_error(self):
+        r = PluginRegistry("plugins")
+        r.discover()
+
+        result = r.get("rag-interface").execute("rag.query", {"query": ""})
+
+        assert result["status"] == "plugin_error"
+        assert result["output"] is None
+        assert "Invalid rag-interface input" in result["error"]
+
+    def test_harness_core_manifest_actions_execute_with_stable_shape(self, tmp_path):
+        checkpoint_task = tmp_path / "checkpoints" / "task-1" / "step-1"
+        checkpoint_task.mkdir(parents=True)
+        (checkpoint_task / "status.json").write_text('{"state": "completed"}', encoding="utf-8")
+
+        r = PluginRegistry("plugins")
+        metas = r.discover()
+        meta = r.get_meta("harness-core")
+        assert meta is not None
+        assert meta.name in [item.name for item in metas]
+        assert {item["id"] for item in meta.provides} == {
+            "harness.integration.checkpoint",
+            "harness.integration.checkpoint_all",
+            "harness.monitor.permission_audit",
+            "harness.monitor.denied_actions",
+            "harness.monitor.anomaly",
+            "harness.monitor.performance",
+            "harness.monitor.failure_patterns",
+        }
+
+        result = r.get("harness-core").execute(
+            "harness.integration.checkpoint",
+            {"checkpoint_dir": str(tmp_path / "checkpoints"), "task_id": "task-1"},
+        )
+
+        assert result["status"] == "success"
+        assert result["plugin"] == "harness-core"
+        assert result["action"] == "harness.integration.checkpoint"
+        assert result["output"]["complete"] is True
+        assert result["output"]["total_steps"] == 1
+        assert result["metadata"]["contract"]["actions"]
+
+    def test_harness_core_invalid_input_is_structured_plugin_error(self):
+        r = PluginRegistry("plugins")
+        r.discover()
+
+        result = r.get("harness-core").execute("harness.integration.checkpoint", {"task_id": "task-1"})
+
+        assert result["status"] == "plugin_error"
+        assert result["output"] is None
+        assert "Invalid harness-core input" in result["error"]
+
+    def test_medical_citation_manifest_actions_execute_with_stable_shape(self):
+        r = PluginRegistry("plugins")
+        metas = r.discover()
+        meta = r.get_meta("medical-citation")
+        assert meta is not None
+        assert meta.name in [item.name for item in metas]
+        assert {item["id"] for item in meta.provides} == {"standard.citation.ama", "standard.citation.vancouver"}
+
+        result = r.get("medical-citation").execute(
+            "standard.citation.ama",
+            {
+                "source_id": "src-1",
+                "sources": {
+                    "src-1": {
+                        "reference_type": "journal",
+                        "authors": ["John Smith", "Jane Doe"],
+                        "title": "Cardiovascular Risk Factors",
+                        "journal": "JAMA",
+                        "year": 2024,
+                        "volume": "331",
+                        "issue": "5",
+                        "pages": "401-410",
+                        "doi": "10.1001/jama.2024.1234",
+                    }
+                },
+            },
+        )
+
+        assert result["status"] == "success"
+        assert result["plugin"] == "medical-citation"
+        assert result["action"] == "standard.citation.ama"
+        assert result["output"]["format"] == "AMA"
+        assert "Smith J" in result["output"]["citation"]
+
+    def test_medical_citation_invalid_input_is_structured_plugin_error(self):
+        r = PluginRegistry("plugins")
+        r.discover()
+
+        result = r.get("medical-citation").execute("standard.citation.ama", {"source_id": "missing", "sources": {}})
+
+        assert result["status"] == "plugin_error"
+        assert result["output"] is None
+        assert "Invalid medical-citation input" in result["error"]

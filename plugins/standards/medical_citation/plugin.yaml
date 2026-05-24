@@ -1,6 +1,8 @@
 name: "medical-citation"
 version: "0.1.0"
 type: "standard"
+language: "python"
+entry: "main.py"
 description: "医学文献引用规范"
 
 provides:

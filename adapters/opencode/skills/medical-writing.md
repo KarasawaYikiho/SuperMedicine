@@ -5,7 +5,9 @@ description: Medical writing standards compliance checking — CONSORT, STROBE, 
 
 # Medical Writing Standards
 
-Compliance checking for major medical research reporting guidelines.
+Compliance checking for major medical research reporting guidelines. This is a
+drafting/reporting-quality review aid only; it is not clinical advice and requires
+human expert review before research, regulatory, or clinical use.
 
 ## Supported Standards
 
@@ -24,10 +26,13 @@ Compliance checking for major medical research reporting guidelines.
 
 ## Usage
 ```python
-from plugins.standards.medical_writing.checklists import get_consort_checklist
-checklist = get_consort_checklist()
-result = checklist.check(manuscript_text)
-print(f"Compliance: {result['compliance_rate']}%")
+from plugins.standards.medical_writing.main import execute
+
+result = execute(
+    "standard.consort",
+    {"text": manuscript_text},
+)
+print(f"Compliance: {result['output']['compliance_rate']}%")
 ```
 
 ## Trigger

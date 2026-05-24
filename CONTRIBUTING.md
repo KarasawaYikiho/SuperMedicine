@@ -35,6 +35,18 @@ Guidelines:
 - Follow existing code patterns in the module you are modifying
 - Maximum line length: 120 characters (E501 is ignored)
 
+### New file naming
+
+For future non-Python files and directories, prefer independent-word initial capitalization: each separate word should start with an uppercase letter while preserving clear word boundaries (for example, `ReleaseNotes.md`, `UserGuide.md`, or `ExampleAssets/`).
+
+Python import compatibility takes priority over this style rule. Do **not** rename Python modules, packages, tests, plugin manifests, or files that are part of an existing public API only to satisfy capitalization preferences. Python paths must continue to support package discovery, pytest discovery, plugin loading, and stable imports.
+
+Examples:
+- Keep package and module paths import-safe, such as `supermedicine/`, `tests/test_kernel.py`, and any existing snake_case module names.
+- Keep pytest-compatible test names such as `test_*.py`; do not change them to capitalized names if that would affect discovery.
+- Keep plugin manifests, entry-point targets, and documented import paths stable unless a migration explicitly updates all consumers.
+- When adding a new Python module or package, choose the name that is safest for imports and tooling first; use the capitalization convention only when it does not affect compatibility.
+
 ## Testing
 
 All changes must include tests and pass the existing test suite:

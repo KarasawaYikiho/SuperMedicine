@@ -5,7 +5,10 @@ description: Modular medical research Agent framework with RAG, Harness, statist
 
 # SuperMedicine
 
-Modular medical research Agent framework for automated evidence synthesis, statistical analysis, manuscript preparation, and compliance checking.
+Modular medical research Agent framework for prototype/interface-only evidence
+synthesis, statistical analysis, manuscript preparation, and compliance checking.
+SuperMedicine does not provide clinical advice, production-grade statistics, or
+regulatory/clinical certification; all outputs require human expert review.
 
 ## When to Use
 
@@ -83,6 +86,33 @@ python Cli.py run "analyze clinical trial data with survival analysis"
 
 # Run all tests
 python Cli.py test
+```
+
+## Stable Python API Examples
+
+RAG queries should use a concrete provider or the executable plugin entrypoint,
+not the abstract `RAGProvider` interface:
+
+```python
+from plugins.rag.main import execute
+
+result = execute("rag.query", {"query": "hypertension diabetes", "provider": "local"})
+items = result["output"]["items"]
+```
+
+Citation formatting should pass structured source metadata or construct a shared
+`JournalArticle`/`Book` model:
+
+```python
+from plugins.standards.medical_citation.ama_format import AMAFormatter, JournalArticle
+
+citation = AMAFormatter().format_journal(JournalArticle(
+    authors=["John Smith"],
+    title="Cardiovascular Risk Factors",
+    journal="JAMA",
+    year=2024,
+    volume="331",
+))
 ```
 
 ## Permissions

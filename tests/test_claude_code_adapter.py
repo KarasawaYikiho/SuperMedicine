@@ -164,3 +164,12 @@ class TestClaudeCodeAdapter:
         result = adapter.tool_call("unknown", {})
         assert result["status"] == "error"
         assert "supported_tools" in result
+
+    def test_skill_doc_stable_api_examples_and_boundary(self):
+        content = (Path(__file__).parent.parent / "adapters" / "claude_code" / "SKILL.md").read_text(encoding="utf-8")
+
+        assert "from plugins.rag.main import execute" in content
+        assert "RAGProvider()" not in content
+        assert "JournalArticle" in content
+        assert "human expert review" in content
+        assert "does not provide clinical advice" in content

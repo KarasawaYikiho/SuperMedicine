@@ -5,7 +5,10 @@ description: Survival analysis tools via R — Kaplan-Meier estimation, log-rank
 
 # R Survival Analysis
 
-Survival analysis toolkit for time-to-event medical research data.
+Survival analysis toolkit for time-to-event medical research data. Current
+implementations are prototype/interface test paths only, not production-grade or
+clinical-grade statistics, and require expert review before research, regulatory,
+or clinical use.
 
 ## Capabilities
 - Kaplan-Meier estimator — survival curve estimation with confidence intervals
@@ -13,18 +16,34 @@ Survival analysis toolkit for time-to-event medical research data.
 - Cox proportional hazards model — multivariate survival regression
 
 ## Prerequisites
-Requires R >= 4.3 and rpy2 Python package:
+The plugin exposes a pure-Python fallback. Optional R bridge support requires
+R >= 4.3 and rpy2 Python package:
 ```bash
 pip install rpy2
 ```
 
 ## Usage
 ```python
+from plugins.tools.r_survival.main import execute
+
+result = execute(
+    "r.survival.km",
+    {
+        "times": [5, 10, 15, 20, 25],
+        "events": [1, 1, 0, 1, 0],
+    },
+)
+time_points = result["output"]["time_points"]
+```
+
+Direct Kaplan-Meier function API example:
+
+```python
 from plugins.tools.r_survival.kaplan_meier import kaplan_meier
+
 result = kaplan_meier(
     times=[5, 10, 15, 20, 25],
     events=[1, 1, 0, 1, 0],
-    groups=["A", "A", "B", "B", "B"]
 )
 ```
 

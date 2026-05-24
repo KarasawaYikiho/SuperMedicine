@@ -1,12 +1,39 @@
 """权限声明解析与检查"""
 from __future__ import annotations
 import fnmatch
+import shutil
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any
 
 DEFAULT_POLICY_RELATIVE_PATH = Path(".supermedicine") / "policies" / "default.yaml"
+
+
+def default_policy_path(project_dir: Path | None = None) -> Path:
+    """Return the canonical default permission policy path under a project root."""
+    root = Path.cwd() if project_dir is None else Path(project_dir)
+    return root / DEFAULT_POLICY_RELATIVE_PATH
+
+
+def ensure_default_policy(project_dir: Path, source_root: Path | None = None) -> Path:
+    """Ensure a project has the canonical default permission policy.
+
+    Existing user policy files are preserved. When creating a new policy, copy
+    the repository/package canonical policy so all initialization entry points
+    stay aligned.
+    """
+    target_policy = default_policy_path(project_dir)
+    target_policy.parent.mkdir(parents=True, exist_ok=True)
+    if target_policy.exists():
+        return target_policy
+
+    source_policy = default_policy_path(source_root or Path(__file__).resolve().parent.parent)
+    if source_policy.resolve() == target_policy.resolve():
+        return target_policy
+
+    shutil.copyfile(source_policy, target_policy)
+    return target_policy
 
 class PermissionResult(Enum):
     ALLOWED = "allowed"

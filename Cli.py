@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import shutil
 import sys
 from pathlib import Path
 
@@ -25,7 +24,7 @@ class CLI:
 
     def init(self, project_dir: Path) -> None:
         """初始化项目"""
-        from permission.engine import PermissionEngine
+        from permission.policy import ensure_default_policy
 
         config_dir = project_dir / ".supermedicine"
         config_dir.mkdir(exist_ok=True)
@@ -34,12 +33,7 @@ class CLI:
         )
         (config_dir / "agents").mkdir(exist_ok=True)
         (config_dir / "plugins").mkdir(exist_ok=True)
-        policies_dir = config_dir / "policies"
-        policies_dir.mkdir(exist_ok=True)
-        target_policy = policies_dir / PermissionEngine.DEFAULT_POLICY_FILENAME
-        source_policy = PermissionEngine.default_policy_path(Path(__file__).parent)
-        if not target_policy.exists():
-            shutil.copyfile(source_policy, target_policy)
+        ensure_default_policy(project_dir, Path(__file__).parent)
         logger.info(f"项目已初始化: {config_dir}")
 
     def status(self) -> None:

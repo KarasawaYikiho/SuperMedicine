@@ -5,7 +5,9 @@ description: RAG-based medical literature retrieval and context management for e
 
 # RAG Query
 
-Retrieval-Augmented Generation interface for medical literature search.
+Retrieval-Augmented Generation interface for medical literature search. Current
+SuperMedicine RAG output is an interface/prototype retrieval aid only; retrieved
+context requires human expert review before research, regulatory, or clinical use.
 
 ## Capabilities
 - `rag.query` — Search medical literature databases with natural language queries
@@ -14,7 +16,11 @@ Retrieval-Augmented Generation interface for medical literature search.
 
 ## Provider
 The default provider uses TF-IDF based local search (`plugins/rag/local_provider.py`).
-To use an external API, configure the provider in `plugins/rag/plugin.yaml`.
+Use the executable plugin entrypoint for stable skill examples. Do not instantiate
+the abstract `RAGProvider` interface directly.
+
+External-vector examples use the deterministic `MockExternalVectorStoreProvider`
+contract backend unless a real provider is explicitly implemented and configured.
 
 ## Trigger
 Use when the task requires searching medical literature, retrieving evidence,
@@ -22,7 +28,40 @@ or managing research context for systematic reviews, meta-analyses, or evidence 
 
 ## Usage
 ```python
-from plugins.rag.interface import RAGProvider
-provider = RAGProvider()
-results = provider.query("efficacy of metformin in type 2 diabetes")
+from plugins.rag.main import execute
+
+result = execute(
+    "rag.query",
+    {
+        "query": "efficacy of metformin in type 2 diabetes",
+        "provider": "local",
+        "documents": [
+            {
+                "id": "doc-1",
+                "title": "Metformin overview",
+                "text": "metformin type 2 diabetes glycemic control",
+            }
+        ],
+        "top_k": 1,
+    },
+)
+items = result["output"]["items"]
+```
+
+External-vector contract backend example:
+
+```python
+from plugins.rag.interface import RAGProviderConfig
+from plugins.rag.local_provider import MockExternalVectorStoreProvider
+
+provider = MockExternalVectorStoreProvider(
+    RAGProviderConfig(
+        provider_type="external_vector",
+        endpoint="mock://vector-store",
+        index_name="medical-literature",
+        api_key_env="SM_RAG_API_KEY",
+    ),
+    records=[{"id": "doc-1", "text": "hypertension diabetes cardiovascular risk"}],
+)
+results = provider.query("hypertension cardiovascular", top_k=1)
 ```

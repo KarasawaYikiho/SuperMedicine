@@ -166,6 +166,38 @@ class TestSkillsExist:
             content = skill_path.read_text(encoding="utf-8")
             assert len(content) > 0, f"Empty skill file: {skill_file}"
 
+    def test_skill_docs_use_stable_python_api_examples(self):
+        """Protect public OpenCode skill examples from drifting from actual APIs."""
+        skills_dir = Path(__file__).parent.parent / "adapters" / "opencode" / "skills"
+
+        rag_doc = (skills_dir / "rag-query.md").read_text(encoding="utf-8")
+        assert "from plugins.rag.main import execute" in rag_doc
+        assert "RAGProvider()" not in rag_doc
+        assert "MockExternalVectorStoreProvider" in rag_doc
+
+        citation_doc = (skills_dir / "medical-citation.md").read_text(encoding="utf-8")
+        assert "JournalArticle" in citation_doc
+        assert "volume=\"331\"" in citation_doc
+        assert "standard.citation.ama" in citation_doc
+
+        python_stats_doc = (skills_dir / "python-stats.md").read_text(encoding="utf-8")
+        assert "stats.descriptive" in python_stats_doc
+        assert "descriptive_stats" not in python_stats_doc
+        assert "ttest_independent" not in python_stats_doc
+
+        survival_doc = (skills_dir / "r-survival.md").read_text(encoding="utf-8")
+        assert "r.survival.km" in survival_doc
+        assert "groups=" not in survival_doc
+
+    def test_skill_docs_preserve_interface_and_human_review_boundaries(self):
+        """OpenCode skill docs must not overclaim clinical/production readiness."""
+        skills_dir = Path(__file__).parent.parent / "adapters" / "opencode" / "skills"
+        for skill_file in ["rag-query.md", "medical-citation.md", "medical-writing.md", "python-stats.md", "r-survival.md", "harness-monitor.md"]:
+            content = (skills_dir / skill_file).read_text(encoding="utf-8").lower()
+            assert "human" in content or "expert review" in content
+            if "clinical-grade" in content:
+                assert "not production-grade" in content
+
 
 class TestAgentsExist:
     """测试所有 Agent 定义文件存在"""

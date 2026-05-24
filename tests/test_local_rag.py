@@ -251,3 +251,12 @@ class TestMockExternalVectorStoreProvider:
         assert record_value not in serialized
         assert "SM_RAG_API_KEY" in serialized
         assert "[REDACTED]" in serialized
+
+    def test_skill_doc_does_not_instantiate_abstract_provider(self):
+        doc_path = __import__("pathlib").Path(__file__).parent.parent / "adapters" / "opencode" / "skills" / "rag-query.md"
+        content = doc_path.read_text(encoding="utf-8")
+
+        assert "RAGProvider()" not in content
+        assert "from plugins.rag.main import execute" in content
+        assert "MockExternalVectorStoreProvider" in content
+        assert "RAGProviderConfig" in content

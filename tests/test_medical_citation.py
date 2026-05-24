@@ -1,4 +1,5 @@
 from plugins.standards.medical_citation.ama_format import AMAFormatter, JournalArticle, Book
+from plugins.standards.medical_citation.main import execute
 from plugins.standards.medical_citation.vancouver_format import VancouverFormatter
 from plugins.standards.medical_citation.utils import CitationSource, validate_source_id
 
@@ -86,3 +87,48 @@ class TestCitationAccuracy:
 
         assert result.status == "warning"
         assert result.confidence == 0.5
+
+
+class TestMedicalCitationPluginEntry:
+    def test_ama_action_formats_valid_structured_source(self):
+        result = execute(
+            "standard.citation.ama",
+            {
+                "source_id": "src-1",
+                "sources": {
+                    "src-1": {
+                        "reference_type": "journal",
+                        "authors": ["John Smith", "Jane Doe"],
+                        "title": "Cardiovascular Risk Factors",
+                        "journal": "JAMA",
+                        "year": 2024,
+                        "volume": "331",
+                        "issue": "5",
+                        "pages": "401-410",
+                        "doi": "10.1001/jama.2024.1234",
+                    }
+                },
+            },
+        )
+
+        assert result["status"] == "success"
+        assert result["plugin"] == "medical-citation"
+        assert result["action"] == "standard.citation.ama"
+        assert "Smith J" in result["output"]["citation"]
+        assert "doi:10.1001/jama.2024.1234" in result["output"]["citation"]
+
+    def test_missing_source_returns_structured_plugin_error_without_citation(self):
+        result = execute("standard.citation.ama", {"sources": {}})
+
+        assert result["status"] == "plugin_error"
+        assert result["output"] is None
+        assert "citation was not generated" in result["error"] or "sources must be" in result["error"]
+
+    def test_skill_doc_formatter_example_uses_journal_article_model(self):
+        doc_path = __import__("pathlib").Path(__file__).parent.parent / "adapters" / "opencode" / "skills" / "medical-citation.md"
+        content = doc_path.read_text(encoding="utf-8")
+
+        assert "JournalArticle" in content
+        assert "formatter.format_journal(JournalArticle(" in content
+        assert "volume=\"331\"" in content
+        assert "source_id" in content
