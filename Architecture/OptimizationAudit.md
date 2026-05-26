@@ -145,3 +145,24 @@ Artifact cleanup intentionally did not remove source or planned untracked files 
 
 - `.pytest_cache/` was detected as an ignored generated artifact, but removal was denied by the operating system with a permission error. It remains ignored and should be removed manually or after releasing the lock/permission constraint if a fully clean ignored-artifact state is required.
 - `Planning/` remains ignored by repository rules. It was not removed because the task only authorized generated artifacts/caches and this path is documented as local-only planning notes, not necessarily generated output.
+
+## Platform documentation model update — Step 6
+
+This documentation pass records the intended model as **core independent +
+platform add-ons**:
+
+- The SuperMedicine Python core is the default runtime and should remain usable
+  without OpenCode, Claude Code, local `claude`, or assistant-platform
+  configuration directories.
+- User-facing installation examples should include a pure Python path using
+  `pip install -e .`, `python Install.py --init`, `python Cli.py status`, and
+  `python Cli.py run ...`.
+- OpenCode documentation should describe the adapter as optional add-on content
+  with implemented tool mappings and metadata, not as a core requirement or as a
+  complete native subagent runtime bridge.
+- Claude Code documentation should describe a minimal optional adapter with
+  capability/runtime/local CLI invocation support only; native skill loading and
+  native subagent dispatch are not supported.
+- Safety boundaries remain unchanged: runtime PermissionEngine checks are the
+  enforcement path, prompt constraints are advisory, and medical outputs require
+  qualified human review.

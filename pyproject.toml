@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "supermedicine"
-version = "0.2.0b0"
+version = "0.2.1b0"
 description = "Modular medical research Agent with RAG and Harness"
 requires-python = ">=3.10"
 dependencies = [
@@ -25,6 +25,9 @@ dev = [
 r = [
     "rpy2>=3.5",
 ]
+# Platform adapter packages are shipped for backwards compatibility, but they
+# are optional integration surfaces layered around the standalone core.
+platform-adapters = []
 
 [project.scripts]
 supermedicine = "Cli:main"
@@ -42,6 +45,12 @@ include = ["core*", "permission*", "agents*", "plugins*", "adapters*"]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-p no:cacheprovider"
+markers = [
+    "core: standalone core tests that must not require OpenCode/Claude Code runtimes",
+    "adapter: optional platform adapter contract tests",
+    "opencode: optional OpenCode integration tests",
+    "claude_code: optional Claude Code integration tests",
+]
 
 [tool.mypy]
 exclude = "^build/"

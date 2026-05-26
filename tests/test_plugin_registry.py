@@ -2,6 +2,56 @@ import yaml
 from core.plugin_registry import PluginRegistry
 from plugins.base_plugin import BasePlugin
 
+
+class TestAdapterDiscoveryRegistry:
+    def test_top_level_adapters_import_exposes_static_metadata_without_platform_imports(self):
+        import sys
+
+        sys.modules.pop("adapters", None)
+        sys.modules.pop("adapters.standalone", None)
+        sys.modules.pop("adapters.standalone.adapter", None)
+        sys.modules.pop("adapters.opencode", None)
+        sys.modules.pop("adapters.opencode.adapter", None)
+        sys.modules.pop("adapters.claude_code", None)
+        sys.modules.pop("adapters.claude_code.adapter", None)
+
+        import adapters
+
+        assert "adapters.standalone.adapter" not in sys.modules
+        assert "adapters.opencode.adapter" not in sys.modules
+        assert "adapters.claude_code.adapter" not in sys.modules
+
+        registrations = adapters.list_adapter_registrations()
+        assert {item["platform"] for item in registrations} == {"standalone", "opencode", "claude-code"}
+        assert adapters.default_adapter_registration()["platform"] == "standalone"
+
+        for registration in registrations:
+            assert registration["module"].startswith("adapters.")
+            assert "adapter_class" in registration
+
+        assert "adapters.standalone" not in sys.modules
+        assert "adapters.opencode" not in sys.modules
+        assert "adapters.claude_code" not in sys.modules
+
+    def test_adapter_registry_distinguishes_core_and_optional_boundaries(self):
+        import adapters
+
+        standalone = adapters.get_adapter_registration("standalone")
+        opencode = adapters.get_adapter_registration("opencode")
+        claude = adapters.get_adapter_registration("claude-code")
+
+        assert standalone["core"] is True
+        assert standalone["default"] is True
+        assert standalone["optional"] is False
+        assert opencode["optional"] is True
+        assert opencode["core"] is False
+        assert opencode["requires_core_runtime"] is False
+        assert claude["optional"] is True
+        assert claude["core"] is False
+        assert claude["requires_core_runtime"] is False
+        assert adapters.list_adapter_registrations(include_optional=False) == [standalone]
+
+
 class TestPluginRegistry:
     def _create_plugin(self, tmp_path, name="test-plugin"):
         d = tmp_path / name

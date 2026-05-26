@@ -38,6 +38,11 @@ flowchart LR
         agents["Agent Workflows"]
     end
 
+    subgraph platform["Optional Platform Add-ons"]
+        opencode["OpenCode Adapter Metadata and Tools"]
+        claude["Minimal Claude Code CLI Adapter"]
+    end
+
     subgraph quality["Tests and CI Hygiene"]
         tests["Test Coverage"]
         ci["CI Checks"]
@@ -58,6 +63,8 @@ flowchart LR
     registry --> pystats
     registry --> rsurvival
     registry --> agents
+    core -. independent core does not require .-> opencode
+    core -. independent core does not require .-> claude
     core --> workspaceManager
     permissions --> paper
     permissions --> experience
@@ -108,9 +115,9 @@ flowchart TD
 
 ## Release Candidate State
 
-- Release-ready label: `Beta0.2.0`.
-- Python package metadata: `0.2.0b0` is the selected PEP 440 fallback because
-  packaging validation rejects `Beta0.2.0` as `project.version`.
+- Release-ready label: `Beta0.2.1`.
+- Python package metadata: `0.2.1b0` is the selected PEP 440 fallback because
+  packaging validation rejects `Beta0.2.1` as `project.version`.
 - R/rpy2 backend: formal support is represented through the optional `r` extra
   and the local `plugins.tools.r_survival` adapter path; it requires a local R
   installation with the R `survival` package available.
@@ -125,6 +132,15 @@ flowchart TD
 - No tag, GitHub Release, publish action, PyPI upload, or TestPyPI upload has
   been performed.
 - `Planning/NextSteps.md` remains local-only and ignored.
+- Documentation model: SuperMedicine is an independent Python medical research
+  agent framework. OpenCode and Claude Code are optional add-ons and are not
+  prerequisites for core installation, initialization, or CLI/Kernel execution.
+- OpenCode status: optional adapter surface with declared tools, plugin metadata,
+  skills, and agent role documents; no standalone native OpenCode subagent
+  runtime bridge is claimed without an injected SuperMedicine orchestrator.
+- Claude Code status: minimal optional adapter for capabilities, runtime status,
+  and permission-checked local `claude --print` invocation; no native Claude Code
+  skill loading or native subagent dispatch is claimed.
 
 ## Remaining Actions
 

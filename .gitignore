@@ -22,5 +22,10 @@ htmlcov/
 .supermedicine/policies/audit.jsonl
 .supermedicine/checkpoints/
 
+# External assistant platform local config/artifacts
+.claude/
+.opencode/
+superpowers/
+
 # Local-only planning notes
 /Planning/NextSteps.md

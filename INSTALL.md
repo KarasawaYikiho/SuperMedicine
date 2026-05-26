@@ -9,6 +9,10 @@
 | pip | >= 21.0 | For package installation |
 | R | >= 4.3 | Optional, for survival analysis tools |
 
+OpenCode, Claude Code, and other assistant platforms are **not** prerequisites
+for installing or running the SuperMedicine Python core. They are optional
+add-on adapter environments.
+
 ## Quick Install
 
 ```bash
@@ -16,6 +20,17 @@ git clone https://github.com/KarasawaYikiho/SuperMedicine.git
 cd SuperMedicine
 pip install -e ".[dev]"
 python Install.py --init
+```
+
+For a core-only user install, omit development tooling:
+
+```bash
+git clone https://github.com/KarasawaYikiho/SuperMedicine.git
+cd SuperMedicine
+pip install -e .
+python Install.py --init
+python Cli.py status
+python Cli.py run "summarize local context"
 ```
 
 ## Step-by-Step Installation
@@ -30,13 +45,16 @@ python -m venv .venv
 source .venv/bin/activate
 ```
 
-### 2. Clone and Install
+### 2. Clone and Install the Independent Python Core
 
 ```bash
 git clone https://github.com/KarasawaYikiho/SuperMedicine.git
 cd SuperMedicine
-pip install -e ".[dev]"
+pip install -e .
 ```
+
+Use `pip install -e ".[dev]"` only for development, testing, linting, or local
+release checks.
 
 ### 3. Initialize Project
 
@@ -45,6 +63,7 @@ python Install.py --init
 ```
 
 This creates the `.supermedicine/` directory with configuration and plugin settings.
+It does not require or create OpenCode/Claude Code configuration.
 
 ### 4. Install Optional R Support
 
@@ -73,7 +92,7 @@ Expected output shows:
 - Number of discovered plugins
 - Number of test modules
 
-Run the test suite:
+For development environments, run the test suite:
 
 ```bash
 python Cli.py test
@@ -81,7 +100,7 @@ python Cli.py test
 pytest tests/ -v
 ```
 
-All 100 tests should pass.
+The exact test count can change as optional adapter coverage evolves.
 
 ## Troubleshooting
 
@@ -117,14 +136,49 @@ supermedicine status
 
 ## Platform Adapters
 
+Platform adapters are optional add-ons around the standalone Python framework.
+Do not install or configure them unless you want platform-specific integration.
+
+| Area | Core install required? | Current status |
+|------|------------------------|----------------|
+| Standalone Python CLI/Kernel | Yes | Default supported path |
+| OpenCode add-on | No | Adapter surface, plugin metadata, skills, and agent role documents are present; no native OpenCode subagent runtime bridge unless a SuperMedicine orchestrator is injected |
+| Claude Code add-on | No | Minimal capability/runtime/local-CLI invocation adapter; no native Claude Code skill loading or native subagent dispatch |
+
 ### Claude Code
-Copy the skill directory to your Claude skills folder:
+Optional minimal adapter. Copy the skill directory only if you want local Claude
+Code-facing documentation/metadata:
 ```bash
 cp -r adapters/claude_code/ ~/.claude/skills/supermedicine/
 ```
 
+The Python adapter supports `claude.capabilities`, `claude.runtime_status`, and
+permission-checked `claude.invoke` when `claude` is on PATH. If `claude` is not
+installed, the adapter reports a structured unavailable state. It does not expose
+native Claude Code subagents or native Claude Code skill loading.
+
 ### OpenCode
-The OpenCode adapter is fully implemented. Copy `adapters/opencode/plugin.json` to your OpenCode plugins directory. Configuration includes 6 skills and 4 agent definitions.
+Optional OpenCode add-on content lives under `adapters/opencode/`. Copy or
+reference `adapters/opencode/plugin.json`, `adapters/opencode/skills/*.md`, and
+`adapters/opencode/agents/*.md` according to your OpenCode installation. The
+adapter maps declared tools such as `bash`, `read`, `write`, `edit`, `glob`,
+`grep`, `skill`, and `task`, with high-risk mutations/execution checked by the
+SuperMedicine permission model.
+
+Current limitation: `OpenCodeAdapter.subagent_dispatch(...)` does not launch an
+external native OpenCode subagent runtime by itself. Without an injected
+SuperMedicine orchestrator, it uses local metadata/fallback behavior.
+
+## Safety Boundaries
+
+- Core and adapter execution paths remain subject to the runtime
+  `PermissionEngine` where actions cross execution, mutation, deletion, network,
+  external API, or other high-risk resource boundaries.
+- The prompt-context safety layer is advisory; the runtime code-layer permission
+  check is the enforcement path.
+- Medical statistics, writing, and citation helpers are research-support
+  interfaces only. They do not provide clinical, regulatory, decision-support, or
+  production-grade guarantees, and outputs require qualified human review.
 
 ## Uninstall
 

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import importlib
 from pathlib import Path
+import sys
 
 import pytest
 import yaml
@@ -45,6 +47,57 @@ def test_cli_help_preserves_legacy_commands_and_run_flags(capsys):
     run_output = capsys.readouterr().out
     for flag in ("--verbose", "--plugin", "--action", "--params-json", "--params-file", "--workspace"):
         assert flag in run_output
+
+
+@pytest.mark.core
+def test_core_cli_kernel_imports_do_not_load_platform_adapters():
+    for module_name in (
+        "Cli",
+        "core.kernel",
+        "adapters.opencode",
+        "adapters.opencode.adapter",
+        "adapters.claude_code",
+        "adapters.claude_code.adapter",
+    ):
+        sys.modules.pop(module_name, None)
+
+    importlib.import_module("Cli")
+    importlib.import_module("core.kernel")
+
+    assert "adapters.opencode" not in sys.modules
+    assert "adapters.opencode.adapter" not in sys.modules
+    assert "adapters.claude_code" not in sys.modules
+    assert "adapters.claude_code.adapter" not in sys.modules
+
+
+def test_cli_help_and_init_do_not_require_platform_runtime_or_config(monkeypatch, tmp_path, capsys):
+    for module_name in (
+        "adapters.opencode",
+        "adapters.opencode.adapter",
+        "adapters.claude_code",
+        "adapters.claude_code.adapter",
+    ):
+        sys.modules.pop(module_name, None)
+
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(SystemExit) as help_exit:
+        main(["--help"])
+    assert help_exit.value.code == 0
+    top_help = capsys.readouterr().out
+    assert "supermedicine" in top_help
+
+    project_dir = tmp_path / "standalone-project"
+    main(["init", "--dir", str(project_dir)])
+
+    assert (project_dir / ".supermedicine" / "config.yaml").is_file()
+    assert (project_dir / ".supermedicine" / "policies" / PermissionEngine.DEFAULT_POLICY_FILENAME).is_file()
+    assert not (project_dir / ".opencode").exists()
+    assert not (project_dir / ".claude").exists()
+    assert "adapters.opencode" not in sys.modules
+    assert "adapters.opencode.adapter" not in sys.modules
+    assert "adapters.claude_code" not in sys.modules
+    assert "adapters.claude_code.adapter" not in sys.modules
 
 
 def test_cli_help_documents_workspace_tui_paper_and_experience_boundaries(capsys):

@@ -23,6 +23,25 @@ class StandaloneAdapter(BaseAdapter):
     def platform_name(self) -> str:
         return "standalone"
 
+    @property
+    def registration(self) -> dict[str, Any]:
+        """Return adapter discovery metadata for registries and callers."""
+        return {
+            "platform": self.platform_name,
+            "adapter_class": self.__class__.__name__,
+            "status": "core_default",
+            "optional": False,
+            "core": True,
+            "default": True,
+            "module": "adapters.standalone.adapter",
+            "capability_tool": None,
+            "requires_core_runtime": True,
+            "limitations": [
+                "Self-contained core adapter; does not load OpenCode or Claude Code platform resources.",
+                "Skill loading returns core-neutral metadata instead of platform skill files.",
+            ],
+        }
+
     def tool_call(self, tool_id: str, params: dict[str, Any]) -> dict[str, Any]:
         """调用本地工具"""
         handlers = {
@@ -51,12 +70,14 @@ class StandaloneAdapter(BaseAdapter):
         return self.subagent_dispatch(agent_id, task if isinstance(task, dict) else {"description": task})
 
     def skill_load(self, skill_name: str) -> str:
-        """从本地加载技能文件"""
-        adapter_dir = Path(__file__).parent.parent
-        skill_path = adapter_dir / "opencode" / "skills" / f"{skill_name}.md"
-        if skill_path.exists():
-            return skill_path.read_text(encoding="utf-8")
-        return f"Skill not found: {skill_name}"
+        """Return standalone skill metadata without depending on OpenCode files."""
+        if not skill_name:
+            return "Standalone skill name is required."
+        return (
+            f"Standalone skill '{skill_name}' is not backed by a platform skill file. "
+            "Use Kernel/plugin actions directly for core SuperMedicine workflows; "
+            "OpenCode skill documents are available only through the optional OpenCode adapter."
+        )
 
     def subagent_dispatch(self, agent_id: str, task: dict[str, Any]) -> dict[str, Any]:
         """进程内模拟 Dispatch"""

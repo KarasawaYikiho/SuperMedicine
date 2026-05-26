@@ -1,4 +1,4 @@
-"""Claude Code 适配器 — 最小真实实现。"""
+"""Claude Code 适配器 — 最小可选附加适配器实现。"""
 from __future__ import annotations
 
 import shutil
@@ -12,14 +12,18 @@ from permission.policy import DEFAULT_POLICY_RELATIVE_PATH, PermissionResult
 
 
 class ClaudeCodeAdapter(BaseAdapter):
-    """Claude Code 平台适配器。
+    """Claude Code optional platform adapter.
 
-    当前实现保持最小、安全边界：提供注册/发现元数据、能力报告、运行时探测，
-    以及一个 contract-compatible 的 ``claude`` CLI 调用路径。所有执行型入口在
-    动作发生前都会通过 canonical ``.supermedicine/policies/default.yaml`` 权限链。
+    This adapter is deliberately not part of the SuperMedicine core runtime. It
+    provides discovery/capability metadata plus a permission-checked, timeout-
+    bounded ``claude --print`` invocation path when a local Claude Code CLI is
+    present. Missing local ``claude`` is therefore a stable optional-adapter
+    unavailable condition, not a core failure.
     """
 
     SUPPORTED_TOOLS = {"claude.capabilities", "claude.runtime_status", "claude.invoke"}
+    USER_FACING_AGENT = {"name": "SuperMedicine", "id": "supermedicine"}
+    INTERNAL_ROLE_CONTEXTS = ["alpha", "beta", "gamma", "delta"]
 
     def __init__(
         self,
@@ -46,9 +50,19 @@ class ClaudeCodeAdapter(BaseAdapter):
         return {
             "platform": self.platform_name,
             "adapter_class": self.__class__.__name__,
-            "status": "minimal",
+            "status": "optional_minimal",
+            "optional": True,
+            "core": False,
+            "default": False,
             "module": "adapters.claude_code.adapter",
             "capability_tool": "claude.capabilities",
+            "requires_core_runtime": False,
+            "requires_local_runtime_for_invoke": True,
+            "limitations": [
+                "Optional minimal add-on; not imported, initialized, or probed by default.",
+                "Invocation requires an explicitly selected adapter and local Claude Code CLI runtime.",
+                "Only SuperMedicine is exposed as a user-facing platform agent; alpha/beta/gamma/delta are internal role contexts only.",
+            ],
         }
 
     def capabilities(self) -> dict[str, Any]:
@@ -57,6 +71,8 @@ class ClaudeCodeAdapter(BaseAdapter):
         return {
             "platform": self.platform_name,
             "status": "available" if runtime["available"] else "runtime_unavailable",
+            "adapter_status": "optional_minimal",
+            "optional": True,
             "supported_tools": sorted(self.SUPPORTED_TOOLS),
             "features": {
                 "registration_discovery": True,
@@ -68,7 +84,10 @@ class ClaudeCodeAdapter(BaseAdapter):
                 "sensitive_redaction": True,
                 "native_subagent_dispatch": False,
                 "native_skill_load": False,
+                "core_runtime_dependency": False,
             },
+            "user_facing_agents": [self.USER_FACING_AGENT],
+            "internal_role_contexts": self.INTERNAL_ROLE_CONTEXTS,
             "resource_limits": {
                 "default_timeout_seconds": self._timeout_seconds,
                 "max_timeout_seconds": self.MAX_TIMEOUT_SECONDS,
@@ -76,9 +95,11 @@ class ClaudeCodeAdapter(BaseAdapter):
             },
             "limits": [
                 "Minimal adapter only; not a full Claude Code sub-agent bridge.",
+                "Claude Code support is an optional add-on and is not required for core SuperMedicine runtime.",
                 "Actual invocation requires a local Claude Code CLI runtime on PATH.",
                 "skill_load returns contract metadata; it does not load native Claude Code skills.",
                 "subagent_dispatch reports unavailable until a stable native API exists.",
+                "Claude Code exposes exactly one user-facing agent/surface: SuperMedicine; α/β/γ/δ remain non-user-facing role contexts.",
             ],
             "runtime": runtime,
         }
@@ -89,7 +110,7 @@ class ClaudeCodeAdapter(BaseAdapter):
             return {
                 "status": "error",
                 "tool": tool_id,
-                "error": f"Unsupported Claude Code adapter tool: {tool_id}",
+                "error": f"Unsupported Claude Code adapter tool: {redact_sensitive(tool_id)}",
                 "error_code": "unsupported_tool",
                 "supported_tools": sorted(self.SUPPORTED_TOOLS),
                 "metadata": {"security": {"permission_checked": False, "reason": "unsupported_tool"}},
@@ -136,6 +157,8 @@ class ClaudeCodeAdapter(BaseAdapter):
             "task": task,
             "error": "Native Claude Code sub-agent dispatch is not available in this minimal adapter.",
             "capabilities": self.capabilities()["features"],
+            "user_facing": False,
+            "internal_role_context": agent_id in self.INTERNAL_ROLE_CONTEXTS,
         }
 
     def _invoke(self, params: dict[str, Any]) -> dict[str, Any]:
@@ -148,22 +171,25 @@ class ClaudeCodeAdapter(BaseAdapter):
             return {
                 "status": "unavailable",
                 "tool": "claude.invoke",
-                "error": "Claude Code CLI runtime is unavailable.",
+                "error": "Claude Code CLI runtime is unavailable; optional adapter invocation requires a local 'claude' command on PATH.",
                 "error_code": "runtime_unavailable",
                 "retryable": True,
                 "runtime": runtime,
-                "metadata": {"resource": {"kind": "local_cli", "timeout_seconds": self._timeout_seconds}},
+                "metadata": {
+                    "adapter": {"optional": True, "core_failure": False},
+                    "resource": {"kind": "local_cli", "timeout_seconds": self._timeout_seconds},
+                },
             }
 
         timeout = self._normalize_timeout(params.get("timeout"), self._timeout_seconds)
         command = [runtime["command_path"], "--print", prompt]
         if params.get("dry_run", False):
-            safe_command = [runtime["command_path"], "--print", redact_sensitive(prompt)]
+            safe_command = redact_sensitive([runtime["command_path"], "--print", prompt])
             return {
                 "status": "ok",
                 "tool": "claude.invoke",
                 "result": {"command": safe_command, "dry_run": True},
-                "metadata": {"resource": {"timeout_seconds": timeout}, "security": {"redacted": safe_command != command}},
+                "metadata": {"resource": {"timeout_seconds": timeout}, "security": {"permission_checked": True, "redacted": safe_command != command}},
             }
 
         try:
@@ -186,7 +212,14 @@ class ClaudeCodeAdapter(BaseAdapter):
                 "metadata": {"resource": {"timeout_seconds": timeout, "kind": "local_cli"}},
             }
         except OSError as exc:
-            return {"status": "error", "tool": "claude.invoke", "error": redact_sensitive(str(exc)), "error_code": "runtime_os_error", "retryable": True}
+            return {
+                "status": "runtime_error",
+                "tool": "claude.invoke",
+                "error": redact_sensitive(str(exc)),
+                "error_code": "runtime_os_error",
+                "retryable": True,
+                "metadata": {"adapter": {"optional": True, "core_failure": False}, "resource": {"kind": "local_cli", "timeout_seconds": timeout}},
+            }
 
         if result.returncode != 0:
             return {
@@ -210,6 +243,8 @@ class ClaudeCodeAdapter(BaseAdapter):
             "available": command_path is not None,
             "command": self._runtime_command,
             "command_path": command_path,
+            "required_for_core": False,
+            "unavailable_is_core_failure": False,
         }
 
     def _permission_denied(self, agent_id: str, action: str, resource: str) -> dict[str, Any] | None:

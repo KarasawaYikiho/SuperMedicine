@@ -1,10 +1,49 @@
 {
   "name": "supermedicine",
-  "version": "Beta0.2.0",
-  "description": "Modular medical research Agent with RAG and Harness",
+  "version": "Beta0.2.1",
+  "description": "Standalone modular medical research assistant with optional OpenCode and Claude Code adapter entry files",
   "platforms": {
-    "claude-code": {"type": "skill+subagent", "entry": "adapters/claude_code/SKILL.md"},
-    "opencode": {"type": "plugin", "entry": "adapters/opencode/plugin.json"}
+    "claude-code": {
+      "type": "skill-doc+minimal-cli-adapter",
+      "entry": "adapters/claude_code/SKILL.md",
+      "adapter_module": "adapters/claude_code/adapter.py",
+      "optional_add_on": true,
+      "core_runtime_required": false,
+      "native_skill_loading": false,
+      "native_subagent_runtime": false,
+      "supported_tools": ["claude.capabilities", "claude.runtime_status", "claude.invoke"],
+      "user_facing_agents": ["SuperMedicine"],
+      "internal_role_contexts": ["alpha", "beta", "gamma", "delta"],
+      "limitations": [
+        "The standalone SuperMedicine core does not require Claude Code.",
+        "Local Claude Code CLI is optional and required only for claude.invoke.",
+        "No native Claude Code skill loading or native subagent dispatch is implemented."
+      ]
+    },
+    "opencode": {
+      "type": "plugin",
+      "entry": "adapters/opencode/plugin.json",
+      "adapter_module": "adapters/opencode/adapter.py",
+      "optional_add_on": true,
+      "core_runtime_required": false,
+      "native_skill_loading": "skill documents provided; adapter can load local declared files",
+      "native_subagent_runtime": false,
+      "supported_tools": ["bash", "read", "write", "edit", "glob", "grep", "skill", "task", "opencode.capabilities"],
+      "user_facing_agents": ["SuperMedicine"],
+      "internal_role_contexts": ["alpha", "beta", "gamma", "delta"],
+      "limitations": [
+        "The standalone SuperMedicine core does not require OpenCode.",
+        "Only SuperMedicine is user-facing; alpha/beta/gamma/delta are internal role contexts.",
+        "Task dispatch needs an injected SuperMedicine orchestrator/runtime bridge; otherwise it returns a degraded context result."
+      ]
+    }
+  },
+  "install_completeness_model": {
+    "core_default": "Python package and CLI run independently of assistant platforms.",
+    "platform_add_ons": "OpenCode and Claude Code entries are optional metadata/adapter surfaces packaged under adapters/.",
+    "single_user_facing_agent": "SuperMedicine",
+    "forbidden_platform_agent_names": ["alpha", "beta", "gamma", "delta"],
+    "truthfulness_boundary": "Adapter manifests declare only implemented local files, metadata, tool mappings, and degraded/unavailable states."
   },
   "dependencies": {"python": ">=3.10", "r": ">=4.3 (optional)"},
   "plugins": {

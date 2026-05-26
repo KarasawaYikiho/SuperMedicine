@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import importlib
+import sys
 import tempfile
 from pathlib import Path
 
@@ -13,6 +15,9 @@ from adapters.base_adapter import BaseAdapter
 from agents.orchestrator import Orchestrator
 from agents.base_agent import BaseAgent
 from permission.engine import PermissionEngine
+
+
+FORBIDDEN_PLATFORM_AGENT_NAMES = {"Brain", "Planner", "Coder", "Tester"}
 
 
 @pytest.fixture
@@ -46,9 +51,58 @@ class TestAdapterImport:
         assert isinstance(adapter, BaseAdapter)
         assert isinstance(adapter, OpenCodeAdapter)
 
+    def test_explicit_optional_import_degrades_without_orchestrator(self):
+        sys.modules.pop("adapters.opencode", None)
+        sys.modules.pop("adapters.opencode.adapter", None)
+
+        module = importlib.import_module("adapters.opencode.adapter")
+        explicit_adapter = module.OpenCodeAdapter()
+
+        capabilities = explicit_adapter.tool_call("opencode.capabilities", {})
+        dispatch = explicit_adapter.subagent_dispatch("alpha", {"action": "standalone-check"})
+
+        assert capabilities["status"] == "ok"
+        assert capabilities["result"]["optional_add_on"] is True
+        assert capabilities["result"]["status"] == "degraded"
+        assert capabilities["result"]["features"]["orchestrator_backed_dispatch"] is False
+        assert dispatch["status"] == "degraded"
+        assert dispatch["error_code"] == "orchestrator_unavailable"
+        assert dispatch["context"]["native_dispatch_executed"] is False
+
     def test_platform_name(self, adapter):
         """验证 platform_name 返回 'opencode'"""
         assert adapter.platform_name == "opencode"
+
+    def test_capabilities_report_optional_degraded_boundary(self, adapter):
+        result = adapter.tool_call("opencode.capabilities", {})
+
+        assert result["status"] == "ok"
+        capabilities = result["result"]
+        assert capabilities["optional_add_on"] is True
+        assert capabilities["status"] == "degraded"
+        assert capabilities["features"]["core_runtime_dependency"] is False
+        assert capabilities["features"]["native_opencode_subagent_runtime"] is False
+        assert capabilities["features"]["permission_checked_dangerous_tools"] is True
+        user_facing_names = [agent["name"] for agent in capabilities["user_facing_agents"]]
+        assert user_facing_names == ["SuperMedicine"]
+        assert len(capabilities["user_facing_agents"]) == 1
+        assert FORBIDDEN_PLATFORM_AGENT_NAMES.isdisjoint(user_facing_names)
+        assert set(capabilities["internal_role_contexts"]) == {
+            "alpha-analyst.md",
+            "beta-reviewer.md",
+            "gamma-writer.md",
+            "delta-orchestrator.md",
+        }
+
+    def test_registration_marks_opencode_as_optional_add_on(self, adapter):
+        registration = adapter.registration
+        assert registration["platform"] == "opencode"
+        assert registration["status"] == "optional_add_on"
+        assert registration["optional"] is True
+        assert registration["core"] is False
+        assert registration["default"] is False
+        assert registration["requires_core_runtime"] is False
+        assert "not imported" in registration["limitations"][0]
 
 
 class TestToolCall:
@@ -86,6 +140,14 @@ class TestToolCall:
         result = adapter.tool_call("nonexistent", {})
         assert result["status"] == "error"
         assert "Unsupported" in result["result"]
+
+    def test_task_tool_without_orchestrator_returns_degraded_result(self, adapter):
+        result = adapter.tool_call("task", {"agent_id": "alpha", "task": {"action": "test"}})
+
+        assert result["status"] == "degraded"
+        assert result["tool"] == "task"
+        assert result["error_code"] == "orchestrator_unavailable"
+        assert result["context"]["native_dispatch_executed"] is False
 
     def test_high_risk_tool_denied_before_write_mutation(self, tmp_path):
         adapter = _adapter_with_policy(tmp_path, allowed=[], denied=[{"action": "tool_call", "scope": "*"}])
@@ -191,7 +253,11 @@ class TestSubagentDispatch:
         """验证 subagent_dispatch 返回有效响应"""
         result = adapter.subagent_dispatch("alpha", {"action": "test", "data": "sample"})
         assert result["agent_id"] == "alpha"
-        assert result["status"] == "dispatched"
+        assert result["status"] == "degraded"
+        assert result["error_code"] == "orchestrator_unavailable"
+        assert result["context"]["native_dispatch_executed"] is False
+        assert result["context"]["user_facing"] is False
+        assert result["context"]["internal_role_context"] is True
         assert "task" in result
         assert result["task"]["action"] == "test"
 
@@ -213,15 +279,42 @@ class TestPluginJson:
 
         # Check Permissions
         assert "tools" in data["permissions"]
-        assert len(data["permissions"]["tools"]) >= 8
+        assert len(data["permissions"]["tools"]) >= 9
+        assert set(data["permissions"]["tools"]) == OpenCodeAdapter.SUPPORTED_TOOLS
+        assert "opencode.capabilities" in data["permissions"]["tools"]
+        assert set(data["permissions"]["high_risk_checked_tools"]) == {"bash", "write", "edit", "task"}
+        assert set(data["permissions"]["high_risk_checked_tools"]).issubset(OpenCodeAdapter.SUPPORTED_TOOLS)
+        assert "read" in data["permissions"]["sandboxed_filesystem_tools"]
+        assert data["optional_add_on"] is True
+        assert data["native_opencode_subagent_runtime"] is False
+        assert data["core_runtime_required"] is False
+        assert data["install_entry_files"]["adapter_module"] == "adapter.py"
+        assert (plugin_path.parent / data["install_entry_files"]["plugin_manifest"]).is_file()
+        assert (plugin_path.parent / data["install_entry_files"]["adapter_module"]).is_file()
+        assert (plugin_path.parent / data["install_entry_files"]["single_user_facing_agent"]).is_file()
+        assert (plugin_path.parent / data["install_entry_files"]["skill_documents_dir"]).is_dir()
+        assert (plugin_path.parent / data["install_entry_files"]["internal_role_context_dir"]).is_dir()
+        assert data["install_completeness_model"]["degraded_without_orchestrator"] is True
 
         # Check Skills
         assert "skills" in data
         assert len(data["skills"]) == 6
+        for skill_path in data["skills"]:
+            assert (plugin_path.parent / skill_path).is_file(), f"Missing declared OpenCode skill: {skill_path}"
 
-        # Check Agents
+        # Check Agents: exactly one user-facing OpenCode agent
         assert "agents" in data
-        assert len(data["agents"]) == 4
+        assert data["agents"] == ["agents/supermedicine.md"]
+        user_facing_names = [agent["name"] for agent in data["user_facing_agents"]]
+        assert user_facing_names == ["SuperMedicine"]
+        assert len(data["user_facing_agents"]) == 1
+        assert FORBIDDEN_PLATFORM_AGENT_NAMES.isdisjoint(user_facing_names)
+        assert sorted(data["internal_role_contexts"]) == sorted([
+            "agents/alpha-analyst.md",
+            "agents/beta-reviewer.md",
+            "agents/gamma-writer.md",
+            "agents/delta-orchestrator.md",
+        ])
 
 
 class TestSkillsExist:
@@ -280,20 +373,28 @@ class TestSkillsExist:
 class TestAgentsExist:
     """测试所有 Agent 定义文件存在"""
 
-    def test_all_agents_exist(self):
-        """验证 4 个 Agent 定义文件存在"""
+    def test_user_facing_agent_and_internal_role_contexts_exist(self):
+        """验证唯一用户可见 Agent 和内部 role context 文件存在"""
         agents_dir = Path(__file__).parent.parent / "adapters" / "opencode" / "agents"
-        expected_agents = [
+        user_facing_agent = agents_dir / "supermedicine.md"
+        assert user_facing_agent.exists(), "Missing SuperMedicine user-facing agent file"
+        user_facing_content = user_facing_agent.read_text(encoding="utf-8")
+        assert "name: SuperMedicine" in user_facing_content
+        assert "user_facing: true" in user_facing_content
+
+        expected_contexts = [
             "alpha-analyst.md",
             "beta-reviewer.md",
             "gamma-writer.md",
             "delta-orchestrator.md",
         ]
-        for agent_file in expected_agents:
+        for agent_file in expected_contexts:
             agent_path = agents_dir / agent_file
-            assert agent_path.exists(), f"Missing agent file: {agent_file}"
+            assert agent_path.exists(), f"Missing internal role context file: {agent_file}"
             content = agent_path.read_text(encoding="utf-8")
-            assert len(content) > 0, f"Empty agent file: {agent_file}"
+            assert len(content) > 0, f"Empty internal role context file: {agent_file}"
+            assert "user_facing: false" in content
+            assert "internal_role_context: true" in content
 
 
 class DummyEchoAgent(BaseAgent):
@@ -329,3 +430,6 @@ class TestOpenCodeRealDispatch:
         adapter = OpenCodeAdapter()
         result = adapter.subagent_dispatch("alpha", {"action": "test"})
         assert result["agent_id"] == "alpha"
+        assert result["status"] == "degraded"
+        assert result["error_code"] == "orchestrator_unavailable"
+        assert result["capabilities"]["native_opencode_subagent_runtime"] is False

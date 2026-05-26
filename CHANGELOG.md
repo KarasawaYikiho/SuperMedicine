@@ -5,19 +5,30 @@ All notable changes to SuperMedicine will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Beta0.2.0] — release-ready, unreleased
+## [Beta0.2.1] — release-ready, unreleased
 
 ### Added
 - Formal optional R/rpy2 backend support for `r-survival` Kaplan-Meier,
   log-rank, and Cox PH actions, with structured unavailable responses when rpy2,
   local R, or the R `survival` package is missing.
+- Documentation now states the core independent + platform add-on model:
+  standalone Python CLI/Kernel is the default supported path, OpenCode is an
+  optional add-on without a native subagent runtime bridge unless an orchestrator
+  is injected, and Claude Code is a minimal optional add-on without native skill
+  or subagent support.
 
 ### Release readiness
-- Set the GitHub/release-ready label to `Beta0.2.0` without creating a tag,
+- Set the GitHub/release-ready label to `Beta0.2.1` without creating a tag,
   release, publish, or upload.
 - Audited Python packaging metadata for the same label; packaging validation
-  rejects `Beta0.2.0` because `project.version` must be PEP 440, so Python
-  metadata uses fallback version `0.2.0b0`.
+  rejects `Beta0.2.1` because `project.version` must be PEP 440, so Python
+  metadata uses fallback version `0.2.1b0`.
+- Final platform-integration audit summary records standalone core independence,
+  OpenCode optional add-on status without native runtime subagent-bridge claims,
+  and Claude Code minimal optional add-on status without native skill/subagent
+  claims.
+- Latest cited local verification set: `ruff` pass; `mypy` pass with 126 source
+  files; `pytest` 424 passed, 3 skipped; build pass; installed wheel smoke pass.
 
 ## [0.1.0-beta] — 2026-05-22
 

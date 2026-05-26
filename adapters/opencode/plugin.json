@@ -1,7 +1,7 @@
 {
   "name": "supermedicine",
   "version": "0.1.0",
-  "description": "Modular medical research Agent framework with RAG, Harness, statistical analysis, and medical writing standards",
+  "description": "Optional OpenCode add-on for SuperMedicine: one user-facing SuperMedicine agent plus adapter tools, skill documents, and internal role context files layered around the standalone core",
   "author": "SuperMedicine contributors",
   "license": "MIT",
   "type": "plugin",
@@ -12,8 +12,18 @@
     "min_version": "0.1.0"
   },
   "permissions": {
-    "tools": ["bash", "read", "write", "edit", "glob", "grep", "skill", "task"],
-    "description": "Required for file I/O, code execution, skill loading, and subagent dispatch"
+    "tools": ["bash", "read", "write", "edit", "glob", "grep", "skill", "task", "opencode.capabilities"],
+    "description": "Optional adapter permissions for file I/O, code execution, declared local skill file loading, capability reporting, and orchestrator-backed task dispatch; dangerous tools are checked by the canonical policy before execution",
+    "high_risk_checked_tools": ["bash", "write", "edit", "task"],
+    "sandboxed_filesystem_tools": ["read", "write", "edit", "glob", "grep"],
+    "unsupported_native_platform_claims": ["native OpenCode subagent runtime without injected orchestrator"]
+  },
+  "install_entry_files": {
+    "plugin_manifest": "plugin.json",
+    "adapter_module": "adapter.py",
+    "single_user_facing_agent": "agents/supermedicine.md",
+    "skill_documents_dir": "skills/",
+    "internal_role_context_dir": "agents/"
   },
   "skills": [
     "skills/rag-query.md",
@@ -24,6 +34,16 @@
     "skills/r-survival.md"
   ],
   "agents": [
+    "agents/supermedicine.md"
+  ],
+  "user_facing_agents": [
+    {
+      "name": "SuperMedicine",
+      "path": "agents/supermedicine.md",
+      "description": "The only platform-visible OpenCode agent for SuperMedicine. Internal α/β/γ/δ roles remain non-user-facing role context documents and capabilities."
+    }
+  ],
+  "internal_role_contexts": [
     "agents/alpha-analyst.md",
     "agents/beta-reviewer.md",
     "agents/gamma-writer.md",
@@ -37,6 +57,23 @@
     "survival_analysis",
     "citation_format",
     "permission_audit",
-    "multi_agent_orchestration"
+    "orchestrator_backed_dispatch"
+  ],
+  "optional_add_on": true,
+  "native_opencode_subagent_runtime": false,
+  "core_runtime_required": false,
+  "install_completeness_model": {
+    "single_user_facing_agent": "SuperMedicine",
+    "adapter_files_complete": true,
+    "skills_declared": 6,
+    "internal_role_contexts_declared": 4,
+    "permission_boundary": "Declared tools match OpenCodeAdapter.SUPPORTED_TOOLS; high-risk mutation/execution paths remain policy checked.",
+    "degraded_without_orchestrator": true
+  },
+  "limitations": [
+    "The SuperMedicine standalone core does not require OpenCode.",
+    "Task dispatch requires an injected orchestrator/runtime bridge; otherwise adapter.py returns a structured degraded result with local role context only.",
+    "Role markdown files describe non-user-facing SuperMedicine/OpenCode role context and do not by themselves implement native OpenCode subagents.",
+    "OpenCode exposes exactly one user-facing agent from this plugin: SuperMedicine."
   ]
 }

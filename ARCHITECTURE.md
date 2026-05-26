@@ -2,7 +2,13 @@
 
 ## Overview
 
-SuperMedicine uses a **microkernel + multi-agent orchestration** architecture. The microkernel (Kernel) integrates core subsystems, workspace state, plugins, adapters, and agents through well-defined interfaces. A P0 runtime permission engine enforces code-layer policy checks, while prompt-layer helpers provide advisory context generation.
+SuperMedicine uses a **microkernel + multi-agent orchestration** architecture for
+an independent Python medical research agent framework. The microkernel (Kernel)
+integrates core subsystems, workspace state, plugins, and in-process agent
+concepts through well-defined interfaces. Platform adapters such as OpenCode and
+Claude Code are optional add-on entrypoints around the core; they are not Kernel
+initialization requirements. A P0 runtime permission engine enforces code-layer
+policy checks, while prompt-layer helpers provide advisory context generation.
 
 The latest roadmap implementation is complete through Step 13/13. Current user-facing additions include explicit workspace management, workspace-local paper import, experience learning, and a Chinese TUI workbench. Detailed historical and phase notes live in [Architecture/ExecutionRoadmap.md](Architecture/ExecutionRoadmap.md), [Architecture/PhaseImplementationPlan.md](Architecture/PhaseImplementationPlan.md), and [Architecture/WorkspaceTuiRagGuide.md](Architecture/WorkspaceTuiRagGuide.md).
 
@@ -32,11 +38,11 @@ The latest roadmap implementation is complete through Step 13/13. Current user-f
 │  └──────────────────┘                                          │
 └──────────────────────────────┬───────────────────────────────────┘
                                │
-          ┌────────────────────┼────────────────────┬────────────────────┐
-          │                    │                    │                    │
+          ┌────────────────────┼────────────────────┐
+          │                    │                    │
 ┌─────────▼─────────┐ ┌───────▼───────┐ ┌─────────▼─────────┐
-│   Agent Layer     │ │ Plugin Layer  │ │  Adapter Layer    │
-│   (agents/)       │ │ (plugins/)    │ │  (adapters/)      │
+│   Agent Layer     │ │ Plugin Layer  │ │ Optional Adapter  │
+│   (agents/)       │ │ (plugins/)    │ │ Add-ons           │
 └───────────────────┘ └───────────────┘ └───────────────────┘
                      ┌─────────▼─────────┐
                      │ Workspace Layer   │
@@ -146,12 +152,12 @@ IDLE → PLANNING → DISPATCH → RUNNING → VERIFYING
 - Returns structured execution results
 
 ### Agent Roles
-| Agent | Role | State Machine Stage | OpenCode Mapping |
-|-------|------|---------------------|-----------------|
-| α-Analyst | Research planning | PLANNING | Brain/Planner |
-| β-Reviewer | Quality verification | VERIFYING | Coder/Tester |
-| γ-Writer | Manuscript writing | RUNNING | Coder |
-| δ-Orchestrator | Workflow coordination | DISPATCH | Brain |
+| Agent | Role | State Machine Stage | Internal Workflow Role |
+|-------|------|---------------------|------------------------|
+| α-Analyst | Research planning | PLANNING | Strategy and requirements analysis |
+| β-Reviewer | Quality verification | VERIFYING | Independent review and validation |
+| γ-Writer | Manuscript writing | RUNNING | Drafting and content execution |
+| δ-Orchestrator | Workflow coordination | DISPATCH | Routing and workflow coordination |
 
 ## Layer 4: Plugin Ecosystem (`plugins/`)
 
@@ -235,7 +241,9 @@ boundary explicit at runtime.
 
 ## Layer 5: Platform Adapters (`adapters/`)
 
-Adapters bridge SuperMedicine to AI coding assistant platforms.
+Adapters bridge SuperMedicine to AI coding assistant platforms as optional
+add-ons. The standalone CLI and Kernel must run without importing or requiring
+OpenCode, Claude Code, `claude`, or platform configuration directories.
 
 ### BaseAdapter Interface
 | Method | Return Type | Purpose |
@@ -245,13 +253,16 @@ Adapters bridge SuperMedicine to AI coding assistant platforms.
 | `skill_load(skill_name)` | `str` | Load skill definition |
 | `subagent_dispatch(agent_id, task)` | `dict` | Dispatch to sub-agent |
 
-### OpenCode Adapter — Implemented Integration Path
+### OpenCode Adapter — Optional Implemented Add-on Surface
 - Native tool mappings for bash, read, write, edit, glob, grep, skill, and task
 - Skill/agent metadata for RAG, Harness, medical writing/citation, and prototype statistics workflows
 - Plugin metadata with permissions, capabilities, and tool declarations
 - Execution remains subject to SuperMedicine permission checks where actions cross execution or external-resource boundaries
+- `OpenCodeAdapter.subagent_dispatch(...)` does not launch a native external
+  OpenCode subagent runtime by itself. When no SuperMedicine orchestrator is
+  injected, it falls back to local metadata/role information.
 
-### Claude Code Adapter — Minimal Available
+### Claude Code Adapter — Minimal Optional Available
 - Registration/discovery metadata via `ClaudeCodeAdapter.registration`
 - Structured capabilities via `tool_call("claude.capabilities", ...)`
 - Runtime discovery via `tool_call("claude.runtime_status", ...)`
@@ -259,6 +270,18 @@ Adapters bridge SuperMedicine to AI coding assistant platforms.
 - All adapter actions are checked through the canonical `.supermedicine/policies/default.yaml` `PermissionEngine` path before execution
 - Explicit unavailable/error states for missing runtime, timeouts, runtime errors, unsupported tools, and native sub-agent dispatch, with timeout/resource metadata and sensitive-value redaction
 - Current limits: not a full Claude Code sub-agent bridge; native skill loading and native sub-agent dispatch are not claimed as supported
+
+### Core/add-on capability matrix
+
+| Capability | Standalone Python core | OpenCode add-on | Claude Code add-on |
+|------------|------------------------|-----------------|--------------------|
+| Required for installation | Yes | No | No |
+| Required for `Kernel` / `Cli.py run` | Yes | No | No |
+| PermissionEngine checks | Core enforcement path | Used for high-risk adapter actions | Used before adapter actions |
+| Plugin discovery/execution | Native through Kernel | Adapter metadata/context only | Not native plugin runtime |
+| Platform tools | Not required | Declared adapter mappings | Minimal `claude.*` tools |
+| Native platform subagents | Not applicable | Not implemented without injected orchestrator | Not implemented |
+| Native platform skill loading | Not applicable | Skill docs available to OpenCode setup | Not implemented |
 
 ### Standalone and CLI execution
 
@@ -331,7 +354,7 @@ a dedicated mypy or pyright configuration.
 User Input
     │
     ▼
-CLI / Platform Adapter
+CLI / Optional Platform Adapter
     │
     ▼
 Kernel (init)

@@ -36,7 +36,7 @@ class TestIntegration:
     """端到端集成测试"""
 
     def test_install_init_creates_canonical_default_policy_without_overwrite(self, tmp_path):
-        """Install.py --init 应创建默认策略，并在重复初始化时保留用户策略。"""
+        """Install.py --init 应创建核心默认策略，并在重复初始化时保留用户策略。"""
         expected_policy = PermissionEngine.default_policy_path().read_text(encoding="utf-8")
 
         init_config(tmp_path)
@@ -50,6 +50,26 @@ class TestIntegration:
         init_config(tmp_path)
 
         assert target_policy.read_text(encoding="utf-8") == custom_policy
+
+    @pytest.mark.core
+    def test_install_init_is_core_only_and_does_not_detect_platforms(self, tmp_path, monkeypatch):
+        """核心初始化不得探测 OpenCode/Claude Code 平台目录。"""
+        from pathlib import Path as PathClass
+
+        original_joinpath = PathClass.joinpath
+
+        def reject_platform_probe(self, *other):
+            joined = "/".join(str(part) for part in other)
+            if ".claude" in joined or "opencode" in joined:
+                raise AssertionError("init_config must not probe platform config directories")
+            return original_joinpath(self, *other)
+
+        monkeypatch.setattr(PathClass, "joinpath", reject_platform_probe)
+
+        init_config(tmp_path)
+
+        assert (tmp_path / ".supermedicine" / "config.yaml").exists()
+        assert default_policy_path(tmp_path).exists()
 
     def test_default_policy_falls_back_to_packaged_resource_when_source_tree_missing(self, tmp_path):
         """安装后的包缺少源码树 .supermedicine 时，应从包资源创建同一默认策略。"""

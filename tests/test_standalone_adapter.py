@@ -1,6 +1,9 @@
 """Standalone 适配器测试"""
 from __future__ import annotations
 
+import builtins
+import importlib
+import sys
 import tempfile
 from pathlib import Path
 
@@ -39,6 +42,33 @@ class TestStandaloneAdapter:
     def test_platform_name(self):
         adapter = StandaloneAdapter()
         assert adapter.platform_name == "standalone"
+
+    def test_registration_marks_standalone_as_core_default(self):
+        adapter = StandaloneAdapter()
+        registration = adapter.registration
+        assert registration["platform"] == "standalone"
+        assert registration["status"] == "core_default"
+        assert registration["optional"] is False
+        assert registration["core"] is True
+        assert registration["default"] is True
+        assert registration["requires_core_runtime"] is True
+
+    def test_explicit_standalone_import_does_not_load_optional_platform_adapters(self):
+        for module_name in (
+            "adapters.opencode",
+            "adapters.opencode.adapter",
+            "adapters.claude_code",
+            "adapters.claude_code.adapter",
+        ):
+            sys.modules.pop(module_name, None)
+
+        module = importlib.import_module("adapters.standalone.adapter")
+
+        assert module.StandaloneAdapter().platform_name == "standalone"
+        assert "adapters.opencode" not in sys.modules
+        assert "adapters.opencode.adapter" not in sys.modules
+        assert "adapters.claude_code" not in sys.modules
+        assert "adapters.claude_code.adapter" not in sys.modules
 
     def test_tool_call_bash(self):
         adapter = StandaloneAdapter()
@@ -125,10 +155,28 @@ class TestStandaloneAdapter:
         assert result["resource"] == "bash"
         assert not marker.exists()
 
-    def test_skill_load(self):
+    @pytest.mark.adapter
+    def test_skill_load_returns_core_neutral_metadata(self):
         adapter = StandaloneAdapter()
         result = adapter.skill_load("rag-query")
-        assert "rag" in result.lower() or "RAG" in result or "not found" in result.lower()
+        assert "Standalone skill 'rag-query'" in result
+        assert "OpenCode" in result
+
+    @pytest.mark.adapter
+    def test_skill_load_does_not_read_opencode_skill_files(self, monkeypatch):
+        opened_paths: list[str] = []
+        original_open = builtins.open
+
+        def tracking_open(file, *args, **kwargs):
+            opened_paths.append(str(file))
+            return original_open(file, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "open", tracking_open)
+
+        result = StandaloneAdapter().skill_load("rag-query")
+
+        assert "optional OpenCode adapter" in result
+        assert not any("adapters" in path and "opencode" in path and "skills" in path for path in opened_paths)
 
     def test_subagent_dispatch(self):
         adapter = StandaloneAdapter()

@@ -1,14 +1,35 @@
 ---
 name: supermedicine
-description: Modular medical research Agent framework with RAG, Harness, statistical analysis tools, medical writing standards (CONSORT/STROBE/PRISMA/STARD), and citation formatting (AMA/Vancouver). Multi-Agent orchestration with P0 dual-layer permission engine.
+description: SuperMedicine is the single user-facing Claude Code skill/agent surface for the modular medical research assistant framework with RAG, Harness, statistical analysis tools, medical writing standards (CONSORT/STROBE/PRISMA/STARD), citation formatting (AMA/Vancouver), internal role-context orchestration, and P0 dual-layer permission engine.
 ---
 
-# SuperMedicine
+# SuperMedicine Claude Code Optional Adapter Skill
 
-Modular medical research Agent framework for prototype/interface-only evidence
-synthesis, statistical analysis, manuscript preparation, and compliance checking.
-SuperMedicine does not provide clinical advice, production-grade statistics, or
-regulatory/clinical certification; all outputs require human expert review.
+This file describes the minimal optional Claude Code add-on for SuperMedicine.
+It is not required for the standalone SuperMedicine core runtime. The adapter can
+report capabilities, probe a local Claude Code CLI, and invoke `claude --print`
+through SuperMedicine's canonical permission chain when the local runtime is
+available. If no local `claude` command exists, the adapter reports a structured
+optional-adapter-unavailable state rather than a core runtime failure.
+
+SuperMedicine itself remains a modular medical research assistant framework for
+prototype/interface-only evidence synthesis, statistical analysis, manuscript
+preparation, and compliance checking. SuperMedicine does not provide clinical advice,
+production-grade statistics, or regulatory/clinical certification; all outputs
+require human expert review.
+
+## Installation Manifest Entry
+
+`install.json` registers this optional Claude Code surface as:
+
+- platform key: `claude-code`
+- entry file: `adapters/claude_code/SKILL.md`
+- adapter module: `adapters/claude_code/adapter.py`
+- optional add-on: yes
+- core runtime required: no
+- user-facing Agent/surface: exactly one, `SuperMedicine`
+- internal role contexts: `alpha`, `beta`, `gamma`, and `delta` as
+  non-user-facing workflow context only
 
 ## When to Use
 
@@ -18,18 +39,45 @@ regulatory/clinical certification; all outputs require human expert review.
 - Checking manuscripts against CONSORT, STROBE, PRISMA, or STARD checklists
 - Formatting citations in AMA or Vancouver style
 - Running survival analysis (Kaplan-Meier, log-rank, Cox proportional hazards)
-- Monitoring multi-agent research workflows with permission auditing
+- Monitoring multi-role research workflows with permission auditing
 
 ## Architecture
 
-SuperMedicine uses a microkernel + multi-agent orchestration pattern:
+SuperMedicine uses a microkernel + internal role-context orchestration pattern.
+For Claude Code and similar platforms, the only user-facing Agent/surface is
+`SuperMedicine`; α-Analyst, β-Reviewer, γ-Writer, and δ-Orchestrator are
+non-user-facing workflow role contexts/capabilities, not separate platform Agents.
 
 - **Kernel** — Microkernel integrating ConfigCenter, EventBus, PluginRegistry, SessionManager, and P0 PermissionEngine
 - **Permission Engine** — Dual-layer (code + prompt) constraints with one-vote veto mechanism and JSONL audit logging
-- **Agent Orchestrator** — δ-Orchestrator coordinates α-Analyst (planning), β-Reviewer (verification), and γ-Writer (execution) through state-machine-driven workflows with checkpoint persistence
+- **Role Orchestrator** — δ-Orchestrator coordinates α-Analyst (analysis and planning), β-Reviewer (quality verification), and γ-Writer (manuscript execution) through state-machine-driven workflows with checkpoint persistence
 - **Plugin System** — 6 plugins: RAG retrieval, Harness monitoring, Python statistics, R survival analysis, medical writing standards, medical citation formatting
 
 ## Capabilities
+
+### Claude Code Optional Adapter Boundary
+- Registration/discovery metadata for `ClaudeCodeAdapter`
+- Capability reporting via `claude.capabilities`
+- Runtime probing via `claude.runtime_status`
+- Permission-checked local CLI invocation via `claude.invoke`
+- Timeout, runtime-unavailable, runtime-error, invalid-input, permission-denied,
+  and unsupported-tool structured responses
+- Secret redaction for prompt/runtime data before returning adapter responses
+- Single user-facing Agent/surface declaration: `SuperMedicine`
+- Internal role contexts are represented as capabilities/role context only
+- Supported adapter tool IDs are limited to `claude.capabilities`,
+  `claude.runtime_status`, and `claude.invoke`
+- `claude.invoke` requires the local `claude` command and a successful
+  SuperMedicine PermissionEngine decision before subprocess execution
+
+### Explicit Limitations
+- No native Claude Code subagent dispatch is implemented.
+- No native Claude Code skill loading is implemented.
+- No α-Analyst, β-Reviewer, γ-Writer, or δ-Orchestrator platform Agent is declared.
+- The local Claude Code CLI is optional and only required for `claude.invoke`.
+- Missing `claude` on PATH is an adapter-unavailable state, not a SuperMedicine core failure.
+- Core CLI/API/plugin/action IDs and permission semantics are not changed by this
+  add-on.
 
 ### Literature Retrieval (RAG)
 - TF-IDF based local search with Chinese/English tokenization
@@ -52,18 +100,23 @@ SuperMedicine uses a microkernel + multi-agent orchestration pattern:
 
 ### Quality Assurance (Harness)
 - Permission audit tracking
-- Agent behavior monitoring
+- Role behavior monitoring
 - Anomaly detection with configurable thresholds
 - Code quality and reproducibility checks
 
-## Sub-Agent Configuration
+## Internal SuperMedicine Role Contexts
 
-| Agent | Role | OpenCode Mapping |
-|-------|------|-----------------|
-| α-Analyst | Research analysis and planning | Brain → Planner |
-| β-Reviewer | Quality review and compliance verification | Coder → Tester |
-| γ-Writer | Manuscript composition and formatting | Coder |
-| δ-Orchestrator | Workflow coordination and dispatch | Brain |
+The roles below are SuperMedicine workflow concepts only. They do not represent
+implemented native Claude Code subagents in this adapter and are explicitly not
+user-facing platform Agents. The only user-facing Agent/surface is
+`SuperMedicine`.
+
+| Internal Role Context | Position | Platform Agent Status |
+|-------|------|-----------------------|
+| α-Analyst | Research analysis and planning | Non-user-facing role context; not a Claude Code Agent |
+| β-Reviewer | Quality review and compliance verification | Non-user-facing role context; not a Claude Code Agent |
+| γ-Writer | Manuscript composition and formatting | Non-user-facing role context; not a Claude Code Agent |
+| δ-Orchestrator | Workflow coordination and dispatch | Non-user-facing role context; not a Claude Code Agent |
 
 ## Installation
 
@@ -117,9 +170,9 @@ citation = AMAFormatter().format_journal(JournalArticle(
 
 ## Permissions
 
-SuperMedicine enforces a P0 dual-layer permission system. All agent actions are checked against:
+SuperMedicine enforces a P0 dual-layer permission system. All role actions are checked against:
 1. Code-layer policy rules (fnmatch-based deny-override-allow)
-2. Prompt-layer constraint templates (injected into agent context)
+2. Prompt-layer constraint templates (injected into SuperMedicine execution context)
 
 Both layers must approve; any single denial blocks the action. All decisions are logged to JSONL audit files with UTC timestamps.
 

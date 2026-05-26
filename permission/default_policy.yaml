@@ -35,12 +35,6 @@
         scope: "glob"
       - action: "tool_call"
         scope: "grep"
-      - action: "tool_call"
-        scope: "claude.capabilities"
-      - action: "tool_call"
-        scope: "claude.runtime_status"
-      - action: "tool_call"
-        scope: "claude.invoke"
     denied:
       - action: "write"
         scope: "*"
