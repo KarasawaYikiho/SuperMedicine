@@ -56,6 +56,9 @@ Only necessary project files should be committed or uploaded. Do not include
 `Docs/`, `Superpower`, `superpower`, external skill packages, or non-essential
 documentation artifacts in Git uploads for this repository.
 
+This documentation update does not create a tag, release, publish, package
+upload, paper upload, or external artifact upload.
+
 ## Quick Start
 
 ```bash
@@ -73,6 +76,53 @@ python Cli.py status    # Show project status
 python Cli.py test      # Run all tests
 python Cli.py run TASK  # Execute a task through the initialized Kernel and plugins
 ```
+
+Workspace-aware commands are explicit by design. Workspaces live under
+`workspaces/<id>`, where `<id>` is a lowercase slug made from letters, digits,
+and hyphens. CLI commands never infer the last TUI workspace; every
+workspace-scoped CLI action requires `--workspace <id>`.
+
+```bash
+supermedicine workspace init --workspace hypertension-review --name "Hypertension Review"
+supermedicine run "summarize local context" --workspace hypertension-review
+supermedicine paper import ./paper.pdf --workspace hypertension-review --title "Trial paper"
+supermedicine experience suggest --workspace hypertension-review --summary "Keep extraction prompts short"
+supermedicine tui  # launches the Chinese TUI workbench
+```
+
+### Workspaces, papers, TUI, and experience learning
+
+- **Workspace layout** — `supermedicine workspace init --workspace <slug>`
+  creates `workspaces/<slug>` with workspace-local `.supermedicine/`, paper,
+  notes, output, checkpoint, session, and local RAG directories.
+- **Explicit CLI workspace use** — `run`, `paper`, and `experience` CLI paths
+  require or accept an explicit `--workspace`; they do not read TUI recent-state
+  files or silently select a workspace.
+- **Chinese TUI** — `supermedicine tui` starts the Chinese-language terminal UI.
+  TUI recent selection is workspace/session state and does not alter CLI defaults.
+- **Workspace deletion** — `supermedicine workspace delete --workspace <slug>
+  --confirm <slug>` is a hard delete. The confirmation must exactly match the
+  workspace id, the path must pass destructive-path guards, PermissionEngine must
+  authorize `workspace.delete`, and audit records are written for cancellation,
+  denial, and deletion outcomes.
+- **Paper import** — imports are copy-only: the source file is read and copied to
+  the workspace, never moved or uploaded. Supported local formats are PDF, TeX,
+  BibTeX/RIS, TXT, and Markdown (`.pdf`, `.tex`, `.bib`, `.ris`, `.txt`, `.md`).
+  Imported papers are deduplicated by SHA-256 and by normalized DOI/PMID when
+  supplied. Metadata such as title, authors, DOI, PMID, notes, and tags remains
+  editable after import.
+- **Paper metadata enrichment** — online or external metadata enrichment requires
+  explicit `--confirm-enrich`, a PermissionEngine check with network and
+  external-API hard-limit context, and audit logging. There is no silent network
+  access during ordinary import.
+- **Experience learning** — experience learning is enabled by default, but raw
+  conversations are not stored. Only user-confirmed summaries/experience records
+  are persisted. General method experience is stored in the OS temp directory
+  method layer; project-specific details remain workspace-local. Users can
+  suggest, add, list, view, edit, delete, and export experience records.
+
+See [Architecture/WorkspaceTuiRagGuide.md](Architecture/WorkspaceTuiRagGuide.md)
+for the detailed workspace/TUI/RAG usage guide.
 
 ## Architecture
 

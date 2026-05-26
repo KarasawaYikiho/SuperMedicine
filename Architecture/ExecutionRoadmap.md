@@ -1,6 +1,6 @@
 # Execution Roadmap
 
-This document records the current SuperMedicine architecture and the completed execution roadmap state requested by the user.
+This document records the current SuperMedicine architecture and the completed execution roadmap state requested by the user. The implementation roadmap is complete at Step 13/13 with final verification passed; Steps 1-13 are historical completion markers, not pending work.
 
 ## Current Architecture
 
@@ -20,6 +20,13 @@ flowchart LR
     subgraph governance["Governance Layer"]
         permissions["Permission Engine"]
         registry["Plugin Registry"]
+    end
+
+    subgraph workspace["Workspace Experience and TUI"]
+        workspaceManager["Workspace Manager"]
+        paper["Workspace Paper Import"]
+        experience["Experience Learning"]
+        tui["Chinese TUI Workbench"]
     end
 
     subgraph extensions["Plugins Adapters and Agents"]
@@ -51,6 +58,12 @@ flowchart LR
     registry --> pystats
     registry --> rsurvival
     registry --> agents
+    core --> workspaceManager
+    permissions --> paper
+    permissions --> experience
+    workspaceManager --> paper
+    workspaceManager --> experience
+    workspaceManager --> tui
     tests -.-> cli
     tests -.-> kernel
     tests -.-> governance
@@ -77,9 +90,21 @@ flowchart TD
     completed6 --> completed7["Completed Step 7: Medical writing and citation handled"]
     completed7 --> completed8["Completed Step 8: Python stats and R survival adapters handled"]
     completed8 --> completed9["Completed Step 9: Tests and CI hygiene handled"]
-    completed9 --> docs["Remaining Action: Documentation saved"]
-    docs --> hold["Remaining Action: No commit or push per user choice"]
+    completed9 --> completed10["Completed Step 10: Workspace foundation handled"]
+    completed10 --> completed11["Completed Step 11: Paper import path handled"]
+    completed11 --> completed12["Completed Step 12: Experience learning handled"]
+    completed12 --> completed13["Completed Step 13: Chinese TUI workbench handled"]
+    completed13 --> verified["Final verification passed"]
+    verified --> docs["Documentation saved"]
+    docs --> hold["No commit or push unless explicitly requested"]
 ```
+
+## Project Rule: Planning vs Push Gate
+
+- Plan-stage work does not need strict project-standard verification.
+- Optimization and standardization are required before Push/finalization, not during early planning.
+- Before any Push, finalization, tag, release, publish, or upload, preserve the final verification requirement: run the project-approved quality gate, perform repository hygiene checks, and resolve required standardization/optimization issues.
+- This rule relaxes Plan-phase overhead only; it does not relax the Push-before-finalization gate.
 
 ## Release Candidate State
 
@@ -103,8 +128,8 @@ flowchart TD
 
 ## Remaining Actions
 
-- Documentation is saved in Markdown files.
+- Documentation is saved in Markdown files and reflects completed Step 13/13 status.
 - No commit or push should be performed unless the user explicitly instructs it later.
 - No tag, release, publish, or upload should be performed unless the user
   explicitly instructs it later.
-- No additional original engineering Step 10 or later exists in the confirmed scope.
+- No additional roadmap implementation step is pending in the confirmed scope.

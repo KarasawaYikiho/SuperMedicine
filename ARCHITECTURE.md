@@ -2,7 +2,9 @@
 
 ## Overview
 
-SuperMedicine uses a **microkernel + multi-agent orchestration** architecture. The microkernel (Kernel) integrates all core subsystems, while plugins and agents extend functionality through well-defined interfaces. A P0 runtime permission engine enforces code-layer policy checks, while prompt-layer helpers provide advisory context generation.
+SuperMedicine uses a **microkernel + multi-agent orchestration** architecture. The microkernel (Kernel) integrates core subsystems, workspace state, plugins, adapters, and agents through well-defined interfaces. A P0 runtime permission engine enforces code-layer policy checks, while prompt-layer helpers provide advisory context generation.
+
+The latest roadmap implementation is complete through Step 13/13. Current user-facing additions include explicit workspace management, workspace-local paper import, experience learning, and a Chinese TUI workbench. Detailed historical and phase notes live in [Architecture/ExecutionRoadmap.md](Architecture/ExecutionRoadmap.md), [Architecture/PhaseImplementationPlan.md](Architecture/PhaseImplementationPlan.md), and [Architecture/WorkspaceTuiRagGuide.md](Architecture/WorkspaceTuiRagGuide.md).
 
 ## Architecture Diagram
 
@@ -25,14 +27,22 @@ SuperMedicine uses a **microkernel + multi-agent orchestration** architecture. T
 │  │ (UUID sessions)  │  │ Code-layer runtime veto          │     │
 │  └──────────────────┘  │ Policy/HardLimits → JSONL Audit  │     │
 │                        └──────────────────────────────────┘     │
+│  ┌──────────────────┐                                          │
+│  │ WorkspaceManager │ explicit workspace anchors + path safety │
+│  └──────────────────┘                                          │
 └──────────────────────────────┬───────────────────────────────────┘
                                │
-          ┌────────────────────┼────────────────────┐
-          │                    │                    │
+          ┌────────────────────┼────────────────────┬────────────────────┐
+          │                    │                    │                    │
 ┌─────────▼─────────┐ ┌───────▼───────┐ ┌─────────▼─────────┐
 │   Agent Layer     │ │ Plugin Layer  │ │  Adapter Layer    │
 │   (agents/)       │ │ (plugins/)    │ │  (adapters/)      │
 └───────────────────┘ └───────────────┘ └───────────────────┘
+                     ┌─────────▼─────────┐
+                     │ Workspace Layer   │
+                     │ papers/experience │
+                     │ TUI workbench     │
+                     └───────────────────┘
 ```
 
 ## Layer 1: Microkernel (`core/`)
@@ -58,6 +68,20 @@ The Kernel is the central coordinator. All subsystems are instantiated and wired
 - UUID-based session creation and retrieval
 - Key-value storage within session scope
 - Supports multi-session isolation
+
+### WorkspaceManager (`workspace.py`)
+- Project-local workspace anchors use `workspaces/<id>`.
+- Workspace ids are lowercase slug identifiers using letters, digits, and
+  hyphens; path separators, traversal, and non-slug values are rejected.
+- Workspace initialization creates workspace-local `.supermedicine/`, paper,
+  notes, outputs, checkpoint/session, and local RAG directories.
+- CLI workspace usage is explicit. `run`, `paper`, and `experience` paths accept
+  or require `--workspace` and do not read TUI recent workspace state.
+- `supermedicine tui` launches the Chinese TUI workbench; its recent selection
+  is session/workspace state, not an implicit CLI default.
+- Workspace-local paper and experience features share the same path-safety and
+  permission model; see the workspace section below and
+  [Architecture/WorkspaceTuiRagGuide.md](Architecture/WorkspaceTuiRagGuide.md).
 
 ### PermissionEngine (`permission/engine.py`)
 - **P0 priority** — initialization is mandatory
@@ -175,6 +199,30 @@ Secrets are referenced by environment variable name (`api_key_env`) rather than
 stored in code or repository configuration. `MockExternalVectorStoreProvider`
 provides external-vector-store behavior without requiring a live service.
 
+### Workspace-local papers, experience learning, and TUI
+
+Paper import and experience learning are workspace-aware support paths layered on
+top of the same permission and path-safety model:
+
+- Paper imports are copy-only into `workspaces/<id>/papers/originals/` and
+  support `.pdf`, `.tex`, `.bib`, `.ris`, `.txt`, and `.md` source files.
+- Imported paper identity is SHA-256 based; duplicate detection also uses
+  normalized DOI and PMID metadata when supplied.
+- Paper metadata records are stored under the workspace and keep editable fields
+  for title, authors, DOI, PMID, notes, and tags.
+- Online/external paper metadata enrichment requires explicit confirmation,
+  PermissionEngine approval, network/external API hard-limit context, and audit
+  logging before a provider fetch; ordinary import performs no silent network
+  access.
+- Experience learning is default-enabled but stores only user-confirmed summaries
+  and experience records, never raw conversations. General method records live in
+  an OS tempdir method layer and must not include project/workspace details;
+  workspace records live under the selected workspace. Records can be listed,
+  viewed, edited, deleted, and exported.
+- The Chinese TUI workbench provides a workspace-oriented interface for recent
+  workspace selection, run/paper/experience flows, and local state visibility.
+  TUI recent state is not an implicit default for non-TUI CLI commands.
+
 ### Medical statistics boundary
 
 `plugins/tools/python_stats` and `plugins/tools/r_survival` currently define a
@@ -233,6 +281,12 @@ High-risk calls use a minimal, dependency-free safety model:
   plugin path was permission-gated.
 - The default policy explicitly declares mock external RAG access and keeps
   general network/external API use disabled for standard alpha/gamma roles.
+- Workspace deletion is a hard delete guarded by exact confirmation,
+  destructive-path validation, PermissionEngine authorization, and audit logs.
+- Paper enrichment treats network and external API use as hard-limit checked
+  external-resource behavior and does not run without explicit confirmation.
+- Experience learning rejects raw conversations and separates general method
+  storage from workspace-local project details.
 
 ## Medical writing and citation constraints
 
@@ -250,6 +304,18 @@ documentation artifacts in this repository. Before release upload, also exclude
 generated `build/`, `dist/`, `*.egg-info`, `__pycache__`, `.pytest_cache`,
 `.pytest-tmp`, runtime checkpoint directories, and any local configuration that
 contains secrets or private endpoints.
+
+Phase documentation/help work does not create tags, releases, package publishes,
+paper uploads, or external artifact uploads.
+
+## Planning and Push Gate Rule
+
+Plan-stage work does not need strict project-standard verification. Optimization
+and standardization are required before Push/finalization, not during early
+planning. This is only a planning-overhead rule: before any Push, finalization,
+tag, release, publish, or upload, the project-approved final verification,
+quality gate, repository hygiene review, and required optimization/standardization
+must still be completed.
 
 ## Quality gate
 

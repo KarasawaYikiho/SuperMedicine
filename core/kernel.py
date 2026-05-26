@@ -241,7 +241,13 @@ class Kernel:
         if "statistics_boundary" not in metadata and plugin_result.get("statistics_boundary"):
             metadata["statistics_boundary"] = plugin_result.get("statistics_boundary")
         metadata.setdefault("resource", execution_context["resource"])
-        metadata.setdefault("security", {"permission_checked": True, "permission": "allowed", "permission_entrypoint": "kernel"})
+        security = metadata.get("security")
+        if not isinstance(security, dict):
+            security = {}
+            metadata["security"] = security
+        security.setdefault("permission_checked", True)
+        security.setdefault("permission", "allowed")
+        security.setdefault("permission_entrypoint", "kernel")
 
         if plugin_result.get("status") not in (None, "success"):
             result = {

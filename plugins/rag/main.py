@@ -135,14 +135,14 @@ def _execute_context_store(params: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("data is required")
     provider = LocalRAGProvider(_storage_dir(params))
     provider.store_context(key, params["data"])
-    return {"key": key, "stored": True, "provider": provider.provider_name}
+    return {"key": key, "stored": True, "provider": "local"}
 
 
 def _execute_context_retrieve(params: dict[str, Any]) -> dict[str, Any]:
     key = _required_str(params, "key")
     provider = LocalRAGProvider(_storage_dir(params))
     data = provider.retrieve_context(key)
-    return {"key": key, "data": data, "found": data is not None, "provider": provider.provider_name}
+    return {"key": key, "data": data, "found": data is not None, "provider": "local"}
 
 
 def _base_metadata(context: dict[str, Any]) -> dict[str, Any]:
