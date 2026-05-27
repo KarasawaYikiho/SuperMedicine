@@ -1,0 +1,200 @@
+"""Tool management screen for SuperMedicine TUI."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from textual.app import ComposeResult
+from textual.containers import Horizontal, Vertical
+from textual.screen import Screen
+from textual.widgets import Button, DataTable, Input, Select, Static
+
+from core.tui.i18n import t
+
+
+class ToolScreen(Screen):
+    """Screen for managing tools."""
+
+    def compose(self) -> ComposeResult:
+        yield Static(t("tool_title"), id="content-header", classes="section-title")
+        with Vertical(id="content-body"):
+            yield Select(
+                [],
+                prompt=t("paper_select_workspace"),
+                id="tool-workspace-select",
+            )
+            yield DataTable(id="tool-table", cursor_type="row")
+            with Horizontal():
+                yield Select(
+                    [
+                        (t("tool_language_python"), "python"),
+                        (t("tool_language_r"), "r"),
+                    ],
+                    value="python",
+                    id="tool-language-select",
+                )
+                yield Input(placeholder=t("tool_tool_id"), id="tool-id-input")
+            with Horizontal():
+                yield Button(t("tool_init"), id="tool-init", classes="btn btn-secondary")
+                yield Button(t("tool_add"), id="tool-add", classes="btn btn-primary")
+                yield Button(t("tool_run"), id="tool-run", classes="btn btn-secondary")
+                yield Button(t("refresh"), id="tool-refresh", classes="btn btn-secondary")
+            yield Static("", id="tool-status")
+
+    def on_mount(self) -> None:
+        self._load_workspaces()
+
+    def _get_workspace_controller(self):
+        from core.tui.screens.workspaces import WorkspaceScreenController
+
+        return WorkspaceScreenController(project_root=self.app.project_root)  # type: ignore[attr-defined]
+
+    def _load_workspaces(self) -> None:
+        select_widget = self.query_one("#tool-workspace-select", Select)
+        controller = self._get_workspace_controller()
+        try:
+            workspaces = controller.list_workspaces()
+            options = [(ws["label"], ws["id"]) for ws in workspaces]
+            select_widget.set_options(options)
+        except Exception as e:
+            self._set_status(f"{t('error')}: {e}")
+
+    def _get_selected_workspace(self) -> str | None:
+        select_widget = self.query_one("#tool-workspace-select", Select)
+        value = select_widget.value
+        if value is None or value == Select.BLANK:
+            return None
+        return str(value)
+
+    def _get_workspace_path(self) -> Path | None:
+        workspace_id = self._get_selected_workspace()
+        if not workspace_id:
+            return None
+        controller = self._get_workspace_controller()
+        try:
+            workspaces = controller.list_workspaces()
+            for ws in workspaces:
+                if ws["id"] == workspace_id:
+                    return Path(ws["path"])
+        except Exception:
+            pass
+        return None
+
+    def _load_tools(self) -> None:
+        workspace_path = self._get_workspace_path()
+        if not workspace_path:
+            self._set_status(t("paper_select_workspace"))
+            return
+
+        table = self.query_one("#tool-table", DataTable)
+        table.clear(columns=True)
+        table.add_columns(t("tool_language"), "ID", "状态")
+
+        tools_dir = workspace_path / "tools"
+        if not tools_dir.is_dir():
+            self._set_status(t("tool_no_tools"))
+            return
+
+        tool_count = 0
+        for lang_dir in tools_dir.iterdir():
+            if lang_dir.is_dir():
+                lang = lang_dir.name
+                for tool_dir in lang_dir.iterdir():
+                    if tool_dir.is_dir():
+                        tool_file = tool_dir / "tool.json"
+                        if tool_file.is_file():
+                            try:
+                                data = json.loads(tool_file.read_text(encoding="utf-8"))
+                                status = "✓" if data.get("executable") else "—"
+                            except Exception:
+                                status = "?"
+                            table.add_row(lang, tool_dir.name, status)
+                            tool_count += 1
+
+        if tool_count == 0:
+            self._set_status(t("tool_no_tools"))
+        else:
+            self._set_status(f"{t('tool_list')}: {tool_count}")
+
+    def _set_status(self, message: str) -> None:
+        status = self.query_one("#tool-status", Static)
+        status.update(message)
+
+    def on_select_changed(self, event: Select.Changed) -> None:
+        if event.select.id == "tool-workspace-select":
+            self._load_tools()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "tool-init":
+            self._init_tools()
+        elif event.button.id == "tool-add":
+            self._add_tool()
+        elif event.button.id == "tool-run":
+            self._run_tool()
+        elif event.button.id == "tool-refresh":
+            self._load_tools()
+
+    def _init_tools(self) -> None:
+        workspace_path = self._get_workspace_path()
+        if not workspace_path:
+            self._set_status(t("paper_select_workspace"))
+            return
+
+        tools_dir = workspace_path / "tools"
+        tools_dir.mkdir(parents=True, exist_ok=True)
+        (tools_dir / "python").mkdir(exist_ok=True)
+        (tools_dir / "r").mkdir(exist_ok=True)
+        self._set_status(t("tool_initialized"))
+        self._load_tools()
+
+    def _add_tool(self) -> None:
+        workspace_path = self._get_workspace_path()
+        if not workspace_path:
+            self._set_status(t("paper_select_workspace"))
+            return
+
+        language_select = self.query_one("#tool-language-select", Select)
+        tool_id_input = self.query_one("#tool-id-input", Input)
+
+        language = str(language_select.value) if language_select.value != Select.BLANK else "python"
+        tool_id = tool_id_input.value.strip()
+
+        if not tool_id:
+            self._set_status(f"{t('error')}: {t('tool_tool_id')}")
+            return
+
+        tool_dir = workspace_path / "tools" / language / tool_id
+        tool_dir.mkdir(parents=True, exist_ok=True)
+
+        tool_meta = {
+            "id": tool_id,
+            "language": language,
+            "executable": False,
+        }
+        (tool_dir / "tool.json").write_text(json.dumps(tool_meta, ensure_ascii=False, indent=2), encoding="utf-8")
+        self._set_status(t("tool_added"))
+        self._load_tools()
+
+    def _run_tool(self) -> None:
+        table = self.query_one("#tool-table", DataTable)
+        if table.cursor_row is None:
+            self._set_status(t("no_selection"))
+            return
+
+        row_data = table.get_row_at(table.cursor_row)
+        language = str(row_data[0])
+        tool_id = str(row_data[1])
+
+        workspace_path = self._get_workspace_path()
+        if not workspace_path:
+            self._set_status(t("paper_select_workspace"))
+            return
+
+        tool_dir = workspace_path / "tools" / language / tool_id
+        if not tool_dir.is_dir():
+            self._set_status(f"{t('error')}: {t('tool_no_tools')}")
+            return
+
+        # Show tool path for user
+        self._set_status(f"{t('tool_run')}: {tool_dir}")

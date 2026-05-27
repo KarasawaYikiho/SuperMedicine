@@ -110,6 +110,16 @@ Standalone core install and initialization:
 git clone https://github.com/KarasawaYikiho/SuperMedicine.git
 cd SuperMedicine
 pip install -e .
+```
+
+> **注意**: `pip install -e .` 会安装 `supermedicine` 命令行工具。
+> 如果安装后 `supermedicine` 命令不可用，请将 Python Scripts 目录添加到 PATH：
+> - **Windows**: `%APPDATA%\Python\Python<版本>\Scripts`（例如 `C:\Users\<用户名>\AppData\Roaming\Python\Python314\Scripts`）
+> - **Linux/macOS**: `~/.local/bin`
+>
+> 或者始终使用 `python Cli.py` 代替 `supermedicine` 命令。
+
+```bash
 python Install.py --init
 python Cli.py status
 python Cli.py run "summarize local context"

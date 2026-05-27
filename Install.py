@@ -41,7 +41,12 @@ def init_config(project_dir: Path) -> None:
     (config_dir / "agents").mkdir(exist_ok=True)
     (config_dir / "plugins").mkdir(exist_ok=True)
     ensure_default_policy(project_dir, Path(__file__).parent)
-    logger.info(f"Configuration initialized at {config_dir}")
+    logger.info("初始化完成。")
+    logger.info("")
+    logger.info("如果 'supermedicine' 命令不可用，请将以下目录添加到系统 PATH：")
+    logger.info("  Windows:  %APPDATA%\\Python\\Python<版本>\\Scripts")
+    logger.info("  Linux/macOS: ~/.local/bin")
+    logger.info("或者使用 'python Cli.py' 代替 'supermedicine' 命令。")
 
 def main():
     logging.basicConfig(level=logging.INFO, format='%(message)s')

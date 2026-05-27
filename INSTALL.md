@@ -86,6 +86,19 @@ Run the status command to check everything is working:
 python Cli.py status
 ```
 
+### Global CLI Access
+
+After `pip install -e .`, the `supermedicine` command is installed as a Python
+console script. If the command is not found, add the Python Scripts directory to
+your PATH:
+
+- **Windows**: `%APPDATA%\Python\Python<版本>\Scripts`
+  (e.g., `C:\Users\<username>\AppData\Roaming\Python\Python314\Scripts`)
+- **Linux/macOS**: `~/.local/bin`
+
+Alternatively, use `python Cli.py` as a direct substitute for the `supermedicine`
+command throughout this guide.
+
 Expected output shows:
 - SuperMedicine version
 - Configuration initialized status
@@ -123,15 +136,23 @@ R -e "install.packages('survival', repos='https://cran.r-project.org')"
 ```
 
 ### CLI command not found
-Ensure you are in the SuperMedicine directory:
+
+If `supermedicine` is not recognized after `pip install -e .`, the Python Scripts
+directory may not be on PATH. Two solutions:
+
+1. **Add Scripts to PATH** (recommended):
+   - Windows: Add `%APPDATA%\Python\Python<版本>\Scripts` to your user PATH
+   - Linux/macOS: Add `~/.local/bin` to your PATH
+
+2. **Use python Cli.py directly**:
+   ```bash
+   cd SuperMedicine
+   python Cli.py status
+   ```
+
+After adding Scripts to PATH, restart your terminal and verify:
 ```bash
-cd SuperMedicine
-python Cli.py status
-```
-Or install in development mode:
-```bash
-pip install -e .
-supermedicine status
+supermedicine --help
 ```
 
 ## Platform Adapters

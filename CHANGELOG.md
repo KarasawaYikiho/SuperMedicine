@@ -16,6 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   optional add-on without a native subagent runtime bridge unless an orchestrator
   is injected, and Claude Code is a minimal optional add-on without native skill
   or subagent support.
+- **Full interactive TUI rewrite** with Textual framework: sidebar navigation,
+  6 screens (Dashboard, Workspace, Paper, Experience, Tool, Dialog History),
+  keyboard shortcuts (1-6 for screen switch, q to quit, ? for help), CSS
+  stylesheet, and Chinese UI throughout. Backend controllers unchanged.
+- **PATH guidance** in Install.py, README.md, and INSTALL.md: after `pip install
+  -e .`, users are informed how to add the Python Scripts directory to PATH for
+  global `supermedicine` command access.
+- `requirements.txt` synced with `pyproject.toml` core dependencies (added
+  `rich>=13.7,<15` and `textual>=0.79,<2`).
 
 ### Release readiness
 - Set the GitHub/release-ready label to `Beta0.2.1` without creating a tag,
@@ -27,8 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   OpenCode optional add-on status without native runtime subagent-bridge claims,
   and Claude Code minimal optional add-on status without native skill/subagent
   claims.
-- Latest cited local verification set: `ruff` pass; `mypy` pass with 126 source
-  files; `pytest` 424 passed, 3 skipped; build pass; installed wheel smoke pass.
+- Latest cited local verification set: `ruff` pass; `mypy` pass with 132 source
+  files; `pytest` 427 passed, 3 skipped; build pass; installed wheel smoke pass.
 
 ## [0.1.0-beta] — 2026-05-22
 
