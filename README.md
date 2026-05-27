@@ -2,11 +2,8 @@
 
 ![Version](https://img.shields.io/badge/version-Beta0.3.0-blue)
 ![CI](https://github.com/KarasawaYikiho/SuperMedicine/actions/workflows/ci.yml/badge.svg)
-
-Release-ready label: `Beta0.3.0`. Python package metadata uses `0.3.0b0`
-because PEP 440 packaging validation rejects `Beta0.3.0` as a Python project
-version. No tag, release, publish, or upload has been created by this release
-readiness update.
+![Python](https://img.shields.io/badge/python-3.10%2B-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
 
 Independent Python medical research agent framework with RAG, plugin execution,
 and permission-gated orchestration. SuperMedicine runs as a standalone Python
@@ -17,259 +14,488 @@ optional add-on adapters around the core, not core runtime requirements.
 
 - **Modular Architecture** — Microkernel + multi-Agent orchestration with plugin system
 - **P0 Permission Engine** — Code-layer runtime permission constraints with prompt-context safety guidance
-- **Plugin Ecosystem** — RAG retrieval, Harness monitoring, prototype Python/R statistics interfaces, medical writing standards
-- **Core standalone by default** — install and run the Python CLI/kernel without OpenCode, Claude Code, or any assistant-platform runtime
-- **Optional platform add-ons** — OpenCode adapter content and a minimal Claude Code CLI adapter are available for platform-specific workflows, with documented limits
-- **Medical Standards** — CONSORT, STROBE, PRISMA, STARD reporting checklists; AMA/Vancouver citation formatting constraints
+- **Plugin Ecosystem** — RAG retrieval, Harness monitoring, Python/R statistics, medical writing standards
+- **Interactive TUI** — Full Chinese terminal UI with sidebar navigation, 6 screens, keyboard shortcuts
+- **Workspace System** — Explicit workspace management with paper import, experience learning, tool management
+- **Core standalone by default** — No OpenCode, Claude Code, or platform runtime required
+- **Optional platform add-ons** — OpenCode and Claude Code adapters for platform-specific workflows
+- **Medical Standards** — CONSORT, STROBE, PRISMA, STARD checklists; AMA/Vancouver citation formatting
 
-## Core independent + platform add-on model
+---
 
-SuperMedicine's supported default model is **core independent + platform
-add-ons**:
+## Table of Contents
 
-- **Core independent runtime** — `Cli.py`, `core/**`, `permission/**`,
-  `agents/**`, and `plugins/**` provide the Python CLI, Kernel, permission
-  engine, in-process orchestration concepts, RAG, harness, prototype statistics,
-  and medical writing/citation helpers. This path does not require OpenCode,
-  Claude Code, `claude`, or platform configuration directories.
-- **OpenCode optional add-on** — `adapters/opencode/**` provides an OpenCode
-  adapter surface, plugin metadata, skill documents, and agent role documents.
-  It supports the implemented adapter tool mapping and permission-gated
-  high-risk operations, but it does **not** launch a native OpenCode subagent
-  runtime by itself when no SuperMedicine orchestrator is injected.
-- **Claude Code minimal optional add-on** — `adapters/claude_code/**` provides
-  capability reporting, runtime probing, and permission-checked
-  `claude --print` invocation when a local `claude` command is available. It
-  does **not** implement native Claude Code skill loading or native Claude Code
-  subagent dispatch.
+- [Installation](#installation)
+  - [Prerequisites](#prerequisites)
+  - [Windows](#windows)
+  - [macOS](#macos)
+  - [Linux](#linux)
+  - [Virtual Environment (Recommended)](#virtual-environment-recommended)
+  - [PATH Configuration](#path-configuration)
+  - [Optional: R Survival Backend](#optional-r-survival-backend)
+  - [Optional: Development Tools](#optional-development-tools)
+- [Quick Start](#quick-start)
+- [CLI Reference](#cli-reference)
+  - [Core Commands](#core-commands)
+  - [Workspace Commands](#workspace-commands)
+  - [Paper Commands](#paper-commands)
+  - [Experience Commands](#experience-commands)
+  - [Tool Commands](#tool-commands)
+  - [TUI Command](#tui-command)
+- [TUI (Terminal UI)](#tui-terminal-ui)
+- [Platform Adapters](#platform-adapters)
+  - [OpenCode Add-on](#opencode-add-on)
+  - [Claude Code Add-on](#claude-code-add-on)
+- [Architecture](#architecture)
+- [Running Tests](#running-tests)
+- [Troubleshooting](#troubleshooting)
+- [Safety and Security](#safety-and-security)
+- [License](#license)
 
-### Installation completeness model
+---
 
-`install.json` is the agent-readable installation manifest. It declares the
-standalone Python core as the default product path and lists OpenCode and Claude
-Code only as optional add-ons under `adapters/`. The platform entries point to
-real repository files and intentionally expose exactly one user-facing platform
-agent/surface: `SuperMedicine`.
+## Installation
 
-- OpenCode entry: `adapters/opencode/plugin.json`, with `adapter.py`, six skill
-  documents, one user-facing `agents/supermedicine.md` file, and four
-  non-user-facing internal role context documents.
-- Claude Code entry: `adapters/claude_code/SKILL.md`, with
-  `adapters/claude_code/adapter.py` providing capability reporting, runtime
-  status, and permission-checked `claude.invoke` only.
-- α/β/γ/δ are internal SuperMedicine role contexts/capabilities, not separate
-  OpenCode or Claude Code user-facing Agents.
-- Missing platform runtimes are adapter degraded/unavailable states, not core
-  SuperMedicine installation failures.
+### Prerequisites
 
-## Medical statistics boundary
+| Requirement | Version | Notes |
+|-------------|---------|-------|
+| Python | >= 3.10 | Required (3.10, 3.11, 3.12, 3.13 tested) |
+| Git | any | For cloning the repository |
+| pip | >= 21.0 | For package installation |
+| R | >= 4.3 | Optional, for survival analysis tools |
 
-The current `python-stats` and `r-survival` plugins provide stable input/output
-contracts and deterministic smoke fixtures for development tests, but
-SuperMedicine does not promise production-grade, clinical-grade,
-regulatory-grade, or decision-support statistical accuracy. `r-survival` uses a
-pure-Python fallback by default and formally supports an optional R/rpy2 backend
-for Kaplan-Meier, log-rank, and Cox PH actions when local R and the R `survival`
-package are available. Outputs require qualified expert review before any
-research, regulatory, or clinical use.
+OpenCode, Claude Code, and other assistant platforms are **not** prerequisites.
 
-## RAG external database/vector index integration
+### Windows
 
-RAG supports a stable provider contract for local retrieval, PubMed retrieval,
-and external database/vector-index backends. External providers use explicit
-configuration (`endpoint`, `index_name`, optional `namespace`, `api_key_env`, and
-`timeout_seconds`) and must reference secrets through environment variable names
-rather than hardcoding credentials. A deterministic mock external vector-store
-backend is included so development and tests do not require a live service.
+```powershell
+# 1. Clone the repository
+git clone https://github.com/KarasawaYikiho/SuperMedicine.git
+cd SuperMedicine
 
-## Safety and resource controls
+# 2. Install
+pip install -e .
 
-Adapter calls, RAG external resources, and plugin execution paths use the
-canonical permission policy where they cross execution or external-resource
-boundaries. Claude Code adapter invocations expose structured timeout,
-unavailable, and runtime errors with timeout metadata. RAG providers expose
-configuration, connection, timeout, and resource errors without dereferencing or
-printing secret values; secret references should use environment variable names.
-Plugin execution through `Kernel` carries resource/security metadata and remains
-permission-gated. The canonical default policy path is
-`.supermedicine/policies/default.yaml`.
+# 3. Initialize
+python Install.py --init
 
-## Repository and upload hygiene
+# 4. Verify
+python Cli.py status
+```
 
-Only necessary project files should be committed or uploaded. Do not include
-`Docs/`, `Superpower`, `superpower`, external skill packages, or non-essential
-documentation artifacts in Git uploads for this repository.
+### macOS
 
-This documentation update does not create a tag, release, publish, package
-upload, paper upload, or external artifact upload.
+```bash
+# 1. Clone the repository
+git clone https://github.com/KarasawaYikiho/SuperMedicine.git
+cd SuperMedicine
+
+# 2. Install
+pip install -e .
+
+# 3. Initialize
+python3 Install.py --init
+
+# 4. Verify
+python3 Cli.py status
+```
+
+### Linux
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/KarasawaYikiho/SuperMedicine.git
+cd SuperMedicine
+
+# 2. Install
+pip install -e .
+
+# 3. Initialize
+python3 Install.py --init
+
+# 4. Verify
+python3 Cli.py status
+```
+
+### Virtual Environment (Recommended)
+
+```bash
+python -m venv .venv
+
+# Windows
+.venv\Scripts\activate
+
+# macOS / Linux
+source .venv/bin/activate
+
+# Then install
+pip install -e .
+python Install.py --init
+```
+
+### PATH Configuration
+
+After `pip install -e .`, the `supermedicine` command is installed as a Python
+console script. If the command is not found, add the Python Scripts directory to
+your PATH:
+
+| System | Path to add |
+|--------|-------------|
+| **Windows** | `%APPDATA%\Python\Python<版本>\Scripts` (e.g., `C:\Users\YourName\AppData\Roaming\Python\Python314\Scripts`) |
+| **macOS** | `~/.local/bin` |
+| **Linux** | `~/.local/bin` |
+
+After adding to PATH, restart your terminal and verify:
+
+```bash
+supermedicine --help
+```
+
+Alternatively, use `python Cli.py` as a direct substitute for `supermedicine`
+throughout this guide.
+
+### Optional: R Survival Backend
+
+```bash
+pip install -e ".[r]"
+R -e "install.packages('survival', repos='https://cran.r-project.org')"
+```
+
+When available, request the R backend with `backend="r"` in r-survival action
+parameters. Without `backend="r"`, the plugin uses the deterministic pure-Python
+fallback.
+
+### Optional: Development Tools
+
+```bash
+pip install -e ".[dev]"
+```
+
+Includes: mypy, pytest, pytest-cov, ruff.
+
+---
 
 ## Quick Start
 
-Standalone core install and initialization:
-
 ```bash
+# Clone and install
 git clone https://github.com/KarasawaYikiho/SuperMedicine.git
 cd SuperMedicine
 pip install -e .
-```
-
-> **注意**: `pip install -e .` 会安装 `supermedicine` 命令行工具。
-> 如果安装后 `supermedicine` 命令不可用，请将 Python Scripts 目录添加到 PATH：
-> - **Windows**: `%APPDATA%\Python\Python<版本>\Scripts`（例如 `C:\Users\<用户名>\AppData\Roaming\Python\Python314\Scripts`）
-> - **Linux/macOS**: `~/.local/bin`
->
-> 或者始终使用 `python Cli.py` 代替 `supermedicine` 命令。
-
-```bash
 python Install.py --init
-python Cli.py status
-python Cli.py run "summarize local context"
+
+# Check status
+supermedicine status
+
+# Create a workspace
+supermedicine workspace init --workspace my-research --name "My Research"
+
+# Run a task
+supermedicine run "summarize local context" --workspace my-research
+
+# Launch the interactive TUI
+supermedicine tui
 ```
 
-Use `pip install -e ".[dev]"` only when you need development/test/lint tooling.
-Use `pip install -e ".[r]"` only when you need the optional R/rpy2 survival
-backend and have local R plus the R `survival` package available.
+---
 
-## CLI Usage
+## CLI Reference
+
+All commands are available via `supermedicine <command>` or `python Cli.py <command>`.
+
+### Core Commands
 
 ```bash
-python Cli.py init      # Initialize project
-python Cli.py status    # Show project status
-python Cli.py test      # Run all tests
-python Cli.py run TASK  # Execute a task through the initialized Kernel and plugins
+supermedicine init [--dir .]          # Initialize project configuration
+supermedicine status                  # Show project status (version, plugins, modules)
+supermedicine test                    # Run the test suite
+supermedicine run TASK [--workspace]  # Execute a task through the Kernel and plugins
+supermedicine run TASK --plugin NAME  # Execute via a specific plugin
+supermedicine run TASK --action NAME  # Execute a specific plugin action
+supermedicine run TASK --params-json '{"key": "value"}'  # Pass structured parameters
+supermedicine run TASK --verbose      # Detailed output
 ```
 
-No-platform example using only the Python core:
+### Workspace Commands
 
 ```bash
-python Install.py --init
-python Cli.py run "Find locally available RAG and writing capabilities"
-supermedicine workspace init --workspace literature-review --name "Literature Review"
-supermedicine run "summarize workspace notes" --workspace literature-review
+# Create a workspace
+supermedicine workspace init --workspace <slug> [--name "Display Name"]
+
+# List all workspaces
+supermedicine workspace list
+
+# Show workspace details
+supermedicine workspace show --workspace <slug>
+
+# Hard delete (requires exact confirmation)
+supermedicine workspace delete --workspace <slug> --confirm <slug>
 ```
 
-Workspace-aware commands are explicit by design. Workspaces live under
-`workspaces/<id>`, where `<id>` is a lowercase slug made from letters, digits,
-and hyphens. CLI commands never infer the last TUI workspace; every
-workspace-scoped CLI action requires `--workspace <id>`.
+Workspaces live under `workspaces/<id>`, where `<id>` is a lowercase slug
+(letters, digits, hyphens). CLI commands never infer the last TUI workspace;
+every workspace-scoped CLI action requires `--workspace <id>`.
+
+### Paper Commands
 
 ```bash
-supermedicine workspace init --workspace hypertension-review --name "Hypertension Review"
-supermedicine run "summarize local context" --workspace hypertension-review
-supermedicine paper import ./paper.pdf --workspace hypertension-review --title "Trial paper"
-supermedicine experience suggest --workspace hypertension-review --summary "Keep extraction prompts short"
-supermedicine tui  # launches the Chinese TUI workbench
+# Import a paper (copy-only, supports PDF/TeX/BibTeX/RIS/TXT/MD)
+supermedicine paper import ./paper.pdf --workspace <slug> --title "Paper Title"
+supermedicine paper import ./paper.pdf --workspace <slug> --doi "10.xxx/yyy"
+supermedicine paper import ./paper.pdf --workspace <slug> --tag "oncology" --tag "RCT"
+
+# List papers in workspace
+supermedicine paper list --workspace <slug>
+
+# Show paper metadata
+supermedicine paper show <paper-id> --workspace <slug>
+
+# Edit paper metadata
+supermedicine paper edit <paper-id> --workspace <slug> --title "New Title"
+
+# Online metadata enrichment (requires explicit confirmation)
+supermedicine paper enrich <paper-id> --workspace <slug> --confirm-enrich
 ```
 
-### Workspaces, papers, TUI, and experience learning
+Paper imports are copy-only: the source file is never moved or uploaded.
+Papers are deduplicated by SHA-256 and by normalized DOI/PMID.
 
-- **Workspace layout** — `supermedicine workspace init --workspace <slug>`
-  creates `workspaces/<slug>` with workspace-local `.supermedicine/`, paper,
-  notes, output, checkpoint, session, and local RAG directories.
-- **Explicit CLI workspace use** — `run`, `paper`, and `experience` CLI paths
-  require or accept an explicit `--workspace`; they do not read TUI recent-state
-  files or silently select a workspace.
-- **Chinese TUI** — `supermedicine tui` starts the Chinese-language terminal UI.
-  TUI recent selection is workspace/session state and does not alter CLI defaults.
-- **Workspace deletion** — `supermedicine workspace delete --workspace <slug>
-  --confirm <slug>` is a hard delete. The confirmation must exactly match the
-  workspace id, the path must pass destructive-path guards, PermissionEngine must
-  authorize `workspace.delete`, and audit records are written for cancellation,
-  denial, and deletion outcomes.
-- **Paper import** — imports are copy-only: the source file is read and copied to
-  the workspace, never moved or uploaded. Supported local formats are PDF, TeX,
-  BibTeX/RIS, TXT, and Markdown (`.pdf`, `.tex`, `.bib`, `.ris`, `.txt`, `.md`).
-  Imported papers are deduplicated by SHA-256 and by normalized DOI/PMID when
-  supplied. Metadata such as title, authors, DOI, PMID, notes, and tags remains
-  editable after import.
-- **Paper metadata enrichment** — online or external metadata enrichment requires
-  explicit `--confirm-enrich`, a PermissionEngine check with network and
-  external-API hard-limit context, and audit logging. There is no silent network
-  access during ordinary import.
-- **Experience learning** — experience learning is enabled by default, but raw
-  conversations are not stored. Only user-confirmed summaries/experience records
-  are persisted. General method experience is stored in the OS temp directory
-  method layer; project-specific details remain workspace-local. Users can
-  suggest, add, list, view, edit, delete, and export experience records.
+### Experience Commands
 
-See [Architecture/WorkspaceTuiRagGuide.md](Architecture/WorkspaceTuiRagGuide.md)
-for the detailed workspace/TUI/RAG usage guide.
+```bash
+# Suggest a classification (does not persist)
+supermedicine experience suggest --workspace <slug> --summary "Keep prompts short"
+
+# Confirm and write to experience store
+supermedicine experience add --workspace <slug> --scope workspace \
+  --title "Prompt Strategy" --summary "Keep prompts short" --confirm
+
+# List experience records
+supermedicine experience list --workspace <slug>
+supermedicine experience list --workspace <slug> --include-general
+
+# View a specific record
+supermedicine experience view <record-id> --workspace <slug>
+
+# Edit a record
+supermedicine experience edit <record-id> --workspace <slug> --scope workspace \
+  --title "Updated Title"
+
+# Delete a record (requires exact ID confirmation)
+supermedicine experience delete <record-id> --workspace <slug> --scope workspace \
+  --confirm <record-id>
+
+# Export experience records
+supermedicine experience export --workspace <slug> --format json
+supermedicine experience export --workspace <slug> --format md --output experience.md
+```
+
+Experience learning is enabled by default. Raw conversations are **not** stored;
+only user-confirmed summaries are persisted.
+
+### Tool Commands
+
+```bash
+# Initialize tool directory in workspace
+supermedicine tool init --workspace <slug>
+
+# Add a built-in tool template (heatmap or umap)
+supermedicine tool add --workspace <slug> --language python --tool heatmap
+supermedicine tool add --workspace <slug> --language r --tool umap
+
+# List tools in workspace
+supermedicine tool list --workspace <slug>
+supermedicine tool list --workspace <slug> --language python
+
+# Show tool manifest
+supermedicine tool show --workspace <slug> --language python --tool heatmap
+
+# Run a tool (dry-run by default for safety)
+supermedicine tool run --workspace <slug> --language python --tool heatmap --dry-run
+supermedicine tool run --workspace <slug> --language python --tool heatmap \
+  --input data.csv --output results/
+```
+
+### TUI Command
+
+```bash
+supermedicine tui              # Launch interactive TUI
+supermedicine tui --dry-run    # Show TUI status without launching
+```
+
+---
+
+## TUI (Terminal UI)
+
+SuperMedicine includes a full interactive Chinese terminal UI built with
+[Textual](https://textual.textualize.io/).
+
+### Launching
+
+```bash
+supermedicine tui
+```
+
+### Navigation
+
+| Key | Action |
+|-----|--------|
+| `1` - `6` | Switch to screen (Dashboard, Workspace, Paper, Experience, Tool, Dialog) |
+| `↑` / `↓` | Navigate sidebar items |
+| `Enter` | Select / Confirm |
+| `Tab` | Cycle focus |
+| `q` | Quit |
+| `?` | Help |
+
+### Screens
+
+| Screen | Description |
+|--------|-------------|
+| **Dashboard** | System status, workspace count, plugin count, quick actions |
+| **Workspace** | Create, select, delete workspaces; view workspace details |
+| **Paper** | Import papers, view/edit metadata, run enrichment |
+| **Experience** | Suggest, confirm, list, edit, delete, export experience records |
+| **Tool** | Initialize tools, add templates, list, run |
+| **Dialog** | View session dialog history (read-only) |
+
+### TUI vs CLI
+
+- TUI recent selection is workspace/session state and does **not** alter CLI defaults
+- CLI commands always require explicit `--workspace` — they never read TUI state
+- TUI and CLI share the same backend controllers and data
+
+---
+
+## Platform Adapters
+
+SuperMedicine's default model is **core independent + platform add-ons**. The
+standalone Python core is the default supported path. OpenCode and Claude Code
+are optional add-on adapters.
+
+### OpenCode Add-on
+
+The OpenCode adapter lives under `adapters/opencode/`. It provides:
+
+- Plugin metadata (`plugin.json`)
+- 6 skill documents (`skills/*.md`)
+- 1 user-facing agent (`agents/supermedicine.md`)
+- 4 internal role context documents (`agents/{alpha,beta,gamma,delta}-*.md`)
+- Adapter tool mapping: `bash`, `read`, `write`, `edit`, `glob`, `grep`, `skill`, `task`
+
+#### Setup
+
+1. Copy or reference `adapters/opencode/plugin.json` and associated files
+   according to your OpenCode installation.
+
+2. The adapter maps declared tools with permission-gated high-risk operations
+   (`bash`, `write`, `edit`, `task`).
+
+3. Without an injected SuperMedicine orchestrator, the adapter uses local
+   metadata/fallback behavior.
+
+#### Capabilities
+
+| Capability | Status |
+|------------|--------|
+| Tool mapping (bash, read, write, edit, glob, grep, skill, task) | Implemented |
+| Permission-gated high-risk operations | Implemented |
+| Skill document loading | Provided for OpenCode use |
+| Native OpenCode subagent runtime | Not implemented without injected orchestrator |
+| Capability reporting | Implemented |
+
+### Claude Code Add-on
+
+The Claude Code adapter lives under `adapters/claude_code/`. It provides:
+
+- Capability reporting (`claude.capabilities`)
+- Runtime status checking (`claude.runtime_status`)
+- Permission-checked `claude --print` invocation (`claude.invoke`)
+
+#### Setup
+
+```bash
+# Copy skill directory for local Claude Code documentation
+cp -r adapters/claude_code/ ~/.claude/skills/supermedicine/
+```
+
+#### Capabilities
+
+| Capability | Status |
+|------------|--------|
+| `claude.capabilities` | Implemented |
+| `claude.runtime_status` | Implemented |
+| `claude.invoke` (when `claude` on PATH) | Implemented, permission-checked |
+| Native Claude Code skill loading | Not implemented |
+| Native Claude Code subagent dispatch | Not implemented |
+| Missing `claude` runtime | Reported as adapter unavailable, not core failure |
+
+### Capability Matrix
+
+| Capability | Standalone Core | OpenCode Add-on | Claude Code Add-on |
+|------------|----------------|-----------------|-------------------|
+| CLI `init`/`status`/`run` | Supported | Can wrap/adapt | Minimal adapter path |
+| PermissionEngine | Supported | Used for adapter ops | Used before tool execution |
+| Plugin discovery/execution | Supported | Metadata integration | Not native |
+| RAG/harness/medical standards | Supported | Skill docs available | Conceptual docs only |
+| Native platform tool calls | Not required | 8 tools mapped | `claude.invoke` only |
+| Native subagent runtime | Not applicable | Not without orchestrator | Not implemented |
+
+---
 
 ## Architecture
 
 ```
 supermedicine/
-├── core/           # Microkernel, event bus, plugin registry
-├── permission/     # P0 priority — policy, audit, engine, prompt constraints
-├── agents/         # State machine, checkpoint, orchestrator, base agent
+├── core/                 # Microkernel, event bus, plugin registry, workspace
+│   ├── redaction.py      # Shared sensitive-value redaction
+│   ├── time_utils.py     # Shared UTC timestamp utilities
+│   ├── tui/              # Interactive TUI (Textual)
+│   │   ├── app.py        # Main TUI application
+│   │   ├── app.tcss      # TUI stylesheet
+│   │   ├── screens/      # Dashboard, Workspace, Paper, Experience, Tool, Dialog
+│   │   ├── i18n.py       # Chinese labels
+│   │   └── dialog_history.py
+│   ├── paper_import/     # Paper import, metadata, enrichment
+│   ├── workspace.py      # Workspace identity and storage
+│   ├── experience.py     # Experience learning store
+│   └── llm_providers/    # LLM provider integrations (OpenRouter)
+├── permission/           # P0 policy, audit, engine, prompt constraints
+├── agents/               # State machine, checkpoint, orchestrator, base agent
 ├── plugins/
-│   ├── rag/        # RAG retrieval interface + local/mock external providers
-│   ├── harness/    # Testing, monitoring, quality assessment
-│   ├── tools/      # Python stats + R survival analysis
-│   └── standards/  # Medical writing checklists + citation formatters
-├── adapters/       # Optional platform add-ons (OpenCode, minimal Claude Code, standalone facade)
-├── Cli.py          # CLI entry point
-└── install.json    # Agent-readable installation manifest
+│   ├── rag/              # RAG retrieval + local/mock external providers
+│   ├── harness/          # Testing, monitoring, quality assessment
+│   ├── tools/            # Python stats + R survival analysis
+│   └── standards/        # Medical writing checklists + citation formatters
+├── adapters/             # Optional platform add-ons
+│   ├── opencode/         # OpenCode adapter (plugin.json, skills, agents)
+│   ├── claude_code/      # Claude Code adapter (SKILL.md, adapter.py)
+│   └── standalone/       # Standalone facade
+├── Cli.py                # CLI entry point
+├── Install.py            # Project initializer
+├── install.json          # Agent-readable installation manifest
+└── tests/                # Test suite (432+ tests)
 ```
 
-### Capability matrix
-
-| Capability | Standalone Python core | OpenCode add-on | Claude Code add-on |
-|------------|------------------------|-----------------|--------------------|
-| Install/init without assistant platform | Supported default | Not required | Not required |
-| CLI `init` / `status` / `run` via Kernel | Supported | Can wrap/adapt core workflows | Can invoke only through minimal adapter path |
-| PermissionEngine runtime checks | Supported | Used for high-risk adapter operations | Used before Claude adapter tool execution |
-| Plugin discovery/execution | Supported through Kernel | Metadata/adapter integration content | Not native plugin runtime |
-| RAG/harness/medical standards/prototype stats | Supported as Python plugins | Skill docs and role context available | Conceptual skill documentation only |
-| Native platform tool calls | Not required | Implemented adapter mapping for declared tools | `claude.capabilities`, `claude.runtime_status`, `claude.invoke` |
-| Native platform subagent runtime bridge | Not applicable | Not implemented unless an orchestrator is injected; local metadata fallback only | Not implemented; `subagent_dispatch` reports unavailable |
-| Native platform skill loading | Not applicable | Skill documents are provided for OpenCode add-on use | Not implemented; `skill_load` returns contract metadata only |
-| Platform runtime requirement | Python >= 3.10 plus package deps | Optional OpenCode environment/configuration | Optional local `claude` CLI only for `claude.invoke` |
-
-### Runtime requirements
-
-- **Required for core**: Python >= 3.10, `pip`, package dependencies declared in
-  `pyproject.toml` (`pyyaml`, `rich`, `textual`), and local filesystem access for
-  `.supermedicine/` plus optional workspaces.
-- **Optional for development**: `.[dev]` dependencies for tests/lint/local release
-  checks.
-- **Optional for R survival backend**: `.[r]`, local R, and the R `survival`
-  package. The default survival path remains deterministic pure Python unless
-  `backend="r"` is requested.
-- **Optional for OpenCode add-on**: OpenCode configuration/plugin placement as
-  appropriate for the user's OpenCode installation. Core install/run does not
-  need OpenCode.
-- **Optional for Claude Code add-on**: a local `claude` command on PATH is needed
-  only for `claude.invoke`; missing runtime is reported as adapter unavailable,
-  not as a core failure.
-
-### Optional platform add-on configuration/status
-
-- **OpenCode**: copy or reference `adapters/opencode/plugin.json` and the
-  associated `adapters/opencode/skills/*.md` and `adapters/opencode/agents/*.md`
-  from an OpenCode setup when you want OpenCode-specific metadata. The adapter
-  declares mappings for `bash`, `read`, `write`, `edit`, `glob`, `grep`, `skill`,
-  and `task`; high-risk execution/mutation paths remain permission-gated. Current
-  status: implemented adapter surface and metadata, but no standalone native
-  OpenCode subagent runtime bridge without an injected SuperMedicine
-  orchestrator.
-- **Claude Code**: optional minimal adapter only. It can report capabilities,
-  check runtime status, and call `claude --print` through `claude.invoke` when
-  available and permitted. Current status: no native Claude Code skills, no
-  native Claude Code subagents, and unavailable/timeout/runtime errors are
-  structured and redacted.
+---
 
 ## Running Tests
 
 ```bash
-pytest tests/ -v     # Run the test suite
-python Cli.py test   # Same via CLI
+# Via CLI
+supermedicine test
+
+# Via pytest directly
+pytest tests/ -v
+
+# Run specific test file
+pytest tests/test_workspace.py -v
+
+# Run with coverage
+pytest tests/ --cov=. --cov-report=term-missing
 ```
 
-## Local quality gate and release checklist
-
-Run the same lightweight checks expected by CI before opening a PR or uploading
-release files:
+### Local Quality Gate
 
 ```bash
 pip install -e ".[dev]"
@@ -278,30 +504,77 @@ python -m pip wheel . --no-deps --wheel-dir .pytest-tmp/wheel-smoke
 pytest tests/ -v
 ```
 
-Release readiness review:
+---
 
-- Treat `Beta0.3.0` as the GitHub/release-ready label. Python packaging
-  metadata intentionally uses the PEP 440 fallback `0.3.0b0`.
+## Troubleshooting
 
-- Confirm permission policies and audit behavior still enforce runtime vetoes through `PermissionEngine.check()`.
-- Exercise the CLI `init`, `status`, `test`, and `run` paths in an initialized workspace.
-- Confirm plugin discovery and execution remain permission-gated.
-- Confirm Claude Code adapter paths report capabilities, runtime status, timeout,
-  unavailable, and runtime errors without exposing secrets.
-- Confirm RAG local/mock-external behavior, external configuration boundaries,
-  timeout/resource errors, and secret environment-variable references.
-- Confirm prototype medical statistics paths remain interface/test contracts only;
-  do not claim clinical-grade, regulatory-grade, production-grade, or
-  decision-support accuracy.
-- Confirm medical writing and citation helpers only provide checklist/formatting
-  constraints and require qualified human review of content and references.
-- Confirm checkpoint and orchestration recovery paths behave as documented.
-- Review security/privacy boundaries for external resources, audit logs, and
-  redaction of sensitive values.
-- Git upload hygiene: stage only necessary project files. Do not upload `Docs/`,
-  `Superpower`, `superpower`, external skill packages, non-essential docs, build
-  outputs, distribution artifacts, `*.egg-info`, `__pycache__`, `.pytest_cache`,
-  `.pytest-tmp`, runtime checkpoints, or secret-bearing local configuration.
+### "No module named 'yaml'"
+
+```bash
+pip install pyyaml
+```
+
+### "Permission denied" on Windows
+
+Run PowerShell as Administrator, or use:
+
+```bash
+python -m venv .venv --without-pip
+```
+
+### CLI command not found
+
+If `supermedicine` is not recognized after `pip install -e .`:
+
+1. **Add Scripts to PATH** (see [PATH Configuration](#path-configuration))
+2. **Or use `python Cli.py` directly**:
+   ```bash
+   cd SuperMedicine
+   python Cli.py status
+   ```
+
+### R survival tools not working
+
+```bash
+pip install -e ".[r]"
+R -e "install.packages('survival', repos='https://cran.r-project.org')"
+```
+
+### TUI not launching
+
+Ensure `textual` is installed:
+
+```bash
+pip install textual
+```
+
+### "Textual 未安装，无法启动交互界面"
+
+```bash
+pip install -e .
+```
+
+This installs `textual` as a core dependency.
+
+---
+
+## Safety and Security
+
+- **Permission Engine** — All high-risk operations (bash, write, edit) are
+  permission-gated through `PermissionEngine.check()` at runtime.
+- **Adapter Sandboxing** — In-project read/write/edit compatible; out-of-root
+  denied; bash permission-gated.
+- **RAG Security** — External providers use environment variable references for
+  secrets; no hardcoded credentials.
+- **Paper Import** — Copy-only; source files are never moved or uploaded.
+- **Experience Learning** — Raw conversations are not stored; only
+  user-confirmed summaries are persisted.
+- **Audit Logging** — All permission decisions are logged to
+  `.supermedicine/policies/audit.jsonl`.
+
+See [SECURITY.md](SECURITY.md) for the full security policy.
+
+---
 
 ## License
 
