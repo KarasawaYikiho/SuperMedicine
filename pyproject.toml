@@ -85,6 +85,7 @@ module = [
     "rpy2.*",
     "textual",
     "textual.*",
+    "yaml",
 ]
 ignore_missing_imports = true
 
