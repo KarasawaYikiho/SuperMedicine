@@ -371,3 +371,13 @@ def test_install_manifest_uses_editable_install():
     assert command == "pip install -e .", (
         f"install_deps command must be 'pip install -e .', got {command!r}"
     )
+
+
+def test_dev_optional_dependencies_include_pyyaml_type_stubs():
+    """CI installs .[dev] before mypy, so PyYAML stubs must be in dev deps."""
+    pyproject = _read_pyproject()
+    dev_dependencies = pyproject.get("project", {}).get("optional-dependencies", {}).get("dev", [])
+
+    assert any(dep.split(";", maxsplit=1)[0].strip().lower().startswith("types-pyyaml") for dep in dev_dependencies), (
+        "project.optional-dependencies.dev must include types-PyYAML so CI mypy has yaml stubs"
+    )
