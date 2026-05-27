@@ -28,6 +28,22 @@ def _read_pyproject() -> dict:
     version_match = re.search(r'^version\s*=\s*"([^"]+)"', text, re.MULTILINE)
     if version_match:
         result["project"]["version"] = version_match.group(1)
+    optional_dependencies_match = re.search(
+        r"^\[project\.optional-dependencies\]\s*$(.*?)(?=^\[|\Z)",
+        text,
+        re.MULTILINE | re.DOTALL,
+    )
+    if optional_dependencies_match:
+        dev_match = re.search(
+            r"^dev\s*=\s*\[(.*?)\]",
+            optional_dependencies_match.group(1),
+            re.MULTILINE | re.DOTALL,
+        )
+        if dev_match:
+            result["project"].setdefault("optional-dependencies", {})["dev"] = re.findall(
+                r'"([^"]+)"',
+                dev_match.group(1),
+            )
     # Extract core package-data entries
     in_core_data = False
     for line in text.splitlines():
