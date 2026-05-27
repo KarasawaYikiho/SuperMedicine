@@ -50,6 +50,7 @@ class SuperMedicineTUI(App[Any]):
 
     BINDINGS = [
         Binding("q", "quit", t("nav_quit")),
+        Binding("question_mark", "show_help", t("help_title"), show=True),
         Binding("1", "switch_view('chat')", t("nav_chat"), show=False),
         Binding("2", "switch_view('dashboard')", t("nav_dashboard"), show=False),
         Binding("3", "switch_view('workspace')", t("nav_workspace"), show=False),
@@ -143,6 +144,14 @@ class SuperMedicineTUI(App[Any]):
                     nav_list.index = i
                     break
 
+    def action_show_help(self) -> None:
+        """Show help information."""
+        self.notify(
+            f"{t('help_navigation')}\n{t('help_global')}",
+            title=t("help_title"),
+            timeout=10,
+        )
+
     def _update_view_title(self, view_id: str) -> None:
         """Update the view title bar."""
         title_map = {
@@ -192,10 +201,7 @@ class SuperMedicineTUI(App[Any]):
     def on_list_view_selected(self, event: ListView.Selected) -> None:
         """Handle sidebar navigation item selection."""
         if isinstance(event.item, NavItem):
-            if event.item.view_id == "__quit__":
-                self.exit()
-            else:
-                self.action_switch_view(event.item.view_id)
+            self.action_switch_view(event.item.view_id)
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle user input submission."""

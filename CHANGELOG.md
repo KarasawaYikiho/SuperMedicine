@@ -17,8 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is injected, and Claude Code is a minimal optional add-on without native skill
   or subagent support.
 - **Full interactive TUI rewrite** with Textual framework: sidebar navigation,
-  6 screens (Dashboard, Workspace, Paper, Experience, Tool, Dialog History),
-  keyboard shortcuts (1-6 for screen switch, q to quit, ? for help), CSS
+  7 views (Chat, Dashboard, Workspace, Paper, Experience, Tool, Dialog History),
+  keyboard shortcuts (1-7 for view switch, q to quit, ? for help), CSS
   stylesheet, and Chinese UI throughout. Backend controllers unchanged.
 - **PATH guidance** in Install.py, README.md, and INSTALL.md: after `pip install
   -e .`, users are informed how to add the Python Scripts directory to PATH for
@@ -37,7 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and Claude Code minimal optional add-on status without native skill/subagent
   claims.
 - Latest cited local verification set: `ruff` pass; `mypy` pass with 132 source
-  files; `pytest` 427 passed, 3 skipped; build pass; installed wheel smoke pass.
+  files; `pytest` 432 passed, 3 skipped; build pass; installed wheel smoke pass.
 
 ## [0.1.0-beta] — 2026-05-22
 

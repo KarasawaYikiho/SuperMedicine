@@ -15,7 +15,7 @@ optional add-on adapters around the core, not core runtime requirements.
 - **Modular Architecture** — Microkernel + multi-Agent orchestration with plugin system
 - **P0 Permission Engine** — Code-layer runtime permission constraints with prompt-context safety guidance
 - **Plugin Ecosystem** — RAG retrieval, Harness monitoring, Python/R statistics, medical writing standards
-- **Interactive TUI** — Full Chinese terminal UI with sidebar navigation, 6 screens, keyboard shortcuts
+- **Interactive TUI** — Full Chinese terminal UI with sidebar navigation, 7 views, keyboard shortcuts
 - **Workspace System** — Explicit workspace management with paper import, experience learning, tool management
 - **Core standalone by default** — No OpenCode, Claude Code, or platform runtime required
 - **Optional platform add-ons** — OpenCode and Claude Code adapters for platform-specific workflows
@@ -341,17 +341,23 @@ supermedicine tui
 
 | Key | Action |
 |-----|--------|
-| `1` - `6` | Switch to screen (Dashboard, Workspace, Paper, Experience, Tool, Dialog) |
-| `↑` / `↓` | Navigate sidebar items |
-| `Enter` | Select / Confirm |
-| `Tab` | Cycle focus |
+| `1` | Chat (对话) |
+| `2` | Dashboard (仪表盘) |
+| `3` | Workspace (工作区管理) |
+| `4` | Paper (论文管理) |
+| `5` | Experience (经验学习) |
+| `6` | Tool (工具管理) |
+| `7` | Dialog (对话历史) |
+| `↑` / `↓` | Navigate sidebar |
+| `Enter` | Send message |
+| `?` | Show help |
 | `q` | Quit |
-| `?` | Help |
 
 ### Screens
 
 | Screen | Description |
 |--------|-------------|
+| **Chat** | Interactive conversation with the AI agent |
 | **Dashboard** | System status, workspace count, plugin count, quick actions |
 | **Workspace** | Create, select, delete workspaces; view workspace details |
 | **Paper** | Import papers, view/edit metadata, run enrichment |

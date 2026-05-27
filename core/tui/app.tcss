@@ -11,7 +11,7 @@ Screen {
 
 #sidebar {
     width: 20;
-    min-width: 18;
+    min-width: 22;
     height: 100%;
     background: $surface;
     border-right: tall $primary;
@@ -48,7 +48,7 @@ Screen {
     padding: 0 1;
     background: $primary 30%;
     text-style: bold;
-    content-align: center middle;
+    content-align: left middle;
 }
 
 #content-pane {
@@ -82,8 +82,8 @@ Screen {
 #status-bar {
     height: 1;
     width: 100%;
-    background: $surface-darken-1;
-    dock: bottom;
+    background: $surface;
+    border-top: tall $primary;
 }
 
 #status-left {
@@ -109,28 +109,6 @@ Screen {
     padding: 0 1;
 }
 
-.chat-user {
-    color: $text;
-    text-style: bold;
-    margin: 0 0 0 0;
-}
-
-.chat-assistant {
-    color: $primary;
-    margin: 0 0 0 0;
-}
-
-.chat-system {
-    color: $text-muted;
-    text-style: italic;
-    margin: 0 0 0 0;
-}
-
-.chat-error {
-    color: $error;
-    margin: 0 0 0 0;
-}
-
 /* Dashboard */
 .dashboard-stat {
     height: 1fr;
@@ -149,7 +127,7 @@ Screen {
 }
 
 /* Experience View */
-#experience-table {
+#exp-table {
     height: 1fr;
 }
 
@@ -184,14 +162,9 @@ Screen {
     border: tall $primary;
 }
 
-/* Input fields */
-.form-input {
-    margin: 0 0 1 0;
-}
-
 /* Section titles */
 .section-title {
     text-style: bold;
-    margin: 1 0 0 0;
+    margin: 1 0 1 0;
     color: $primary;
 }

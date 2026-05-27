@@ -73,7 +73,6 @@ LABELS: dict[str, str] = {
     "paper_authors": "作者",
     "paper_format": "格式",
     "paper_imported_at": "导入时间",
-    "paper_edit": "编辑元数据",
     "paper_enrich": "在线补全",
     "paper_enrich_confirm": "确认在线补全？将发起网络请求。",
 
@@ -91,7 +90,6 @@ LABELS: dict[str, str] = {
     "experience_suggested": "分类建议已生成",
     "experience_confirmed": "经验已确认写入",
     "experience_deleted": "经验已删除",
-    "experience_edit": "编辑经验",
     "experience_export": "导出经验",
     "experience_export_format": "导出格式",
     "experience_confirm_delete": "输入经验 ID 确认删除",
@@ -110,7 +108,6 @@ LABELS: dict[str, str] = {
     "tool_initialized": "工具目录已初始化",
     "tool_added": "工具已添加",
     "tool_run": "运行工具",
-    "tool_dry_run": "预览命令（不执行）",
 
     # Dialog
     "dialog_title": "对话历史",
@@ -139,7 +136,6 @@ LABELS: dict[str, str] = {
     "input_placeholder": "输入消息...",
     "select_prompt": "请选择...",
     "no_selection": "未选择",
-    "status_bar_ready": "就绪 | 按 ? 查看帮助 | 按 Q 退出",
     "status_workspaces": "工作区",
     "status_plugins": "插件",
     "thinking": "正在思考...",
