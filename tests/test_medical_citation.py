@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from plugins.standards.medical_citation.ama_format import AMAFormatter, JournalArticle, Book
 from plugins.standards.medical_citation.main import execute
 from plugins.standards.medical_citation.vancouver_format import VancouverFormatter

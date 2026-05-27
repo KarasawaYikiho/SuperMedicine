@@ -38,7 +38,7 @@ class CLI:
         config_dir = project_dir / ".supermedicine"
         config_dir.mkdir(parents=True, exist_ok=True)
         (config_dir / "config.yaml").write_text(
-            "# SuperMedicine 配置\nproject_name: supermedicine\nversion: Beta0.2.1\n",
+            "# SuperMedicine 配置\nproject_name: supermedicine\nversion: Beta0.3.0\n",
             encoding="utf-8",
         )
         (config_dir / "agents").mkdir(exist_ok=True)
@@ -48,7 +48,7 @@ class CLI:
 
     def status(self) -> None:
         """显示项目状态"""
-        logger.info("SuperMedicine Beta0.2.1")
+        logger.info("SuperMedicine Beta0.3.0")
         logger.info("=" * 40)
 
         # 检查配置
@@ -56,7 +56,7 @@ class CLI:
         if config_dir.exists():
             logger.info("[OK] 项目配置已初始化")
         else:
-            logger.info("[FAIL] 项目配置未初始化 (运行 'Supermedicine Init')")
+            logger.info("[FAIL] 项目配置未初始化 (运行 'supermedicine init')")
 
         # 检查插件
         plugins_dir = Path(__file__).parent / "plugins"
@@ -96,7 +96,7 @@ class CLI:
         # 确定项目根目录
         project_dir = Path.cwd()
 
-        logger.info("SuperMedicine Beta0.2.1 — 任务执行")
+        logger.info("SuperMedicine Beta0.3.0 — 任务执行")
         logger.info("任务: %s", task)
         logger.info("=" * 50)
 

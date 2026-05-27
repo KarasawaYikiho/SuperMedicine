@@ -419,7 +419,7 @@ Scope: read-only repository baseline audit for the repeated optimization request
 
 ### 15.2 Project type, major structure, and discovery-sensitive entry points
 
-- Project type: Python package/application named `supermedicine`, version `0.2.1b0`, with setuptools build backend (`setuptools>=68.0`, `wheel`) and Python requirement `>=3.10`.
+- Project type: Python package/application named `supermedicine`, version `0.3.0b0`, with setuptools build backend (`setuptools>=68.0`, `wheel`) and Python requirement `>=3.10`.
 - Runtime model: standalone Python medical research agent framework with optional OpenCode, Claude Code, and standalone adapter surfaces around the core.
 - Top-level structure currently observed:
   - Repository metadata/config: `.gitignore`, `pyproject.toml`, `requirements.txt`, `install.json`, `.github/workflows/ci.yml`.
@@ -549,7 +549,7 @@ Cleanup plan for a later explicit cleanup step only:
 - `permission/default_policy.yaml` and `.supermedicine/policies/default.yaml`: duplicate-looking policy content is skipped because the first is package data and the second is local runtime bootstrap policy.
 - Repeated policy action names such as RAG, tool, workspace, and Claude scopes are skipped because rule meaning depends on agent, action, effect, and hard-limit context.
 - `install.json` and `adapters/opencode/plugin.json`: overlapping optional-add-on fields and capability language are skipped because they serve different consumers: repository install metadata versus OpenCode plugin metadata.
-- `pyproject.toml`, `install.json`, README release wording, and `CHANGELOG.md`: version labels intentionally differ between public release label `Beta0.2.1` and PEP 440 package metadata `0.2.1b0`; do not normalize away the documented distinction.
+- `pyproject.toml`, `install.json`, README release wording, and `CHANGELOG.md`: version labels intentionally differ between public release label `Beta0.3.0` and PEP 440 package metadata `0.3.0b0`; do not normalize away the documented distinction.
 - Tests under `tests/**`: duplicate-looking path literals, fixture setup, and adapter assertions are skipped because they protect specific docs/manifests/import paths and discovery boundaries.
 - Hardcoded test path checks in `tests/test_repo_hygiene.py`, `tests/test_opencode_adapter.py`, and `tests/test_claude_code_adapter.py` are skipped because they intentionally enforce install manifest paths, adapter resource paths, skill/agent paths, package entry points, and platform declaration contracts.
 - Python imports from `core`, `permission`, `agents`, `plugins`, and `adapters` are skipped because import paths are behavior-sensitive. Apparent repeated imports in CLI command handlers and tests may preserve lazy import behavior, optional dependency boundaries, or local fixture meaning.

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from plugins.standards.medical_writing.checklists import get_consort_checklist, get_strobe_checklist
 from plugins.standards.medical_writing.checklist_base import MedicalClaim
 from plugins.standards.medical_writing.main import execute

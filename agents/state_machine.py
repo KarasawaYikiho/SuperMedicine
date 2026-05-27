@@ -1,8 +1,9 @@
 """长任务状态机"""
 from __future__ import annotations
-from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
+
+from core.time_utils import utc_now
 
 class TaskState(Enum):
     PLANNING = "planning"
@@ -12,9 +13,6 @@ class TaskState(Enum):
     RETRY = "retry"
     COMPLETED = "completed"
     FAILED = "failed"
-
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 VALID_TRANSITIONS: dict[TaskState, list[TaskState]] = {
     TaskState.PLANNING: [TaskState.DISPATCH],
@@ -32,16 +30,40 @@ class StateMachine:
         self._state = TaskState.PLANNING
         self._max_retries = max_retries
         self._retry_count = 0
-        self._history: list[dict[str, Any]] = [{"task_id": task_id, "from": None, "to": self._state.value, "status": "initialized", "retry_count": 0, "timestamp": _utc_now()}]
+        self._history: list[dict[str, Any]] = [
+            {
+                "task_id": task_id,
+                "from": None,
+                "to": self._state.value,
+                "status": "initialized",
+                "retry_count": 0,
+                "timestamp": utc_now(),
+            }
+        ]
+
     @property
-    def task_id(self) -> str: return self._task_id
+    def task_id(self) -> str:
+        return self._task_id
+
     @property
-    def state(self) -> TaskState: return self._state
+    def state(self) -> TaskState:
+        return self._state
+
     @property
-    def retry_count(self) -> int: return self._retry_count
+    def retry_count(self) -> int:
+        return self._retry_count
+
     @property
-    def history(self) -> list[dict[str, Any]]: return self._history.copy()
-    def transition(self, new_state: TaskState, *, status: str | None = None, details: dict[str, Any] | None = None) -> None:
+    def history(self) -> list[dict[str, Any]]:
+        return self._history.copy()
+
+    def transition(
+        self,
+        new_state: TaskState,
+        *,
+        status: str | None = None,
+        details: dict[str, Any] | None = None,
+    ) -> None:
         valid = VALID_TRANSITIONS.get(self._state, [])
         if new_state not in valid:
             raise ValueError(f"Invalid transition: {self._state.value} -> {new_state.value}")
@@ -59,7 +81,7 @@ class StateMachine:
             "to": new_state.value,
             "status": status or new_state.value,
             "retry_count": self._retry_count,
-            "timestamp": _utc_now(),
+            "timestamp": utc_now(),
             "details": details or {},
         })
 

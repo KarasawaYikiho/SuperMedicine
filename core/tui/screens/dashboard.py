@@ -69,7 +69,7 @@ class DashboardScreen(Screen):
         lines.append(f"{t('dashboard_modules')}: {module_count}")
 
         # Version
-        version = "0.2.1b0"
+        version = "0.3.0b0"
         try:
             from importlib.metadata import version as pkg_version
 

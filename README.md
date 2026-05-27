@@ -1,10 +1,10 @@
 # SuperMedicine
 
-![Version](https://img.shields.io/badge/version-Beta0.2.1-blue)
+![Version](https://img.shields.io/badge/version-Beta0.3.0-blue)
 ![CI](https://github.com/KarasawaYikiho/SuperMedicine/actions/workflows/ci.yml/badge.svg)
 
-Release-ready label: `Beta0.2.1`. Python package metadata uses `0.2.1b0`
-because PEP 440 packaging validation rejects `Beta0.2.1` as a Python project
+Release-ready label: `Beta0.3.0`. Python package metadata uses `0.3.0b0`
+because PEP 440 packaging validation rejects `Beta0.3.0` as a Python project
 version. No tag, release, publish, or upload has been created by this release
 readiness update.
 
@@ -280,8 +280,8 @@ pytest tests/ -v
 
 Release readiness review:
 
-- Treat `Beta0.2.1` as the GitHub/release-ready label. Python packaging
-  metadata intentionally uses the PEP 440 fallback `0.2.1b0`.
+- Treat `Beta0.3.0` as the GitHub/release-ready label. Python packaging
+  metadata intentionally uses the PEP 440 fallback `0.3.0b0`.
 
 - Confirm permission policies and audit behavior still enforce runtime vetoes through `PermissionEngine.check()`.
 - Exercise the CLI `init`, `status`, `test`, and `run` paths in an initialized workspace.

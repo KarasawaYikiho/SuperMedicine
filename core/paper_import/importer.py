@@ -6,7 +6,7 @@ import hashlib
 import json
 import re
 from dataclasses import asdict, is_dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +17,7 @@ from core.paper_import.models import (
     PaperMetadata,
 )
 from core.path_safety import validate_path_in_project_root
+from core.time_utils import utc_now_datetime
 from core.workspace import WorkspaceInfo, WorkspaceManager
 
 
@@ -28,10 +29,6 @@ _EDITABLE_METADATA_FIELDS: tuple[str, ...] = (
     "notes",
     "tags",
 )
-
-
-def _utc_now() -> datetime:
-    return datetime.now(timezone.utc).replace(microsecond=0)
 
 
 def _is_relative_to(path: Path, root: Path) -> bool:
@@ -122,7 +119,7 @@ class PaperImporter:
 
         source_bytes = source.read_bytes()
         sha256 = hashlib.sha256(source_bytes).hexdigest()
-        now = _utc_now()
+        now = utc_now_datetime()
 
         originals_dir = self._workspace_child(workspace, "papers", "originals")
         metadata_dir = self._workspace_child(workspace, "papers", "metadata")
@@ -249,7 +246,7 @@ class PaperImporter:
             raise MissingPaperSourceError(f"Paper metadata not found: {paper_id}")
         current = self._load_metadata(path)
         self._apply_editable_metadata(current, metadata)
-        current.updated_at = _utc_now()
+        current.updated_at = utc_now_datetime()
         self._write_metadata(path, current)
         return current
 
@@ -261,7 +258,7 @@ class PaperImporter:
         path = self._metadata_path_for_paper(workspace_id, metadata.id)
         if not path.exists() or not path.is_file():
             raise MissingPaperSourceError(f"Paper metadata not found: {metadata.id}")
-        metadata.updated_at = _utc_now()
+        metadata.updated_at = utc_now_datetime()
         self._write_metadata(path, metadata)
         return metadata
 

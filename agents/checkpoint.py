@@ -1,9 +1,10 @@
 """检查点管理 — 结构化、可审计、敏感信息脱敏。"""
 from __future__ import annotations
 import json
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from core.time_utils import utc_now
 
 SENSITIVE_KEYS = {
     "api_key",
@@ -14,10 +15,6 @@ SENSITIVE_KEYS = {
     "secret",
     "token",
 }
-
-
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 
 def _is_sensitive_key(key: str) -> bool:
@@ -76,7 +73,7 @@ class CheckpointManager:
             "step": step,
             "state": state,
             "status": status or state,
-            "timestamp": _utc_now(),
+            "timestamp": utc_now(),
             "input_summary": sanitize_for_checkpoint(input_data or {}),
             "output_summary": sanitize_for_checkpoint(output_data if output_data is not None else safe_result),
             "error_summary": sanitize_for_checkpoint(error) if error is not None else None,

@@ -1,4 +1,6 @@
 """集成测试 — 端到端科研流程"""
+from __future__ import annotations
+
 import json
 import shutil
 from pathlib import Path

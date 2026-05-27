@@ -1,6 +1,6 @@
 {
   "name": "supermedicine",
-  "version": "Beta0.2.1",
+  "version": "Beta0.3.0",
   "description": "Standalone modular medical research assistant with optional OpenCode and Claude Code adapter entry files",
   "platforms": {
     "claude-code": {

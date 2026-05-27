@@ -1,1 +1,2 @@
-"""工具插件"""
+"""SuperMedicine tools plugins."""
+from __future__ import annotations

@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 import json
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
 from core.path_safety import validate_path_in_project_root
+from core.time_utils import utc_now
 from core.workspace import WorkspaceManager
 
 
@@ -30,10 +30,6 @@ RAW_CONVERSATION_FIELDS = frozenset(
 
 class DialogHistoryPrivacyError(ValueError):
     """Raised when dialog history input contains prohibited raw conversation data."""
-
-
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
 def _contains_prohibited_key(value: Any) -> bool:
@@ -72,7 +68,7 @@ class DialogHistoryEvent:
     summary: str
     metadata: dict[str, Any] = field(default_factory=dict)
     id: str = field(default_factory=lambda: str(uuid4()))
-    created_at: str = field(default_factory=_utc_now)
+    created_at: str = field(default_factory=utc_now)
 
     def to_dict(self) -> dict[str, Any]:
         payload = {
@@ -90,7 +86,7 @@ class DialogHistoryEvent:
         _reject_raw_conversation(data)
         return cls(
             id=str(data.get("id") or uuid4()),
-            created_at=str(data.get("created_at") or _utc_now()),
+            created_at=str(data.get("created_at") or utc_now()),
             event=str(data.get("event") or "event"),
             summary=str(data.get("summary") or ""),
             metadata=dict(data.get("metadata") or {}),

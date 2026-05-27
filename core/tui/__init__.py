@@ -1,4 +1,5 @@
 """Chinese TUI foundation for SuperMedicine."""
+from __future__ import annotations
 
 from core.tui.app import TUIStatus, launch_tui, main
 from core.tui.i18n import LABELS, t

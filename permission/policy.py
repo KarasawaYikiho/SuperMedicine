@@ -45,16 +45,20 @@ def ensure_default_policy(project_dir: Path, source_root: Path | None = None) ->
     target_policy.write_text(_bundled_default_policy_text(), encoding="utf-8")
     return target_policy
 
+
 class PermissionResult(Enum):
     ALLOWED = "allowed"
     DENIED = "denied"
+
 
 @dataclass
 class PermissionRule:
     action: str
     scope: str
+
     def matches(self, action: str, scope: str) -> bool:
         return fnmatch.fnmatch(action, self.action) and fnmatch.fnmatch(scope, self.scope)
+
 
 @dataclass
 class HardLimits:
@@ -78,6 +82,7 @@ class HardLimits:
     def from_dict(cls, data: dict[str, Any]) -> HardLimits:
         return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
 
+
 @dataclass
 class PermissionPolicy:
     agent_id: str
@@ -86,13 +91,22 @@ class PermissionPolicy:
     allowed: list[PermissionRule] = field(default_factory=list)
     denied: list[PermissionRule] = field(default_factory=list)
     hard_limits: HardLimits = field(default_factory=HardLimits)
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> PermissionPolicy:
         perms = data.get("permissions", {})
         allowed = [PermissionRule(action=r["action"], scope=r["scope"]) for r in perms.get("allowed", [])]
         denied = [PermissionRule(action=r["action"], scope=r["scope"]) for r in perms.get("denied", [])]
         hard_limits = HardLimits.from_dict(perms.get("hard_limits", {}))
-        return cls(agent_id=data["agent_id"], role=data["role"], security_level=data.get("security_level", "restricted"), allowed=allowed, denied=denied, hard_limits=hard_limits)
+        return cls(
+            agent_id=data["agent_id"],
+            role=data["role"],
+            security_level=data.get("security_level", "restricted"),
+            allowed=allowed,
+            denied=denied,
+            hard_limits=hard_limits,
+        )
+
     def check(self, action: str, scope: str) -> PermissionResult:
         for rule in self.denied:
             if rule.matches(action, scope):

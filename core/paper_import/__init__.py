@@ -1,4 +1,5 @@
 """Public types for paper import support."""
+from __future__ import annotations
 
 from core.paper_import.errors import (
     MissingPaperSourceError,

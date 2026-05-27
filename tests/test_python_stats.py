@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from plugins.tools.python_stats.main import execute, descriptive, ttest, anova, regression
 
 

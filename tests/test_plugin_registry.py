@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import yaml
 from core.plugin_registry import PluginRegistry
 from plugins.base_plugin import BasePlugin

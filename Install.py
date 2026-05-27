@@ -7,6 +7,8 @@ without inspecting OpenCode, Claude Code, or any other assistant-platform
 runtime/config directories. Platform discovery remains available only through
 the explicit optional ``--detect`` command.
 """
+from __future__ import annotations
+
 import argparse
 import logging
 from pathlib import Path
@@ -35,7 +37,7 @@ def init_config(project_dir: Path) -> None:
     config_file = config_dir / "config.yaml"
     if not config_file.exists():
         config_file.write_text(
-            "# SuperMedicine 配置\nproject_name: supermedicine\nversion: Beta0.2.1\n",
+            "# SuperMedicine 配置\nproject_name: supermedicine\nversion: Beta0.3.0\n",
             encoding="utf-8",
         )
     (config_dir / "agents").mkdir(exist_ok=True)

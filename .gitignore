@@ -29,3 +29,21 @@ superpowers/
 
 # Local-only planning notes
 /Planning/NextSteps.md
+
+# Environment secrets
+.env
+
+# Python virtual environments
+.venv/
+
+# Runtime workspace data (not committed)
+workspaces/
+
+# Log files
+*.log
+
+# macOS metadata
+.DS_Store
+
+# Windows metadata
+Thumbs.db

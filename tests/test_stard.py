@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from plugins.standards.medical_writing.stard import STARDChecklist
 
 

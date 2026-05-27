@@ -5,7 +5,7 @@ All notable changes to SuperMedicine will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Beta0.2.1] — release-ready
+## [Beta0.3.0] — release-ready
 
 ### Added
 - Formal optional R/rpy2 backend support for `r-survival` Kaplan-Meier,
@@ -27,11 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `rich>=13.7,<15` and `textual>=0.79,<2`).
 
 ### Release readiness
-- Set the GitHub/release-ready label to `Beta0.2.1` without creating a tag,
+- Set the GitHub/release-ready label to `Beta0.3.0` without creating a tag,
   release, publish, or upload.
 - Audited Python packaging metadata for the same label; packaging validation
-  rejects `Beta0.2.1` because `project.version` must be PEP 440, so Python
-  metadata uses fallback version `0.2.1b0`.
+  rejects `Beta0.3.0` because `project.version` must be PEP 440, so Python
+  metadata uses fallback version `0.3.0b0`.
 - Final platform-integration audit summary records standalone core independence,
   OpenCode optional add-on status without native runtime subagent-bridge claims,
   and Claude Code minimal optional add-on status without native skill/subagent

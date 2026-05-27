@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from permission.policy import PermissionPolicy, PermissionResult
 
 class TestPermissionPolicy:

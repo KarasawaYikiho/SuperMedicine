@@ -8,7 +8,7 @@ class TestConfigCenter:
     """测试 ConfigCenter"""
 
     def test_get_set(self, tmp_path):
-        """验证 Set/Get 读写正确"""
+        """验证 set/get 读写正确"""
         config_path = tmp_path / "config.yaml"
         cc = ConfigCenter(config_path)
         cc.set("key1", "value1")
@@ -17,7 +17,7 @@ class TestConfigCenter:
         assert cc.get("nonexistent", "default") == "default"
 
     def test_save_and_reload(self, tmp_path):
-        """验证 Save() 持久化后重新加载正确"""
+        """验证 save() 持久化后重新加载正确"""
         config_path = tmp_path / "config.yaml"
         cc = ConfigCenter(config_path)
         cc.set("project", "supermedicine")

@@ -7,13 +7,13 @@ actions yet.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 import json
 import tempfile
 import uuid
 from typing import Any, Literal
 
+from core.time_utils import utc_now
 from core.workspace import WorkspaceManager
 
 
@@ -51,10 +51,6 @@ class ExperiencePrivacyError(ExperienceError):
 
 class ExperienceValidationError(ExperienceError):
     """Raised when an experience record is not safe to persist."""
-
-
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
 def _new_id() -> str:
@@ -113,8 +109,8 @@ class ExperienceRecord:
     tags: list[str] = field(default_factory=list)
     workspace_id: str | None = None
     id: str = field(default_factory=_new_id)
-    created_at: str = field(default_factory=_utc_now)
-    updated_at: str = field(default_factory=_utc_now)
+    created_at: str = field(default_factory=utc_now)
+    updated_at: str = field(default_factory=utc_now)
     raw_conversation_stored: bool = False
     confirmed: bool = True
 
@@ -131,8 +127,8 @@ class ExperienceRecord:
             title=str(data.get("title", "")),
             summary=str(data.get("summary", "")),
             tags=[str(tag) for tag in data.get("tags", [])],
-            created_at=str(data.get("created_at") or _utc_now()),
-            updated_at=str(data.get("updated_at") or _utc_now()),
+            created_at=str(data.get("created_at") or utc_now()),
+            updated_at=str(data.get("updated_at") or utc_now()),
             raw_conversation_stored=bool(data.get("raw_conversation_stored", False)),
             confirmed=bool(data.get("confirmed", True)),
         )
@@ -398,7 +394,7 @@ class ExperienceStore:
                     summary=summary if summary is not None else record.summary,
                     tags=list(tags) if tags is not None else list(record.tags),
                     created_at=record.created_at,
-                    updated_at=_utc_now(),
+                    updated_at=utc_now(),
                     raw_conversation_stored=False,
                     confirmed=True,
                 )

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from permission.prompt_generator import PromptGenerator
 
 class TestPromptGenerator:

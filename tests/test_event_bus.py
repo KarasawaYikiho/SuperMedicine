@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from core.event_bus import EventBus
 
 class TestEventBus:

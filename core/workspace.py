@@ -7,7 +7,6 @@ permission/security behavior or adding implicit workspace selection.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 import re
 from typing import Any
@@ -19,6 +18,7 @@ from core.path_safety import (
     resolve_project_root,
     validate_path_in_project_root,
 )
+from core.time_utils import utc_now
 
 
 WORKSPACES_DIR = "workspaces"
@@ -116,10 +116,6 @@ def validate_workspace_id(workspace_id: str) -> str:
     return workspace_id
 
 
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
-
-
 class WorkspaceManager:
     """Explicit manager for project-local workspace storage."""
 
@@ -159,7 +155,7 @@ class WorkspaceManager:
             path.mkdir(parents=True, exist_ok=True)
 
         metadata_file = self.metadata_path(slug)
-        now = _utc_now()
+        now = utc_now()
         if metadata_file.exists():
             existing = self.load_metadata(slug)
             metadata = WorkspaceMetadata(
@@ -251,7 +247,7 @@ class WorkspaceManager:
         state_path.parent.mkdir(parents=True, exist_ok=True)
         data = {
             "recent_workspace_id": selected,
-            "updated_at": _utc_now(),
+            "updated_at": utc_now(),
         }
         state_path.write_text(
             yaml.safe_dump(data, sort_keys=False, allow_unicode=True),

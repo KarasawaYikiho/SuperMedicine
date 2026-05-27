@@ -12,42 +12,13 @@ from dataclasses import dataclass, field
 import inspect
 import importlib
 import importlib.util
-import re
 from pathlib import Path
 from typing import Any
 
+from core.redaction import redact_sensitive
+
 
 PLUGIN_CONTRACT_VERSION = "2026-05-p0"
-
-
-_SENSITIVE_VALUE_PATTERNS = (
-    re.compile(r"(?i)(api[_-]?key|token|secret|password|credential)\s*[:=]\s*([^\s,;&]+)"),
-    re.compile(r"(?i)(bearer\s+)([A-Za-z0-9._~+\-/=]+)"),
-)
-
-
-def redact_sensitive(value: Any) -> Any:
-    if isinstance(value, dict):
-        safe: dict[Any, Any] = {}
-        for key, item in value.items():
-            key_text = str(key).lower()
-            if key_text.endswith("_env"):
-                safe[key] = item
-            elif any(marker in key_text for marker in ("api_key", "apikey", "token", "secret", "password", "credential")):
-                safe[key] = "[REDACTED]" if item not in (None, "") else item
-            else:
-                safe[key] = redact_sensitive(item)
-        return safe
-    if isinstance(value, list):
-        return [redact_sensitive(item) for item in value]
-    if isinstance(value, tuple):
-        return tuple(redact_sensitive(item) for item in value)
-    if isinstance(value, str):
-        text = value
-        for pattern in _SENSITIVE_VALUE_PATTERNS:
-            text = pattern.sub(lambda match: f"{match.group(1)}=[REDACTED]", text)
-        return text
-    return value
 
 
 def plugin_result(
@@ -78,18 +49,33 @@ class PluginMeta:
     entry: str = "main.py"
     permissions_required: list[str] = field(default_factory=list)
     provides: list[str] = field(default_factory=list)
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> PluginMeta:
-        return cls(name=data["name"], version=data["version"], type=data["type"], language=data.get("language", "python"), entry=data.get("entry", "main.py"), permissions_required=data.get("permissions_required", []), provides=data.get("provides", []))
+        return cls(
+            name=data["name"],
+            version=data["version"],
+            type=data["type"],
+            language=data.get("language", "python"),
+            entry=data.get("entry", "main.py"),
+            permissions_required=data.get("permissions_required", []),
+            provides=data.get("provides", []),
+        )
+
 
 class BasePlugin:
     def __init__(self, meta: PluginMeta, plugin_dir: Path):
         self._meta = meta
         self._plugin_dir = plugin_dir
+
     @property
-    def meta(self) -> PluginMeta: return self._meta
+    def meta(self) -> PluginMeta:
+        return self._meta
+
     @property
-    def name(self) -> str: return self._meta.name
+    def name(self) -> str:
+        return self._meta.name
+
     def execute(
         self,
         action: str,
@@ -159,7 +145,9 @@ class BasePlugin:
                 error=f"Plugin '{self.name}' returned non-dict result.",
             )
         return self._normalize_result(action, result)
-    def health_check(self) -> bool: return True
+
+    def health_check(self) -> bool:
+        return True
 
     def _load_entry_module(self, entry_path: Path):
         """加载插件入口；优先按包导入以支持入口中的相对 import。"""

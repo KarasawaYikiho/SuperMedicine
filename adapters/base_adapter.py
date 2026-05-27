@@ -7,39 +7,9 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
+from core.redaction import redact_sensitive
 from permission.engine import PermissionEngine
 from permission.policy import DEFAULT_POLICY_RELATIVE_PATH, PermissionResult
-
-
-SENSITIVE_VALUE_PATTERNS = (
-    re.compile(r"(?i)(api[_-]?key|token|secret|password|credential)\s*[:=]\s*([^\s,;&]+)"),
-    re.compile(r"(?i)(bearer\s+)([A-Za-z0-9._~+\-/=]+)"),
-)
-
-
-def redact_sensitive(value: Any) -> Any:
-    """Return a copy of value with common secret-like payloads redacted."""
-    if isinstance(value, dict):
-        redacted: dict[Any, Any] = {}
-        for key, item in value.items():
-            key_text = str(key).lower()
-            if key_text.endswith("_env"):
-                redacted[key] = item
-            elif any(marker in key_text for marker in ("api_key", "apikey", "token", "secret", "password", "credential")):
-                redacted[key] = "[REDACTED]" if item not in (None, "") else item
-            else:
-                redacted[key] = redact_sensitive(item)
-        return redacted
-    if isinstance(value, list):
-        return [redact_sensitive(item) for item in value]
-    if isinstance(value, tuple):
-        return tuple(redact_sensitive(item) for item in value)
-    if isinstance(value, str):
-        text = value
-        for pattern in SENSITIVE_VALUE_PATTERNS:
-            text = pattern.sub(lambda match: f"{match.group(1)}=[REDACTED]", text)
-        return text
-    return value
 
 
 class BaseAdapter(ABC):
