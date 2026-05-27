@@ -4,12 +4,40 @@ import importlib
 import json
 import re
 import subprocess
-import tomllib
 from pathlib import Path
+
+try:
+    import tomllib
+except ModuleNotFoundError:
+    tomllib = None  # type: ignore[assignment]
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FORBIDDEN_PLATFORM_AGENT_NAMES = {"Brain", "Planner", "Coder", "Tester"}
+
+
+def _read_pyproject() -> dict:
+    """Read pyproject.toml, falling back to regex if tomllib unavailable."""
+    path = REPO_ROOT / "pyproject.toml"
+    if tomllib is not None:
+        with path.open("rb") as f:
+            return tomllib.load(f)
+    # Fallback: simple regex-based extraction for CI on Python <3.11
+    text = path.read_text(encoding="utf-8")
+    result: dict = {"project": {}, "tool": {"setuptools": {"package-data": {}}}}
+    version_match = re.search(r'^version\s*=\s*"([^"]+)"', text, re.MULTILINE)
+    if version_match:
+        result["project"]["version"] = version_match.group(1)
+    # Extract core package-data entries
+    in_core_data = False
+    for line in text.splitlines():
+        if re.match(r'^core\s*=\s*\[', line):
+            in_core_data = True
+            entries = re.findall(r'"([^"]+)"', line)
+            result["tool"]["setuptools"]["package-data"]["core"] = entries
+        elif in_core_data and line.strip().startswith("]"):
+            in_core_data = False
+    return result
 
 
 def _tracked_files() -> list[str]:
@@ -288,11 +316,9 @@ def test_pyproject_console_script_top_level_module_is_packaged():
 
 def test_opencode_plugin_version_matches_package_version():
     """OpenCode plugin.json version must match pyproject.toml version."""
-    pyproject_path = REPO_ROOT / "pyproject.toml"
     plugin_path = REPO_ROOT / "adapters" / "opencode" / "plugin.json"
 
-    with pyproject_path.open("rb") as f:
-        pyproject = tomllib.load(f)
+    pyproject = _read_pyproject()
     package_version = pyproject["project"]["version"]
 
     with plugin_path.open("r", encoding="utf-8") as f:
@@ -324,9 +350,7 @@ def test_gitignore_excludes_mypy_cache():
 
 def test_package_data_includes_tui_css():
     """pyproject.toml package-data must include core/tui/app.tcss."""
-    pyproject_path = REPO_ROOT / "pyproject.toml"
-    with pyproject_path.open("rb") as f:
-        pyproject = tomllib.load(f)
+    pyproject = _read_pyproject()
     package_data = pyproject.get("tool", {}).get("setuptools", {}).get("package-data", {})
     core_data = package_data.get("core", [])
     assert "tui/app.tcss" in core_data, (
