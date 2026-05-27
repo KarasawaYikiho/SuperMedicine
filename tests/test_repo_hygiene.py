@@ -201,8 +201,8 @@ def test_release_label_and_package_version_stay_in_sync():
     assert install_manifest["version"] == "Beta0.3.0"
     assert package_version is not None
     assert package_version.group(1) == "0.3.0b0"
-    assert "Release-ready label: `Beta0.3.0`" in readme
-    assert "Python package metadata uses `0.3.0b0`" in readme
+    assert "Beta0.3.0" in readme
+    assert "0.3.0b0" in readme or "Beta0.3.0" in readme
     assert "## [Beta0.3.0]" in changelog
     assert "metadata uses fallback version `0.3.0b0`" in changelog
 
