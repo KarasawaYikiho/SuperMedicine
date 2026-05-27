@@ -7,7 +7,7 @@ import subprocess
 from pathlib import Path
 
 try:
-    import tomllib
+    import tomllib  # type: ignore[import-not-found]
 except ModuleNotFoundError:
     tomllib = None  # type: ignore[assignment]
 
