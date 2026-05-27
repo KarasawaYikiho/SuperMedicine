@@ -169,7 +169,10 @@ class SuperMedicineTUI(App[Any]):
             ws_count = 0
 
         plugins_dir = self.project_root / "plugins"
-        plugin_count = sum(1 for _ in plugins_dir.iterdir()) if plugins_dir.is_dir() else 0
+        plugin_count = sum(
+            1 for d in plugins_dir.iterdir()
+            if d.is_dir() and not d.name.startswith("_") and (d / "plugin.yaml").exists()
+        ) if plugins_dir.is_dir() else 0
 
         now = datetime.now(timezone.utc).strftime("%H:%M UTC")
 
@@ -179,7 +182,12 @@ class SuperMedicineTUI(App[Any]):
 
         status_left.update(f"  📁 {ws_count} {t('status_workspaces')}")
         status_center.update(f"  🔌 {plugin_count} {t('status_plugins')}")
-        status_right.update(f"  🕐 {now}  |  Beta0.3.0  ")
+        try:
+            from importlib.metadata import version as pkg_version
+            ver = pkg_version("supermedicine")
+        except Exception:
+            ver = "0.3.0b0"
+        status_right.update(f"  🕐 {now}  |  {ver}  ")
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
         """Handle sidebar navigation item selection."""
@@ -204,26 +212,45 @@ class SuperMedicineTUI(App[Any]):
         self._process_message(message)
 
     def _process_message(self, message: str) -> None:
-        """Process a user message through the Kernel."""
+        """Process a user message through the Kernel asynchronously."""
         chat_view = self._views.get("chat")
         if not chat_view:
             return
+        # Run in background worker to avoid blocking UI
+        self.run_worker(self._run_kernel_task(message, chat_view), exclusive=True)
 
-        # Show thinking indicator
-        if hasattr(chat_view, "add_system_message"):
-            chat_view.add_system_message(t("thinking"))
-
-        # Try to execute through Kernel
+    async def _run_kernel_task(self, message: str, chat_view: Any) -> None:
+        """Execute kernel task in background worker."""
         try:
             from core.kernel import Kernel
 
-            kernel = Kernel(self.project_root)
+            chat_view.add_system_message(t("thinking"))
+
+            # Build kernel with proper paths
+            config_path = self.project_root / ".supermedicine" / "config.yaml"
+            plugins_dir = self.project_root / "plugins"
+            policies_dir = self.project_root / ".supermedicine" / "policies"
+
+            kernel = Kernel(
+                config_path=config_path,
+                plugins_dir=plugins_dir,
+                policies_dir=policies_dir,
+            )
             result = kernel.execute_task(message)
-            if hasattr(chat_view, "add_system_message"):
-                chat_view.add_system_message(str(result))
+
+            # Format the result nicely
+            status = result.get("status", "unknown")
+            output = result.get("output", "")
+            error = result.get("error")
+
+            if status == "success" and output:
+                chat_view.add_assistant_message(f"{output}")
+            elif error:
+                chat_view.add_error_message(f"{error}")
+            else:
+                chat_view.add_assistant_message(f"Status: {status}\n{output or 'No output'}")
         except Exception as e:
-            if hasattr(chat_view, "add_error_message"):
-                chat_view.add_error_message(f"{t('error')}: {e}")
+            chat_view.add_error_message(f"{t('error')}: {e}")
 
 
 def launch_tui(*, dry_run: bool = False, project_root: Path | str | None = None) -> TUIStatus:

@@ -48,7 +48,10 @@ class DashboardView(Vertical):
 
         # Plugins
         plugins_dir = self._project_root / "plugins"
-        plugin_count = sum(1 for _ in plugins_dir.iterdir()) if plugins_dir.is_dir() else 0
+        plugin_count = sum(
+            1 for d in plugins_dir.iterdir()
+            if d.is_dir() and not d.name.startswith("_") and (d / "plugin.yaml").exists()
+        ) if plugins_dir.is_dir() else 0
         table.add_row(t("dashboard_plugins"), str(plugin_count))
 
         # Modules

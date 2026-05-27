@@ -133,33 +133,33 @@ Screen {
 
 /* Dashboard */
 .dashboard-stat {
-    height: 3;
+    height: 1fr;
     padding: 0 2;
     margin: 0 0 1 0;
 }
 
 /* Workspace View */
-.workspace-table {
+#workspace-table {
     height: 1fr;
 }
 
 /* Paper View */
-.paper-table {
+#paper-table {
     height: 1fr;
 }
 
 /* Experience View */
-.experience-table {
+#experience-table {
     height: 1fr;
 }
 
 /* Tool View */
-.tool-table {
+#tool-table {
     height: 1fr;
 }
 
 /* Dialog View */
-.dialog-table {
+#dialog-table {
     height: 1fr;
 }
 
