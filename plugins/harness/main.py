@@ -7,6 +7,7 @@ from typing import Any
 from plugins.base_plugin import plugin_result
 from plugins.harness.checkpoint_verifier import CheckpointVerifier
 from plugins.harness.monitor import AgentMonitor, AgentPerformanceMonitor
+from plugins.tools._common import required_str
 
 
 PLUGIN_NAME = "harness-core"
@@ -100,7 +101,7 @@ def execute(
 
 def _execute_checkpoint(params: dict[str, Any]) -> dict[str, Any]:
     checkpoint_dir = _required_path(params, "checkpoint_dir")
-    task_id = _required_str(params, "task_id")
+    task_id = required_str(params, "task_id")
     return CheckpointVerifier(checkpoint_dir).verify(task_id)
 
 
@@ -165,13 +166,6 @@ def _required_path(params: dict[str, Any], key: str) -> Path:
     if isinstance(value, str) and any(ch in value for ch in "\x00\r\n"):
         raise ValueError(f"{key} must not contain control characters")
     return Path(value)
-
-
-def _required_str(params: dict[str, Any], key: str) -> str:
-    value = params.get(key)
-    if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"{key} must be a non-empty string")
-    return value
 
 
 def _optional_str(params: dict[str, Any], key: str) -> str | None:

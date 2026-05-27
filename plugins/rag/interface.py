@@ -173,7 +173,6 @@ __all__ = [
     "RAGConnectionError",
     "RAGQueryTimeoutError",
     "RAGResourceError",
-    "redact_sensitive",
     "RAGProvider",
     "EmptyRAGProvider",
     "make_rag_result",

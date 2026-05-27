@@ -9,6 +9,8 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+from plugins.tools._common import normal_cdf
+
 
 @dataclass
 class CoxResult:
@@ -126,7 +128,7 @@ def cox_ph(
     for k in range(n_covs):
         if se[k] > 0:
             z = beta[k] / se[k]
-            p = 2 * (1 - _normal_cdf(abs(z)))
+            p = 2 * (1 - normal_cdf(abs(z)))
             p_values.append(round(p, 6))
         else:
             p_values.append(1.0)
@@ -157,7 +159,3 @@ def _exp_dot(beta: list[float], covariates: list[list[float]], idx: int) -> floa
     dot = sum(b * covariates[k][idx] for k, b in enumerate(beta))
     return math.exp(dot)
 
-
-def _normal_cdf(z: float) -> float:
-    """标准正态分布 CDF"""
-    return 0.5 * (1 + math.erf(z / math.sqrt(2)))

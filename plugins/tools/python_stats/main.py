@@ -11,7 +11,7 @@ import math
 from typing import Any
 
 from plugins.base_plugin import plugin_result
-from plugins.tools._common import as_float_groups, as_float_list, param_or_default
+from plugins.tools._common import as_float_groups, as_float_list, normal_cdf, param_or_default
 
 
 MEDICAL_BOUNDARY = (
@@ -102,7 +102,7 @@ def ttest(group1: list[float], group2: list[float]) -> dict[str, float | str]:
 
     # 近似 p 值（使用正态近似）
     z = abs(t_stat)
-    p_value = 2 * (1 - _normal_cdf(z))
+    p_value = 2 * (1 - normal_cdf(z))
 
     # Cohen's d
     pooled_std = math.sqrt(((n1 - 1) * var1 + (n2 - 1) * var2) / (n1 + n2 - 2))
@@ -250,15 +250,10 @@ def execute(
     )
 
 
-def _normal_cdf(z: float) -> float:
-    """标准正态分布 CDF 近似"""
-    return 0.5 * (1 + math.erf(z / math.sqrt(2)))
-
-
 def _f_cdf(f: float, d1: int, d2: int) -> float:
     """F 分布 CDF 近似（使用正态近似）"""
     if f <= 0:
         return 0
     # 近似公式
     z = ((f ** (1/3)) * (1 - 2 / (9 * d2)) - (1 - 2 / (9 * d1))) / math.sqrt(2 / (9 * d1) + (f ** (2/3)) * 2 / (9 * d2))
-    return _normal_cdf(z)
+    return normal_cdf(z)

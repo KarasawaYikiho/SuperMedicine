@@ -13,6 +13,7 @@ from plugins.standards.medical_citation.utils import (
     validate_source_id,
 )
 from plugins.standards.medical_citation.vancouver_format import VancouverFormatter
+from plugins.tools._common import required_str
 
 
 PLUGIN_NAME = "medical-citation"
@@ -190,10 +191,10 @@ def _reference_from_source_dict(item: dict[str, Any]) -> JournalArticle | Book:
 
 def _journal_from_dict(data: dict[str, Any]) -> JournalArticle:
     authors = _authors(data.get("authors"))
-    title = _required_str(data, "title")
-    journal = _required_str(data, "journal")
+    title = required_str(data, "title")
+    journal = required_str(data, "journal")
     year = _year(data.get("year"))
-    volume = _required_str(data, "volume")
+    volume = required_str(data, "volume")
     return JournalArticle(
         authors=authors,
         title=title,
@@ -209,8 +210,8 @@ def _journal_from_dict(data: dict[str, Any]) -> JournalArticle:
 def _book_from_dict(data: dict[str, Any]) -> Book:
     return Book(
         authors=_authors(data.get("authors")),
-        title=_required_str(data, "title"),
-        publisher=_required_str(data, "publisher"),
+        title=required_str(data, "title"),
+        publisher=required_str(data, "publisher"),
         year=_year(data.get("year")),
         edition=_optional_str(data.get("edition")),
     )
@@ -225,13 +226,6 @@ def _authors(value: Any) -> list[str]:
             raise ValueError("authors must be a non-empty list of strings")
         authors.append(author)
     return authors
-
-
-def _required_str(data: dict[str, Any], key: str) -> str:
-    value = data.get(key)
-    if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"{key} must be a non-empty string")
-    return value
 
 
 def _optional_str(value: Any) -> str:

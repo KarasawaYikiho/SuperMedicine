@@ -1,6 +1,7 @@
 """Shared helper utilities for tool plugins."""
 from __future__ import annotations
 
+import math
 from typing import Any
 
 
@@ -54,3 +55,34 @@ def as_float_groups(value: Any, name: str) -> list[list[float]]:
     if not isinstance(value, list):
         raise ValueError(f"{name} must be a list of numeric lists")
     return [as_float_list(group, f"{name}[{index}]") for index, group in enumerate(value)]
+
+
+def normal_cdf(z: float) -> float:
+    """Compute the cumulative distribution function of the standard normal distribution.
+
+    Args:
+        z: The z-score.
+
+    Returns:
+        The probability that a standard normal random variable is less than z.
+    """
+    return 0.5 * (1 + math.erf(z / math.sqrt(2)))
+
+
+def required_str(params: dict[str, Any], key: str) -> str:
+    """Extract a required non-empty string parameter.
+
+    Args:
+        params: Parameter dictionary.
+        key: The key to extract.
+
+    Returns:
+        The string value.
+
+    Raises:
+        ValueError: If the key is missing or empty.
+    """
+    value = params.get(key)
+    if not value or not isinstance(value, str):
+        raise ValueError(f"Parameter '{key}' is required and must be a non-empty string")
+    return value

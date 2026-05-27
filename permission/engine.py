@@ -2,11 +2,11 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import yaml
 
 from .audit import AuditLogger
-from typing import Any
 from .policy import DEFAULT_POLICY_RELATIVE_PATH, PermissionPolicy, PermissionResult, default_policy_path
 
 

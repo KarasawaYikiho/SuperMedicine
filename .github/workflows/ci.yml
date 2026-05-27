@@ -36,6 +36,10 @@ jobs:
         shell: pwsh
         run: python -m ruff check --select=E,F,W --ignore=E501 .
 
+      - name: Type check
+        shell: pwsh
+        run: python -m mypy . --cache-dir (Join-Path $env:RUNNER_TEMP "mypy-cache")
+
       - name: Repository hygiene checks
         shell: pwsh
         run: |

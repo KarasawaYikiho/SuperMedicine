@@ -9,6 +9,7 @@ from plugins.base_plugin import plugin_result
 from plugins.rag.interface import RAGProviderConfig
 from plugins.rag.local_provider import LocalRAGProvider, MockExternalVectorStoreProvider
 from plugins.rag.pubmed_provider import PubmedRAGProvider
+from plugins.tools._common import required_str
 
 
 PLUGIN_NAME = "rag-interface"
@@ -102,7 +103,7 @@ def execute(
 
 def _execute_query(params: dict[str, Any], context: dict[str, Any] | None = None) -> dict[str, Any]:
     context = context or {}
-    query = _required_str(params, "query")
+    query = required_str(params, "query")
     top_k = _top_k(params.get("top_k", 5))
     provider_name = str(params.get("provider") or params.get("provider_type") or "local").lower()
 
@@ -130,7 +131,7 @@ def _execute_query(params: dict[str, Any], context: dict[str, Any] | None = None
 
 
 def _execute_context_store(params: dict[str, Any]) -> dict[str, Any]:
-    key = _required_str(params, "key")
+    key = required_str(params, "key")
     if "data" not in params:
         raise ValueError("data is required")
     provider = LocalRAGProvider(_storage_dir(params))
@@ -139,7 +140,7 @@ def _execute_context_store(params: dict[str, Any]) -> dict[str, Any]:
 
 
 def _execute_context_retrieve(params: dict[str, Any]) -> dict[str, Any]:
-    key = _required_str(params, "key")
+    key = required_str(params, "key")
     provider = LocalRAGProvider(_storage_dir(params))
     data = provider.retrieve_context(key)
     return {"key": key, "data": data, "found": data is not None, "provider": "local"}
@@ -209,13 +210,6 @@ def _records_from_params(params: dict[str, Any]) -> list[dict[str, Any]]:
         else:
             raise ValueError("records entries must be strings or dictionaries")
     return normalized
-
-
-def _required_str(params: dict[str, Any], key: str) -> str:
-    value = params.get(key)
-    if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"{key} must be a non-empty string")
-    return value
 
 
 def _top_k(value: Any) -> int:
