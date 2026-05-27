@@ -1,47 +1,52 @@
-"""Experience management screen for SuperMedicine TUI."""
+﻿"""Experience management view for SuperMedicine TUI."""
 
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Any
+
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
-from textual.screen import Screen
 from textual.widgets import Button, DataTable, Input, Select, Static
 
 from core.tui.i18n import t
 
 
-class ExperienceScreen(Screen):
-    """Screen for managing experience records."""
+class ExperienceView(Vertical):
+    """View for managing experience records."""
+
+    def __init__(self, project_root: Path | str | None = None, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._project_root = Path(project_root) if project_root else Path.cwd()
 
     def compose(self) -> ComposeResult:
-        yield Static(t("experience_title"), id="content-header", classes="section-title")
-        with Vertical(id="content-body"):
+        yield Static(t("experience_title"), classes="section-title")
+        yield Select(
+            [],
+            prompt=t("paper_select_workspace"),
+            id="exp-workspace-select",
+        )
+        yield DataTable(id="exp-table", cursor_type="row")
+        with Horizontal():
+            yield Input(placeholder=t("experience_title_label"), id="exp-title-input")
+            yield Input(placeholder=t("experience_summary_label"), id="exp-summary-input")
+        with Horizontal():
+            yield Input(placeholder=t("experience_tags_label"), id="exp-tags-input")
             yield Select(
-                [],
-                prompt=t("paper_select_workspace"),
-                id="exp-workspace-select",
+                [
+                    (t("experience_scope_workspace"), "workspace"),
+                    (t("experience_scope_general"), "general"),
+                ],
+                value="workspace",
+                id="exp-scope-select",
             )
-            yield DataTable(id="exp-table", cursor_type="row")
-            with Horizontal():
-                yield Input(placeholder=t("experience_title_label"), id="exp-title-input")
-                yield Input(placeholder=t("experience_summary_label"), id="exp-summary-input")
-            with Horizontal():
-                yield Input(placeholder=t("experience_tags_label"), id="exp-tags-input")
-                yield Select(
-                    [
-                        (t("experience_scope_workspace"), "workspace"),
-                        (t("experience_scope_general"), "general"),
-                    ],
-                    value="workspace",
-                    id="exp-scope-select",
-                )
-            with Horizontal():
-                yield Button(t("experience_suggest"), id="exp-suggest", classes="btn btn-secondary")
-                yield Button(t("confirm"), id="exp-confirm", classes="btn btn-primary")
-                yield Button(t("delete"), id="exp-delete", classes="btn btn-danger")
-                yield Button(t("experience_export"), id="exp-export", classes="btn btn-secondary")
-                yield Button(t("refresh"), id="exp-refresh", classes="btn btn-secondary")
-            yield Static("", id="exp-status")
+        with Horizontal():
+            yield Button(t("experience_suggest"), id="exp-suggest", classes="btn btn-secondary")
+            yield Button(t("confirm"), id="exp-confirm", classes="btn btn-primary")
+            yield Button(t("delete"), id="exp-delete", classes="btn btn-danger")
+            yield Button(t("experience_export"), id="exp-export", classes="btn btn-secondary")
+            yield Button(t("refresh"), id="exp-refresh", classes="btn btn-secondary")
+        yield Static("", id="exp-status")
 
     def on_mount(self) -> None:
         self._load_workspaces()
@@ -49,12 +54,12 @@ class ExperienceScreen(Screen):
     def _get_experience_controller(self):
         from core.tui.screens.experience import ExperienceScreenController
 
-        return ExperienceScreenController(project_root=self.app.project_root)  # type: ignore[attr-defined]
+        return ExperienceScreenController(project_root=self._project_root)
 
     def _get_workspace_controller(self):
         from core.tui.screens.workspaces import WorkspaceScreenController
 
-        return WorkspaceScreenController(project_root=self.app.project_root)  # type: ignore[attr-defined]
+        return WorkspaceScreenController(project_root=self._project_root)
 
     def _load_workspaces(self) -> None:
         select_widget = self.query_one("#exp-workspace-select", Select)
@@ -81,7 +86,13 @@ class ExperienceScreen(Screen):
 
         table = self.query_one("#exp-table", DataTable)
         table.clear(columns=True)
-        table.add_columns("ID", t("experience_title_label"), t("experience_summary_label"), t("experience_scope_label"), t("experience_tags_label"))
+        table.add_columns(
+            "ID",
+            t("experience_title_label"),
+            t("experience_summary_label"),
+            t("experience_scope_label"),
+            t("experience_tags_label"),
+        )
 
         controller = self._get_experience_controller()
         try:
@@ -138,7 +149,11 @@ class ExperienceScreen(Screen):
             self._set_status(f"{t('error')}: {t('experience_summary_label')}")
             return
 
-        tags = [tag.strip() for tag in tags_input.value.split(",") if tag.strip()] if tags_input.value.strip() else None
+        tags = (
+            [tag.strip() for tag in tags_input.value.split(",") if tag.strip()]
+            if tags_input.value.strip()
+            else None
+        )
 
         controller = self._get_experience_controller()
         try:
@@ -169,7 +184,11 @@ class ExperienceScreen(Screen):
             self._set_status(f"{t('error')}: {t('experience_title_label')}, {t('experience_summary_label')}")
             return
 
-        tags = [tag.strip() for tag in tags_input.value.split(",") if tag.strip()] if tags_input.value.strip() else None
+        tags = (
+            [tag.strip() for tag in tags_input.value.split(",") if tag.strip()]
+            if tags_input.value.strip()
+            else None
+        )
         scope = str(scope_select.value) if scope_select.value != Select.BLANK else "workspace"
 
         controller = self._get_experience_controller()
@@ -226,3 +245,8 @@ class ExperienceScreen(Screen):
             self._set_status(result.get("message", ""))
         except Exception as e:
             self._set_status(f"{t('error')}: {e}")
+
+
+# Backward-compatible alias
+ExperienceScreen = ExperienceView
+

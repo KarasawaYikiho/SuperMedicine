@@ -1,46 +1,49 @@
-"""Tool management screen for SuperMedicine TUI."""
+﻿"""Tool management view for SuperMedicine TUI."""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
-from textual.screen import Screen
 from textual.widgets import Button, DataTable, Input, Select, Static
 
 from core.tui.i18n import t
 
 
-class ToolScreen(Screen):
-    """Screen for managing tools."""
+class ToolView(Vertical):
+    """View for managing tools."""
+
+    def __init__(self, project_root: Path | str | None = None, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._project_root = Path(project_root) if project_root else Path.cwd()
 
     def compose(self) -> ComposeResult:
-        yield Static(t("tool_title"), id="content-header", classes="section-title")
-        with Vertical(id="content-body"):
+        yield Static(t("tool_title"), classes="section-title")
+        yield Select(
+            [],
+            prompt=t("paper_select_workspace"),
+            id="tool-workspace-select",
+        )
+        yield DataTable(id="tool-table", cursor_type="row")
+        with Horizontal():
             yield Select(
-                [],
-                prompt=t("paper_select_workspace"),
-                id="tool-workspace-select",
+                [
+                    (t("tool_language_python"), "python"),
+                    (t("tool_language_r"), "r"),
+                ],
+                value="python",
+                id="tool-language-select",
             )
-            yield DataTable(id="tool-table", cursor_type="row")
-            with Horizontal():
-                yield Select(
-                    [
-                        (t("tool_language_python"), "python"),
-                        (t("tool_language_r"), "r"),
-                    ],
-                    value="python",
-                    id="tool-language-select",
-                )
-                yield Input(placeholder=t("tool_tool_id"), id="tool-id-input")
-            with Horizontal():
-                yield Button(t("tool_init"), id="tool-init", classes="btn btn-secondary")
-                yield Button(t("tool_add"), id="tool-add", classes="btn btn-primary")
-                yield Button(t("tool_run"), id="tool-run", classes="btn btn-secondary")
-                yield Button(t("refresh"), id="tool-refresh", classes="btn btn-secondary")
-            yield Static("", id="tool-status")
+            yield Input(placeholder=t("tool_tool_id"), id="tool-id-input")
+        with Horizontal():
+            yield Button(t("tool_init"), id="tool-init", classes="btn btn-secondary")
+            yield Button(t("tool_add"), id="tool-add", classes="btn btn-primary")
+            yield Button(t("tool_run"), id="tool-run", classes="btn btn-secondary")
+            yield Button(t("refresh"), id="tool-refresh", classes="btn btn-secondary")
+        yield Static("", id="tool-status")
 
     def on_mount(self) -> None:
         self._load_workspaces()
@@ -48,7 +51,7 @@ class ToolScreen(Screen):
     def _get_workspace_controller(self):
         from core.tui.screens.workspaces import WorkspaceScreenController
 
-        return WorkspaceScreenController(project_root=self.app.project_root)  # type: ignore[attr-defined]
+        return WorkspaceScreenController(project_root=self._project_root)
 
     def _load_workspaces(self) -> None:
         select_widget = self.query_one("#tool-workspace-select", Select)
@@ -89,7 +92,7 @@ class ToolScreen(Screen):
 
         table = self.query_one("#tool-table", DataTable)
         table.clear(columns=True)
-        table.add_columns(t("tool_language"), "ID", "状态")
+        table.add_columns(t("tool_language"), "ID", t("dashboard_status"))
 
         tools_dir = workspace_path / "tools"
         if not tools_dir.is_dir():
@@ -106,7 +109,7 @@ class ToolScreen(Screen):
                         if tool_file.is_file():
                             try:
                                 data = json.loads(tool_file.read_text(encoding="utf-8"))
-                                status = "✓" if data.get("executable") else "—"
+                                status = "OK" if data.get("executable") else "--"
                             except Exception:
                                 status = "?"
                             table.add_row(lang, tool_dir.name, status)
@@ -172,7 +175,9 @@ class ToolScreen(Screen):
             "language": language,
             "executable": False,
         }
-        (tool_dir / "tool.json").write_text(json.dumps(tool_meta, ensure_ascii=False, indent=2), encoding="utf-8")
+        (tool_dir / "tool.json").write_text(
+            json.dumps(tool_meta, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
         self._set_status(t("tool_added"))
         self._load_tools()
 
@@ -198,3 +203,8 @@ class ToolScreen(Screen):
 
         # Show tool path for user
         self._set_status(f"{t('tool_run')}: {tool_dir}")
+
+
+# Backward-compatible alias
+ToolScreen = ToolView
+

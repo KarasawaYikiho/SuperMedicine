@@ -1,15 +1,23 @@
-"""SuperMedicine TUI application with Textual framework."""
+"""SuperMedicine TUI Application."""
 
 from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from rich.console import Console
+from textual.app import App, ComposeResult
+from textual.binding import Binding
+from textual.containers import Horizontal, Vertical
+from textual.widgets import Footer, Header, Input, ListItem, ListView, Static
 
 from core.tui.i18n import LABELS, t
+
+
+_CSS_PATH = Path(__file__).parent / "app.tcss"
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,12 +30,207 @@ class TUIStatus:
     interactive: bool
 
 
+class NavItem(ListItem):
+    """A sidebar navigation item."""
+
+    def __init__(self, label: str, view_id: str) -> None:
+        super().__init__()
+        self.view_id = view_id
+        self._label = label
+
+    def compose(self) -> ComposeResult:
+        yield Static(self._label)
+
+
+class SuperMedicineTUI(App[Any]):
+    """Main TUI application with persistent sidebar and swappable content."""
+
+    CSS_PATH = str(_CSS_PATH)
+    TITLE = t("app_title")
+
+    BINDINGS = [
+        Binding("q", "quit", t("nav_quit")),
+        Binding("1", "switch_view('chat')", t("nav_chat"), show=False),
+        Binding("2", "switch_view('dashboard')", t("nav_dashboard"), show=False),
+        Binding("3", "switch_view('workspace')", t("nav_workspace"), show=False),
+        Binding("4", "switch_view('paper')", t("nav_paper"), show=False),
+        Binding("5", "switch_view('experience')", t("nav_experience"), show=False),
+        Binding("6", "switch_view('tool')", t("nav_tool"), show=False),
+        Binding("7", "switch_view('dialog')", t("nav_dialog"), show=False),
+    ]
+
+    def __init__(self, project_root: Path | str | None = None, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.project_root = Path(project_root) if project_root else Path.cwd()
+        self._current_view = "chat"
+        self._views: dict[str, Any] = {}
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        with Horizontal(id="app-body"):
+            with Vertical(id="sidebar"):
+                yield ListView(
+                    NavItem(f"💬 {t('nav_chat')}", "chat"),
+                    NavItem(f"📊 {t('nav_dashboard')}", "dashboard"),
+                    NavItem(f"📁 {t('nav_workspace')}", "workspace"),
+                    NavItem(f"📄 {t('nav_paper')}", "paper"),
+                    NavItem(f"💡 {t('nav_experience')}", "experience"),
+                    NavItem(f"🔧 {t('nav_tool')}", "tool"),
+                    NavItem(f"📋 {t('nav_dialog')}", "dialog"),
+                    id="nav-list",
+                )
+            with Vertical(id="main-area"):
+                yield Static(t("nav_chat"), id="view-title")
+                yield Vertical(id="content-pane")
+                with Horizontal(id="input-bar"):
+                    yield Static("> ", id="prompt-prefix")
+                    yield Input(
+                        placeholder=t("input_placeholder"),
+                        id="prompt-input",
+                    )
+        with Horizontal(id="status-bar"):
+            yield Static("", id="status-left")
+            yield Static("", id="status-center")
+            yield Static("", id="status-right")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        """Initialize views and show chat by default."""
+        from core.tui.screens.chat_view import ChatView
+        from core.tui.screens.dashboard import DashboardView
+        from core.tui.screens.dialog_screen import DialogView
+        from core.tui.screens.experience_screen import ExperienceView
+        from core.tui.screens.paper_screen import PaperView
+        from core.tui.screens.tool_screen import ToolView
+        from core.tui.screens.workspace_screen import WorkspaceView
+
+        self._views = {
+            "chat": ChatView(self.project_root),
+            "dashboard": DashboardView(self.project_root),
+            "workspace": WorkspaceView(self.project_root),
+            "paper": PaperView(self.project_root),
+            "experience": ExperienceView(self.project_root),
+            "tool": ToolView(self.project_root),
+            "dialog": DialogView(self.project_root),
+        }
+        # Add all views to content pane, hide all except chat
+        content_pane = self.query_one("#content-pane")
+        for name, view in self._views.items():
+            content_pane.mount(view)
+            if name != "chat":
+                view.display = False
+
+        self._update_status_bar()
+        self._update_view_title("chat")
+        # Focus the input
+        self.query_one("#prompt-input", Input).focus()
+
+    def action_switch_view(self, view_id: str) -> None:
+        """Switch the visible content view."""
+        if view_id == self._current_view:
+            return
+        # Hide current, show new
+        if self._current_view in self._views:
+            self._views[self._current_view].display = False
+        if view_id in self._views:
+            self._views[view_id].display = True
+            self._current_view = view_id
+            self._update_view_title(view_id)
+            # Update sidebar selection
+            nav_list = self.query_one("#nav-list", ListView)
+            for i, item in enumerate(nav_list.query(NavItem)):
+                if item.view_id == view_id:
+                    nav_list.index = i
+                    break
+
+    def _update_view_title(self, view_id: str) -> None:
+        """Update the view title bar."""
+        title_map = {
+            "chat": t("nav_chat"),
+            "dashboard": t("nav_dashboard"),
+            "workspace": t("nav_workspace"),
+            "paper": t("nav_paper"),
+            "experience": t("nav_experience"),
+            "tool": t("nav_tool"),
+            "dialog": t("nav_dialog"),
+        }
+        title_widget = self.query_one("#view-title", Static)
+        title_widget.update(title_map.get(view_id, view_id))
+
+    def _update_status_bar(self) -> None:
+        """Update the bottom status bar with context info."""
+        try:
+            from core.workspace import WorkspaceManager
+
+            manager = WorkspaceManager(self.project_root)
+            workspaces = manager.list_workspaces()
+            ws_count = len(workspaces)
+        except Exception:
+            ws_count = 0
+
+        plugins_dir = self.project_root / "plugins"
+        plugin_count = sum(1 for _ in plugins_dir.iterdir()) if plugins_dir.is_dir() else 0
+
+        now = datetime.now(timezone.utc).strftime("%H:%M UTC")
+
+        status_left = self.query_one("#status-left", Static)
+        status_center = self.query_one("#status-center", Static)
+        status_right = self.query_one("#status-right", Static)
+
+        status_left.update(f"  📁 {ws_count} {t('status_workspaces')}")
+        status_center.update(f"  🔌 {plugin_count} {t('status_plugins')}")
+        status_right.update(f"  🕐 {now}  |  Beta0.3.0  ")
+
+    def on_list_view_selected(self, event: ListView.Selected) -> None:
+        """Handle sidebar navigation item selection."""
+        if isinstance(event.item, NavItem):
+            if event.item.view_id == "__quit__":
+                self.exit()
+            else:
+                self.action_switch_view(event.item.view_id)
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        """Handle user input submission."""
+        message = event.value.strip()
+        if not message:
+            return
+        # Clear input
+        event.input.value = ""
+        # Send to chat view
+        chat_view = self._views.get("chat")
+        if chat_view and hasattr(chat_view, "add_user_message"):
+            chat_view.add_user_message(message)
+        # Process the message
+        self._process_message(message)
+
+    def _process_message(self, message: str) -> None:
+        """Process a user message through the Kernel."""
+        chat_view = self._views.get("chat")
+        if not chat_view:
+            return
+
+        # Show thinking indicator
+        if hasattr(chat_view, "add_system_message"):
+            chat_view.add_system_message(t("thinking"))
+
+        # Try to execute through Kernel
+        try:
+            from core.kernel import Kernel
+
+            kernel = Kernel(self.project_root)
+            result = kernel.execute_task(message)
+            if hasattr(chat_view, "add_system_message"):
+                chat_view.add_system_message(str(result))
+        except Exception as e:
+            if hasattr(chat_view, "add_error_message"):
+                chat_view.add_error_message(f"{t('error')}: {e}")
+
+
 def launch_tui(*, dry_run: bool = False, project_root: Path | str | None = None) -> TUIStatus:
     """Launch or describe the Chinese TUI foundation.
 
     ``dry_run`` returns a status object and prints a minimal Chinese readiness
-    message, which keeps command-line tests non-interactive.  The real screen
-    composition is intentionally deferred to the next implementation step.
+    message, which keeps command-line tests non-interactive.
     """
 
     status = TUIStatus(
@@ -44,10 +247,8 @@ def launch_tui(*, dry_run: bool = False, project_root: Path | str | None = None)
         return status
 
     try:
-        from textual.app import App, ComposeResult
-        from textual.binding import Binding
-        from textual.containers import Container
-        from textual.widgets import Footer, Header, Static
+        app = SuperMedicineTUI(project_root=project_root or Path.cwd())
+        app.run()
     except ImportError:
         console.print("Textual 未安装，无法启动交互界面。")
         return TUIStatus(
@@ -56,87 +257,6 @@ def launch_tui(*, dry_run: bool = False, project_root: Path | str | None = None)
             labels=status.labels,
             interactive=False,
         )
-
-    # Import screens
-    from core.tui.screens.dashboard import DashboardScreen
-    from core.tui.screens.dialog_screen import DialogScreen
-    from core.tui.screens.experience_screen import ExperienceScreen
-    from core.tui.screens.paper_screen import PaperScreen
-    from core.tui.screens.tool_screen import ToolScreen
-    from core.tui.screens.workspace_screen import WorkspaceScreen
-
-    _CSS_PATH = Path(__file__).parent / "app.tcss"
-
-    class NavItem(Static):
-        """A clickable sidebar navigation item."""
-
-        def __init__(self, label: str, screen_name: str, **kwargs: Any) -> None:
-            super().__init__(label, **kwargs)
-            self.screen_name = screen_name
-            self.add_class("nav-item")
-
-        def on_click(self) -> None:
-            self.app.switch_screen(self.screen_name)  # type: ignore[union-attr]
-
-    class Sidebar(Container):
-        """Left sidebar with navigation items."""
-
-        def compose(self) -> ComposeResult:
-            yield Static(t("app_title"), classes="nav-label")
-            yield NavItem(f"1. {t('nav_dashboard')}", "dashboard")
-            yield NavItem(f"2. {t('nav_workspace')}", "workspace")
-            yield NavItem(f"3. {t('nav_paper')}", "paper")
-            yield NavItem(f"4. {t('nav_experience')}", "experience")
-            yield NavItem(f"5. {t('nav_tool')}", "tool")
-            yield NavItem(f"6. {t('nav_dialog')}", "dialog")
-            yield Static("")
-            yield NavItem(f"Q. {t('nav_quit')}", "__quit__")
-
-    class SuperMedicineTUI(App[Any]):
-        """Main SuperMedicine TUI application."""
-
-        CSS_PATH = str(_CSS_PATH)
-        TITLE = "SuperMedicine 终端工作台"
-        BINDINGS = [
-            Binding("q", "quit", t("nav_quit")),
-            Binding("question_mark", "help", t("help_title")),
-            Binding("1", "switch_screen('dashboard')", t("nav_dashboard"), show=False),
-            Binding("2", "switch_screen('workspace')", t("nav_workspace"), show=False),
-            Binding("3", "switch_screen('paper')", t("nav_paper"), show=False),
-            Binding("4", "switch_screen('experience')", t("nav_experience"), show=False),
-            Binding("5", "switch_screen('tool')", t("nav_tool"), show=False),
-            Binding("6", "switch_screen('dialog')", t("nav_dialog"), show=False),
-        ]
-
-        def __init__(self, project_root: Path | str, **kwargs: Any) -> None:
-            super().__init__(**kwargs)
-            self.project_root = Path(project_root)
-
-        def compose(self) -> ComposeResult:
-            yield Header()
-            yield Sidebar(id="sidebar")
-            yield Container(id="content")
-            yield Static(t("status_bar_ready"), id="status-bar")
-            yield Footer()
-
-        def on_mount(self) -> None:
-            # Register all screens
-            self.install_screen(DashboardScreen(), name="dashboard")
-            self.install_screen(WorkspaceScreen(), name="workspace")
-            self.install_screen(PaperScreen(), name="paper")
-            self.install_screen(ExperienceScreen(), name="experience")
-            self.install_screen(ToolScreen(), name="tool")
-            self.install_screen(DialogScreen(), name="dialog")
-            # Push dashboard as default
-            self.push_screen("dashboard")
-
-        def action_help(self) -> None:
-            """Show help notification."""
-            help_text = f"{t('help_navigation')}\n{t('help_global')}"
-            self.notify(help_text, title=t("help_title"), timeout=5)
-
-    app = SuperMedicineTUI(project_root=project_root or Path.cwd())
-    app.run()
     return status
 
 

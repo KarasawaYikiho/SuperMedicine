@@ -1,32 +1,37 @@
-"""Workspace management screen for SuperMedicine TUI."""
+﻿"""Workspace management view for SuperMedicine TUI."""
 
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Any
+
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
-from textual.screen import Screen
 from textual.widgets import Button, DataTable, Input, Static
 
 from core.tui.i18n import t
 
 
-class WorkspaceScreen(Screen):
-    """Screen for managing workspaces."""
+class WorkspaceView(Vertical):
+    """View for managing workspaces."""
+
+    def __init__(self, project_root: Path | str | None = None, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._project_root = Path(project_root) if project_root else Path.cwd()
 
     def compose(self) -> ComposeResult:
-        yield Static(t("workspace_title"), id="content-header", classes="section-title")
-        with Vertical(id="content-body"):
-            yield DataTable(id="workspace-table", cursor_type="row")
-            with Horizontal():
-                yield Input(
-                    placeholder=t("workspace_id_label"),
-                    id="workspace-id-input",
-                )
-                yield Button(t("workspace_create"), id="workspace-create", classes="btn btn-primary")
-                yield Button(t("workspace_select"), id="workspace-select", classes="btn btn-secondary")
-                yield Button(t("workspace_delete"), id="workspace-delete", classes="btn btn-danger")
-                yield Button(t("refresh"), id="workspace-refresh", classes="btn btn-secondary")
-            yield Static("", id="workspace-status")
+        yield Static(t("workspace_title"), classes="section-title")
+        yield DataTable(id="workspace-table", cursor_type="row")
+        with Horizontal():
+            yield Input(
+                placeholder=t("workspace_id_label"),
+                id="workspace-id-input",
+            )
+            yield Button(t("workspace_create"), id="workspace-create", classes="btn btn-primary")
+            yield Button(t("workspace_select"), id="workspace-select", classes="btn btn-secondary")
+            yield Button(t("workspace_delete"), id="workspace-delete", classes="btn btn-danger")
+            yield Button(t("refresh"), id="workspace-refresh", classes="btn btn-secondary")
+        yield Static("", id="workspace-status")
 
     def on_mount(self) -> None:
         self._load_workspaces()
@@ -34,8 +39,7 @@ class WorkspaceScreen(Screen):
     def _get_controller(self):
         from core.tui.screens.workspaces import WorkspaceScreenController
 
-        project_root = self.app.project_root  # type: ignore[attr-defined]
-        return WorkspaceScreenController(project_root=project_root)
+        return WorkspaceScreenController(project_root=self._project_root)
 
     def _load_workspaces(self) -> None:
         table = self.query_one("#workspace-table", DataTable)
@@ -106,3 +110,8 @@ class WorkspaceScreen(Screen):
             self._load_workspaces()
         except Exception as e:
             self._set_status(f"{t('error')}: {e}")
+
+
+# Backward-compatible alias
+WorkspaceScreen = WorkspaceView
+

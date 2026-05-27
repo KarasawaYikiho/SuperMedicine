@@ -1,41 +1,46 @@
-"""Paper management screen for SuperMedicine TUI."""
+﻿"""Paper management view for SuperMedicine TUI."""
 
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Any
+
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
-from textual.screen import Screen
 from textual.widgets import Button, DataTable, Input, Select, Static
 
 from core.tui.i18n import t
 
 
-class PaperScreen(Screen):
-    """Screen for managing papers."""
+class PaperView(Vertical):
+    """View for managing papers."""
+
+    def __init__(self, project_root: Path | str | None = None, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._project_root = Path(project_root) if project_root else Path.cwd()
 
     def compose(self) -> ComposeResult:
-        yield Static(t("paper_title"), id="content-header", classes="section-title")
-        with Vertical(id="content-body"):
-            yield Select(
-                [],
-                prompt=t("paper_select_workspace"),
-                id="paper-workspace-select",
-            )
-            yield DataTable(id="paper-table", cursor_type="row")
-            with Horizontal():
-                yield Input(placeholder=t("paper_file_path"), id="paper-path-input")
-                yield Input(placeholder=t("paper_title_label"), id="paper-title-input")
-            with Horizontal():
-                yield Input(placeholder=t("paper_doi_label"), id="paper-doi-input")
-                yield Input(placeholder=t("paper_pmid_label"), id="paper-pmid-input")
-            with Horizontal():
-                yield Input(placeholder=t("paper_notes_label"), id="paper-notes-input")
-                yield Input(placeholder=t("paper_tags_label"), id="paper-tags-input")
-            with Horizontal():
-                yield Button(t("paper_import"), id="paper-import", classes="btn btn-primary")
-                yield Button(t("paper_enrich"), id="paper-enrich", classes="btn btn-secondary")
-                yield Button(t("refresh"), id="paper-refresh", classes="btn btn-secondary")
-            yield Static("", id="paper-status")
+        yield Static(t("paper_title"), classes="section-title")
+        yield Select(
+            [],
+            prompt=t("paper_select_workspace"),
+            id="paper-workspace-select",
+        )
+        yield DataTable(id="paper-table", cursor_type="row")
+        with Horizontal():
+            yield Input(placeholder=t("paper_file_path"), id="paper-path-input")
+            yield Input(placeholder=t("paper_title_label"), id="paper-title-input")
+        with Horizontal():
+            yield Input(placeholder=t("paper_doi_label"), id="paper-doi-input")
+            yield Input(placeholder=t("paper_pmid_label"), id="paper-pmid-input")
+        with Horizontal():
+            yield Input(placeholder=t("paper_notes_label"), id="paper-notes-input")
+            yield Input(placeholder=t("paper_tags_label"), id="paper-tags-input")
+        with Horizontal():
+            yield Button(t("paper_import"), id="paper-import", classes="btn btn-primary")
+            yield Button(t("paper_enrich"), id="paper-enrich", classes="btn btn-secondary")
+            yield Button(t("refresh"), id="paper-refresh", classes="btn btn-secondary")
+        yield Static("", id="paper-status")
 
     def on_mount(self) -> None:
         self._load_workspaces()
@@ -43,12 +48,12 @@ class PaperScreen(Screen):
     def _get_paper_controller(self):
         from core.tui.screens.papers import PaperScreenController
 
-        return PaperScreenController(project_root=self.app.project_root)  # type: ignore[attr-defined]
+        return PaperScreenController(project_root=self._project_root)
 
     def _get_workspace_controller(self):
         from core.tui.screens.workspaces import WorkspaceScreenController
 
-        return WorkspaceScreenController(project_root=self.app.project_root)  # type: ignore[attr-defined]
+        return WorkspaceScreenController(project_root=self._project_root)
 
     def _load_workspaces(self) -> None:
         select_widget = self.query_one("#paper-workspace-select", Select)
@@ -169,3 +174,8 @@ class PaperScreen(Screen):
             self._load_papers()
         except Exception as e:
             self._set_status(f"{t('error')}: {e}")
+
+
+# Backward-compatible alias
+PaperScreen = PaperView
+

@@ -1,30 +1,35 @@
-"""Dialog history screen for SuperMedicine TUI."""
+﻿"""Dialog history view for SuperMedicine TUI."""
 
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Any
+
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
-from textual.screen import Screen
 from textual.widgets import Button, DataTable, Select, Static
 
 from core.tui.i18n import t
 
 
-class DialogScreen(Screen):
-    """Screen for viewing dialog history."""
+class DialogView(Vertical):
+    """View for viewing dialog history."""
+
+    def __init__(self, project_root: Path | str | None = None, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._project_root = Path(project_root) if project_root else Path.cwd()
 
     def compose(self) -> ComposeResult:
-        yield Static(t("dialog_title"), id="content-header", classes="section-title")
-        with Vertical(id="content-body"):
-            yield Select(
-                [],
-                prompt=t("paper_select_workspace"),
-                id="dialog-workspace-select",
-            )
-            yield DataTable(id="dialog-table", cursor_type="row")
-            with Horizontal():
-                yield Button(t("refresh"), id="dialog-refresh", classes="btn btn-secondary")
-            yield Static("", id="dialog-status")
+        yield Static(t("dialog_title"), classes="section-title")
+        yield Select(
+            [],
+            prompt=t("paper_select_workspace"),
+            id="dialog-workspace-select",
+        )
+        yield DataTable(id="dialog-table", cursor_type="row")
+        with Horizontal():
+            yield Button(t("refresh"), id="dialog-refresh", classes="btn btn-secondary")
+        yield Static("", id="dialog-status")
 
     def on_mount(self) -> None:
         self._load_workspaces()
@@ -32,7 +37,7 @@ class DialogScreen(Screen):
     def _get_workspace_controller(self):
         from core.tui.screens.workspaces import WorkspaceScreenController
 
-        return WorkspaceScreenController(project_root=self.app.project_root)  # type: ignore[attr-defined]
+        return WorkspaceScreenController(project_root=self._project_root)
 
     def _load_workspaces(self) -> None:
         select_widget = self.query_one("#dialog-workspace-select", Select)
@@ -63,7 +68,7 @@ class DialogScreen(Screen):
 
         from core.tui.dialog_history import DialogHistoryStore
 
-        store = DialogHistoryStore(project_root=self.app.project_root)  # type: ignore[attr-defined]
+        store = DialogHistoryStore(project_root=self._project_root)
         try:
             events = store.load_events(workspace_id)
             if not events:
@@ -90,3 +95,8 @@ class DialogScreen(Screen):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "dialog-refresh":
             self._load_dialog_history()
+
+
+# Backward-compatible alias
+DialogScreen = DialogView
+
