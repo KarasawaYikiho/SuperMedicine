@@ -68,7 +68,7 @@ class HardLimits:
     network_access: bool = True
     external_api: bool = True
 
-    def items(self):
+    def items(self) -> list[tuple[str, int]]:
         """返回非零/非默认的限制项"""
         return [
             (k, v) for k, v in (

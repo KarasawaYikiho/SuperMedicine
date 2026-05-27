@@ -1,4 +1,5 @@
 """Paper import specific exceptions."""
+from __future__ import annotations
 
 
 class PaperImportError(Exception):

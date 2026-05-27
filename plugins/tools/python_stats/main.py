@@ -11,6 +11,7 @@ import math
 from typing import Any
 
 from plugins.base_plugin import plugin_result
+from plugins.tools._common import as_float_groups, as_float_list, param_or_default
 
 
 MEDICAL_BOUNDARY = (
@@ -208,18 +209,18 @@ def execute(
     }
     try:
         if action == "stats.descriptive":
-            data = _param_or_default(params, action, "data")
-            result: dict[str, Any] = descriptive(_as_float_list(data, "data"))
+            data = param_or_default(params, "data", DEFAULT_PARAMS[action]["data"])
+            result: dict[str, Any] = descriptive(as_float_list(data, "data"))
         elif action == "stats.ttest":
-            group1 = _param_or_default(params, action, "group1")
-            group2 = _param_or_default(params, action, "group2")
-            result = ttest(_as_float_list(group1, "group1"), _as_float_list(group2, "group2"))
+            group1 = param_or_default(params, "group1", DEFAULT_PARAMS[action]["group1"])
+            group2 = param_or_default(params, "group2", DEFAULT_PARAMS[action]["group2"])
+            result = ttest(as_float_list(group1, "group1"), as_float_list(group2, "group2"))
         elif action == "stats.anova":
-            groups = _param_or_default(params, action, "groups")
-            result = anova(*_as_float_groups(groups, "groups"))
+            groups = param_or_default(params, "groups", DEFAULT_PARAMS[action]["groups"])
+            result = anova(*as_float_groups(groups, "groups"))
         elif action == "stats.regression":
-            x = _as_float_list(_param_or_default(params, action, "x"), "x")
-            y = _as_float_list(_param_or_default(params, action, "y"), "y")
+            x = as_float_list(param_or_default(params, "x", DEFAULT_PARAMS[action]["x"]), "x")
+            y = as_float_list(param_or_default(params, "y", DEFAULT_PARAMS[action]["y"]), "y")
             if len(x) != len(y):
                 raise ValueError("x and y must have the same length")
             result = regression(x, y)
@@ -247,25 +248,6 @@ def execute(
         output=result,
         metadata=metadata,
     )
-
-
-def _param_or_default(params: dict[str, Any], action: str, key: str) -> Any:
-    """Return explicit input or smoke-test fixture input for compatibility."""
-    if key in params:
-        return params[key]
-    return DEFAULT_PARAMS[action][key]
-
-
-def _as_float_list(value: Any, name: str) -> list[float]:
-    if not isinstance(value, list):
-        raise ValueError(f"{name} must be a list of numbers")
-    return [float(item) for item in value]
-
-
-def _as_float_groups(value: Any, name: str) -> list[list[float]]:
-    if not isinstance(value, list):
-        raise ValueError(f"{name} must be a list of numeric lists")
-    return [_as_float_list(group, f"{name}[{index}]") for index, group in enumerate(value)]
 
 
 def _normal_cdf(z: float) -> float:

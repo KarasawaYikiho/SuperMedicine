@@ -9,6 +9,7 @@ from plugins.rag.interface import (
     RAGProviderConfig,
     RAGProviderError,
     RAGQueryTimeoutError,
+    RAGResourceError,
     make_rag_result,
 )
 from plugins.rag.local_provider import LocalRAGProvider, MockExternalVectorStoreProvider
@@ -20,6 +21,7 @@ __all__ = [
     "RAGConfigurationError",
     "RAGConnectionError",
     "RAGQueryTimeoutError",
+    "RAGResourceError",
     "RAGProvider",
     "EmptyRAGProvider",
     "LocalRAGProvider",

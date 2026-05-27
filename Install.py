@@ -50,7 +50,7 @@ def init_config(project_dir: Path) -> None:
     logger.info("  Linux/macOS: ~/.local/bin")
     logger.info("或者使用 'python Cli.py' 代替 'supermedicine' 命令。")
 
-def main():
+def main() -> None:
     logging.basicConfig(level=logging.INFO, format='%(message)s')
     parser = argparse.ArgumentParser(description="SuperMedicine standalone installer")
     parser.add_argument("--detect", action="store_true", help="Optionally detect OpenCode/Claude Code add-on presence")

@@ -4,5 +4,6 @@ from __future__ import annotations
 from permission.engine import PermissionEngine
 from permission.policy import PermissionPolicy, PermissionResult
 from permission.audit import AuditLogger
+from permission.prompt_generator import PromptGenerator
 
-__all__ = ["PermissionEngine", "PermissionPolicy", "PermissionResult", "AuditLogger"]
+__all__ = ["PermissionEngine", "PermissionPolicy", "PermissionResult", "AuditLogger", "PromptGenerator"]

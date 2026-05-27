@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 class CLI:
     """SuperMedicine CLI"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.kernel = None
         self.orchestrator = None
 
@@ -658,7 +658,7 @@ def _resolve_run_params(params_json: str | None, params_file: str | None) -> dic
     return None
 
 
-def main(argv: list[str] | None = None):
+def main(argv: list[str] | None = None) -> None:
     logging.basicConfig(level=logging.INFO, format='%(message)s')
     parser = argparse.ArgumentParser(
         prog="supermedicine",

@@ -12,6 +12,7 @@ from functools import lru_cache
 from typing import Any
 
 from plugins.base_plugin import plugin_result
+from plugins.tools._common import as_float_groups, as_float_list, param_or_default
 
 from .kaplan_meier import kaplan_meier
 from .logrank import logrank_test
@@ -403,23 +404,23 @@ def execute(
         )
     try:
         if action == "r.survival.km":
-            times = _as_float_list(_param_or_default(params, action, "times"), "times")
-            events = _as_event_list(_param_or_default(params, action, "events"), "events")
+            times = as_float_list(param_or_default(params, "times", DEFAULT_PARAMS[action]["times"]), "times")
+            events = _as_event_list(param_or_default(params, "events", DEFAULT_PARAMS[action]["events"]), "events")
             result = km_tool_r(times, events) if r_backend_requested else km_tool(times, events)
         elif action == "r.survival.logrank":
-            times1 = _as_float_list(_param_or_default(params, action, "times1"), "times1")
-            events1 = _as_event_list(_param_or_default(params, action, "events1"), "events1")
-            times2 = _as_float_list(_param_or_default(params, action, "times2"), "times2")
-            events2 = _as_event_list(_param_or_default(params, action, "events2"), "events2")
+            times1 = as_float_list(param_or_default(params, "times1", DEFAULT_PARAMS[action]["times1"]), "times1")
+            events1 = _as_event_list(param_or_default(params, "events1", DEFAULT_PARAMS[action]["events1"]), "events1")
+            times2 = as_float_list(param_or_default(params, "times2", DEFAULT_PARAMS[action]["times2"]), "times2")
+            events2 = _as_event_list(param_or_default(params, "events2", DEFAULT_PARAMS[action]["events2"]), "events2")
             result = (
                 logrank_tool_r(times1, events1, times2, events2)
                 if r_backend_requested
                 else logrank_tool(times1, events1, times2, events2)
             )
         elif action == "r.survival.cox":
-            times = _as_float_list(_param_or_default(params, action, "times"), "times")
-            events = _as_event_list(_param_or_default(params, action, "events"), "events")
-            covariates = _as_float_groups(_param_or_default(params, action, "covariates"), "covariates")
+            times = as_float_list(param_or_default(params, "times", DEFAULT_PARAMS[action]["times"]), "times")
+            events = _as_event_list(param_or_default(params, "events", DEFAULT_PARAMS[action]["events"]), "events")
+            covariates = as_float_groups(param_or_default(params, "covariates", DEFAULT_PARAMS[action]["covariates"]), "covariates")
             result = cox_tool_r(times, events, covariates) if r_backend_requested else cox_tool(times, events, covariates)
         else:
             return plugin_result(
@@ -456,19 +457,6 @@ def _is_r_na_or_infinite(value: float) -> bool:
     return value != value or value in (float("inf"), float("-inf"))
 
 
-def _param_or_default(params: dict[str, Any], action: str, key: str) -> Any:
-    """Return explicit input or smoke-test fixture input for compatibility."""
-    if key in params:
-        return params[key]
-    return DEFAULT_PARAMS[action][key]
-
-
-def _as_float_list(value: Any, name: str) -> list[float]:
-    if not isinstance(value, list):
-        raise ValueError(f"{name} must be a list of numbers")
-    return [float(item) for item in value]
-
-
 def _as_event_list(value: Any, name: str) -> list[int]:
     if not isinstance(value, list):
         raise ValueError(f"{name} must be a list of 0/1 event indicators")
@@ -476,9 +464,3 @@ def _as_event_list(value: Any, name: str) -> list[int]:
     if any(item not in (0, 1) for item in events):
         raise ValueError(f"{name} must contain only 0 or 1")
     return events
-
-
-def _as_float_groups(value: Any, name: str) -> list[list[float]]:
-    if not isinstance(value, list):
-        raise ValueError(f"{name} must be a list of numeric lists")
-    return [_as_float_list(group, f"{name}[{index}]") for index, group in enumerate(value)]
