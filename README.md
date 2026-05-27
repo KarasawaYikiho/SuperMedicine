@@ -1,6 +1,7 @@
 # SuperMedicine
 
 ![Version](https://img.shields.io/badge/version-Beta0.2.1-blue)
+![CI](https://github.com/KarasawaYikiho/SuperMedicine/actions/workflows/ci.yml/badge.svg)
 
 Release-ready label: `Beta0.2.1`. Python package metadata uses `0.2.1b0`
 because PEP 440 packaging validation rejects `Beta0.2.1` as a Python project

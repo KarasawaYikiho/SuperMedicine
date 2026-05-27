@@ -102,7 +102,7 @@ paths, and treat all external network/API access as permission-gated behavior.
 |----------|---------|
 | `SM_CONFIG` | Override config file path |
 | `SM_<KEY>` | Override any config key (uppercase, `_` for `-`) |
-| `OPENROUTER_API_KEY` | API key for LLM integration |
+| `OPENROUTER_API_KEY` | Optional API key for OpenRouter LLM provider integration only; not required for core functionality |
 
 ## Reporting a Vulnerability
 

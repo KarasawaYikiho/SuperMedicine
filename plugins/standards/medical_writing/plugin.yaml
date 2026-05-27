@@ -16,5 +16,7 @@ provides:
     description: "STARD 2015 诊断准确性研究报告规范"
 
 references:
-  - "references/consort-checklist.md"
-  - "references/stard-checklist.md"
+  - path: references/consort-checklist.md
+  - path: references/stard-checklist.md
+  - path: references/prisma-checklist.md
+  - path: references/strobe-checklist.md

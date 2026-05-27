@@ -1,6 +1,6 @@
 {
   "name": "supermedicine",
-  "version": "0.1.0",
+  "version": "0.2.1b0",
   "description": "Optional OpenCode add-on for SuperMedicine: one user-facing SuperMedicine agent plus adapter tools, skill documents, and internal role context files layered around the standalone core",
   "author": "SuperMedicine contributors",
   "license": "MIT",

@@ -1,4 +1,4 @@
-#!/Usr/Bin/Env Python3
+#!/usr/bin/env python3
 """SuperMedicine standalone installer.
 
 The default ``--init`` path is intentionally core-only: it creates the

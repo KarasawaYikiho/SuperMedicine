@@ -1,4 +1,4 @@
-#!/Usr/Bin/Env Python3
+#!/usr/bin/env python3
 """SuperMedicine CLI 入口"""
 from __future__ import annotations
 

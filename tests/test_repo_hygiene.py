@@ -2,6 +2,7 @@ import importlib
 import json
 import re
 import subprocess
+import tomllib
 from pathlib import Path
 
 
@@ -281,3 +282,66 @@ def test_pyproject_console_script_top_level_module_is_packaged():
         return
 
     assert module_name in _setuptools_py_modules(pyproject)
+
+
+def test_opencode_plugin_version_matches_package_version():
+    """OpenCode plugin.json version must match pyproject.toml version."""
+    pyproject_path = REPO_ROOT / "pyproject.toml"
+    plugin_path = REPO_ROOT / "adapters" / "opencode" / "plugin.json"
+
+    with pyproject_path.open("rb") as f:
+        pyproject = tomllib.load(f)
+    package_version = pyproject["project"]["version"]
+
+    with plugin_path.open("r", encoding="utf-8") as f:
+        plugin = json.load(f)
+    plugin_version = plugin.get("version", "")
+
+    assert plugin_version == package_version, (
+        f"OpenCode plugin.json version {plugin_version!r} must match "
+        f"pyproject.toml version {package_version!r}"
+    )
+
+
+def test_shebang_lines_are_portable():
+    """Cli.py and Install.py must use portable shebang."""
+    expected = "#!/usr/bin/env python3"
+    for filename in ("Cli.py", "Install.py"):
+        path = REPO_ROOT / filename
+        first_line = path.read_text(encoding="utf-8").split("\n")[0]
+        assert first_line == expected, (
+            f"{filename} first line must be {expected!r}, got {first_line!r}"
+        )
+
+
+def test_gitignore_excludes_mypy_cache():
+    """.gitignore must exclude .mypy_cache/."""
+    gitignore = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
+    assert ".mypy_cache/" in gitignore
+
+
+def test_package_data_includes_tui_css():
+    """pyproject.toml package-data must include core/tui/app.tcss."""
+    pyproject_path = REPO_ROOT / "pyproject.toml"
+    with pyproject_path.open("rb") as f:
+        pyproject = tomllib.load(f)
+    package_data = pyproject.get("tool", {}).get("setuptools", {}).get("package-data", {})
+    core_data = package_data.get("core", [])
+    assert "tui/app.tcss" in core_data, (
+        f"core package-data must include 'tui/app.tcss', got {core_data!r}"
+    )
+
+
+def test_install_manifest_uses_editable_install():
+    """install.json install_deps step must use pip install -e . not pip install -r."""
+    install_json_path = REPO_ROOT / "install.json"
+    with install_json_path.open("r", encoding="utf-8") as f:
+        manifest = json.load(f)
+
+    install_steps = manifest.get("install_steps", [])
+    install_deps_steps = [s for s in install_steps if s.get("step") == "install_deps"]
+    assert len(install_deps_steps) == 1, "Expected exactly one install_deps step"
+    command = install_deps_steps[0].get("command", "")
+    assert command == "pip install -e .", (
+        f"install_deps command must be 'pip install -e .', got {command!r}"
+    )

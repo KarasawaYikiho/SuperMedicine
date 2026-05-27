@@ -52,7 +52,7 @@
   },
   "install_steps": [
     {"step": "clone", "command": "git clone https://github.com/KarasawaYikiho/SuperMedicine.git"},
-    {"step": "install_deps", "command": "pip install -r requirements.txt"},
+    {"step": "install_deps", "command": "pip install -e ."},
     {"step": "detect_platform", "script": "Install.py --detect"},
     {"step": "setup_config", "script": "Install.py --init"}
   ]
