@@ -27,6 +27,7 @@ jobs:
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
+          python -m pip cache purge
           python -m pip install -e ".[dev]"
 
       - name: Ruff lint
@@ -66,6 +67,7 @@ jobs:
         shell: bash
         run: |
           python -m pip install --upgrade pip
+          python -m pip cache purge
           python -m pip install build
 
       - name: Build sdist for validation only
