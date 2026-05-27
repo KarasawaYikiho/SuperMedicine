@@ -350,6 +350,8 @@ supermedicine tui
 | `7` | Dialog (对话历史) |
 | `↑` / `↓` | Navigate sidebar |
 | `Enter` | Send message |
+| `f` | Maximize/Minimize focused widget |
+| `Esc` | Exit maximize mode |
 | `?` | Show help |
 | `q` | Quit |
 

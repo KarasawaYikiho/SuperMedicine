@@ -9,9 +9,9 @@ Screen {
     width: 100%;
 }
 
+/* Sidebar */
 #sidebar {
-    width: 20;
-    min-width: 22;
+    width: 22;
     height: 100%;
     background: $surface;
     border-right: tall $primary;
@@ -23,7 +23,7 @@ Screen {
 }
 
 #nav-list > NavItem {
-    padding: 0 1;
+    padding: 0 2;
     height: 3;
 }
 
@@ -36,6 +36,7 @@ Screen {
     text-style: bold;
 }
 
+/* Main Area */
 #main-area {
     width: 1fr;
     height: 100%;
@@ -45,7 +46,7 @@ Screen {
 #view-title {
     height: 1;
     width: 100%;
-    padding: 0 1;
+    padding: 0 2;
     background: $primary 30%;
     text-style: bold;
     content-align: left middle;
@@ -55,9 +56,10 @@ Screen {
     height: 1fr;
     width: 100%;
     overflow-y: auto;
-    padding: 0 1;
+    padding: 1 2;
 }
 
+/* Input Bar */
 #input-bar {
     height: 3;
     width: 100%;
@@ -79,6 +81,7 @@ Screen {
     height: 3;
 }
 
+/* Status Bar */
 #status-bar {
     height: 1;
     width: 100%;
@@ -113,30 +116,13 @@ Screen {
 .dashboard-stat {
     height: 1fr;
     padding: 0 2;
-    margin: 0 0 1 0;
 }
 
-/* Workspace View */
-#workspace-table {
-    height: 1fr;
-}
-
-/* Paper View */
-#paper-table {
-    height: 1fr;
-}
-
-/* Experience View */
-#exp-table {
-    height: 1fr;
-}
-
-/* Tool View */
-#tool-table {
-    height: 1fr;
-}
-
-/* Dialog View */
+/* Tables */
+#workspace-table,
+#paper-table,
+#exp-table,
+#tool-table,
 #dialog-table {
     height: 1fr;
 }
@@ -152,9 +138,17 @@ Screen {
     color: $text;
 }
 
+.btn-primary:hover {
+    background: $primary-lighten-1;
+}
+
 .btn-danger {
     background: $error;
     color: $text;
+}
+
+.btn-danger:hover {
+    background: $error-lighten-1;
 }
 
 .btn-secondary {
@@ -162,9 +156,18 @@ Screen {
     border: tall $primary;
 }
 
-/* Section titles */
+.btn-secondary:hover {
+    background: $primary 20%;
+}
+
+/* Section Titles */
 .section-title {
     text-style: bold;
     margin: 1 0 1 0;
     color: $primary;
+}
+
+/* Maximized View */
+.-maximized {
+    height: 1fr;
 }

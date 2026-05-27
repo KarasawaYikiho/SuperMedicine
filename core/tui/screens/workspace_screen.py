@@ -24,7 +24,7 @@ class WorkspaceView(Vertical):
         yield DataTable(id="workspace-table", cursor_type="row")
         with Horizontal():
             yield Input(
-                placeholder=t("workspace_id_label"),
+                placeholder=t("workspace_id_label") + " (a-z, 0-9, -)",
                 id="workspace-id-input",
             )
             yield Button(t("workspace_create"), id="workspace-create", classes="btn btn-primary")
@@ -58,6 +58,7 @@ class WorkspaceView(Vertical):
                 table.add_row(ws["id"], ws["path"], str(created_at), key=ws["id"])
         except Exception as e:
             self._set_status(f"{t('error')}: {e}")
+            self.app.notify(f"{t('error')}: {e}", severity="error")
 
     def _set_status(self, message: str) -> None:
         status = self.query_one("#workspace-status", Static)
@@ -84,9 +85,11 @@ class WorkspaceView(Vertical):
         try:
             result = controller.create_workspace(workspace_id)
             self._set_status(result.get("message", t("workspace_created")))
+            self.app.notify(result.get("message", t("workspace_created")))
             self._load_workspaces()
         except Exception as e:
             self._set_status(f"{t('error')}: {e}")
+            self.app.notify(f"{t('error')}: {e}", severity="error")
 
     def _select_workspace(self, workspace_id: str) -> None:
         if not workspace_id:
@@ -96,8 +99,10 @@ class WorkspaceView(Vertical):
         try:
             result = controller.select_workspace(workspace_id)
             self._set_status(result.get("message", t("workspace_selected")))
+            self.app.notify(result.get("message", t("workspace_selected")))
         except Exception as e:
             self._set_status(f"{t('error')}: {e}")
+            self.app.notify(f"{t('error')}: {e}", severity="error")
 
     def _delete_workspace(self, workspace_id: str) -> None:
         if not workspace_id:
@@ -107,9 +112,11 @@ class WorkspaceView(Vertical):
         try:
             result = controller.delete_workspace(workspace_id, confirm=workspace_id)
             self._set_status(result.get("message", t("workspace_deleted")))
+            self.app.notify(result.get("message", t("workspace_deleted")))
             self._load_workspaces()
         except Exception as e:
             self._set_status(f"{t('error')}: {e}")
+            self.app.notify(f"{t('error')}: {e}", severity="error")
 
 
 # Backward-compatible alias

@@ -26,6 +26,7 @@ LABELS: dict[str, str] = {
     "nav_tool": "工具管理",
     "nav_dialog": "对话历史",
     "nav_quit": "退出",
+    "nav_maximize": "最大化",
 
     # Dashboard
     "dashboard_title": "仪表盘",
@@ -142,7 +143,8 @@ LABELS: dict[str, str] = {
     "chat_help": "在下方输入框输入消息，按 Enter 发送。输入 /help 查看命令。",
     "help_title": "快捷键帮助",
     "help_navigation": "导航：↑↓ 选择 | Enter 确认 | Esc 返回",
-    "help_global": "全局：Q 退出 | ? 帮助 | Tab 切换焦点",
+    "help_global": "全局：Q 退出 | ? 帮助 | F 最大化 | Tab 切换焦点",
+    "help_escape_hint": "按 Esc 可退出最大化",
 }
 
 

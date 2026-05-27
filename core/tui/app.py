@@ -50,6 +50,7 @@ class SuperMedicineTUI(App[Any]):
 
     BINDINGS = [
         Binding("q", "quit", t("nav_quit")),
+        Binding("f", "toggle_maximize", t("nav_maximize"), show=True),
         Binding("question_mark", "show_help", t("help_title"), show=True),
         Binding("1", "switch_view('chat')", t("nav_chat"), show=False),
         Binding("2", "switch_view('dashboard')", t("nav_dashboard"), show=False),
@@ -144,10 +145,19 @@ class SuperMedicineTUI(App[Any]):
                     nav_list.index = i
                     break
 
+    def action_toggle_maximize(self) -> None:
+        """Toggle maximize on the focused widget."""
+        if self.screen.maximized is not None:
+            self.screen.minimize()
+        else:
+            focused = self.screen.focused
+            if focused is not None and getattr(focused, "allow_maximize", False):
+                self.screen.maximize(focused)
+
     def action_show_help(self) -> None:
         """Show help information."""
         self.notify(
-            f"{t('help_navigation')}\n{t('help_global')}",
+            f"{t('help_navigation')}\n{t('help_global')}\n{t('help_escape_hint')}",
             title=t("help_title"),
             timeout=10,
         )
