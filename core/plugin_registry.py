@@ -1,7 +1,10 @@
 """插件注册中心"""
 from __future__ import annotations
+
 from pathlib import Path
+
 import yaml
+
 from plugins.base_plugin import BasePlugin, PluginMeta
 
 class PluginRegistry:

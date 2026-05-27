@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import asdict, is_dataclass
-from datetime import datetime
 import json
 import logging
 import shutil
@@ -13,6 +11,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 import yaml
+
+from core.serialization import json_ready
 
 if TYPE_CHECKING:
     from core.experience import ExperienceScope, ExportFormat
@@ -44,7 +44,7 @@ class CLI:
         (config_dir / "agents").mkdir(exist_ok=True)
         (config_dir / "plugins").mkdir(exist_ok=True)
         ensure_default_policy(project_dir, Path(__file__).parent)
-        logger.info(f"项目已初始化: {config_dir}")
+        logger.info("项目已初始化: %s", config_dir)
 
     def status(self) -> None:
         """显示项目状态"""
@@ -62,13 +62,13 @@ class CLI:
         plugins_dir = Path(__file__).parent / "plugins"
         if plugins_dir.exists():
             plugin_count = len(list(plugins_dir.rglob("plugin.yaml")))
-            logger.info(f"[OK] 发现 {plugin_count} 个插件")
+            logger.info("[OK] 发现 %s 个插件", plugin_count)
 
         # 检查测试
         tests_dir = Path(__file__).parent / "tests"
         if tests_dir.exists():
             test_count = len(list(tests_dir.glob("test_*.py")))
-            logger.info(f"[OK] 发现 {test_count} 个测试模块")
+            logger.info("[OK] 发现 %s 个测试模块", test_count)
 
     def test(self) -> None:
         """运行测试"""
@@ -582,22 +582,8 @@ def _as_export_format(format: str) -> ExportFormat:
     return cast("ExportFormat", format)
 
 
-def _json_ready(value):
-    if isinstance(value, Path):
-        return str(value)
-    if isinstance(value, datetime):
-        return value.isoformat()
-    if is_dataclass(value) and not isinstance(value, type):
-        return _json_ready(asdict(value))
-    if isinstance(value, dict):
-        return {key: _json_ready(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [_json_ready(item) for item in value]
-    return value
-
-
 def _paper_metadata_to_dict(metadata) -> dict:
-    return _json_ready(metadata)
+    return json_ready(metadata)
 
 
 def _paper_import_result_to_dict(import_result, warnings: list[str] | None = None) -> dict:

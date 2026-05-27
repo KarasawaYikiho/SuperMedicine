@@ -1,11 +1,15 @@
 """审计日志"""
 from __future__ import annotations
+
 import json
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
+
 class AuditLogger:
+    """Audit logger for permission decisions and security events."""
+
     def __init__(self, log_path: Path):
         self._log_path = Path(log_path)
         self._log_path.parent.mkdir(parents=True, exist_ok=True)

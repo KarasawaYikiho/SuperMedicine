@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from dataclasses import asdict, is_dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -16,7 +15,8 @@ from core.paper_import.models import (
     PaperImportResult,
     PaperMetadata,
 )
-from core.path_safety import validate_path_in_project_root
+from core.path_safety import _is_relative_to, validate_path_in_project_root
+from core.serialization import json_ready
 from core.time_utils import utc_now_datetime
 from core.workspace import WorkspaceInfo, WorkspaceManager
 
@@ -31,34 +31,12 @@ _EDITABLE_METADATA_FIELDS: tuple[str, ...] = (
 )
 
 
-def _is_relative_to(path: Path, root: Path) -> bool:
-    try:
-        path.relative_to(root)
-    except ValueError:
-        return False
-    return True
-
-
 def _metadata_value(metadata: PaperMetadata | dict[str, Any] | None, field: str) -> Any:
     if metadata is None:
         return None
     if isinstance(metadata, dict):
         return metadata.get(field)
     return getattr(metadata, field, None)
-
-
-def _json_ready(value: Any) -> Any:
-    if isinstance(value, Path):
-        return str(value)
-    if isinstance(value, datetime):
-        return value.isoformat()
-    if is_dataclass(value) and not isinstance(value, type):
-        return _json_ready(asdict(value))
-    if isinstance(value, dict):
-        return {key: _json_ready(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [_json_ready(item) for item in value]
-    return value
 
 
 def _parse_datetime(value: Any) -> datetime | None:
@@ -195,7 +173,7 @@ class PaperImporter:
         self._apply_editable_metadata(paper_metadata, metadata)
 
         metadata_path.write_text(
-            json.dumps(_json_ready(paper_metadata), ensure_ascii=False, sort_keys=True, indent=2)
+            json.dumps(json_ready(paper_metadata), ensure_ascii=False, sort_keys=True, indent=2)
             + "\n",
             encoding="utf-8",
         )
@@ -210,7 +188,7 @@ class PaperImporter:
             "metadata_path": metadata_path,
         }
         with import_log_path.open("a", encoding="utf-8") as log_file:
-            log_file.write(json.dumps(_json_ready(log_record), ensure_ascii=False, sort_keys=True) + "\n")
+            log_file.write(json.dumps(json_ready(log_record), ensure_ascii=False, sort_keys=True) + "\n")
 
         return PaperImportResult(metadata=paper_metadata, source_path=source)
 
@@ -325,7 +303,7 @@ class PaperImporter:
             "duplicate_reason": duplicate_reason,
         }
         with import_log_path.open("a", encoding="utf-8") as log_file:
-            log_file.write(json.dumps(_json_ready(log_record), ensure_ascii=False, sort_keys=True) + "\n")
+            log_file.write(json.dumps(json_ready(log_record), ensure_ascii=False, sort_keys=True) + "\n")
 
     def _load_metadata(self, metadata_path: Path) -> PaperMetadata:
         data = json.loads(metadata_path.read_text(encoding="utf-8"))
@@ -347,6 +325,6 @@ class PaperImporter:
 
     def _write_metadata(self, metadata_path: Path, metadata: PaperMetadata) -> None:
         metadata_path.write_text(
-            json.dumps(_json_ready(metadata), ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+            json.dumps(json_ready(metadata), ensure_ascii=False, sort_keys=True, indent=2) + "\n",
             encoding="utf-8",
         )

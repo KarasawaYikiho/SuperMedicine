@@ -59,6 +59,8 @@ py-modules = ["Cli", "Install"]
 [tool.setuptools.package-data]
 permission = ["default_policy.yaml"]
 core = ["tui/app.tcss"]
+plugins = ["**/plugin.yaml", "**/*.yaml"]
+adapters = ["opencode/plugin.json"]
 
 [tool.setuptools.packages.find]
 include = ["core*", "permission*", "agents*", "plugins*", "adapters*"]

@@ -5,21 +5,52 @@ from typing import Any
 
 
 def param_or_default(params: dict[str, Any], key: str, default: Any = None) -> Any:
-    """Extract a parameter value from params, falling back to default."""
+    """Extract a parameter value from params, falling back to default.
+
+    Args:
+        params: Parameter dictionary to search.
+        key: Key to look up in *params*.
+        default: Value returned when *key* is absent.
+
+    Returns:
+        The value associated with *key*, or *default* if missing.
+    """
     if key in params:
         return params[key]
     return default
 
 
 def as_float_list(value: Any, name: str) -> list[float]:
-    """Convert a value to a list of floats, raising ValueError on failure."""
+    """Convert a value to a list of floats, raising ValueError on failure.
+
+    Args:
+        value: Expected to be a list of numeric values.
+        name: Human-readable label used in the error message.
+
+    Returns:
+        A ``list[float]`` converted from *value*.
+
+    Raises:
+        ValueError: If *value* is not a list.
+    """
     if not isinstance(value, list):
         raise ValueError(f"{name} must be a list of numbers")
     return [float(item) for item in value]
 
 
 def as_float_groups(value: Any, name: str) -> list[list[float]]:
-    """Convert a value to a list of lists of floats, raising ValueError on failure."""
+    """Convert a value to a list of lists of floats, raising ValueError on failure.
+
+    Args:
+        value: Expected to be a list of lists of numeric values.
+        name: Human-readable label used in the error message.
+
+    Returns:
+        A ``list[list[float]]`` converted from *value*.
+
+    Raises:
+        ValueError: If *value* or any nested element is not a list.
+    """
     if not isinstance(value, list):
         raise ValueError(f"{name} must be a list of numeric lists")
     return [as_float_list(group, f"{name}[{index}]") for index, group in enumerate(value)]

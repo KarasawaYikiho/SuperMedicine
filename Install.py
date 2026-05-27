@@ -57,7 +57,7 @@ def main() -> None:
     parser.add_argument("--init", action="store_true", help="Initialize core SuperMedicine config only")
     args = parser.parse_args()
     if args.detect:
-        logger.info(f"Detected platform: {detect_platform()}")
+        logger.info("Detected platform: %s", detect_platform())
         return
     if args.init:
         init_config(Path.cwd())

@@ -1,9 +1,13 @@
 """Agent 基类"""
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from typing import Any
 
+
 class BaseAgent(ABC):
+    """Abstract base class for all agents in the orchestration system."""
+
     def __init__(self, agent_id: str, role: str):
         self._agent_id = agent_id
         self._role = role
