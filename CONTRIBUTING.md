@@ -1,6 +1,9 @@
 # Contributing to SuperMedicine
 
-Thank you for your interest in contributing! This document outlines the process and guidelines.
+Thank you for your interest in contributing. This guide summarizes the local
+development workflow, code-style expectations, testing expectations, and Pull
+Request process. User installation details remain in [INSTALL.md](INSTALL.md),
+while the release-quality gate is linked from [README.md](README.md).
 
 ## Development Environment
 
@@ -35,7 +38,7 @@ Guidelines:
 - Follow existing code patterns in the module you are modifying
 - Maximum line length: 120 characters (E501 is ignored)
 
-### New file naming
+### New File Naming
 
 For future non-Python files and directories, prefer independent-word initial capitalization: each separate word should start with an uppercase letter while preserving clear word boundaries (for example, `ReleaseNotes.md`, `UserGuide.md`, or `ExampleAssets/`).
 

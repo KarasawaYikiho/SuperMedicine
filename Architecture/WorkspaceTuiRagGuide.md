@@ -4,6 +4,11 @@ This guide documents the user-facing workspace/TUI/RAG-adjacent workflows added
 for the current phase. It is documentation only: no tag, release, publish,
 package upload, paper upload, or external artifact upload is part of this work.
 
+For installation and command setup, see [../INSTALL.md](../INSTALL.md). For the
+broader architecture model, see [../ARCHITECTURE.md](../ARCHITECTURE.md). This
+guide focuses on workspace-local operation and avoids repeating global setup
+details.
+
 ## Workspaces
 
 SuperMedicine stores project workspaces under `workspaces/<id>`. The workspace
@@ -46,8 +51,6 @@ stay inside the project root, pass destructive-path validation, receive
 PermissionEngine approval for `workspace.delete`, and emit audit records. A
 failed confirmation, missing policy, permission denial, or successful deletion is
 recorded for review.
-
-## Paper Import and Metadata
 
 ## Workspace-local Python/R Tools
 

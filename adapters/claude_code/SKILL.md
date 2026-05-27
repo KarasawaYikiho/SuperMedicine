@@ -18,6 +18,11 @@ preparation, and compliance checking. SuperMedicine does not provide clinical ad
 production-grade statistics, or regulatory/clinical certification; all outputs
 require human expert review.
 
+Use this skill document for Claude Code-facing capability context only. General
+installation details remain in the repository [README](../../README.md) and
+[INSTALL](../../INSTALL.md) documents; the adapter limitations below are kept
+local so this optional skill remains self-contained.
+
 ## Installation Manifest Entry
 
 `install.json` registers this optional Claude Code surface as:

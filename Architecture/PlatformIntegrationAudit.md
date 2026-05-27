@@ -1,8 +1,13 @@
 # Platform Integration Audit
 
-Step 1 audit artifact for separating SuperMedicine standalone core capability from optional OpenCode / Claude Code platform integrations. Step 6 documentation updates preserve this model as **core independent + platform add-ons**.
+Step 1 audit artifact for separating SuperMedicine standalone core capability
+from optional OpenCode / Claude Code platform integrations. Step 6 documentation
+updates preserve this model as **core independent + platform add-ons**. Current
+user-facing summaries live in [../README.md](../README.md), [../INSTALL.md](../INSTALL.md),
+and [../ARCHITECTURE.md](../ARCHITECTURE.md); this file preserves audit evidence
+and final support-status reasoning.
 
-## 1. Core standalone boundary
+## 1. Core Standalone Boundary
 
 The standalone core should be runnable without OpenCode, Claude Code, or any assistant-platform runtime on the host. Based on the inspected files, the core boundary currently consists of:
 
@@ -17,7 +22,7 @@ The standalone core should be runnable without OpenCode, Claude Code, or any ass
 
 Standalone success criterion for later steps: a fresh install using only package/core dependencies can run `supermedicine init`, `supermedicine status`, and `supermedicine run ...` through `Kernel` and plugins without importing `adapters.opencode`, requiring `claude`, or requiring OpenCode configuration directories.
 
-## 2. Optional platform add-on boundary
+## 2. Optional Platform Add-on Boundary
 
 Platform-specific support should be treated as optional integration layers around the core:
 
@@ -30,7 +35,7 @@ Platform-specific support should be treated as optional integration layers aroun
 
 Optional add-on success criterion for later steps: adapter packages and docs can be installed/copied separately from the core, and their tests/documentation clearly indicate they are optional integrations layered over the standalone core.
 
-## 3. OpenCode support findings
+## 3. OpenCode Support Findings
 
 Current OpenCode support is implemented as an optional integration surface:
 
@@ -59,7 +64,7 @@ Current documentation status after Step 6:
   implemented; current behavior depends on an injected SuperMedicine
   orchestrator or local metadata fallback.
 
-## 4. Claude Code support completeness findings
+## 4. Claude Code Support Completeness Findings
 
 Claude Code support is intentionally minimal and should be documented as such:
 
@@ -90,7 +95,7 @@ Current documentation status after Step 6:
 - Native Claude Code skill loading and native subagent dispatch remain
   documented as unavailable.
 
-## 5. Coupling risks and exact file-level modification targets for Steps 2-7
+## 5. Coupling Risks and Exact File-Level Modification Targets for Steps 2-7
 
 ### Risk A — default package/distribution blurs core and adapters
 

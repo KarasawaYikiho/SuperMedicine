@@ -10,16 +10,21 @@ and permission-gated orchestration. SuperMedicine runs as a standalone Python
 package by default; OpenCode, Claude Code, and similar assistant platforms are
 optional add-on adapters around the core, not core runtime requirements.
 
-## Features
+**Use this README for orientation and quick-start commands.** For full setup
+detail, see [INSTALL.md](INSTALL.md); for system design, see
+[ARCHITECTURE.md](ARCHITECTURE.md); for security boundaries, see
+[SECURITY.md](SECURITY.md).
 
-- **Modular Architecture** — Microkernel + multi-Agent orchestration with plugin system
-- **P0 Permission Engine** — Code-layer runtime permission constraints with prompt-context safety guidance
-- **Plugin Ecosystem** — RAG retrieval, Harness monitoring, Python/R statistics, medical writing standards
-- **Interactive TUI** — Full Chinese terminal UI with sidebar navigation, 7 views, keyboard shortcuts
-- **Workspace System** — Explicit workspace management with paper import, experience learning, tool management
-- **Core standalone by default** — No OpenCode, Claude Code, or platform runtime required
-- **Optional platform add-ons** — OpenCode and Claude Code adapters for platform-specific workflows
-- **Medical Standards** — CONSORT, STROBE, PRISMA, STARD checklists; AMA/Vancouver citation formatting
+## Feature Summary
+
+- **Modular Architecture** — Microkernel plus multi-agent orchestration with a plugin system.
+- **P0 Permission Engine** — Runtime permission constraints with prompt-context safety guidance.
+- **Plugin Ecosystem** — RAG retrieval, Harness monitoring, Python/R statistics, and medical writing standards.
+- **Interactive TUI** — Chinese terminal UI with sidebar navigation, seven views, and keyboard shortcuts.
+- **Workspace System** — Explicit workspace management with paper import, experience learning, and tool management.
+- **Standalone Core by Default** — No OpenCode, Claude Code, or platform runtime is required.
+- **Optional Platform Add-ons** — OpenCode and Claude Code adapters support platform-specific workflows.
+- **Medical Standards** — CONSORT, STROBE, PRISMA, and STARD checklists plus AMA/Vancouver citation formatting.
 
 ---
 

@@ -4,6 +4,10 @@
 
 This document is the verifiable repository artifact for the phase implementation baseline. It maps the current SuperMedicine repository structure and compatibility boundaries before follow-on phase work.
 
+This baseline avoids repeating full user guidance. Use [../README.md](../README.md)
+for quick-start commands, [../INSTALL.md](../INSTALL.md) for installation detail,
+and [../ARCHITECTURE.md](../ARCHITECTURE.md) for the current design narrative.
+
 Scope for this baseline:
 
 - Document the actual current repository layout and implementation entry points.

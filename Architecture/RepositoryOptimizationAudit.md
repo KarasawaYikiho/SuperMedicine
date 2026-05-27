@@ -4,7 +4,7 @@ Date: 2026-05-26
 
 Purpose: establish the immutable baseline and protection boundaries before any repository optimization. This step is audit-only: no runtime/source behavior changes are allowed in this step except creating this document.
 
-## Audit pass index
+## Audit Pass Index
 
 Use this index as the canonical navigation layer for repeated repository-optimization passes. Later passes should link back here instead of restating long prior findings unless a fresh observation materially differs.
 
@@ -16,7 +16,7 @@ Use this index as the canonical navigation layer for repeated repository-optimiz
 | 12 | Initial Step 4 audit | Duplicate/redundant content and generated artifact audit | Recommended generated-artifact cleanup only; skipped source/content deduplication. |
 | 13 | Initial Step 5 execution | Generated-artifact cleanup | Removed accessible generated/cache/runtime artifacts; skipped inaccessible `.pytest_cache/` and source content. |
 | 14 | Initial Step 6 execution | Documentation-only consistency update | Clarified audit wording; changed no runtime/source behavior. |
-| 15 | Repeated-pass baseline | Fresh state after commit `b4cc636` | Re-established clean tracked baseline and repeated-pass boundaries. |
+| 15 | Current repeated-pass baseline refresh | Fresh state at commit `0fe238b` | Re-established clean tracked baseline, complete tracked Markdown inventory, and repeated-pass boundaries from current Git observations. |
 | 16 | Repeated-pass Step 2 audit | Deep semantic-preserving audit | Identified generated cleanup and docs-navigation candidates; skipped risky duplicates/renames. |
 | 17 | Repeated-pass Step 3 execution | Generated/cache cleanup | Removed accessible generated/cache/runtime artifacts only. |
 | 18 | Repeated-pass Step 4 execution | Naming/capitalization follow-up | Performed no renames; no reference synchronization required. |
@@ -24,6 +24,8 @@ Use this index as the canonical navigation layer for repeated repository-optimiz
 | 20 | Repeated-pass Step 6 execution | Repository format and text hygiene | Applied minimal docs-only hygiene; skipped risky formatting churn. |
 | 21 | Repeated-pass Step 7 assessment | Non-invasive repository hygiene test coverage | Added audit-only coverage assessment; no new test churn needed. |
 | 22 | Repeated-pass Step 9 review | Final diff and semantic-preservation confirmation | Cleaned accessible regenerated artifacts and confirmed final diff scope remains audit-document only. |
+| 23 | Step 2 Markdown strategy | Tracked Markdown rewrite and deduplication strategy | Defined safe prose rewrite rules, per-file categories, duplication policy, and verification approach for all 29 tracked Markdown files. |
+| 24 | Step 3 Markdown rewrite execution notes | Markdown-only rewrite traceability | Records that the follow-up rewrite should modify tracked Markdown only while preserving protected literals and audit evidence. |
 
 ## 1. Current branch, remote, and working tree status
 
@@ -386,11 +388,11 @@ Risky optimizations intentionally skipped:
 - No code imports, command handlers, output protocols, result schemas, permission/security policies, default values, package metadata, dependency versions, or tests were changed.
 - No additional generated-artifact cleanup was attempted in this step, including the previously inaccessible `.pytest_cache/` and the intentionally preserved ignored `Planning/` path.
 
-## 15. Repeated optimization pass baseline audit after commit `b4cc636`
+## 15. Current repeated optimization pass baseline refresh at commit `0fe238b`
 
-Date: 2026-05-26
+Date: 2026-05-27
 
-Scope: read-only repository baseline audit for the repeated optimization request received after the prior optimization commit `b4cc636` was pushed. This section intentionally rechecks the repository state from fresh Git/project observations rather than assuming earlier audit conclusions remain true. No runtime/source behavior files are to be changed in this step; this audit document is the only intended modification.
+Scope: documentation-only repository baseline refresh for the repeated optimization request. This section records the current Git/project observations directly from the current repository state, not from older Architecture audit text. No runtime/source behavior files are to be changed in this step; this audit document is the only intended modification.
 
 ### 15.1 Current branch, remote, HEAD, and initial worktree state
 
@@ -399,23 +401,11 @@ Scope: read-only repository baseline audit for the repeated optimization request
 - Remote:
   - `origin https://github.com/KarasawaYikiho/SuperMedicine.git (fetch)`
   - `origin https://github.com/KarasawaYikiho/SuperMedicine.git (push)`
-- Current HEAD / fresh baseline commit: `b4cc636 chore: align platform agents and clean repository`
-- Recent commit baseline observed:
-  - `b4cc636 chore: align platform agents and clean repository`
-  - `08ee767 feat: add workspace research tools and TUI workflows`
-  - `2815703 fix: harden Windows compatibility and packaging`
-  - `9f59ff4 ci: harden Windows pytest temp handling`
-  - `274839f ci: isolate pytest temp files on Windows`
-  - `5ce638e chore: prepare Beta0.2.0 release candidate`
-  - `d855e6b feat: enable manifest plugin execution paths`
-  - `4ade2ca chore: align release readiness and repository hygiene`
-  - `7a1b8ea refactor: rename cli.py→Cli.py, install.py→Install.py (capitalize entry scripts)`
-  - `9c90b49 chore: remove unused format_authors imports from citation formatters`
-- Initial tracked/staged/untracked state before this audit edit:
+- Current HEAD / fresh baseline commit: `0fe238b5adc72ede496f6d3e34f1cb776bf8c05a`
+- Current HEAD summary: `0fe238b fix: disable setup-python pip cache for CI`
+- Current tracked/staged/untracked state before this documentation-only refresh:
   - `git status --short --branch` reported only `## master...origin/master`; no modified, staged, deleted, renamed, or untracked non-ignored files were shown.
-  - `git diff --stat` and `git diff --cached --stat` showed no file-change summary before this audit edit.
-  - `git ls-files --others --exclude-standard` reported no untracked non-ignored files; it did emit `warning: could not open directory '.pytest_cache/': Permission denied`.
-  - `Architecture/RepositoryOptimizationAudit.md` is tracked at mode `100644` and was the only intended file to update for this step.
+  - `Architecture/RepositoryOptimizationAudit.md` is tracked at mode `100644` and is the only intended file to update for this step.
 
 ### 15.2 Project type, major structure, and discovery-sensitive entry points
 
@@ -452,7 +442,7 @@ Commands inventoried from `pyproject.toml`, CI, and documentation for later Test
 - Documented direct local test command: `pytest tests/ -v`.
 - Wheel smoke/build gate: `python -m pip wheel . --no-deps --wheel-dir <temp-wheel-dir>`.
 - Source distribution smoke/build gate: `python -m build --sdist --outdir dist`.
-- Optional type command availability: `mypy` is present in the `dev` optional dependency set and `[tool.mypy]` configuration exists; current CI file does not define a separate mypy gate.
+- Type gate: `python -m mypy . --cache-dir <temp-mypy-cache>`.
 - CLI smoke commands documented for later verification: `python Install.py --init`, `python Cli.py status`, `python Cli.py run "..."`, `supermedicine status`, `supermedicine init`, `supermedicine run ...`, workspace/paper/experience commands, and `supermedicine tui`.
 
 ### 15.4 Tracked, untracked, ignored, and generated artifact observations
@@ -471,6 +461,40 @@ Commands inventoried from `pyproject.toml`, CI, and documentation for later Test
   - Treat `.pytest_cache/` permission denial as a boundary to document and skip rather than force.
   - Preserve `Planning/` unless a later step explicitly confirms it is disposable local-only material.
   - Do not mix generated-artifact cleanup with source/runtime behavior changes.
+
+### 15.4.1 Complete tracked Markdown inventory at current baseline
+
+The current output of `git ls-files "*.md"` contains 29 tracked Markdown files:
+
+- `ARCHITECTURE.md`
+- `Architecture/ExecutionRoadmap.md`
+- `Architecture/OptimizationAudit.md`
+- `Architecture/PhaseImplementationPlan.md`
+- `Architecture/PlatformIntegrationAudit.md`
+- `Architecture/RepositoryOptimizationAudit.md`
+- `Architecture/WorkspaceTuiRagGuide.md`
+- `CHANGELOG.md`
+- `CONTRIBUTING.md`
+- `INSTALL.md`
+- `README.md`
+- `SECURITY.md`
+- `adapters/claude_code/SKILL.md`
+- `adapters/opencode/agents/alpha-analyst.md`
+- `adapters/opencode/agents/beta-reviewer.md`
+- `adapters/opencode/agents/delta-orchestrator.md`
+- `adapters/opencode/agents/gamma-writer.md`
+- `adapters/opencode/agents/supermedicine.md`
+- `adapters/opencode/skills/harness-monitor.md`
+- `adapters/opencode/skills/medical-citation.md`
+- `adapters/opencode/skills/medical-writing.md`
+- `adapters/opencode/skills/python-stats.md`
+- `adapters/opencode/skills/r-survival.md`
+- `adapters/opencode/skills/rag-query.md`
+- `plugins/rag/references/provider-interface.md`
+- `plugins/standards/medical_writing/references/consort-checklist.md`
+- `plugins/standards/medical_writing/references/prisma-checklist.md`
+- `plugins/standards/medical_writing/references/stard-checklist.md`
+- `plugins/standards/medical_writing/references/strobe-checklist.md`
 
 ### 15.5 Hard no-go semantic preservation boundaries for the repeated pass
 
@@ -491,8 +515,8 @@ Absolute priority: do not change existing functionality or code meaning, even wh
 
 ### 15.6 Repeated-pass baseline notes
 
-- This is a repeated optimization pass after prior commit/push `b4cc636`; prior audit findings are useful history but are not sufficient authority for new edits.
-- The fresh initial state was clean for tracked and non-ignored untracked files; only ignored/generated/local artifacts were observed before this audit edit.
+- This is a repeated optimization baseline refresh at commit `0fe238b5adc72ede496f6d3e34f1cb776bf8c05a`; prior audit findings are useful history but are not sufficient authority for new edits.
+- The current initial state was clean for tracked and non-ignored untracked files; only ignored/generated/local artifacts were observed before this audit edit.
 - The prior generated-artifact cleanup conclusion must be rechecked because caches and runtime artifacts have reappeared after later activity.
 - The previous naming/capitalization conclusion remains a high-risk area to revalidate rather than assume: Python imports, setuptools/pytest discovery, plugin/platform manifests, and Windows case-only rename behavior make most path capitalization changes unsafe.
 - Any later intended changes should keep the repository clean, avoid runtime/source behavior changes, and be committed/pushed only after Brain/Tester verification confirms the planned scope.
@@ -712,3 +736,173 @@ Semantic-preservation confirmation:
 - Documentation changes in this step were limited to this audit trail and only record cleanup/diff-review evidence; they do not alter documented commands, runtime behavior, platform contracts, package metadata, permissions, tests, or source semantics.
 
 Step 9 conclusion: final repeated-pass diff scope is intentionally restricted to `Architecture/RepositoryOptimizationAudit.md`. Accessible regenerated artifacts were cleaned or confirmed absent, inaccessible `.pytest_cache/` and ignored `Planning/` content were preserved, and no runtime/source/config/test/manifest semantics changed.
+
+## 23. Step 2 Markdown rewrite and deduplication strategy
+
+Date: 2026-05-27
+
+Scope: strategy-only pass over the 29 tracked Markdown files listed in section 15.4.1. This section defines the concrete rewrite and deduplication rules for a later Markdown-only pass. No code/runtime files, configuration files, manifests, tests, package metadata, generated artifacts, staging, commit, push, tag, release, publish, or upload actions are part of this strategy step.
+
+### 23.1 Rewrite goal and preservation rule
+
+The goal is conservative Markdown prose cleanup while preserving every original functional meaning, warning, command, identifier, platform contract, checklist item, and audit trace. The later rewrite pass should prefer the smallest local text edit that improves consistency or removes provably redundant prose. If a phrase is ambiguous, consumer-facing, or possibly asserted by tests/platform tooling, leave it unchanged and record the skip rather than normalize it.
+
+### 23.2 Forbidden transformations
+
+Do not alter any of the following during Markdown rewriting or deduplication:
+
+- Fenced code blocks and inline code literals, including commands, Python examples, JSON/YAML/TOML snippets, Mermaid diagrams, shell paths, and API examples.
+- Frontmatter keys or values in adapter/agent/skill Markdown, including `name`, `description`, `agent_id`, `user_facing`, `internal_role_context`, `role`, and `state_machine_stage`.
+- Filenames, path literals, import paths, module names, package names, plugin paths, manifest paths, policy paths, workspace paths, and anchor targets/links.
+- CLI commands, options, positional arguments, placeholders, environment variables, and console-script names, including `supermedicine`, `python Cli.py`, `python Install.py`, `--workspace`, `--confirm`, `--confirm-enrich`, `--params-json`, `--params-file`, and `PATH`.
+- Package names, dependency names, platform names, manifest IDs, plugin/action IDs, tool IDs, API names, method/function/class names, result keys, metadata labels, semantic status labels, version labels, release labels, and test/quality command text.
+- Medical reporting checklist item wording, citation/reference text, standard names, acronyms, item numbers, table column semantics, and clinical/statistical boundary disclaimers.
+- Audit evidence, historical findings, verification result numbers, branch/commit/version observations, and no-go boundary statements unless the rewrite is additive navigation or explicitly preserves the full evidence nearby.
+- Any capitalization change that would touch code identifiers, platform-required names, package names, command syntax, semantic labels, or established acronyms.
+
+### 23.3 Safe transformations
+
+Allowed transformations are documentation-only and limited to prose outside protected literals:
+
+- Apply Independent English Word Title Case where safe in prose headings and short prose labels, for example changing a purely descriptive heading such as "Core standalone boundary" to "Core Standalone Boundary" only when no link anchor compatibility or semantic label is at risk.
+- Improve sentence casing, punctuation, and wording in ordinary explanatory prose without changing the described behavior, support status, limitation, warning, or audience.
+- Convert duplicate explanatory prose into a short summary plus an existing local link only when the target file remains self-contained enough for its audience and no command/warning/example is removed.
+- Add navigation/index cross-links to reduce repeated explanation without deleting authoritative audit evidence.
+- Standardize terminology in prose only when already established by the repository, for example "Standalone Python Core", "Optional Platform Add-on", "Permission Engine", "Chinese TUI", and "Workspace"; do not force these into code/manifest literals.
+- Leave mixed Chinese/English role text intact where it identifies a role, UI label, or platform-facing description.
+
+### 23.4 Per-file rewrite categories
+
+| Category | Files | Strategy |
+| --- | --- | --- |
+| User-facing entry docs | `README.md`, `INSTALL.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md` | Keep standalone readability. Safe prose Title Case is allowed in headings and bullets, but command blocks, links, anchors, version labels, quality gates, and troubleshooting text are protected. Dedup should prefer cross-links, not removal of essential quick-start/install/security context. |
+| Architecture/current design docs | `ARCHITECTURE.md`, `Architecture/ExecutionRoadmap.md`, `Architecture/PhaseImplementationPlan.md`, `Architecture/WorkspaceTuiRagGuide.md` | Preserve architecture diagrams, Mermaid blocks, path references, CLI/API names, and compatibility invariants. Safe cleanup is limited to prose headings/labels and navigation. Do not collapse roadmap/baseline/guide content unless each document keeps its own purpose clear. |
+| Audit/history docs | `Architecture/OptimizationAudit.md`, `Architecture/PlatformIntegrationAudit.md`, `Architecture/RepositoryOptimizationAudit.md` | Treat as evidence records. Add indexes or compact summaries only if full findings remain available. Avoid deleting repeated no-go rules, observations, verification evidence, or historical remediation notes because local audit traceability is the file purpose. |
+| OpenCode agent docs | `adapters/opencode/agents/alpha-analyst.md`, `adapters/opencode/agents/beta-reviewer.md`, `adapters/opencode/agents/gamma-writer.md`, `adapters/opencode/agents/delta-orchestrator.md`, `adapters/opencode/agents/supermedicine.md` | Frontmatter and role/safety positioning are platform-facing and must remain local. Do not deduplicate repeated optional-add-on/internal-role disclaimers across files. Prose edits are allowed only outside frontmatter/code blocks and only when each file remains independently installable/readable. |
+| Platform skill docs | `adapters/claude_code/SKILL.md`, `adapters/opencode/skills/harness-monitor.md`, `adapters/opencode/skills/medical-citation.md`, `adapters/opencode/skills/medical-writing.md`, `adapters/opencode/skills/python-stats.md`, `adapters/opencode/skills/r-survival.md`, `adapters/opencode/skills/rag-query.md` | Preserve frontmatter, trigger language, usage examples, action IDs, imports, and medical/statistical boundary disclaimers. Repeated disclaimers are intentional because skills are consumed independently. Safe prose cleanup may improve ordinary descriptions but must not weaken standalone safety context. |
+| Plugin reference docs | `plugins/rag/references/provider-interface.md`, `plugins/standards/medical_writing/references/consort-checklist.md`, `plugins/standards/medical_writing/references/prisma-checklist.md`, `plugins/standards/medical_writing/references/stard-checklist.md`, `plugins/standards/medical_writing/references/strobe-checklist.md` | Treat as source references. Do not rewrite checklist rows, item numbers, standard names, references, or interface signatures. Safe edits are limited to headings or brief surrounding prose when not changing checklist meaning. Do not merge checklist files. |
+
+### 23.5 Deduplication rules
+
+Safe to reduce only with local review:
+
+- Installation prose duplicated between `README.md` and `INSTALL.md`: keep README as quick-start and INSTALL as detailed guide. A later pass may shorten README explanations and link to INSTALL, but must retain at least one working quick-start path in README and full standalone install detail in INSTALL.
+- Validation/quality-gate prose repeated across `README.md`, `CONTRIBUTING.md`, and audit files: keep canonical user guidance in README/CONTRIBUTING and historical verification evidence in audits. Reduce only by cross-linking, not by removing command examples that users need.
+- Adapter descriptions repeated across `README.md`, `INSTALL.md`, `ARCHITECTURE.md`, `Architecture/PlatformIntegrationAudit.md`, and adapter skill/agent files: keep user-facing summaries in README/INSTALL, design detail in ARCHITECTURE, audit evidence in PlatformIntegrationAudit, and standalone platform context in adapter files. Cross-link rather than centralize away.
+- Architecture summaries repeated across `ARCHITECTURE.md`, roadmap, phase plan, workspace guide, and audits: keep each file's local framing. Use navigation/index additions if needed; do not delete compatibility invariants or completed-roadmap context.
+- Repeated medical/statistical boundary language across skill docs and references: generally do not reduce because each file is independently consumed and safety context must travel with the file.
+
+Must remain duplicated:
+
+- OpenCode internal-role disclaimers in each agent file.
+- Skill frontmatter, trigger/capability descriptions, and safety disclaimers in each skill file.
+- Medical checklist structure and reference sections across separate CONSORT, STROBE, PRISMA, and STARD files.
+- Command examples necessary for standalone README/INSTALL/skill usability.
+- Audit no-go boundaries and historical evidence in audit documents.
+- Manifest/path/action/API names repeated for clarity in docs and tests.
+
+### 23.6 Exact verification approach for the later rewrite pass
+
+Verification should be performed after the Markdown rewrite by Tester, not by the strategy writer. The expected verification approach is:
+
+1. Confirm Git diff scope is Markdown-only and includes no runtime/source/config/test/manifest/package/generated files other than the intended Markdown files.
+2. Confirm the tracked Markdown inventory remains the same 29 files unless a later plan explicitly authorizes a Markdown file add/delete/rename.
+3. Inspect `git diff --word-diff` or equivalent for protected literals and confirm no fenced code block, inline command/path/import/API/action ID/frontmatter value/checklist item/reference text was changed unintentionally.
+4. Check Markdown links/anchors affected by heading Title Case changes; if anchor stability is uncertain, either preserve the original heading text or add an explicit stable anchor strategy in that later plan.
+5. Re-run repository hygiene and Markdown-sensitive tests selected by Tester, especially tests that assert docs/manifests/adapter resources, without using this strategy section as proof of correctness.
+6. Review semantic preservation manually for every dedup deletion: each removed paragraph must have an equivalent retained source, local context must remain clear, and standalone files must still explain their own install/safety/platform boundaries.
+7. Confirm final diff contains no generated artifact churn and no line-ending-only rewrite of unrelated Markdown.
+
+### 23.7 Step 2 strategy conclusion
+
+The later Markdown rewrite should be conservative, additive where possible, and biased toward preserving standalone documentation over aggressive deduplication. Title Case normalization is safe only in ordinary prose/headings outside protected literals and must be skipped whenever it could affect anchors, identifiers, commands, paths, package/API/action names, semantic labels, frontmatter, or platform-required wording. The main deduplication mechanism should be cross-linking and summarization, not deletion of self-contained install, validation, adapter, architecture, audit, skill, or checklist context.
+
+## 24. Step 3 Markdown Rewrite Execution Notes
+
+Date: 2026-05-27
+
+Scope: Markdown-only follow-up to the Step 2 strategy. The rewrite touches the 29
+tracked Markdown files only and focuses on navigation, concise summaries,
+terminology consistency, and safe heading/prose cleanup. Runtime/source files,
+configuration files, manifests, tests, package metadata, generated artifacts,
+staging, commit, push, tag, release, publish, and upload actions remain outside
+scope.
+
+Execution approach:
+
+- Added short orientation or cross-reference summaries to user-facing,
+  architecture, audit, adapter, skill, and plugin-reference Markdown files so
+  repeated long explanations can point readers to the canonical detailed guide
+  without removing each file's standalone safety/context purpose.
+- Applied safe Title Case only to ordinary prose headings where no protected
+  literal, link target, code identifier, manifest value, platform-required name,
+  checklist wording, or command syntax was changed.
+- Preserved frontmatter keys/values in adapter and skill documents, fenced code
+  examples, inline commands and paths, plugin/action/tool IDs, API names,
+  checklist item rows, references, verification evidence, and historical audit
+  observations.
+- Kept duplicated safety disclaimers local in platform agent/skill and checklist
+  reference documents because those files may be consumed independently.
+- Reduced one safe repeated heading in the workspace guide by keeping the actual
+  `Paper Import and Metadata` section where its content begins.
+
+Step 3 conclusion: the Markdown rewrite is intentionally conservative and uses
+summary/cross-reference additions as the main deduplication mechanism. The audit
+record, platform boundaries, medical/statistical disclaimers, and protected
+identifiers remain local where standalone consumption requires them.
+
+## 25. Step 4 File and Directory Naming Normalization Review
+
+Date: 2026-05-27
+
+Scope: repository path and reference review after the Markdown rewrite. This pass
+looked for safe file or directory capitalization changes under the user's
+independent-word initial-capitalization preference, with functionality
+preservation taking absolute priority.
+
+Result:
+
+- Renames performed: none.
+- Reference synchronization performed: none, because no path rename was made.
+- Safe capitalization rename candidates found: none.
+
+Skipped risky rename candidates:
+
+- Python entry modules `Cli.py` and `Install.py` remain unchanged because they are
+  public/documented entry points and are referenced by packaging metadata,
+  commands, documentation, and tests.
+- Python packages, modules, and subpackages under `core/**`, `permission/**`,
+  `agents/**`, `plugins/**`, and `adapters/**` remain unchanged because changing
+  capitalization would alter import paths, package discovery, plugin discovery,
+  package data paths, or adapter loading behavior.
+- Plugin manifests and platform manifests, including `plugins/**/plugin.yaml`,
+  `adapters/opencode/plugin.json`, and `install.json`, remain unchanged because
+  their names and paths may be loaded literally by tooling, tests, packaging, or
+  platform adapters.
+- Adapter platform resources under `adapters/opencode/**` and
+  `adapters/claude_code/**`, including agent and skill Markdown filenames, remain
+  unchanged because filenames and directories can function as platform-facing
+  identifiers or installation targets.
+- Tests under `tests/**` remain unchanged because pytest discovery conventions,
+  path literals, and test imports depend on the current lowercase `tests/` tree
+  and `test_*.py` names.
+- Package data and runtime/configuration paths such as
+  `permission/default_policy.yaml`, `.supermedicine/**`, `.github/workflows/**`,
+  `.gitignore`, `pyproject.toml`, and `requirements.txt` remain unchanged because
+  ecosystem tooling and runtime discovery expect those conventional names.
+- Conventional repository metadata files `README.md`, `INSTALL.md`,
+  `ARCHITECTURE.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`, and
+  `LICENSE` remain unchanged because their uppercase forms are intentional
+  ecosystem conventions and because renaming them could break documentation links
+  or repository presentation.
+- Documentation paths under `Architecture/**` remain unchanged because the current
+  mixed-case directory is already referenced throughout the audit trail and a
+  case-only or title-case reshaping would create unnecessary Windows/Git and link
+  synchronization risk.
+
+Rationale: every apparent capitalization opportunity is coupled to imports,
+entry points, manifests, package data, platform discovery, test discovery,
+runtime configuration, documentation links, repository hosting conventions, or
+case-only rename behavior on Windows. Since no candidate was demonstrably
+non-functional and safe, the conservative outcome is to perform no rename and
+avoid reference churn.

@@ -2,6 +2,10 @@
 
 PRISMA (Preferred Reporting Items for Systematic Reviews and Meta-Analyses) provides evidence-based minimum standards for reporting systematic reviews and meta-analyses.
 
+This reference preserves checklist item wording for implementation and manual
+review. Do not treat checklist completion as clinical, regulatory, or evidence
+quality validation.
+
 ## Checklist Items
 
 | No. | Section | Item | Description |

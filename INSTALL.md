@@ -1,5 +1,9 @@
 # SuperMedicine Installation Guide
 
+This guide is the detailed installation reference. For a shorter orientation,
+start with [README.md](README.md); for optional adapter design boundaries, see
+[ARCHITECTURE.md](ARCHITECTURE.md#layer-5-platform-adapters-adapters).
+
 ## Prerequisites
 
 | Requirement | Version | Notes |

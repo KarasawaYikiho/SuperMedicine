@@ -2,16 +2,22 @@
 
 This documentation-only artifact records the Step 1 optimization audit so it can be reviewed and verified from the repository workspace.
 
-## Branch / remote / status summary
+This file is an evidence record. Current user-facing installation, architecture,
+and security guidance lives in [../README.md](../README.md),
+[../INSTALL.md](../INSTALL.md), [../ARCHITECTURE.md](../ARCHITECTURE.md), and
+[../SECURITY.md](../SECURITY.md); repeated operational details are therefore kept
+brief here unless needed for audit traceability.
+
+## Branch / Remote / Status Summary
 
 - Working directory: `D:\GIT\SuperMedicine`
 - Branch summary from `git status --short --branch` before creating this report artifact: `master...origin/master`
 - The workspace already contained modified and untracked files before this report was created.
 - No staging area, commit, push, tag, release, publish, or upload action was performed as part of this audit step.
 
-## Categorized modified / untracked files
+## Categorized Modified / Untracked Files
 
-### Modified tracked documentation / metadata files
+### Modified Tracked Documentation / Metadata Files
 
 - `ARCHITECTURE.md`
 - `Architecture/ExecutionRoadmap.md`
@@ -19,19 +25,19 @@ This documentation-only artifact records the Step 1 optimization audit so it can
 - `SECURITY.md`
 - `pyproject.toml`
 
-### Modified tracked application / plugin files
+### Modified Tracked Application / Plugin Files
 
 - `Cli.py`
 - `core/kernel.py`
 - `plugins/rag/main.py`
 
-### Untracked architecture / documentation files
+### Untracked Architecture / Documentation Files
 
 - `Architecture/PhaseImplementationPlan.md`
 - `Architecture/WorkspaceTuiRagGuide.md`
 - `Architecture/OptimizationAudit.md` — created by this audit artifact step.
 
-### Untracked core implementation files / directories
+### Untracked Core Implementation Files / Directories
 
 - `core/experience.py`
 - `core/operation_guard.py`
@@ -41,7 +47,7 @@ This documentation-only artifact records the Step 1 optimization audit so it can
 - `core/workspace.py`
 - `core/workspace_tools.py`
 
-### Untracked tests
+### Untracked Tests
 
 - `tests/test_backward_compatibility.py`
 - `tests/test_experience_cli.py`
@@ -61,7 +67,7 @@ This documentation-only artifact records the Step 1 optimization audit so it can
 - `tests/test_workspace_cli.py`
 - `tests/test_workspace_tools.py`
 
-## Generated artifact candidates / forbidden commit candidates
+## Generated Artifact Candidates / Forbidden Commit Candidates
 
 The following paths are candidates for review as generated or forbidden-to-commit artifacts unless a later review confirms they are intentional source artifacts:
 
@@ -71,7 +77,7 @@ The following paths are candidates for review as generated or forbidden-to-commi
 
 No cleanup, deletion, staging, or commit action was taken for these candidates in this audit step.
 
-## Protected semantics / no-go list
+## Protected Semantics / No-Go List
 
 The following semantics are protected during the optimization work and must not be changed accidentally:
 

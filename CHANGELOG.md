@@ -5,7 +5,13 @@ All notable changes to SuperMedicine will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Beta0.3.0] — release-ready
+Release notes intentionally preserve public labels, package metadata labels, and
+verification evidence exactly as recorded. Installation and architecture details
+are summarized here only when they affect a release; see [README.md](README.md),
+[INSTALL.md](INSTALL.md), and [ARCHITECTURE.md](ARCHITECTURE.md) for current user
+guidance.
+
+## [Beta0.3.0] — Release-Ready
 
 ### Added
 - Formal optional R/rpy2 backend support for `r-survival` Kaplan-Meier,
@@ -26,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `requirements.txt` synced with `pyproject.toml` core dependencies (added
   `rich>=13.7,<15` and `textual>=0.79,<2`).
 
-### Release readiness
+### Release Readiness
 - Set the GitHub/release-ready label to `Beta0.3.0` without creating a tag,
   release, publish, or upload.
 - Audited Python packaging metadata for the same label; packaging validation
@@ -41,7 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0-beta] — 2026-05-22
 
-### Release readiness
+### Release Readiness
 - Aligned CI/local quality gate around pytest, ruff, and a dependency-light packaging smoke check.
 - Documented final regression and release checklist covering permissions, CLI, plugins, Claude adapter, RAG, prototype medical statistics boundaries, medical writing/citation constraints, checkpoint/orchestration, security/privacy, and Git upload hygiene.
 

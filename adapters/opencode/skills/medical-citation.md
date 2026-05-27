@@ -10,6 +10,10 @@ Citation output is deterministic formatting only; citations are not generated wh
 the source is missing, unknown, or invalid, and all output requires human expert
 review before research, regulatory, or clinical use.
 
+This skill keeps citation boundaries local for optional OpenCode consumption;
+project-wide installation and architecture details are documented in the root
+README and installation guide.
+
 ## Supported Formats
 
 | Format | Style | Common In |

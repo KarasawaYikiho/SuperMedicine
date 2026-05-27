@@ -2,6 +2,11 @@
 
 This document records the current SuperMedicine architecture and the completed execution roadmap state requested by the user. The implementation roadmap is complete at Step 13/13 with final verification passed; Steps 1-13 are historical completion markers, not pending work.
 
+For current user commands, use [../README.md](../README.md) and
+[../INSTALL.md](../INSTALL.md). For detailed component responsibilities, use
+[../ARCHITECTURE.md](../ARCHITECTURE.md). This roadmap intentionally keeps only
+completion status and release-candidate notes.
+
 ## Current Architecture
 
 ```mermaid
@@ -113,7 +118,7 @@ flowchart TD
 - Before any Push, finalization, tag, release, publish, or upload, preserve the final verification requirement: run the project-approved quality gate, perform repository hygiene checks, and resolve required standardization/optimization issues.
 - This rule relaxes Plan-phase overhead only; it does not relax the Push-before-finalization gate.
 
-## Release Candidate State
+## Release-Candidate State
 
 - Release-ready label: `Beta0.3.0`.
 - Python package metadata: `0.3.0b0` is the selected PEP 440 fallback because

@@ -2,6 +2,10 @@
 
 CONSORT (Consolidated Standards of Reporting Trials) 2010 — 随机对照试验报告规范。
 
+This reference preserves checklist item wording for implementation and manual
+review. Do not treat checklist completion as clinical, regulatory, or evidence
+quality validation.
+
 ## Checklist Items
 
 | Section | Item No | Description | Reported |

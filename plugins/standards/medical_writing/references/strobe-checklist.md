@@ -2,6 +2,10 @@
 
 STROBE (Strengthening the Reporting of Observational Studies in Epidemiology) provides reporting guidelines for observational studies, including cohort, case-control, and cross-sectional designs.
 
+This reference preserves checklist item wording for implementation and manual
+review. Do not treat checklist completion as clinical, regulatory, or evidence
+quality validation.
+
 ## Checklist Items
 
 | No. | Section | Item | Description |

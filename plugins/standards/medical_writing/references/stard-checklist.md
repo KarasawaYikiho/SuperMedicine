@@ -2,6 +2,10 @@
 
 STARD (Standards for Reporting Diagnostic Accuracy Studies) provides guidance for transparent and complete reporting of studies that evaluate the accuracy of diagnostic tests.
 
+This reference preserves checklist item wording for implementation and manual
+review. Do not treat checklist completion as clinical, regulatory, or evidence
+quality validation.
+
 ## Checklist Items
 
 | No. | Section | Item | Description |

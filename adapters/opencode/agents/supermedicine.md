@@ -16,6 +16,10 @@ description: |
 > δ-Orchestrator documents are role context only and are not separate platform
 > agents.
 
+Use this file as the platform-visible entry document. The other agent files in
+this directory provide internal role context only and remain independently
+readable for OpenCode installation workflows.
+
 ## Scope
 
 - Prototype/interface-only medical research assistance

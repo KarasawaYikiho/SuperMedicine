@@ -10,7 +10,16 @@ Claude Code are optional add-on entrypoints around the core; they are not Kernel
 initialization requirements. A P0 runtime permission engine enforces code-layer
 policy checks, while prompt-layer helpers provide advisory context generation.
 
-The latest roadmap implementation is complete through Step 13/13. Current user-facing additions include explicit workspace management, workspace-local paper import, experience learning, and a Chinese TUI workbench. Detailed historical and phase notes live in [Architecture/ExecutionRoadmap.md](Architecture/ExecutionRoadmap.md), [Architecture/PhaseImplementationPlan.md](Architecture/PhaseImplementationPlan.md), and [Architecture/WorkspaceTuiRagGuide.md](Architecture/WorkspaceTuiRagGuide.md).
+The latest roadmap implementation is complete through Step 13/13. Current
+user-facing additions include explicit workspace management, workspace-local
+paper import, experience learning, and a Chinese TUI workbench. Historical and
+phase details are maintained in focused architecture documents rather than
+repeated here:
+
+- [ExecutionRoadmap.md](Architecture/ExecutionRoadmap.md) — Completed roadmap state.
+- [PhaseImplementationPlan.md](Architecture/PhaseImplementationPlan.md) — Baseline compatibility map.
+- [WorkspaceTuiRagGuide.md](Architecture/WorkspaceTuiRagGuide.md) — Workspace, TUI, paper, and experience workflows.
+- [PlatformIntegrationAudit.md](Architecture/PlatformIntegrationAudit.md) — Standalone-core and optional-adapter audit evidence.
 
 ## Architecture Diagram
 
@@ -193,7 +202,7 @@ provides:
     description: "..."
 ```
 
-### RAG provider contract
+### RAG Provider Contract
 
 The RAG layer supports local, PubMed, and external database/vector-index
 semantics through `RAGProviderConfig` and `RAGProvider`. Query output is stable:
@@ -205,7 +214,7 @@ Secrets are referenced by environment variable name (`api_key_env`) rather than
 stored in code or repository configuration. `MockExternalVectorStoreProvider`
 provides external-vector-store behavior without requiring a live service.
 
-### Workspace-local papers, experience learning, and TUI
+### Workspace-Local Papers, Experience Learning, and TUI
 
 Paper import and experience learning are workspace-aware support paths layered on
 top of the same permission and path-safety model:
@@ -229,7 +238,7 @@ top of the same permission and path-safety model:
   workspace selection, run/paper/experience flows, and local state visibility.
   TUI recent state is not an implicit default for non-TUI CLI commands.
 
-### Medical statistics boundary
+### Medical Statistics Boundary
 
 `plugins/tools/python_stats` and `plugins/tools/r_survival` currently define a
 minimal, deterministic interface contract for plugin execution and tests. The
@@ -271,7 +280,7 @@ OpenCode, Claude Code, `claude`, or platform configuration directories.
 - Explicit unavailable/error states for missing runtime, timeouts, runtime errors, unsupported tools, and native sub-agent dispatch, with timeout/resource metadata and sensitive-value redaction
 - Current limits: not a full Claude Code sub-agent bridge; native skill loading and native sub-agent dispatch are not claimed as supported
 
-### Core/add-on capability matrix
+### Core/Add-on Capability Matrix
 
 | Capability | Standalone Python core | OpenCode add-on | Claude Code add-on |
 |------------|------------------------|-----------------|--------------------|
@@ -289,7 +298,7 @@ The CLI initializes the Kernel for `init`, `status`, `test`, and `run` paths. Th
 `run` command uses the real component stack rather than a placeholder-only path,
 including plugin discovery and permission-gated execution where applicable.
 
-## Safety and resource metadata
+## Safety and Resource Metadata
 
 High-risk calls use a minimal, dependency-free safety model:
 
@@ -311,7 +320,7 @@ High-risk calls use a minimal, dependency-free safety model:
 - Experience learning rejects raw conversations and separates general method
   storage from workspace-local project details.
 
-## Medical writing and citation constraints
+## Medical Writing and Citation Constraints
 
 Medical writing support provides reporting-checklist and citation-formatting
 constraints only. CONSORT, STROBE, PRISMA, and STARD helpers can identify missing
@@ -319,7 +328,7 @@ checklist items, and AMA/Vancouver helpers format citation strings. These module
 do not validate clinical correctness, evidence quality, or regulatory compliance;
 all manuscript content and references require qualified human review.
 
-## Repository hygiene
+## Repository Hygiene
 
 Git uploads should contain only necessary project files. Do not include `Docs/`,
 `Superpower`, `superpower`, external skill packages, or non-essential generated
@@ -340,7 +349,7 @@ tag, release, publish, or upload, the project-approved final verification,
 quality gate, repository hygiene review, and required optimization/standardization
 must still be completed.
 
-## Quality gate
+## Quality Gate
 
 The minimal CI/local release gate is intentionally dependency-light and is kept
 canonical in [README.md](README.md#local-quality-gate-and-release-checklist).

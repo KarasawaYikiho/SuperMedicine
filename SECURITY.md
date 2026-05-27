@@ -1,5 +1,9 @@
 # Security Policy
 
+This policy records SuperMedicine's security, privacy, and medical-use
+boundaries. Operational setup is covered in [INSTALL.md](INSTALL.md), and the
+architecture-level permission model is described in [ARCHITECTURE.md](ARCHITECTURE.md#layer-2-permission-system-permission).
+
 ## Security Model
 
 SuperMedicine uses a **runtime permission engine plus prompt-context guidance** (P0 priority) to manage security:
@@ -86,7 +90,7 @@ Use `plugins/harness/monitor.py` to analyze audit logs for anomalies.
   workspace/project details; workspace-specific experiences remain under the
   selected workspace and can be viewed, edited, deleted, or exported by the user.
 
-## Safety, Privacy, and Medical Use Boundaries
+## Safety, Privacy, and Medical-Use Boundaries
 
 SuperMedicine is a research-assistance framework, not a clinical decision system.
 Plugin outputs, RAG results, paper metadata, writing checklists, citation

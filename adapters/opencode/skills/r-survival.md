@@ -10,6 +10,10 @@ implementations are prototype/interface test paths only, not production-grade or
 clinical-grade statistics, and require expert review before research, regulatory,
 or clinical use.
 
+This optional OpenCode-facing summary documents the survival-analysis boundary
+locally because the skill may be consumed independently of the full repository
+documentation.
+
 ## Capabilities
 - Kaplan-Meier estimator — survival curve estimation with confidence intervals
 - Log-rank test — compare survival between groups

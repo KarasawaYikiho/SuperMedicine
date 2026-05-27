@@ -10,6 +10,9 @@ outputs are observability and quality-control aids for prototype/interface
 workflows; they do not certify clinical, regulatory, or production readiness and
 require human expert review before operational decisions.
 
+This skill is an optional OpenCode-facing summary. It preserves local capability
+and safety context so it can be consumed without opening the full project README.
+
 ## Capabilities
 
 ### Integration

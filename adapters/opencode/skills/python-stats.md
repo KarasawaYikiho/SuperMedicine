@@ -9,6 +9,9 @@ Statistical analysis toolkit for medical research data. Current implementations
 are prototype/interface test paths only, not production-grade or clinical-grade
 statistics, and require expert review before research, regulatory, or clinical use.
 
+This optional OpenCode-facing summary documents the available prototype actions
+without changing plugin APIs or claiming clinical/statistical certification.
+
 ## Capabilities
 - Descriptive statistics — mean, median, std, quartiles, skewness, kurtosis
 - Student's t-test — independent and paired samples

@@ -1,5 +1,8 @@
 # RAG Provider 实现规范
 
+本文档是 RAG Provider 的最小接口参考。更完整的插件行为、错误结构和安全边界以
+`plugins/rag/interface.py`、`plugins/rag/local_provider.py` 以及项目架构文档为准。
+
 ## 接口要求
 
 实现 `RAGProvider` 抽象基类的三个方法：

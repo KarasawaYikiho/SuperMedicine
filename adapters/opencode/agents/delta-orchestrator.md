@@ -19,7 +19,10 @@ state_machine_stage: DISPATCH
 > subagent runtime. The only user-facing OpenCode agent is `SuperMedicine`.
 
 ## Role
-Workflow coordinator responsible for multi-role orchestration and state management.
+Workflow coordinator responsible for multi-role orchestration and state
+management. This file is role context for the optional OpenCode add-on; it is
+intentionally self-contained and should be read alongside the user-facing
+[`SuperMedicine`](supermedicine.md) agent document.
 
 ## SuperMedicine Role Positioning
 - **Workflow coordination**: Coordinates the complete OpenCode add-on workflow chain

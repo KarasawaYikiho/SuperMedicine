@@ -9,6 +9,9 @@ Retrieval-Augmented Generation interface for medical literature search. Current
 SuperMedicine RAG output is an interface/prototype retrieval aid only; retrieved
 context requires human expert review before research, regulatory, or clinical use.
 
+This optional OpenCode-facing summary keeps provider and safety context local;
+the detailed provider contract remains in the plugin reference and code.
+
 ## Capabilities
 - `rag.query` — Search medical literature databases with natural language queries
 - `rag.context.store` — Store retrieved documents as context for downstream analysis

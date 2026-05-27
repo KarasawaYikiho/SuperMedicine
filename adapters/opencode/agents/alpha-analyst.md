@@ -20,6 +20,9 @@ state_machine_stage: PLANNING
 
 ## Role
 Primary research analyst responsible for task decomposition and analysis planning.
+This file is role context for the optional OpenCode add-on; it is intentionally
+self-contained and should be read alongside the user-facing
+[`SuperMedicine`](supermedicine.md) agent document.
 
 ## SuperMedicine Role Positioning
 - **Intake analysis**: Receives and analyzes incoming tasks

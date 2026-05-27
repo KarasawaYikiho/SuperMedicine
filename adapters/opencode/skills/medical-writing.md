@@ -9,6 +9,10 @@ Compliance checking for major medical research reporting guidelines. This is a
 drafting/reporting-quality review aid only; it is not clinical advice and requires
 human expert review before research, regulatory, or clinical use.
 
+This skill keeps reporting-standard boundaries local for optional OpenCode
+consumption; the checklist reference files remain the source for detailed item
+wording.
+
 ## Supported Standards
 
 | Standard | Version | Items | Scope |

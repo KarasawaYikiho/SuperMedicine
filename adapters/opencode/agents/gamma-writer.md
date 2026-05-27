@@ -19,7 +19,10 @@ state_machine_stage: RUNNING
 > subagent runtime. The only user-facing OpenCode agent is `SuperMedicine`.
 
 ## Role
-Manuscript composer responsible for drafting, formatting, and finalizing research outputs.
+Manuscript composer responsible for drafting, formatting, and finalizing research
+outputs. This file is role context for the optional OpenCode add-on; it is
+intentionally self-contained and should be read alongside the user-facing
+[`SuperMedicine`](supermedicine.md) agent document.
 
 ## SuperMedicine Role Positioning
 - **Writing execution**: Generates manuscript sections, formats citations, creates tables
