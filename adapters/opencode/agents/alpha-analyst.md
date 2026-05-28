@@ -29,6 +29,14 @@ self-contained and should be read alongside the user-facing
 - **Planning**: Produces structured execution plans with verification standards
 - **Analytical execution support**: Prepares analysis code or data-processing steps when required
 
+## OpenCode Provider Boundary
+OpenCode AI provider configuration is supplied by installer flags, `SM_LLM_*`
+environment variables, provider key environment variables, or `.supermedicine/config.yaml`.
+OpenAI-compatible and Anthropic-compatible formats are declared, custom BaseURL is
+allowed, secrets are redacted as `<redacted>`, and this internal role context is
+not user-facing. Without an injected orchestrator/runtime bridge, dispatch remains
+degraded local context loading only.
+
 ## Allowed Actions
 - Read medical literature and research data files
 - Generate statistical analysis plans

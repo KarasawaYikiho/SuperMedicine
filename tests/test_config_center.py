@@ -54,3 +54,36 @@ class TestConfigCenter:
         cc = ConfigCenter(config_path)
         assert cc.get("app") == "supermedicine"
         assert cc.get("debug") is True
+
+    def test_get_llm_provider_config(self, tmp_path):
+        """验证 LLM Provider 配置可按 provider 加载"""
+        import yaml
+        config_path = tmp_path / "config.yaml"
+        config_path.write_text(yaml.dump({
+            "llm": {
+                "provider": "anthropic",
+                "providers": {
+                    "openai": {
+                        "api_format": "openai",
+                        "base_url": "https://api.openai.com/v1",
+                        "api_key_env": "OPENAI_API_KEY",
+                        "model": "gpt-test",
+                    },
+                    "anthropic": {
+                        "api_format": "anthropic",
+                        "base_url": "https://api.anthropic.com/v1",
+                        "api_key_env": "ANTHROPIC_API_KEY",
+                        "model": "claude-test",
+                    },
+                },
+            }
+        }), encoding="utf-8")
+        cc = ConfigCenter(config_path)
+
+        default_config = cc.get_llm_provider_config()
+        openai_config = cc.get_llm_provider_config("openai")
+
+        assert default_config["provider"] == "anthropic"
+        assert default_config["api_format"] == "anthropic"
+        assert openai_config["provider"] == "openai"
+        assert openai_config["api_format"] == "openai"

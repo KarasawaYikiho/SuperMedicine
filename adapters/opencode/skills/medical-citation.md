@@ -14,6 +14,12 @@ This skill keeps citation boundaries local for optional OpenCode consumption;
 project-wide installation and architecture details are documented in the root
 README and installation guide.
 
+OpenCode AI provider metadata is supplied by installer flags, `SM_LLM_*`
+environment variables, provider key environment variables, or `.supermedicine/config.yaml`.
+The add-on declares OpenAI-compatible and Anthropic-compatible formats, supports
+custom BaseURL values, redacts secrets as `<redacted>`, and degrades without an
+injected orchestrator/runtime bridge. Do not include plaintext API keys in skill docs.
+
 ## Supported Formats
 
 | Format | Style | Common In |

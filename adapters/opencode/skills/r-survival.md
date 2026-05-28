@@ -14,6 +14,12 @@ This optional OpenCode-facing summary documents the survival-analysis boundary
 locally because the skill may be consumed independently of the full repository
 documentation.
 
+OpenCode AI provider metadata is supplied by installer flags, `SM_LLM_*`
+environment variables, provider key environment variables, or `.supermedicine/config.yaml`.
+The add-on declares OpenAI-compatible and Anthropic-compatible formats, supports
+custom BaseURL values, redacts secrets as `<redacted>`, and degrades without an
+injected orchestrator/runtime bridge. Do not include plaintext API keys in skill docs.
+
 ## Capabilities
 - Kaplan-Meier estimator — survival curve estimation with confidence intervals
 - Log-rank test — compare survival between groups

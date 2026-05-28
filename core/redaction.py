@@ -40,7 +40,7 @@ def redact_sensitive(value: Any) -> Any:
         return tuple(redact_sensitive(item) for item in value)
     if isinstance(value, str):
         text = value
-        for pattern in _SENSITIVE_VALUE_PATTERNS:
-            text = pattern.sub(lambda match: f"{match.group(1)}=[REDACTED]", text)
+        text = _SENSITIVE_VALUE_PATTERNS[0].sub(lambda match: f"{match.group(1)}=[REDACTED]", text)
+        text = _SENSITIVE_VALUE_PATTERNS[1].sub(lambda match: f"{match.group(1)}[REDACTED]", text)
         return text
     return value

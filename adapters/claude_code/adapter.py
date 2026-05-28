@@ -4,7 +4,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from adapters.base_adapter import BaseAdapter, redact_sensitive
 from permission.engine import PermissionEngine
@@ -24,6 +24,40 @@ class ClaudeCodeAdapter(BaseAdapter):
     SUPPORTED_TOOLS = {"claude.capabilities", "claude.runtime_status", "claude.invoke"}
     USER_FACING_AGENT = {"name": "SuperMedicine", "id": "supermedicine"}
     INTERNAL_ROLE_CONTEXTS = ["alpha", "beta", "gamma", "delta"]
+    AI_PROVIDER_SUPPORT: ClassVar[dict[str, Any]] = {
+        "config_sources": [
+            "Installer/runtime injection flags: Install.py --provider openai|anthropic --base-url <url> --api-key <secret> --model <model>",
+            "Generic environment variables: SM_LLM_PROVIDER, SM_LLM_BASE_URL, SM_LLM_API_KEY, SM_LLM_MODEL",
+            "Provider environment variables: OPENAI_API_KEY or ANTHROPIC_API_KEY",
+            "Project-local config: .supermedicine/config.yaml llm.provider and llm.providers.*",
+        ],
+        "supported_api_formats": {
+            "openai": {
+                "api_format": "openai",
+                "default_base_url": "https://api.openai.com/v1",
+                "provider_key_env": "OPENAI_API_KEY",
+                "generic_key_env": "SM_LLM_API_KEY",
+                "custom_base_url": True,
+            },
+            "anthropic": {
+                "api_format": "anthropic",
+                "default_base_url": "https://api.anthropic.com/v1",
+                "provider_key_env": "ANTHROPIC_API_KEY",
+                "generic_key_env": "SM_LLM_API_KEY",
+                "custom_base_url": True,
+            },
+        },
+        "custom_base_url": True,
+        "secret_redaction": {
+            "required": True,
+            "redacted_value": "<redacted>",
+            "plain_text_keys_in_manifest_or_docs": False,
+        },
+        "boundary": (
+            "Optional Claude Code platform surface; provider config is supplied by installer/runtime/project config "
+            "for SuperMedicine/Claude Code invocation context and must never be embedded as plaintext keys."
+        ),
+    }
 
     def __init__(
         self,
@@ -58,10 +92,12 @@ class ClaudeCodeAdapter(BaseAdapter):
             "capability_tool": "claude.capabilities",
             "requires_core_runtime": False,
             "requires_local_runtime_for_invoke": True,
+            "ai_provider_support": self.AI_PROVIDER_SUPPORT,
             "limitations": [
                 "Optional minimal add-on; not imported, initialized, or probed by default.",
                 "Invocation requires an explicitly selected adapter and local Claude Code CLI runtime.",
                 "Only SuperMedicine is exposed as a user-facing platform agent; alpha/beta/gamma/delta are internal role contexts only.",
+                "OpenAI/Anthropic provider config is injected by installer/runtime/project config; manifests and docs must not contain plaintext API keys.",
             ],
         }
 
@@ -85,7 +121,11 @@ class ClaudeCodeAdapter(BaseAdapter):
                 "native_subagent_dispatch": False,
                 "native_skill_load": False,
                 "core_runtime_dependency": False,
+                "ai_provider_config_discovery": True,
+                "ai_provider_secret_redaction": True,
+                "custom_ai_provider_base_url": True,
             },
+            "ai_provider": self.AI_PROVIDER_SUPPORT,
             "user_facing_agents": [self.USER_FACING_AGENT],
             "internal_role_contexts": self.INTERNAL_ROLE_CONTEXTS,
             "resource_limits": {
@@ -100,6 +140,7 @@ class ClaudeCodeAdapter(BaseAdapter):
                 "skill_load returns contract metadata; it does not load native Claude Code skills.",
                 "subagent_dispatch reports unavailable until a stable native API exists.",
                 "Claude Code exposes exactly one user-facing agent/surface: SuperMedicine; α/β/γ/δ remain non-user-facing role contexts.",
+                "OpenAI and Anthropic provider settings are read from installer/runtime/project configuration declarations only; no plaintext API keys are stored in adapter docs or manifests.",
             ],
             "runtime": runtime,
         }
@@ -154,9 +195,9 @@ class ClaudeCodeAdapter(BaseAdapter):
             "agent_id": agent_id,
             "status": "unavailable",
             "platform": self.platform_name,
-            "task": task,
+            "task": redact_sensitive(task),
             "error": "Native Claude Code sub-agent dispatch is not available in this minimal adapter.",
-            "capabilities": self.capabilities()["features"],
+            "capabilities": redact_sensitive(self.capabilities()["features"]),
             "user_facing": False,
             "internal_role_context": agent_id in self.INTERNAL_ROLE_CONTEXTS,
         }
@@ -245,6 +286,13 @@ class ClaudeCodeAdapter(BaseAdapter):
             "command_path": command_path,
             "required_for_core": False,
             "unavailable_is_core_failure": False,
+            "ai_provider_configured": {
+                "supported_api_formats": sorted(self.AI_PROVIDER_SUPPORT["supported_api_formats"].keys()),
+                "config_sources": self.AI_PROVIDER_SUPPORT["config_sources"],
+                "secret_redaction_required": self.AI_PROVIDER_SUPPORT["secret_redaction"]["required"],
+                "plaintext_api_keys_in_manifest_or_docs": self.AI_PROVIDER_SUPPORT["secret_redaction"]["plain_text_keys_in_manifest_or_docs"],
+                "custom_base_url": self.AI_PROVIDER_SUPPORT["custom_base_url"],
+            },
         }
 
     def _permission_denied(self, agent_id: str, action: str, resource: str) -> dict[str, Any] | None:

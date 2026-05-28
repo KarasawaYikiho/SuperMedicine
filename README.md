@@ -40,6 +40,7 @@ detail, see [INSTALL.md](INSTALL.md); for system design, see
   - [Optional: R Survival Backend](#optional-r-survival-backend)
   - [Optional: Development Tools](#optional-development-tools)
 - [Quick Start](#quick-start)
+- [LLM Provider Configuration](#llm-provider-configuration)
 - [CLI Reference](#cli-reference)
   - [Core Commands](#core-commands)
   - [Workspace Commands](#workspace-commands)
@@ -139,6 +140,34 @@ pip install -e .
 python Install.py --init
 ```
 
+To initialize with an LLM provider at the same time, pass OpenAI-compatible or
+Anthropic-compatible settings. Use placeholders or fake keys in shared examples;
+never commit real API keys:
+
+```bash
+# OpenAI-compatible endpoint
+python Install.py --init --provider openai \
+  --base-url https://api.openai.com/v1 \
+  --api-key <OPENAI_API_KEY> \
+  --model gpt-4o-mini
+
+# Anthropic-compatible endpoint
+python Install.py --init --provider anthropic \
+  --base-url https://api.anthropic.com/v1 \
+  --api-key <ANTHROPIC_API_KEY> \
+  --model claude-3-5-sonnet-latest
+```
+
+Instead of `--api-key`, prefer environment variables for private workstations:
+
+```bash
+export SM_LLM_PROVIDER=openai
+export SM_LLM_BASE_URL=https://api.openai.com/v1
+export SM_LLM_MODEL=gpt-4o-mini
+export OPENAI_API_KEY=<OPENAI_API_KEY>
+python Install.py --init
+```
+
 ### PATH Configuration
 
 After `pip install -e .`, the `supermedicine` command is installed as a Python
@@ -202,6 +231,79 @@ supermedicine run "summarize local context" --workspace my-research
 # Launch the interactive TUI
 supermedicine tui
 ```
+
+---
+
+## LLM Provider Configuration
+
+SuperMedicine supports direct OpenAI-compatible and Anthropic-compatible LLM
+configuration through the standalone Python core. OpenCode and Claude Code are
+optional platform surfaces around the same configuration model; they are not
+required to use it.
+
+### Supported formats
+
+| Provider | API format | Default BaseURL | Default key env | Default model |
+|----------|------------|-----------------|-----------------|---------------|
+| `openai` | OpenAI Chat Completions | `https://api.openai.com/v1` | `OPENAI_API_KEY` | `gpt-4o-mini` |
+| `anthropic` | Anthropic Messages | `https://api.anthropic.com/v1` | `ANTHROPIC_API_KEY` | `claude-3-5-sonnet-latest` |
+
+Custom compatible endpoints are supported with `--base-url` or
+`SM_LLM_BASE_URL`. OpenAI-compatible requests post to `/chat/completions` by
+default; Anthropic-compatible requests post to `/messages`.
+
+### Configuration sources
+
+Configuration can be injected in these ways, with examples using fake keys only:
+
+```bash
+# Command-line injection during project initialization
+python Install.py --init --provider openai \
+  --base-url https://api.openai.com/v1 \
+  --api-key <OPENAI_API_KEY> \
+  --model gpt-4o-mini
+
+# Environment-variable injection during initialization
+SM_LLM_PROVIDER=anthropic \
+SM_LLM_BASE_URL=https://api.anthropic.com/v1 \
+SM_LLM_MODEL=claude-3-5-sonnet-latest \
+ANTHROPIC_API_KEY=<ANTHROPIC_API_KEY> \
+python Install.py --init
+
+# Interactive prompt; API key input is hidden
+python Install.py --init --interactive
+```
+
+`Install.py --init` writes local project configuration to
+`.supermedicine/config.yaml`. If an API key is supplied by `--api-key` or
+`SM_LLM_API_KEY`, it can be written to that local file; do not commit that file
+after adding real secrets. Prefer provider environment variables
+(`OPENAI_API_KEY` or `ANTHROPIC_API_KEY`) for real credentials.
+
+### Runtime use and validation
+
+Use `python Cli.py status` or `supermedicine status` to confirm the project is
+initialized. Provider validation is performed when an LLM client is used: missing
+BaseURL, API key, or model returns a structured error such as
+`missing_api_key`; request and HTTP errors are sanitized so known secret values
+are redacted.
+
+Python callers can use the factory directly:
+
+```python
+from core.llm_client import create_llm_client
+
+client = create_llm_client(
+    "openai",
+    api_key="<OPENAI_API_KEY>",
+    base_url="https://api.openai.com/v1",
+    model="gpt-4o-mini",
+)
+```
+
+Never paste real keys into committed source, docs, tests, manifests, issue logs,
+or screenshots. Use placeholders such as `<OPENAI_API_KEY>`,
+`<ANTHROPIC_API_KEY>`, or `<redacted>` in examples.
 
 ---
 
@@ -402,10 +504,14 @@ The OpenCode adapter lives under `adapters/opencode/`. It provides:
    according to your OpenCode installation.
 
 2. The adapter maps declared tools with permission-gated high-risk operations
-   (`bash`, `write`, `edit`, `task`).
+    (`bash`, `write`, `edit`, `task`).
 
-3. Without an injected SuperMedicine orchestrator, the adapter uses local
-   metadata/fallback behavior.
+3. Configure optional OpenAI/Anthropic provider metadata through `Install.py`,
+   `SM_LLM_*`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or project-local
+   `.supermedicine/config.yaml`; never embed real keys in OpenCode files.
+
+4. Without an injected SuperMedicine orchestrator, the adapter uses local
+    metadata/fallback behavior.
 
 #### Capabilities
 
@@ -431,6 +537,12 @@ The Claude Code adapter lives under `adapters/claude_code/`. It provides:
 # Copy skill directory for local Claude Code documentation
 cp -r adapters/claude_code/ ~/.claude/skills/supermedicine/
 ```
+
+Claude Code adapter calls use the same SuperMedicine provider configuration
+boundary as the core: OpenAI-compatible or Anthropic-compatible settings from
+installer flags, `SM_LLM_*`, provider key environment variables, or local project
+config. Missing `claude` on PATH is reported as optional-adapter unavailable,
+not as a core failure.
 
 #### Capabilities
 
@@ -472,7 +584,7 @@ supermedicine/
 │   ├── paper_import/     # Paper import, metadata, enrichment
 │   ├── workspace.py      # Workspace identity and storage
 │   ├── experience.py     # Experience learning store
-│   └── llm_providers/    # LLM provider integrations (OpenRouter)
+│   └── llm_providers/    # OpenAI/Anthropic provider config and HTTP clients
 ├── permission/           # P0 policy, audit, engine, prompt constraints
 ├── agents/               # State machine, checkpoint, orchestrator, base agent
 ├── plugins/
@@ -579,6 +691,8 @@ This installs `textual` as a core dependency.
   denied; bash permission-gated.
 - **RAG Security** — External providers use environment variable references for
   secrets; no hardcoded credentials.
+- **LLM Secrets** — Use environment variables or local private config for API
+  keys. Documentation examples use placeholders only; never commit real keys.
 - **Paper Import** — Copy-only; source files are never moved or uploaded.
 - **Experience Learning** — Raw conversations are not stored; only
   user-confirmed summaries are persisted.

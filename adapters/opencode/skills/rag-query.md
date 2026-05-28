@@ -12,6 +12,12 @@ context requires human expert review before research, regulatory, or clinical us
 This optional OpenCode-facing summary keeps provider and safety context local;
 the detailed provider contract remains in the plugin reference and code.
 
+OpenCode AI provider metadata is supplied by installer flags, `SM_LLM_*`
+environment variables, provider key environment variables, or `.supermedicine/config.yaml`.
+The add-on declares OpenAI-compatible and Anthropic-compatible formats, supports
+custom BaseURL values, redacts secrets as `<redacted>`, and degrades without an
+injected orchestrator/runtime bridge. Do not include plaintext API keys in skill docs.
+
 ## Capabilities
 - `rag.query` — Search medical literature databases with natural language queries
 - `rag.context.store` — Store retrieved documents as context for downstream analysis

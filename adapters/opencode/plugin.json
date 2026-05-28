@@ -18,6 +18,36 @@
     "sandboxed_filesystem_tools": ["read", "write", "edit", "glob", "grep"],
     "unsupported_native_platform_claims": ["native OpenCode subagent runtime without injected orchestrator"]
   },
+  "ai_provider": {
+    "config_sources": [
+      "Install.py --provider openai|anthropic --base-url <url> --api-key <placeholder-or-secret> --model <model>",
+      "SM_LLM_PROVIDER, SM_LLM_BASE_URL, SM_LLM_API_KEY, SM_LLM_MODEL",
+      "OPENAI_API_KEY or ANTHROPIC_API_KEY",
+      ".supermedicine/config.yaml llm.provider and llm.providers.*"
+    ],
+    "supported_api_formats": {
+      "openai": {
+        "api_format": "openai",
+        "default_base_url": "https://api.openai.com/v1",
+        "provider_key_env": "OPENAI_API_KEY",
+        "generic_key_env": "SM_LLM_API_KEY",
+        "custom_base_url": true
+      },
+      "anthropic": {
+        "api_format": "anthropic",
+        "default_base_url": "https://api.anthropic.com/v1",
+        "provider_key_env": "ANTHROPIC_API_KEY",
+        "generic_key_env": "SM_LLM_API_KEY",
+        "custom_base_url": true
+      }
+    },
+    "secret_redaction_required": true,
+    "redacted_value": "<redacted>",
+    "plaintext_api_keys_in_manifest": false,
+    "example_key_policy": "Use non-secret-shaped placeholders such as <OPENAI_API_KEY_PLACEHOLDER> in docs; never commit real API keys.",
+    "degraded_without_orchestrator": true,
+    "visibility": "Only the SuperMedicine user-facing OpenCode agent exposes this provider capability metadata."
+  },
   "install_entry_files": {
     "plugin_manifest": "plugin.json",
     "adapter_module": "adapter.py",
@@ -57,7 +87,13 @@
     "survival_analysis",
     "citation_format",
     "permission_audit",
-    "orchestrator_backed_dispatch"
+    "orchestrator_backed_dispatch",
+    "ai_provider_config_discovery",
+    "openai_api_format",
+    "anthropic_api_format",
+    "custom_ai_provider_base_url",
+    "secret_redaction",
+    "degraded_without_orchestrator"
   ],
   "optional_add_on": true,
   "native_opencode_subagent_runtime": false,
@@ -68,7 +104,20 @@
     "skills_declared": 6,
     "internal_role_contexts_declared": 4,
     "permission_boundary": "Declared tools match OpenCodeAdapter.SUPPORTED_TOOLS; high-risk mutation/execution paths remain policy checked.",
-    "degraded_without_orchestrator": true
+    "degraded_without_orchestrator": true,
+    "ai_provider_config_boundary": "OpenCode reads provider metadata from installer/runtime/project configuration declarations only; manifests and docs contain no plaintext API keys."
+  },
+  "install": {
+    "entry": "Install.py --init",
+    "provider_flags": ["--provider", "--base-url", "--api-key", "--model", "--interactive"],
+    "env": ["SM_LLM_PROVIDER", "SM_LLM_BASE_URL", "SM_LLM_API_KEY", "SM_LLM_MODEL", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"],
+    "log_redaction_required": true
+  },
+  "uninstall": {
+    "entry": "Uninstall.py",
+    "remove_recorded_opencode_artifacts_only": true,
+    "candidate_artifacts": [".opencode/plugin/supermedicine", ".opencode/agents/supermedicine.md", ".opencode/skills/supermedicine"],
+    "ownership_rule": "Remove only installer-recorded or explicitly targeted OpenCode artifacts owned by SuperMedicine; do not delete user-owned global OpenCode configuration."
   },
   "limitations": [
     "The SuperMedicine standalone core does not require OpenCode.",

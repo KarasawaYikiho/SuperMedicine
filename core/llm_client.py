@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Mapping
+
+from core.redaction import redact_sensitive
 
 
 class LLMClient(ABC):
@@ -39,7 +41,7 @@ def create_llm_client(provider: str, **kwargs: Any) -> LLMClient:
     """工厂函数：根据 provider 名称创建 LLMClient 实例
 
     Args:
-        provider: "openrouter" (当前唯一支持)
+        provider: "openai", "anthropic", or legacy "openrouter"
         **kwargs: 传递给具体 Provider 的参数 (api_key, model, etc.)
 
     Returns:
@@ -48,7 +50,20 @@ def create_llm_client(provider: str, **kwargs: Any) -> LLMClient:
     Raises:
         ValueError: 不支持的 provider
     """
-    if provider == "openrouter":
+    config = kwargs.pop("config", None)
+    if isinstance(config, Mapping):
+        merged = dict(config)
+        merged.update(kwargs)
+        kwargs = merged
+
+    normalized_provider = provider.lower()
+    if normalized_provider == "openai":
+        from core.llm_providers.base import OpenAIClient
+        return OpenAIClient(**kwargs)
+    if normalized_provider == "anthropic":
+        from core.llm_providers.base import AnthropicClient
+        return AnthropicClient(**kwargs)
+    if normalized_provider == "openrouter":
         from core.llm_providers.openrouter import OpenRouterClient
         return OpenRouterClient(**kwargs)
-    raise ValueError(f"Unsupported LLM provider: {provider}")
+    raise ValueError(f"Unsupported LLM provider: {redact_sensitive(provider)}")

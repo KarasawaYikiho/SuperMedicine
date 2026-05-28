@@ -35,6 +35,14 @@ local so this optional skill remains self-contained.
 - user-facing Agent/surface: exactly one, `SuperMedicine`
 - internal role contexts: `alpha`, `beta`, `gamma`, and `delta` as
   non-user-facing workflow context only
+- AI provider formats: OpenAI-compatible and Anthropic-compatible
+- provider configuration source: installer/runtime/project configuration only,
+  including `Install.py --provider openai|anthropic --base-url <url>
+  --api-key <placeholder-or-secret> --model <model>`, `SM_LLM_*` variables,
+  `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`, and `.supermedicine/config.yaml`
+- secret handling: API keys must be redacted from logs, manifests, adapter
+  responses, and documentation; this skill document intentionally contains no
+  real plaintext API key examples
 
 ## When to Use
 
@@ -74,6 +82,40 @@ non-user-facing workflow role contexts/capabilities, not separate platform Agent
   `claude.runtime_status`, and `claude.invoke`
 - `claude.invoke` requires the local `claude` command and a successful
   SuperMedicine PermissionEngine decision before subprocess execution
+- OpenAI/Anthropic provider configuration discovery through the same
+  installer-injected SuperMedicine configuration model used by other optional
+  platform surfaces
+- Custom provider BaseURL metadata for OpenAI-compatible and
+  Anthropic-compatible endpoints, with secret redaction required
+
+### AI Provider Configuration Boundary
+
+Claude Code remains an optional platform surface around the standalone
+SuperMedicine core. When a Claude Code invocation path needs LLM provider
+metadata, it must use configuration supplied during SuperMedicine installation
+or runtime setup rather than embedding credentials in adapter files. Supported
+sources are:
+
+- `Install.py --provider openai|anthropic --base-url <url> --api-key <placeholder-or-secret>
+  --model <model>`
+- `SM_LLM_PROVIDER`, `SM_LLM_BASE_URL`, `SM_LLM_API_KEY`, and `SM_LLM_MODEL`
+- `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`
+- `.supermedicine/config.yaml` entries under `llm.provider` and
+  `llm.providers.*`
+
+Supported API formats are OpenAI-compatible and Anthropic-compatible. Custom
+BaseURL values are allowed for compatible endpoints. Adapter capability/status
+metadata may report that these formats and configuration sources are supported,
+but it must not echo plaintext API keys.
+
+Example placeholders, not real credentials:
+
+```bash
+python Install.py --init --provider openai \
+  --base-url https://api.openai.com/v1 \
+  --api-key <OPENAI_API_KEY_PLACEHOLDER> \
+  --model gpt-4o-mini
+```
 
 ### Explicit Limitations
 - No native Claude Code subagent dispatch is implemented.
@@ -81,6 +123,8 @@ non-user-facing workflow role contexts/capabilities, not separate platform Agent
 - No α-Analyst, β-Reviewer, γ-Writer, or δ-Orchestrator platform Agent is declared.
 - The local Claude Code CLI is optional and only required for `claude.invoke`.
 - Missing `claude` on PATH is an adapter-unavailable state, not a SuperMedicine core failure.
+- OpenAI/Anthropic provider configuration support does not make Claude Code a
+  required platform dependency for SuperMedicine core runtime.
 - Core CLI/API/plugin/action IDs and permission semantics are not changed by this
   add-on.
 
@@ -132,6 +176,10 @@ pip install -e ".[dev]"
 python Install.py --init
 python Cli.py status
 ```
+
+For Anthropic-compatible configuration, use `--provider anthropic` with
+`ANTHROPIC_API_KEY` or a fake placeholder such as
+`<ANTHROPIC_API_KEY_PLACEHOLDER>` in examples. Never commit real keys.
 
 ## Quick Start
 

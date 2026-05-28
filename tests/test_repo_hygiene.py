@@ -190,6 +190,10 @@ def test_install_manifest_platform_entries_point_to_existing_adapter_files():
     assert set(platforms["opencode"]["supported_tools"]) == OpenCodeAdapter.SUPPORTED_TOOLS
     assert platforms["claude-code"]["native_skill_loading"] is False
     assert platforms["claude-code"]["native_subagent_runtime"] is False
+    assert set(platforms["claude-code"]["ai_provider"]["supported_api_formats"]) == {"openai", "anthropic"}
+    assert platforms["claude-code"]["ai_provider"]["custom_base_url"] is True
+    assert platforms["claude-code"]["ai_provider"]["secret_redaction_required"] is True
+    assert platforms["claude-code"]["ai_provider"]["plaintext_api_keys_in_manifest"] is False
     assert platforms["opencode"]["native_subagent_runtime"] is False
 
 
@@ -248,6 +252,11 @@ def test_opencode_plugin_declared_entry_skills_and_agents_exist():
     assert FORBIDDEN_PLATFORM_AGENT_NAMES.isdisjoint(user_facing_names)
     assert plugin["install_entry_files"]["single_user_facing_agent"] == "agents/supermedicine.md"
     assert plugin["install_completeness_model"]["single_user_facing_agent"] == "SuperMedicine"
+    assert set(plugin["ai_provider"]["supported_api_formats"]) == {"openai", "anthropic"}
+    assert plugin["ai_provider"]["supported_api_formats"]["openai"]["custom_base_url"] is True
+    assert plugin["ai_provider"]["secret_redaction_required"] is True
+    assert plugin["ai_provider"]["plaintext_api_keys_in_manifest"] is False
+    assert plugin["uninstall"]["remove_recorded_opencode_artifacts_only"] is True
 
     for relative_path in plugin["skills"]:
         declared_path = plugin_dir / relative_path
@@ -265,6 +274,69 @@ def test_opencode_plugin_declared_entry_skills_and_agents_exist():
         content = declared_path.read_text(encoding="utf-8")
         assert "user_facing: false" in content
         assert "internal_role_context: true" in content
+
+
+def test_opencode_adapter_docs_do_not_contain_plaintext_api_key_examples():
+    opencode_dir = REPO_ROOT / "adapters" / "opencode"
+    checked_paths = [opencode_dir / "plugin.json", *sorted((opencode_dir / "agents").glob("*.md")), *sorted((opencode_dir / "skills").glob("*.md"))]
+    forbidden_secret_patterns = [
+        re.compile(r"sk-[A-Za-z0-9_-]{12,}"),
+        re.compile(r"sk-ant-[A-Za-z0-9_-]{12,}"),
+        re.compile(r"api[_-]?key\s*[:=]\s*['\"][^'\"<{][^'\"]+['\"]", re.IGNORECASE),
+    ]
+
+    offenders = []
+    for path in checked_paths:
+        content = path.read_text(encoding="utf-8")
+        if any(pattern.search(content) for pattern in forbidden_secret_patterns):
+            offenders.append(str(path.relative_to(REPO_ROOT)))
+
+    assert offenders == []
+
+
+def test_claude_code_adapter_docs_do_not_contain_plaintext_api_key_examples():
+    claude_code_dir = REPO_ROOT / "adapters" / "claude_code"
+    checked_paths = [claude_code_dir / "adapter.py", claude_code_dir / "SKILL.md", REPO_ROOT / "install.json"]
+    forbidden_secret_patterns = [
+        re.compile(r"sk-[A-Za-z0-9_-]{12,}"),
+        re.compile(r"sk-ant-[A-Za-z0-9_-]{12,}"),
+        re.compile(r"api[_-]?key\s*[:=]\s*['\"][^'\"<{][^'\"]+['\"]", re.IGNORECASE),
+    ]
+
+    offenders = []
+    for path in checked_paths:
+        content = path.read_text(encoding="utf-8")
+        if any(pattern.search(content) for pattern in forbidden_secret_patterns):
+            offenders.append(str(path.relative_to(REPO_ROOT)))
+
+    assert offenders == []
+
+
+def test_repository_docs_and_manifests_do_not_contain_realistic_plaintext_secrets():
+    checked_paths = [
+        REPO_ROOT / "README.md",
+        REPO_ROOT / "CHANGELOG.md",
+        REPO_ROOT / "install.json",
+        REPO_ROOT / "Install.py",
+        REPO_ROOT / "Uninstall.py",
+        REPO_ROOT / ".supermedicine" / "config.yaml",
+        REPO_ROOT / ".supermedicine" / "policies" / "default.yaml",
+    ]
+    forbidden_secret_patterns = [
+        re.compile(r"sk-[A-Za-z0-9_-]{12,}"),
+        re.compile(r"sk-ant-[A-Za-z0-9_-]{12,}"),
+        re.compile(r"(?:api[_-]?key|authorization|token)\s*[:=]\s*['\"][^'\"<{][^'\"]{8,}['\"]", re.IGNORECASE),
+    ]
+
+    offenders = []
+    for path in checked_paths:
+        if not path.exists():
+            continue
+        content = path.read_text(encoding="utf-8")
+        if any(pattern.search(content) for pattern in forbidden_secret_patterns):
+            offenders.append(str(path.relative_to(REPO_ROOT)))
+
+    assert offenders == []
 
 
 def test_platform_adapter_docs_do_not_use_legacy_platform_agent_names():
@@ -348,14 +420,24 @@ def test_opencode_plugin_version_matches_package_version():
 
 
 def test_shebang_lines_are_portable():
-    """Cli.py and Install.py must use portable shebang."""
+    """CLI/install/uninstall entry scripts must use portable shebang."""
     expected = "#!/usr/bin/env python3"
-    for filename in ("Cli.py", "Install.py"):
+    for filename in ("Cli.py", "Install.py", "Uninstall.py"):
         path = REPO_ROOT / filename
         first_line = path.read_text(encoding="utf-8").split("\n")[0]
         assert first_line == expected, (
             f"{filename} first line must be {expected!r}, got {first_line!r}"
         )
+
+
+def test_install_manifest_declares_safe_uninstall_entry():
+    manifest = json.loads((REPO_ROOT / "install.json").read_text(encoding="utf-8"))
+    uninstall = manifest["uninstall"]
+
+    assert uninstall["entry"] == "Uninstall.py"
+    assert uninstall["removes_pip_package"] is False
+    assert uninstall["log_redaction_required"] is True
+    assert "source repository" in uninstall["ownership_rule"]
 
 
 def test_gitignore_excludes_mypy_cache():

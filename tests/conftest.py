@@ -2,9 +2,24 @@
 from __future__ import annotations
 
 from pathlib import Path
+import urllib.request
 
 import pytest
 import yaml
+
+
+@pytest.fixture(autouse=True)
+def block_real_network(monkeypatch):
+    """Prevent accidental real HTTP access from tests.
+
+    Individual tests that intentionally exercise HTTP request construction must
+    monkeypatch ``urllib.request.urlopen`` with a local fake response.
+    """
+
+    def _blocked_urlopen(*args, **kwargs):
+        raise AssertionError("Real network access is forbidden in tests")
+
+    monkeypatch.setattr(urllib.request, "urlopen", _blocked_urlopen)
 
 
 @pytest.fixture

@@ -238,3 +238,166 @@ Follow-up recommendations:
 - Decide whether to keep adapters bundled as optional content in the base package or split them into optional extras/packages with corresponding packaging tests.
 - Add explicit test markers or documented commands for core-only, OpenCode-adapter, Claude-Code-adapter, and full-suite verification.
 - If native platform integration is desired later, implement it as new adapter functionality with tests before changing support claims in user documentation or manifests.
+
+## 8. AI/LLM, Installation, Platform Adapter, and Configuration Boundary Audit
+
+Date: 2026-05-27
+
+Scope: audit-only inventory of the current AI/LLM, installation/configuration,
+OpenCode, Claude Code, permission, documentation, and test contracts. No runtime
+feature implementation was performed, and no real API keys, private endpoints, or
+secrets were added to source, tests, or documentation.
+
+### 8.1 Installation and local configuration contracts
+
+- `install.json` is the agent-readable installation manifest. It declares the
+  standalone core install steps (`git clone`, `pip install -e .`, optional
+  `Install.py --detect`, and `Install.py --init`) plus two optional platform
+  entries: `claude-code` and `opencode`. Both platform entries are marked
+  `optional_add_on: true`, `core_runtime_required: false`, and expose exactly one
+  user-facing surface, `SuperMedicine`; `alpha`, `beta`, `gamma`, and `delta` are
+  internal role contexts only. The manifest points to repository-local adapter
+  files, not user-local `.claude` or `.opencode` configuration directories.
+- `Install.py` keeps `--init` core-only. `init_config(...)` creates
+  `.supermedicine/config.yaml`, `.supermedicine/agents`, `.supermedicine/plugins`,
+  and the canonical permission policy without probing OpenCode, Claude Code, or
+  assistant-platform directories. Platform probing is isolated behind explicit
+  `--detect`, which checks for `~/.claude` and `~/.config/opencode` and returns a
+  platform label only.
+- `.supermedicine/config.yaml` currently contains only bootstrap metadata:
+  project name and `Beta0.3.0` version. It contains no LLM endpoint, BaseURL,
+  OpenAI/Anthropic/OpenRouter key, or private platform configuration.
+- Tracked `.supermedicine/**` is intentionally limited by
+  `tests/test_repo_hygiene.py` to `.supermedicine/config.yaml` and
+  `.supermedicine/policies/default.yaml`; runtime audit logs and checkpoints are
+  treated as ignored/generated artifacts.
+- `README.md`, `INSTALL.md`, and `ARCHITECTURE.md` consistently describe the
+  default setup as standalone Python core installation. OpenCode and Claude Code
+  are documented as optional add-ons and are not prerequisites for installation,
+  `Kernel` initialization, or ordinary CLI use.
+- Uninstall guidance in `INSTALL.md` is core-local: `pip uninstall supermedicine`
+  and removal of `.supermedicine/`; it does not instruct users to remove or alter
+  user-local assistant-platform configuration directories.
+
+### 8.2 LLM provider and secret-boundary contracts
+
+- `core/llm_client.py` defines the abstract `LLMClient` contract with `chat(...)`
+  and `complete(...)` methods returning dictionaries with `content`, `model`, and
+  `usage` fields. The factory `create_llm_client(...)` supports `openai`,
+  `anthropic`, and legacy `openrouter`, and raises `ValueError` for unsupported
+  providers.
+- `core/llm_providers/base.py` implements configured OpenAI-compatible and
+  Anthropic-compatible HTTP clients. `core/llm_providers/config.py` normalizes
+  provider, API format, custom BaseURL, API key or API key environment variable,
+  model, timeout, and headers.
+- Installer defaults are `https://api.openai.com/v1` with `OPENAI_API_KEY` and
+  `gpt-4o-mini`, and `https://api.anthropic.com/v1` with `ANTHROPIC_API_KEY` and
+  `claude-3-5-sonnet-latest`. Custom compatible BaseURL values are supported by
+  installer flags, `SM_LLM_BASE_URL`, and project configuration.
+- `Install.py --init` accepts `--provider openai|anthropic`, `--base-url`,
+  `--api-key`, `--model`, and `--interactive`. It also reads `SM_LLM_PROVIDER`,
+  `SM_LLM_BASE_URL`, `SM_LLM_API_KEY`, `SM_LLM_MODEL`, `OPENAI_API_KEY`, and
+  `ANTHROPIC_API_KEY`. Installer output redacts supplied API keys.
+- OpenRouter remains available as a legacy provider path with
+  `OPENROUTER_API_KEY`; it is not the only LLM provider path.
+- Missing provider values return structured validation errors such as
+  `missing_api_key`, `missing_base_url`, and `missing_model`; request/HTTP errors
+  sanitize known secret values.
+- `tests/test_llm_client.py` uses dummy values such as `test-key` and
+  `test-model` only. It covers default/custom model initialization, missing-key
+  behavior, mocked chat/complete responses, and unsupported provider errors. It
+  does not contain or require real OpenRouter, OpenAI, or Anthropic credentials.
+- Related RAG external-provider contracts use environment-variable references
+  such as `api_key_env`/`SM_RAG_API_KEY` rather than storing secret values in
+  repository configuration.
+
+### 8.3 OpenCode adapter contracts
+
+- `adapters/opencode/adapter.py` implements `OpenCodeAdapter` as an optional
+  add-on. It reports `platform_name == "opencode"`, `optional_add_on: true`, and
+  `core_runtime_dependency: false`.
+- Supported OpenCode tool ids are exactly `bash`, `read`, `write`, `edit`,
+  `glob`, `grep`, `skill`, `task`, and `opencode.capabilities`. High-risk paths
+  are routed through the shared permission and project-root sandbox logic.
+- OpenCode skill loading is local-file loading from the declared skill allowlist:
+  `rag-query.md`, `harness-monitor.md`, `medical-writing.md`,
+  `medical-citation.md`, `python-stats.md`, and `r-survival.md` under
+  `adapters/opencode/skills/`.
+- OpenCode role context files are declared for `alpha`, `beta`, `gamma`, and
+  `delta` under `adapters/opencode/agents/`. They are non-user-facing internal
+  role context only. `adapters/opencode/agents/supermedicine.md` is the single
+  user-facing OpenCode agent document.
+- `OpenCodeAdapter.subagent_dispatch(...)` executes a real SuperMedicine
+  orchestrator dispatch only when an orchestrator/runtime bridge is injected by
+  the caller. Without one, it returns a structured degraded result and explicitly
+  reports that native OpenCode subagent dispatch was not executed.
+- `adapters/opencode/plugin.json` is the OpenCode manifest. It declares the
+  adapter module, plugin entry, one user-facing agent, six skills, four internal
+  role context documents, permission boundaries, and the no-native-runtime-bridge
+  limitation.
+
+### 8.4 Claude Code adapter contracts
+
+- `adapters/claude_code/adapter.py` implements `ClaudeCodeAdapter` as a minimal
+  optional add-on. It reports `platform_name == "claude-code"`, optional status,
+  no core runtime dependency, and no native skill/subagent support.
+- Supported Claude Code tool ids are exactly `claude.capabilities`,
+  `claude.runtime_status`, and `claude.invoke`.
+- `claude.invoke` is a permission-checked, timeout-bounded local CLI invocation
+  path for `claude --print <prompt>` when a local `claude` runtime is available
+  on `PATH`. Missing `claude` is returned as an adapter-unavailable state, not a
+  SuperMedicine core failure.
+- Claude Code adapter responses include structured unavailable, timeout,
+  runtime-error, unsupported-tool, invalid-input, and permission-denied states;
+  sensitive-looking prompt/runtime output is redacted via shared adapter helpers.
+- `adapters/claude_code/SKILL.md` is a Claude Code-facing skill/documentation
+  surface. It documents the manifest entry, supported tools, explicit limitations,
+  one user-facing `SuperMedicine` surface, and internal role contexts. It does not
+  claim native Claude Code skill loading or native subagent dispatch.
+
+### 8.5 Documentation and test coverage contracts
+
+- `README.md` contains user-facing installation, quick start, optional platform
+  add-on setup, capability matrix, testing commands, and safety/security notes.
+  It explicitly states that OpenCode, Claude Code, and other assistant platforms
+  are not prerequisites.
+- `INSTALL.md` is the detailed setup reference. It keeps core installation,
+  optional R support, platform add-ons, safety boundaries, and uninstall guidance
+  separate. It notes that `Install.py --init` creates `.supermedicine/` core
+  configuration only and does not create OpenCode/Claude Code configuration.
+- `ARCHITECTURE.md` documents `core/llm_providers/` as OpenRouter integration,
+  describes secrets as environment-variable references, and frames `adapters/` as
+  optional platform add-ons rather than Kernel requirements.
+- `tests/test_opencode_adapter.py` verifies OpenCode adapter import, capability
+  reporting, single user-facing agent, supported tools, sandbox/permission
+  behavior, skill files, agent files, manifest declarations, and degraded versus
+  orchestrator-backed dispatch behavior.
+- `tests/test_claude_code_adapter.py` verifies Claude Code optional import,
+  capability/runtime reporting, mocked invocation, runtime unavailable behavior,
+  timeout handling, redaction, permission denial before subprocess execution,
+  unsupported tools, unavailable subagent dispatch, and skill-document boundary
+  wording.
+- `tests/test_repo_hygiene.py` enforces repository hygiene around generated
+  artifacts, tracked `.supermedicine/**` limits, external platform config
+  exclusions, install manifest adapter paths, supported tool declarations,
+  single user-facing platform agent, OpenCode manifest resources, and forbidden
+  legacy platform agent names.
+- The audit found no real OpenAI, Anthropic, OpenRouter, or platform API key
+  value written into the inspected source, docs, manifests, config, or tests.
+  Existing test strings such as `test-key`, `secret-key`, and redaction payloads
+  are dummy fixtures used to exercise missing-key and redaction behavior.
+
+### 8.6 Current implementation boundary and follow-up risks
+
+- Current AI/LLM functionality includes direct OpenAI-compatible and
+  Anthropic-compatible provider clients, custom BaseURL configuration, environment
+  variable and installer injection, and legacy OpenRouter support. Documentation
+  examples must continue to use placeholders only.
+- Platform adapters are packaged in the repository tree and tested in the default
+  suite, but their docs and manifests label them optional. A future packaging or
+  test-marker split may improve core-only versus adapter-only diagnostics without
+  changing behavior.
+- Any future support for additional provider formats, native OpenCode runtime
+  dispatch, or native Claude Code skill/subagent loading must be added as new
+  functionality with tests before updating manifests or user-facing support
+  claims.

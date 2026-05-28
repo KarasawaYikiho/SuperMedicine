@@ -13,6 +13,12 @@ This skill keeps reporting-standard boundaries local for optional OpenCode
 consumption; the checklist reference files remain the source for detailed item
 wording.
 
+OpenCode AI provider metadata is supplied by installer flags, `SM_LLM_*`
+environment variables, provider key environment variables, or `.supermedicine/config.yaml`.
+The add-on declares OpenAI-compatible and Anthropic-compatible formats, supports
+custom BaseURL values, redacts secrets as `<redacted>`, and degrades without an
+injected orchestrator/runtime bridge. Do not include plaintext API keys in skill docs.
+
 ## Supported Standards
 
 | Standard | Version | Items | Scope |

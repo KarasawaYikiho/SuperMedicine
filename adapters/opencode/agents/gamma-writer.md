@@ -28,6 +28,14 @@ intentionally self-contained and should be read alongside the user-facing
 - **Writing execution**: Generates manuscript sections, formats citations, creates tables
 - **Guideline checking**: Checks writing against reporting guidelines
 
+## OpenCode Provider Boundary
+OpenCode AI provider configuration is supplied by installer flags, `SM_LLM_*`
+environment variables, provider key environment variables, or `.supermedicine/config.yaml`.
+OpenAI-compatible and Anthropic-compatible formats are declared, custom BaseURL is
+allowed, secrets are redacted as `<redacted>`, and this internal role context is
+not user-facing. Without an injected orchestrator/runtime bridge, dispatch remains
+degraded local context loading only.
+
 ## Allowed Actions
 - Draft manuscript sections (Introduction, Methods, Results, Discussion)
 - Format citations in AMA or Vancouver style

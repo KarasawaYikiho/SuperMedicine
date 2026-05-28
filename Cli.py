@@ -34,11 +34,12 @@ class CLI:
     def init(self, project_dir: Path) -> None:
         """初始化项目"""
         from permission.policy import ensure_default_policy
+        from Install import _default_config_text
 
         config_dir = project_dir / ".supermedicine"
         config_dir.mkdir(parents=True, exist_ok=True)
         (config_dir / "config.yaml").write_text(
-            "# SuperMedicine 配置\nproject_name: supermedicine\nversion: Beta0.3.0\n",
+            _default_config_text(),
             encoding="utf-8",
         )
         (config_dir / "agents").mkdir(exist_ok=True)

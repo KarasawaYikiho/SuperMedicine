@@ -12,6 +12,12 @@ statistics, and require expert review before research, regulatory, or clinical u
 This optional OpenCode-facing summary documents the available prototype actions
 without changing plugin APIs or claiming clinical/statistical certification.
 
+OpenCode AI provider metadata is supplied by installer flags, `SM_LLM_*`
+environment variables, provider key environment variables, or `.supermedicine/config.yaml`.
+The add-on declares OpenAI-compatible and Anthropic-compatible formats, supports
+custom BaseURL values, redacts secrets as `<redacted>`, and degrades without an
+injected orchestrator/runtime bridge. Do not include plaintext API keys in skill docs.
+
 ## Capabilities
 - Descriptive statistics — mean, median, std, quartiles, skewness, kurtosis
 - Student's t-test — independent and paired samples

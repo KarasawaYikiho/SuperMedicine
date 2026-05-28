@@ -28,6 +28,14 @@ intentionally self-contained and should be read alongside the user-facing
 - **Review execution**: Generates review reports and compliance checks
 - **Quality verification**: Verifies analysis correctness, methodology compliance, and output quality
 
+## OpenCode Provider Boundary
+OpenCode AI provider configuration is supplied by installer flags, `SM_LLM_*`
+environment variables, provider key environment variables, or `.supermedicine/config.yaml`.
+OpenAI-compatible and Anthropic-compatible formats are declared, custom BaseURL is
+allowed, secrets are redacted as `<redacted>`, and this internal role context is
+not user-facing. Without an injected orchestrator/runtime bridge, dispatch remains
+degraded local context loading only.
+
 ## Allowed Actions
 - Review statistical methodology
 - Check compliance with CONSORT, STROBE, PRISMA, STARD standards

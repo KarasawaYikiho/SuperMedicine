@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from adapters.base_adapter import BaseAdapter
+from core.redaction import redact_sensitive
 from permission.engine import PermissionEngine
 
 
@@ -44,6 +45,39 @@ class OpenCodeAdapter(BaseAdapter):
     }
 
     USER_FACING_AGENT = {"name": "SuperMedicine", "id": "supermedicine", "file": "supermedicine.md"}
+
+    AI_PROVIDER_SUPPORT = {
+        "config_sources": [
+            "Installer/runtime injection flags: Install.py --provider openai|anthropic --base-url <url> --api-key <secret> --model <model>",
+            "Generic environment variables: SM_LLM_PROVIDER, SM_LLM_BASE_URL, SM_LLM_API_KEY, SM_LLM_MODEL",
+            "Provider environment variables: OPENAI_API_KEY or ANTHROPIC_API_KEY",
+            "Project-local config: .supermedicine/config.yaml llm.provider and llm.providers.*",
+        ],
+        "supported_api_formats": {
+            "openai": {
+                "api_format": "openai",
+                "default_base_url": "https://api.openai.com/v1",
+                "provider_key_env": "OPENAI_API_KEY",
+                "generic_key_env": "SM_LLM_API_KEY",
+                "custom_base_url": True,
+            },
+            "anthropic": {
+                "api_format": "anthropic",
+                "default_base_url": "https://api.anthropic.com/v1",
+                "provider_key_env": "ANTHROPIC_API_KEY",
+                "generic_key_env": "SM_LLM_API_KEY",
+                "custom_base_url": True,
+            },
+        },
+        "custom_base_url": True,
+        "secret_redaction": {
+            "required": True,
+            "redacted_value": "<redacted>",
+            "plain_text_keys_in_manifest_or_docs": False,
+        },
+        "degraded_without_orchestrator": True,
+        "boundary": "Optional add-on; provider config is supplied by installer/runtime/project config and is visible only through the SuperMedicine OpenCode agent surface.",
+    }
 
     def __init__(
         self,
@@ -80,6 +114,7 @@ class OpenCodeAdapter(BaseAdapter):
             "module": "adapters.opencode.adapter",
             "capability_tool": "opencode.capabilities",
             "requires_core_runtime": False,
+            "ai_provider_support": self.AI_PROVIDER_SUPPORT,
             "limitations": [
                 "Optional add-on; not imported, initialized, or probed by default.",
                 "Native OpenCode dispatch requires an explicit orchestrator/runtime bridge.",
@@ -104,7 +139,11 @@ class OpenCodeAdapter(BaseAdapter):
                 "orchestrator_backed_dispatch": self._orchestrator is not None,
                 "native_opencode_subagent_runtime": False,
                 "core_runtime_dependency": False,
+                "ai_provider_config_discovery": True,
+                "ai_provider_secret_redaction": True,
+                "custom_ai_provider_base_url": True,
             },
+            "ai_provider": self.AI_PROVIDER_SUPPORT,
             "user_facing_agents": [self.USER_FACING_AGENT],
             "internal_role_contexts": sorted(self.AGENT_FILES.values()),
             "limits": [
@@ -196,7 +235,7 @@ class OpenCodeAdapter(BaseAdapter):
         # 真实 Dispatch（需要 Orchestrator）
         if self._orchestrator is not None:
             try:
-                return self._orchestrator.dispatch(agent_id, task)
+                return redact_sensitive(self._orchestrator.dispatch(agent_id, task))
             except KeyError:
                 return {
                     "agent_id": agent_id,
@@ -207,7 +246,7 @@ class OpenCodeAdapter(BaseAdapter):
                 return {
                     "agent_id": agent_id,
                     "status": "error",
-                    "message": str(e),
+                    "message": redact_sensitive(str(e)),
                 }
 
         # 降级路径（无 Orchestrator）：只加载本地非用户可见 role context 文档上下文，不声称已派发
@@ -229,13 +268,13 @@ class OpenCodeAdapter(BaseAdapter):
             "error_code": "orchestrator_unavailable",
             "message": "OpenCode native sub-agent dispatch is unavailable without an injected orchestrator/runtime bridge.",
             "role": role,
-            "task": task,
-            "capabilities": self.capabilities()["features"],
+            "task": redact_sensitive(task),
+            "capabilities": redact_sensitive(self.capabilities()["features"]),
             "context": {
                 "agent_file": agent_file,
                 "user_facing": False,
                 "internal_role_context": True,
-                "agent_context_preview": agent_context[:500],
+                "agent_context_preview": redact_sensitive(agent_context[:500]),
                 "native_dispatch_executed": False,
             },
         }

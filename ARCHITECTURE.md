@@ -26,7 +26,7 @@ repeated here:
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │                         CLI (Cli.py)                             │
-│                   init / status / test / run                     │
+│             init / status / test / run / LLM config              │
 └──────────────────────────────┬───────────────────────────────────┘
                                │
 ┌──────────────────────────────▼───────────────────────────────────┐
@@ -68,6 +68,8 @@ The Kernel is the central coordinator. All subsystems are instantiated and wired
 - YAML-based configuration file reader
 - Supports `SM_*` environment variable overrides
 - Default path: `.supermedicine/config.yaml`
+- Exposes `get_llm_provider_config(redacted=True)` for secret-safe OpenAI /
+  Anthropic provider configuration snapshots
 
 ### EventBus (`event_bus.py`)
 - Publish/subscribe messaging between decoupled components
@@ -214,6 +216,29 @@ Secrets are referenced by environment variable name (`api_key_env`) rather than
 stored in code or repository configuration. `MockExternalVectorStoreProvider`
 provides external-vector-store behavior without requiring a live service.
 
+### LLM Provider Contract
+
+The LLM client layer is intentionally provider-neutral and independent of
+OpenCode/Claude Code:
+
+- `core.llm_client.create_llm_client(...)` supports `openai`, `anthropic`, and
+  legacy `openrouter` provider ids.
+- `core.llm_providers.config.LLMProviderConfig` normalizes `api_format`,
+  `base_url`/`baseURL`, `api_key`, `api_key_env`, `model`, timeout, and headers.
+- OpenAI-compatible requests use bearer authorization and the chat-completions
+  path by default. Anthropic-compatible requests use `x-api-key`,
+  `anthropic-version`, and the messages path.
+- Installer defaults are OpenAI-compatible (`https://api.openai.com/v1`,
+  `OPENAI_API_KEY`, `gpt-4o-mini`) and Anthropic-compatible
+  (`https://api.anthropic.com/v1`, `ANTHROPIC_API_KEY`,
+  `claude-3-5-sonnet-latest`).
+- Custom BaseURL values are accepted for compatible endpoints through
+  `Install.py --base-url`, `SM_LLM_BASE_URL`, or local project configuration.
+- Missing required provider fields produce structured validation errors;
+  HTTP/request errors are sanitized with known API keys redacted.
+- Documentation, manifests, tests, and adapter files must use fake keys or
+  placeholders only and must not commit real API keys.
+
 ### Workspace-Local Papers, Experience Learning, and TUI
 
 Paper import and experience learning are workspace-aware support paths layered on
@@ -279,6 +304,8 @@ OpenCode, Claude Code, `claude`, or platform configuration directories.
 - All adapter actions are checked through the canonical `.supermedicine/policies/default.yaml` `PermissionEngine` path before execution
 - Explicit unavailable/error states for missing runtime, timeouts, runtime errors, unsupported tools, and native sub-agent dispatch, with timeout/resource metadata and sensitive-value redaction
 - Current limits: not a full Claude Code sub-agent bridge; native skill loading and native sub-agent dispatch are not claimed as supported
+- OpenAI/Anthropic provider metadata follows the core LLM configuration model;
+  the adapter must not embed plaintext credentials in skill docs or manifests
 
 ### Core/Add-on Capability Matrix
 
@@ -291,6 +318,7 @@ OpenCode, Claude Code, `claude`, or platform configuration directories.
 | Platform tools | Not required | Declared adapter mappings | Minimal `claude.*` tools |
 | Native platform subagents | Not applicable | Not implemented without injected orchestrator | Not implemented |
 | Native platform skill loading | Not applicable | Skill docs available to OpenCode setup | Not implemented |
+| LLM provider config | OpenAI/Anthropic via config/env/installer | Metadata only, from core config sources | Metadata only, from core config sources |
 
 ### Standalone and CLI execution
 

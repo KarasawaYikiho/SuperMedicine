@@ -10,6 +10,7 @@ import yaml
 from Cli import CLI, main
 from adapters.base_adapter import BaseAdapter
 from core.kernel import Kernel
+from core.llm_client import create_llm_client
 from core.workspace import WorkspaceManager
 from permission.engine import PermissionEngine
 from permission.policy import PermissionResult, ensure_default_policy
@@ -305,6 +306,16 @@ def test_rag_actions_and_result_contract_are_unchanged(tmp_path):
 
 def test_adapter_gated_tools_remain_bash_write_edit():
     assert BaseAdapter.PERMISSION_GATED_TOOLS == {"bash", "write", "edit"}
+
+
+def test_legacy_openrouter_factory_still_uses_openai_compatible_defaults():
+    client = create_llm_client("openrouter", api_key="test-openrouter-key")
+
+    assert client.model == "anthropic/claude-3.5-sonnet"
+    assert client.config.provider == "openrouter"
+    assert client.config.api_format == "openai"
+    assert client.config.base_url == "https://openrouter.ai/api/v1"
+    assert client.config.safe_dict()["api_key"] == "<redacted>"
 
 
 def test_paper_and_experience_paths_do_not_read_tui_recent_workspace_state(monkeypatch, tmp_path):

@@ -9,7 +9,7 @@ import yaml
 import pytest
 
 from Cli import CLI, _resolve_run_params
-from Install import init_config
+from Install import init_config, write_llm_config
 from core.kernel import Kernel
 from agents.orchestrator import Orchestrator
 from agents.base_agent import BaseAgent
@@ -99,6 +99,78 @@ class TestIntegration:
 
         assert (cli_project / ".supermedicine").is_dir()
         assert default_policy_path(cli_project).read_text(encoding="utf-8") == default_policy_path(install_project).read_text(encoding="utf-8")
+
+    def test_install_init_writes_openai_llm_config_with_secret_redaction(self, tmp_path, caplog):
+        secret = "sk-test-install-secret"
+        caplog.set_level("INFO", logger="Install")
+
+        init_config(
+            tmp_path,
+            provider="openai",
+            base_url="https://openai.example.test/v1",
+            api_key=secret,
+            model="gpt-test-install",
+        )
+
+        config = yaml.safe_load((tmp_path / ".supermedicine" / "config.yaml").read_text(encoding="utf-8"))
+        openai = config["llm"]["providers"]["openai"]
+        assert config["llm"]["provider"] == "openai"
+        assert openai["base_url"] == "https://openai.example.test/v1"
+        assert openai["api_key"] == secret
+        assert openai["model"] == "gpt-test-install"
+        assert secret not in caplog.text
+        assert "<redacted>" in caplog.text
+
+    def test_install_init_writes_anthropic_llm_config(self, tmp_path):
+        secret = "anthropic-test-install-secret"
+
+        init_config(
+            tmp_path,
+            provider="anthropic",
+            base_url="https://anthropic.example.test/v1",
+            api_key=secret,
+            model="claude-test-install",
+        )
+
+        config = yaml.safe_load((tmp_path / ".supermedicine" / "config.yaml").read_text(encoding="utf-8"))
+        anthropic = config["llm"]["providers"]["anthropic"]
+        assert config["llm"]["provider"] == "anthropic"
+        assert anthropic["base_url"] == "https://anthropic.example.test/v1"
+        assert anthropic["api_key"] == secret
+        assert anthropic["model"] == "claude-test-install"
+
+    def test_install_llm_config_merges_existing_config_without_touching_home(self, tmp_path, monkeypatch, caplog):
+        secret = "sk-test-merge-secret"
+        config_dir = tmp_path / ".supermedicine"
+        config_dir.mkdir()
+        (config_dir / "config.yaml").write_text(
+            yaml.safe_dump({"project_name": "legacy", "custom": {"keep": True}, "llm": {"providers": {}}}),
+            encoding="utf-8",
+        )
+
+        def fail_home_access():
+            raise AssertionError("LLM config injection must not read the real user home")
+
+        monkeypatch.setattr(Path, "home", fail_home_access)
+        caplog.set_level("INFO", logger="Install")
+
+        write_llm_config(
+            tmp_path,
+            provider="openai",
+            base_url="https://merge.local.test/v1",
+            api_key=secret,
+            model="gpt-merge",
+        )
+
+        config = yaml.safe_load((config_dir / "config.yaml").read_text(encoding="utf-8"))
+        assert config["project_name"] == "legacy"
+        assert config["custom"] == {"keep": True}
+        assert config["llm"]["provider"] == "openai"
+        assert config["llm"]["providers"]["openai"]["api_key"] == secret
+        assert config["llm"]["providers"]["openai"]["base_url"] == "https://merge.local.test/v1"
+        assert config["llm"]["providers"]["openai"]["model"] == "gpt-merge"
+        assert secret not in caplog.text
+        assert "<redacted>" in caplog.text
 
     def test_init_paths_write_unicode_config_with_explicit_utf8(self, tmp_path, monkeypatch):
         """初始化入口写入含中文的配置时不应依赖平台默认编码。"""

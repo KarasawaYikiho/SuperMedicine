@@ -83,6 +83,14 @@ class TestAdapterImport:
         assert capabilities["features"]["core_runtime_dependency"] is False
         assert capabilities["features"]["native_opencode_subagent_runtime"] is False
         assert capabilities["features"]["permission_checked_dangerous_tools"] is True
+        assert capabilities["features"]["ai_provider_config_discovery"] is True
+        assert capabilities["features"]["ai_provider_secret_redaction"] is True
+        assert capabilities["features"]["custom_ai_provider_base_url"] is True
+        assert set(capabilities["ai_provider"]["supported_api_formats"]) == {"openai", "anthropic"}
+        assert capabilities["ai_provider"]["supported_api_formats"]["openai"]["custom_base_url"] is True
+        assert capabilities["ai_provider"]["secret_redaction"]["required"] is True
+        assert capabilities["ai_provider"]["secret_redaction"]["redacted_value"] == "<redacted>"
+        assert capabilities["ai_provider"]["degraded_without_orchestrator"] is True
         user_facing_names = [agent["name"] for agent in capabilities["user_facing_agents"]]
         assert user_facing_names == ["SuperMedicine"]
         assert len(capabilities["user_facing_agents"]) == 1
@@ -93,6 +101,19 @@ class TestAdapterImport:
             "gamma-writer.md",
             "delta-orchestrator.md",
         }
+
+    def test_capabilities_do_not_expose_environment_api_keys(self, adapter, monkeypatch):
+        openai_secret = "sk-test-opencode-env-secret"
+        anthropic_secret = "anthropic-test-opencode-env-secret"
+        monkeypatch.setenv("OPENAI_API_KEY", openai_secret)
+        monkeypatch.setenv("ANTHROPIC_API_KEY", anthropic_secret)
+
+        result = adapter.tool_call("opencode.capabilities", {})
+
+        serialized = json.dumps(result, ensure_ascii=False)
+        assert openai_secret not in serialized
+        assert anthropic_secret not in serialized
+        assert "<redacted>" in serialized
 
     def test_registration_marks_opencode_as_optional_add_on(self, adapter):
         registration = adapter.registration
@@ -295,6 +316,14 @@ class TestPluginJson:
         assert (plugin_path.parent / data["install_entry_files"]["skill_documents_dir"]).is_dir()
         assert (plugin_path.parent / data["install_entry_files"]["internal_role_context_dir"]).is_dir()
         assert data["install_completeness_model"]["degraded_without_orchestrator"] is True
+        assert set(data["ai_provider"]["supported_api_formats"]) == {"openai", "anthropic"}
+        assert data["ai_provider"]["supported_api_formats"]["anthropic"]["custom_base_url"] is True
+        assert data["ai_provider"]["secret_redaction_required"] is True
+        assert data["ai_provider"]["redacted_value"] == "<redacted>"
+        assert data["ai_provider"]["plaintext_api_keys_in_manifest"] is False
+        assert data["ai_provider"]["degraded_without_orchestrator"] is True
+        assert data["install"]["log_redaction_required"] is True
+        assert data["uninstall"]["remove_recorded_opencode_artifacts_only"] is True
 
         # Check Skills
         assert "skills" in data
@@ -366,6 +395,9 @@ class TestSkillsExist:
         for skill_file in ["rag-query.md", "medical-citation.md", "medical-writing.md", "python-stats.md", "r-survival.md", "harness-monitor.md"]:
             content = (skills_dir / skill_file).read_text(encoding="utf-8").lower()
             assert "human" in content or "expert review" in content
+            assert "openai-compatible" in content
+            assert "anthropic-compatible" in content
+            assert "<redacted>" in content
             if "clinical-grade" in content:
                 assert "not production-grade" in content
 
@@ -381,6 +413,8 @@ class TestAgentsExist:
         user_facing_content = user_facing_agent.read_text(encoding="utf-8")
         assert "name: SuperMedicine" in user_facing_content
         assert "user_facing: true" in user_facing_content
+        assert "AI Provider Configuration" in user_facing_content
+        assert "<redacted>" in user_facing_content
 
         expected_contexts = [
             "alpha-analyst.md",
@@ -395,6 +429,7 @@ class TestAgentsExist:
             assert len(content) > 0, f"Empty internal role context file: {agent_file}"
             assert "user_facing: false" in content
             assert "internal_role_context: true" in content
+            assert "OpenCode Provider Boundary" in content
 
 
 class DummyEchoAgent(BaseAgent):

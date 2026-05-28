@@ -88,6 +88,8 @@ class TestClaudeCodeAdapter:
         assert adapter.registration["core"] is False
         assert adapter.registration["default"] is False
         assert adapter.registration["requires_core_runtime"] is False
+        assert set(adapter.registration["ai_provider_support"]["supported_api_formats"]) == {"openai", "anthropic"}
+        assert adapter.registration["ai_provider_support"]["secret_redaction"]["required"] is True
         assert "not imported" in adapter.registration["limitations"][0]
 
     def test_capabilities_available_with_mock_runtime(self, tmp_path, monkeypatch):
@@ -99,6 +101,11 @@ class TestClaudeCodeAdapter:
         assert result["result"]["features"]["permission_checked_calls"] is True
         assert result["result"]["features"]["native_subagent_dispatch"] is False
         assert result["result"]["features"]["native_skill_load"] is False
+        assert result["result"]["features"]["ai_provider_config_discovery"] is True
+        assert result["result"]["features"]["ai_provider_secret_redaction"] is True
+        assert result["result"]["features"]["custom_ai_provider_base_url"] is True
+        assert set(result["result"]["ai_provider"]["supported_api_formats"]) == {"openai", "anthropic"}
+        assert result["result"]["ai_provider"]["secret_redaction"]["plain_text_keys_in_manifest_or_docs"] is False
         assert result["result"]["optional"] is True
         assert result["result"]["status"] == "available"
         user_facing_names = [agent["name"] for agent in result["result"]["user_facing_agents"]]
@@ -106,6 +113,22 @@ class TestClaudeCodeAdapter:
         assert len(result["result"]["user_facing_agents"]) == 1
         assert FORBIDDEN_PLATFORM_AGENT_NAMES.isdisjoint(user_facing_names)
         assert result["result"]["internal_role_contexts"] == ["alpha", "beta", "gamma", "delta"]
+
+    def test_capabilities_do_not_expose_environment_api_keys(self, tmp_path, monkeypatch):
+        _write_policy(tmp_path)
+        openai_secret = "sk-test-claude-env-secret"
+        anthropic_secret = "anthropic-test-claude-env-secret"
+        monkeypatch.setenv("OPENAI_API_KEY", openai_secret)
+        monkeypatch.setenv("ANTHROPIC_API_KEY", anthropic_secret)
+        monkeypatch.setattr("adapters.claude_code.adapter.shutil.which", lambda command: None)
+
+        adapter = ClaudeCodeAdapter(project_dir=tmp_path)
+        result = adapter.tool_call("claude.capabilities", {})
+
+        serialized = str(result)
+        assert openai_secret not in serialized
+        assert anthropic_secret not in serialized
+        assert "<redacted>" in serialized
 
     def test_runtime_unavailable_returns_structured_state(self, tmp_path, monkeypatch):
         _write_policy(tmp_path)
@@ -115,6 +138,9 @@ class TestClaudeCodeAdapter:
         assert result["status"] == "unavailable"
         assert result["runtime"]["available"] is False
         assert result["runtime"]["required_for_core"] is False
+        assert result["runtime"]["ai_provider_configured"]["supported_api_formats"] == ["anthropic", "openai"]
+        assert result["runtime"]["ai_provider_configured"]["secret_redaction_required"] is True
+        assert result["runtime"]["ai_provider_configured"]["plaintext_api_keys_in_manifest_or_docs"] is False
         assert result["metadata"]["adapter"]["core_failure"] is False
         assert "error" in result
 
@@ -236,6 +262,10 @@ class TestClaudeCodeAdapter:
         assert "only user-facing Agent/surface is" in content
         assert "not a Claude Code Agent" in content
         assert "not a SuperMedicine core failure" in content
+        assert "OpenAI-compatible and Anthropic-compatible" in content
+        assert "OPENAI_API_KEY" in content
+        assert "ANTHROPIC_API_KEY" in content
+        assert "plaintext API key examples" in content
         assert "Installation Manifest Entry" in content
         assert "entry file: `adapters/claude_code/SKILL.md`" in content
         assert "Supported adapter tool IDs are limited" in content

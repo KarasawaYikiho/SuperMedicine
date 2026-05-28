@@ -37,6 +37,22 @@ python Cli.py status
 python Cli.py run "summarize local context"
 ```
 
+To initialize and configure an LLM provider in one command, use OpenAI-compatible
+or Anthropic-compatible settings. The keys below are fake placeholders; do not
+commit real keys to Git, docs, tests, manifests, or screenshots.
+
+```bash
+python Install.py --init --provider openai \
+  --base-url https://api.openai.com/v1 \
+  --api-key <OPENAI_API_KEY> \
+  --model gpt-4o-mini
+
+python Install.py --init --provider anthropic \
+  --base-url https://api.anthropic.com/v1 \
+  --api-key <ANTHROPIC_API_KEY> \
+  --model claude-3-5-sonnet-latest
+```
+
 ## Step-by-Step Installation
 
 ### 1. Create a Virtual Environment (Recommended)
@@ -68,6 +84,33 @@ python Install.py --init
 
 This creates the `.supermedicine/` directory with configuration and plugin settings.
 It does not require or create OpenCode/Claude Code configuration.
+
+Optional LLM settings can be injected during this same step:
+
+```bash
+# Command-line flags
+python Install.py --init --provider openai \
+  --base-url https://api.openai.com/v1 \
+  --api-key <OPENAI_API_KEY> \
+  --model gpt-4o-mini
+
+# Environment variables; provider-specific key variables are preferred for real secrets
+SM_LLM_PROVIDER=anthropic \
+SM_LLM_BASE_URL=https://api.anthropic.com/v1 \
+SM_LLM_MODEL=claude-3-5-sonnet-latest \
+ANTHROPIC_API_KEY=<ANTHROPIC_API_KEY> \
+python Install.py --init
+
+# Prompt for values; API key input is hidden
+python Install.py --init --interactive
+```
+
+`--provider` accepts only `openai` or `anthropic`. `SM_LLM_PROVIDER`,
+`SM_LLM_BASE_URL`, `SM_LLM_API_KEY`, and `SM_LLM_MODEL` are installer-time
+generic overrides. Provider key variables are `OPENAI_API_KEY` and
+`ANTHROPIC_API_KEY`. If `--api-key` or `SM_LLM_API_KEY` is supplied, the value can
+be written to local `.supermedicine/config.yaml`; keep that file private after
+adding real secrets.
 
 ### 4. Install Optional R Support
 
@@ -108,6 +151,12 @@ Expected output shows:
 - Configuration initialized status
 - Number of discovered plugins
 - Number of test modules
+
+To inspect LLM configuration without exposing secrets, use code paths that call
+`ConfigCenter.get_llm_provider_config(redacted=True)` or review only placeholder
+values in `.supermedicine/config.yaml`. LLM client calls return structured
+validation errors such as `missing_api_key`, `missing_base_url`, or
+`missing_model` when required values are absent.
 
 For development environments, run the test suite:
 
@@ -159,6 +208,22 @@ After adding Scripts to PATH, restart your terminal and verify:
 supermedicine --help
 ```
 
+### LLM provider missing key or endpoint
+
+Use provider-specific environment variables for real credentials:
+
+```bash
+# OpenAI-compatible
+export OPENAI_API_KEY=<OPENAI_API_KEY>
+
+# Anthropic-compatible
+export ANTHROPIC_API_KEY=<ANTHROPIC_API_KEY>
+```
+
+Use `SM_LLM_BASE_URL` or `--base-url` for compatible gateways. If you supplied a
+real key through `--api-key` or `SM_LLM_API_KEY`, treat `.supermedicine/config.yaml`
+as local private configuration and do not commit it.
+
 ## Platform Adapters
 
 Platform adapters are optional add-ons around the standalone Python framework.
@@ -182,6 +247,11 @@ permission-checked `claude.invoke` when `claude` is on PATH. If `claude` is not
 installed, the adapter reports a structured unavailable state. It does not expose
 native Claude Code subagents or native Claude Code skill loading.
 
+Claude Code uses SuperMedicine's optional provider metadata only. Configure
+OpenAI-compatible or Anthropic-compatible settings through `Install.py`,
+`SM_LLM_*`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or project-local config; never
+store real keys in `adapters/claude_code/SKILL.md`.
+
 ### OpenCode
 Optional OpenCode add-on content lives under `adapters/opencode/`. Copy or
 reference `adapters/opencode/plugin.json`, `adapters/opencode/skills/*.md`, and
@@ -193,6 +263,10 @@ SuperMedicine permission model.
 Current limitation: `OpenCodeAdapter.subagent_dispatch(...)` does not launch an
 external native OpenCode subagent runtime by itself. Without an injected
 SuperMedicine orchestrator, it uses local metadata/fallback behavior.
+
+OpenCode add-on manifests and skills declare the same OpenAI/Anthropic provider
+formats and custom BaseURL support as the core configuration model. They contain
+metadata only and must not contain plaintext real API keys.
 
 ## Safety Boundaries
 
@@ -208,6 +282,22 @@ SuperMedicine orchestrator, it uses local metadata/fallback behavior.
 ## Uninstall
 
 ```bash
-pip uninstall supermedicine
-rm -rf .supermedicine/
+python Uninstall.py --dry-run
+python Uninstall.py --force
+python Uninstall.py --target .opencode/skills/supermedicine --dry-run
 ```
+
+The uninstaller removes only SuperMedicine-owned local artifacts inside the
+current project: `.supermedicine/`, runtime artifacts, repository-scoped
+`.opencode/`, `.claude/`, and `superpowers/` copies ignored by this repository,
+installer-created platform target copies recorded in
+`.supermedicine/install-record.json`, and explicit `--target` paths. It does not
+delete the source repository itself or unrecorded user-owned global OpenCode /
+Claude Code configuration. Use `pip uninstall supermedicine` separately if you
+installed the Python package and want to remove that package from the Python
+environment.
+
+Uninstall logs redact secret-looking fields. If you manually created environment
+variables such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `SM_LLM_API_KEY`,
+remove them from your shell/profile separately; the project uninstaller does not
+edit user shell startup files.

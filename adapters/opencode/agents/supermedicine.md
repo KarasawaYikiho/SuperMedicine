@@ -28,6 +28,20 @@ readable for OpenCode installation workflows.
 - Manuscript drafting, reporting-guideline checks, and citation formatting
 - Permission-audited workflow coordination through SuperMedicine runtime context
 
+## AI Provider Configuration
+
+- OpenCode reads SuperMedicine provider metadata from installer flags, `SM_LLM_*`
+  environment variables, provider key environment variables, or project-local
+  `.supermedicine/config.yaml` entries.
+- Supported API formats are OpenAI-compatible and Anthropic-compatible. Both may
+  use a custom BaseURL supplied by the installer or runtime environment.
+- Secrets must be redacted as `<redacted>` in logs, capability output, and docs;
+  do not place plaintext API keys in OpenCode agent or skill files.
+- Without an injected SuperMedicine orchestrator/runtime bridge, OpenCode task
+  dispatch remains degraded and only local role context is loaded.
+- This capability metadata is visible only through the `SuperMedicine` user-facing
+  OpenCode agent.
+
 ## Boundaries
 
 - Does not provide clinical advice or regulatory/clinical certification

@@ -7,6 +7,8 @@ from typing import Any
 
 import yaml
 
+from core.redaction import redact_sensitive
+
 
 class ConfigCenter:
     """配置管理中心"""
@@ -45,3 +47,29 @@ class ConfigCenter:
                 config_key = env_key[3:].lower().replace("_", "-")
                 result[config_key] = env_val
         return result
+
+    def safe_all(self) -> dict[str, Any]:
+        """获取可用于日志、错误、快照和能力输出的脱敏配置。"""
+        return redact_sensitive(self.all())
+
+    def get_llm_provider_config(self, provider: str | None = None, *, redacted: bool = False) -> dict[str, Any]:
+        """获取可注入 LLM Provider 配置。
+
+        默认返回运行时注入所需原始值；日志、错误、测试快照和能力输出必须使用
+        ``redacted=True`` 或 ``safe_all()``，避免 API Key 明文外泄。
+        """
+        llm_config = self._config.get("llm", {})
+        if not isinstance(llm_config, dict):
+            llm_config = {}
+        providers = llm_config.get("providers", {})
+        if not isinstance(providers, dict):
+            providers = {}
+
+        provider_name = provider or llm_config.get("provider") or "openai"
+        provider_config = providers.get(provider_name, {})
+        if not isinstance(provider_config, dict):
+            provider_config = {}
+
+        result = dict(provider_config)
+        result["provider"] = provider_name
+        return redact_sensitive(result) if redacted else result

@@ -106,7 +106,31 @@ paths, and treat all external network/API access as permission-gated behavior.
 |----------|---------|
 | `SM_CONFIG` | Override config file path |
 | `SM_<KEY>` | Override any config key (uppercase, `_` for `-`) |
-| `OPENROUTER_API_KEY` | Optional API key for OpenRouter LLM provider integration only; not required for core functionality |
+| `SM_LLM_PROVIDER` | Installer-time LLM provider override: `openai` or `anthropic` |
+| `SM_LLM_BASE_URL` | Installer-time custom compatible provider BaseURL |
+| `SM_LLM_API_KEY` | Installer-time generic API key injection; may be written to local config, so avoid committing it |
+| `SM_LLM_MODEL` | Installer-time default model override |
+| `OPENAI_API_KEY` | Runtime/installer key for OpenAI-compatible provider configuration |
+| `ANTHROPIC_API_KEY` | Runtime/installer key for Anthropic-compatible provider configuration |
+| `OPENROUTER_API_KEY` | Optional key for legacy OpenRouter provider integration |
+
+## LLM Secret Handling
+
+- Use environment variables or local private `.supermedicine/config.yaml` values
+  for real API keys. Do not commit real OpenAI, Anthropic, OpenRouter, gateway, or
+  platform credentials.
+- Documentation and tests must use non-realistic placeholders only, for example
+  `<OPENAI_API_KEY>`, `<ANTHROPIC_API_KEY>`, or `<redacted>`.
+- `Install.py --api-key` and `SM_LLM_API_KEY` can write the supplied key to local
+  project config. Prefer `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` for real keys
+  when possible.
+- LLM provider config snapshots intended for logs or capability reporting must use
+  redacted paths such as `get_llm_provider_config(redacted=True)` or provider
+  `safe_dict()` output.
+- OpenCode and Claude Code adapter manifests expose provider metadata only. They
+  must not contain plaintext credentials, and missing optional platform runtimes
+  degrade to unavailable/degraded states rather than bypassing the core security
+  model.
 
 ## Reporting a Vulnerability
 
