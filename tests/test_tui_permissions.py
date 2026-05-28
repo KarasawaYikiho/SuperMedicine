@@ -49,3 +49,22 @@ def test_high_risk_action_requires_permission_engine_allow():
 
     assert allowed.allowed is True
     assert allowed.permission == "allowed"
+
+
+def test_low_risk_action_still_uses_permission_engine_but_not_confirmation_gate():
+    engine = FakePermissionEngine(PermissionResult.ALLOWED)
+
+    request = prepare_tool_action(
+        engine,
+        tool="read",
+        resource="notes/summary.md",
+        confirmed=False,
+        context={"screen": "工具管理"},
+    )
+
+    assert request.allowed is True
+    assert request.confirmed is False
+    assert request.context["requires_confirmation"] is False
+    assert request.context["sandbox_required"] is True
+    assert request.context["audit_required"] is True
+    assert engine.calls[0]["context"]["screen"] == "工具管理"

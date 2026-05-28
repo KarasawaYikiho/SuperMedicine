@@ -630,7 +630,20 @@ SuperMedicine includes a full interactive Chinese terminal UI built with
 supermedicine tui
 ```
 
-### Navigation
+### Interface structure
+
+The TUI is organized as a persistent left sidebar plus a swappable main content
+area and bottom status bar:
+
+- **Sidebar** — numbered navigation entries `1` through `8` and a compact global
+  shortcut hint.
+- **Main area** — current view title, the selected management/workbench screen,
+  and a shared input bar for chat-style commands.
+- **Status bar** — workspace count and current focus on the left, plugin count,
+  LLM status, and task running state in the center, and current view/version on
+  the right.
+
+### Navigation and shortcuts
 
 | Key | Action |
 |-----|--------|
@@ -643,11 +656,17 @@ supermedicine tui
 | `7` | Dialog (对话历史) |
 | `8` | LLM (LLM 管理) |
 | `↑` / `↓` | Navigate sidebar |
-| `Enter` | Send message |
+| `Tab` | Move focus forward between input, buttons, lists, and tables |
+| `Shift+Tab` | Move focus backward between focusable widgets |
+| `Enter` | Submit the input when focused on the prompt; activate the focused button/list item elsewhere |
 | `f` | Maximize/Minimize focused widget |
 | `Esc` | Exit maximize mode |
 | `?` | Show help |
 | `q` | Quit |
+
+The sidebar shortcut hint shown in the TUI mirrors these bindings: `1-8` switch
+views, `Tab`/`Shift+Tab` change focus, `Enter` submits, `?` opens help, `f`
+maximizes/restores the focused widget, and `q` exits.
 
 ### Screens
 
@@ -662,11 +681,26 @@ supermedicine tui
 | **LLM** | Add providers, switch current default, inspect redacted readiness state |
 | **Dialog** | View session dialog history (read-only) |
 
+### Status and safety cues
+
+- **LLM 状态** appears in the center status segment. It shows whether the current
+  provider is ready and names the active provider without exposing API keys.
+- **任务运行状态** also appears in the center segment as `任务空闲` or
+  `任务执行中`, so long-running kernel work is visible without leaving the
+  current screen.
+- **刷新** buttons on Workspace, Paper, Experience, Tool, Dialog, and LLM screens
+  reload their current lists from the shared backend controllers.
+- **危险操作** such as workspace deletion, experience deletion, and online paper
+  enrichment require explicit confirmation, exact ID input, or a dedicated
+  action button before irreversible or network-touching work proceeds.
+
 ### TUI vs CLI
 
 - TUI recent selection is workspace/session state and does **not** alter CLI defaults
 - CLI commands always require explicit `--workspace` — they never read TUI state
 - TUI and CLI share the same backend controllers and data
+- The TUI is part of the standalone Python package; platform adapters remain
+  optional surfaces and are not required for CLI or TUI operation.
 
 ---
 

@@ -9,6 +9,8 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Input, Select, Static
 
+from core.redaction import redact_sensitive
+from core.tui.app import apply_status_style
 from core.tui.i18n import t
 
 
@@ -27,10 +29,10 @@ class ExperienceView(Vertical):
             id="exp-workspace-select",
         )
         yield DataTable(id="exp-table", cursor_type="row")
-        with Horizontal():
+        with Horizontal(classes="form-row"):
             yield Input(placeholder=t("experience_title_label"), id="exp-title-input")
             yield Input(placeholder=t("experience_summary_label"), id="exp-summary-input")
-        with Horizontal():
+        with Horizontal(classes="form-row"):
             yield Input(placeholder=t("experience_tags_label"), id="exp-tags-input")
             yield Select(
                 [
@@ -40,12 +42,12 @@ class ExperienceView(Vertical):
                 value="workspace",
                 id="exp-scope-select",
             )
-        with Horizontal():
+        with Horizontal(classes="form-row"):
             yield Button(t("experience_suggest"), id="exp-suggest", classes="btn btn-secondary")
             yield Button(t("confirm"), id="exp-confirm", classes="btn btn-primary")
-            yield Button(t("delete"), id="exp-delete", classes="btn btn-danger")
             yield Button(t("experience_export"), id="exp-export", classes="btn btn-secondary")
             yield Button(t("refresh"), id="exp-refresh", classes="btn btn-secondary")
+            yield Button(t("delete"), id="exp-delete", classes="btn btn-danger")
         yield Static("", id="exp-status")
 
     def on_mount(self) -> None:
@@ -69,7 +71,7 @@ class ExperienceView(Vertical):
             options = [(ws["label"], ws["id"]) for ws in workspaces]
             select_widget.set_options(options)
         except Exception as e:
-            self._set_status(f"{t('error')}: {e}")
+            self._set_error(e)
 
     def _get_selected_workspace(self) -> str | None:
         select_widget = self.query_one("#exp-workspace-select", Select)
@@ -80,10 +82,6 @@ class ExperienceView(Vertical):
 
     def _load_experiences(self) -> None:
         workspace_id = self._get_selected_workspace()
-        if not workspace_id:
-            self._set_status(t("paper_select_workspace"))
-            return
-
         table = self.query_one("#exp-table", DataTable)
         table.clear(columns=True)
         table.add_columns(
@@ -93,6 +91,9 @@ class ExperienceView(Vertical):
             t("experience_scope_label"),
             t("experience_tags_label"),
         )
+        if not workspace_id:
+            self._set_status(t("paper_select_workspace"))
+            return
 
         controller = self._get_experience_controller()
         try:
@@ -110,12 +111,18 @@ class ExperienceView(Vertical):
                     tags,
                     key=record.get("id", ""),
                 )
+            self._set_status(f"{t('experience_list')}: {len(records)}")
         except Exception as e:
-            self._set_status(f"{t('error')}: {e}")
+            self._set_error(e)
 
     def _set_status(self, message: str) -> None:
         status = self.query_one("#exp-status", Static)
-        status.update(message)
+        safe_message = str(redact_sensitive(message))
+        status.update(safe_message)
+        apply_status_style(status, safe_message)
+
+    def _set_error(self, error: Exception) -> None:
+        self._set_status(f"{t('error')}: {redact_sensitive(str(error)) or t('safe_error_hint')}")
 
     def on_select_changed(self, event: Select.Changed) -> None:
         if event.select.id == "exp-workspace-select":
@@ -165,7 +172,7 @@ class ExperienceView(Vertical):
             )
             self._set_status(result.get("message", t("experience_suggested")))
         except Exception as e:
-            self._set_status(f"{t('error')}: {e}")
+            self._set_error(e)
 
     def _confirm_experience(self) -> None:
         workspace_id = self._get_selected_workspace()
@@ -204,7 +211,7 @@ class ExperienceView(Vertical):
             self._set_status(result.get("message", t("experience_confirmed")))
             self._load_experiences()
         except Exception as e:
-            self._set_status(f"{t('error')}: {e}")
+            self._set_error(e)
 
     def _delete_experience(self) -> None:
         workspace_id = self._get_selected_workspace()
@@ -219,6 +226,10 @@ class ExperienceView(Vertical):
 
         row_data = table.get_row_at(table.cursor_row)
         record_id = str(row_data[0])
+        confirmation = self.query_one("#exp-title-input", Input).value.strip()
+        if confirmation != record_id:
+            self._set_status(t("experience_delete_requires_confirm"))
+            return
 
         controller = self._get_experience_controller()
         try:
@@ -231,7 +242,7 @@ class ExperienceView(Vertical):
             self._set_status(result.get("message", t("experience_deleted")))
             self._load_experiences()
         except Exception as e:
-            self._set_status(f"{t('error')}: {e}")
+            self._set_error(e)
 
     def _export_experiences(self) -> None:
         workspace_id = self._get_selected_workspace()
@@ -244,7 +255,7 @@ class ExperienceView(Vertical):
             result = controller.export_experiences(workspace_id=workspace_id, format="json", include_general=True)
             self._set_status(result.get("message", ""))
         except Exception as e:
-            self._set_status(f"{t('error')}: {e}")
+            self._set_error(e)
 
 
 # Backward-compatible alias

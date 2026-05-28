@@ -61,6 +61,54 @@ def test_tui_controller_restores_previous_exit_provider_on_startup(tmp_path):
     assert ConfigCenter(config_dir / "config.yaml").get_llm_current_provider_name() == "anthropic"
 
 
+def test_tui_controller_ignores_missing_last_provider_and_keeps_valid_current(tmp_path):
+    config_dir = tmp_path / ".supermedicine"
+    config_dir.mkdir()
+    (config_dir / "config.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "llm": {
+                    "provider": "openai",
+                    "last_provider": "missing-provider",
+                    "providers": {
+                        "openai": {
+                            "api_format": "openai",
+                            "base_url": "https://openai.test/v1",
+                            "api_key": "sk-openai-fallback",
+                            "model": "gpt-test",
+                        }
+                    },
+                }
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    controller = LLMScreenController(tmp_path)
+
+    assert controller.current_provider()["provider"] == "openai"
+    assert controller.readiness() == {"ok": True, "provider": "openai", "message": t("llm_ready")}
+    assert ConfigCenter(config_dir / "config.yaml").get_llm_current_provider_name() == "openai"
+
+
+def test_tui_controller_save_exit_state_persists_current_provider_for_restore(tmp_path):
+    controller = LLMScreenController(tmp_path)
+    controller.add_provider(
+        "openai",
+        base_url="https://openai.test/v1",
+        api_key="sk-openai-exit-state",
+        model="gpt-test",
+        set_current=True,
+    )
+
+    saved = controller.save_exit_state()
+    restored = LLMScreenController(tmp_path)
+
+    assert saved == {"ok": True, "provider": "openai"}
+    assert restored.current_provider()["provider"] == "openai"
+
+
 def test_tui_controller_error_messages_do_not_expose_api_key(tmp_path):
     secret = "sk-tui-broken-secret"
     controller = LLMScreenController(tmp_path)
@@ -76,3 +124,25 @@ def test_tui_controller_error_messages_do_not_expose_api_key(tmp_path):
     assert result["ok"] is False
     assert result["error"]["code"] == "missing_base_url"
     assert secret not in str(result)
+
+
+def test_tui_controller_readiness_message_redacts_api_key(tmp_path):
+    secret = "sk-tui-readiness-secret"
+    controller = LLMScreenController(tmp_path)
+
+    result = controller.add_provider(
+        "needs-model",
+        base_url="https://needs-model.local.test/v1",
+        api_key=secret,
+        model="",
+        set_current=False,
+    )
+    switch_result = controller.manager.switch_provider("needs-model", save=False)
+    readiness = controller.readiness()
+
+    assert result["ok"] is True
+    assert switch_result["ok"] is False
+    assert readiness["ok"] is False
+    assert secret not in str(result)
+    assert secret not in str(switch_result)
+    assert secret not in str(readiness)

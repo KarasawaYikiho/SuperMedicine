@@ -9,6 +9,8 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Select, Static
 
+from core.redaction import redact_sensitive
+from core.tui.app import apply_status_style
 from core.tui.i18n import t
 
 
@@ -27,7 +29,7 @@ class DialogView(Vertical):
             id="dialog-workspace-select",
         )
         yield DataTable(id="dialog-table", cursor_type="row")
-        with Horizontal():
+        with Horizontal(classes="form-row"):
             yield Button(t("refresh"), id="dialog-refresh", classes="btn btn-secondary")
         yield Static("", id="dialog-status")
 
@@ -47,7 +49,7 @@ class DialogView(Vertical):
             options = [(ws["label"], ws["id"]) for ws in workspaces]
             select_widget.set_options(options)
         except Exception as e:
-            self._set_status(f"{t('error')}: {e}")
+            self._set_error(e)
 
     def _get_selected_workspace(self) -> str | None:
         select_widget = self.query_one("#dialog-workspace-select", Select)
@@ -58,13 +60,12 @@ class DialogView(Vertical):
 
     def _load_dialog_history(self) -> None:
         workspace_id = self._get_selected_workspace()
-        if not workspace_id:
-            self._set_status(t("paper_select_workspace"))
-            return
-
         table = self.query_one("#dialog-table", DataTable)
         table.clear(columns=True)
         table.add_columns(t("dialog_event"), t("dialog_summary"), t("dialog_time"))
+        if not workspace_id:
+            self._set_status(t("paper_select_workspace"))
+            return
 
         from core.tui.dialog_history import DialogHistoryStore
 
@@ -81,12 +82,18 @@ class DialogView(Vertical):
                     event.created_at,
                     key=event.id,
                 )
+            self._set_status(f"{t('dialog_refreshed')}: {len(events)}")
         except Exception as e:
-            self._set_status(f"{t('error')}: {e}")
+            self._set_error(e)
 
     def _set_status(self, message: str) -> None:
         status = self.query_one("#dialog-status", Static)
-        status.update(message)
+        safe_message = str(redact_sensitive(message))
+        status.update(safe_message)
+        apply_status_style(status, safe_message)
+
+    def _set_error(self, error: Exception) -> None:
+        self._set_status(f"{t('error')}: {redact_sensitive(str(error)) or t('safe_error_hint')}")
 
     def on_select_changed(self, event: Select.Changed) -> None:
         if event.select.id == "dialog-workspace-select":

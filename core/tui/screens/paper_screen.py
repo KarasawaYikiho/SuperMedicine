@@ -9,6 +9,8 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Input, Select, Static
 
+from core.redaction import redact_sensitive
+from core.tui.app import apply_status_style
 from core.tui.i18n import t
 
 
@@ -27,19 +29,19 @@ class PaperView(Vertical):
             id="paper-workspace-select",
         )
         yield DataTable(id="paper-table", cursor_type="row")
-        with Horizontal():
+        with Horizontal(classes="form-row"):
             yield Input(placeholder=t("paper_file_path"), id="paper-path-input")
             yield Input(placeholder=t("paper_title_label"), id="paper-title-input")
-        with Horizontal():
+        with Horizontal(classes="form-row"):
             yield Input(placeholder=t("paper_doi_label"), id="paper-doi-input")
             yield Input(placeholder=t("paper_pmid_label"), id="paper-pmid-input")
-        with Horizontal():
+        with Horizontal(classes="form-row"):
             yield Input(placeholder=t("paper_notes_label"), id="paper-notes-input")
             yield Input(placeholder=t("paper_tags_label"), id="paper-tags-input")
-        with Horizontal():
+        with Horizontal(classes="form-row"):
             yield Button(t("paper_import"), id="paper-import", classes="btn btn-primary")
-            yield Button(t("paper_enrich"), id="paper-enrich", classes="btn btn-secondary")
             yield Button(t("refresh"), id="paper-refresh", classes="btn btn-secondary")
+            yield Button(t("paper_enrich"), id="paper-enrich", classes="btn btn-secondary")
         yield Static("", id="paper-status")
 
     def on_mount(self) -> None:
@@ -63,7 +65,7 @@ class PaperView(Vertical):
             options = [(ws["label"], ws["id"]) for ws in workspaces]
             select_widget.set_options(options)
         except Exception as e:
-            self._set_status(f"{t('error')}: {e}")
+            self._set_error(e)
 
     def _get_selected_workspace(self) -> str | None:
         select_widget = self.query_one("#paper-workspace-select", Select)
@@ -74,13 +76,12 @@ class PaperView(Vertical):
 
     def _load_papers(self) -> None:
         workspace_id = self._get_selected_workspace()
-        if not workspace_id:
-            self._set_status(t("paper_select_workspace"))
-            return
-
         table = self.query_one("#paper-table", DataTable)
         table.clear(columns=True)
         table.add_columns("ID", t("paper_title_label"), t("paper_authors"), t("paper_format"), t("paper_imported_at"))
+        if not workspace_id:
+            self._set_status(t("paper_select_workspace"))
+            return
 
         controller = self._get_paper_controller()
         try:
@@ -98,12 +99,18 @@ class PaperView(Vertical):
                     paper.get("imported_at", ""),
                     key=paper.get("id", ""),
                 )
+            self._set_status(f"{t('paper_list')}: {len(papers)}")
         except Exception as e:
-            self._set_status(f"{t('error')}: {e}")
+            self._set_error(e)
 
     def _set_status(self, message: str) -> None:
         status = self.query_one("#paper-status", Static)
-        status.update(message)
+        safe_message = str(redact_sensitive(message))
+        status.update(safe_message)
+        apply_status_style(status, safe_message)
+
+    def _set_error(self, error: Exception) -> None:
+        self._set_status(f"{t('error')}: {redact_sensitive(str(error)) or t('safe_error_hint')}")
 
     def on_select_changed(self, event: Select.Changed) -> None:
         if event.select.id == "paper-workspace-select":
@@ -153,7 +160,7 @@ class PaperView(Vertical):
             self._set_status(result.get("message", t("paper_imported")))
             self._load_papers()
         except Exception as e:
-            self._set_status(f"{t('error')}: {e}")
+            self._set_error(e)
 
     def _enrich_paper(self) -> None:
         workspace_id = self._get_selected_workspace()
@@ -167,13 +174,17 @@ class PaperView(Vertical):
             return
 
         row_key = table.get_row_at(table.cursor_row)[0]
+        confirmation = self.query_one("#paper-doi-input", Input).value.strip()
+        if confirmation != str(row_key):
+            self._set_status(t("paper_enrich_confirm"))
+            return
         controller = self._get_paper_controller()
         try:
             result = controller.enrich_metadata(workspace_id, row_key, confirm=True)
             self._set_status(result.get("message", ""))
             self._load_papers()
         except Exception as e:
-            self._set_status(f"{t('error')}: {e}")
+            self._set_error(e)
 
 
 # Backward-compatible alias

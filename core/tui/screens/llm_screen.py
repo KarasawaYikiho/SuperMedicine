@@ -12,6 +12,7 @@ from textual.widgets import Button, DataTable, Input, Select, Static
 from core.config_center import ConfigCenter
 from core.llm_manager import LLMConfigManager
 from core.redaction import redact_sensitive
+from core.tui.app import apply_status_style
 from core.tui.i18n import t
 
 
@@ -40,7 +41,7 @@ class LLMScreenController:
         return {
             "ok": False,
             "provider": provider,
-            "message": str(validation.get("error", {}).get("message") or t("llm_not_ready")),
+            "message": str(redact_sensitive(validation.get("error", {}).get("message") or t("llm_not_ready"))),
         }
 
     def add_provider(
@@ -82,7 +83,7 @@ class LLMView(Vertical):
         yield Static("", id="llm-current")
         yield Static(t("llm_secret_hidden"), id="llm-secret-hint")
         yield DataTable(id="llm-table", cursor_type="row")
-        with Horizontal():
+        with Horizontal(classes="form-row"):
             yield Select([], prompt=t("llm_missing_selection"), id="llm-provider-select")
             yield Button(t("llm_switch_provider"), id="llm-switch", classes="btn btn-primary")
             yield Button(t("refresh"), id="llm-refresh", classes="btn btn-secondary")
@@ -144,6 +145,7 @@ class LLMView(Vertical):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "llm-refresh":
             self.refresh_llm_state()
+            self._set_status(t("llm_refreshed"))
         elif event.button.id == "llm-add":
             self._add_provider_from_form()
         elif event.button.id == "llm-switch":
@@ -186,10 +188,13 @@ class LLMView(Vertical):
     def _safe_error_message(self, result: dict[str, Any]) -> str:
         error = result.get("error", {}) if isinstance(result, dict) else {}
         message = str(error.get("message") or t("error")) if isinstance(error, dict) else t("error")
-        return f"{t('error')}: {redact_sensitive(message)}"
+        return f"{t('error')}: {redact_sensitive(message) or t('safe_error_hint')}"
 
     def _set_status(self, message: str) -> None:
-        self.query_one("#llm-status", Static).update(str(redact_sensitive(message)))
+        status = self.query_one("#llm-status", Static)
+        safe_message = str(redact_sensitive(message))
+        status.update(safe_message)
+        apply_status_style(status, safe_message)
 
     def on_unmount(self) -> None:
         try:

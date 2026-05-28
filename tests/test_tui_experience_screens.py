@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import inspect
+
 import pytest
 
 from core.tui.screens.experience import ExperienceScreenController
+from core.tui.i18n import t
+from core.tui.screens.experience_screen import ExperienceView
 from core.workspace import WorkspaceManager
 
 
@@ -15,6 +19,22 @@ def test_experience_screen_suggest_requires_later_confirmation(tmp_path):
     assert suggestion["label"] == "经验分类建议"
     assert suggestion["confirmed"] is False
     assert controller.list_experiences("study-a") == []
+
+
+def test_experience_screen_empty_state_and_confirmation_copy_are_chinese(tmp_path):
+    WorkspaceManager(tmp_path).initialize_workspace("study-a")
+    controller = ExperienceScreenController(tmp_path)
+
+    assert controller.list_experiences("study-a") == []
+    assert t("experience_no_records") == "暂无经验记录"
+    with pytest.raises(ValueError, match="最终确认"):
+        controller.confirm_suggestion(
+            "study-a",
+            scope="workspace",
+            title="经验",
+            summary="摘要",
+            confirm=False,
+        )
 
 
 def test_experience_screen_confirm_then_list_edit_export(tmp_path):
@@ -64,3 +84,15 @@ def test_experience_screen_delete_requires_exact_confirmation(tmp_path):
     deleted = controller.delete_experience(record["id"], workspace_id="study-a", scope="workspace", confirm=record["id"])
     assert deleted["status"] == "deleted"
     assert controller.list_experiences("study-a") == []
+
+
+def test_experience_delete_copy_describes_exact_irreversible_confirmation():
+    assert "完全一致" in t("experience_delete_requires_confirm")
+    assert "不可恢复" in t("experience_delete_requires_confirm")
+
+
+def test_experience_view_sets_deterministic_non_empty_reload_status():
+    loader = inspect.getsource(ExperienceView._load_experiences)
+
+    assert "experience_list" in loader
+    assert "len(records)" in loader

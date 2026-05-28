@@ -9,7 +9,8 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Input, Static
 
-from core.tui.i18n import t
+from core.tui.app import apply_status_style
+from core.tui.i18n import t, tui_redact_sensitive
 
 
 class WorkspaceView(Vertical):
@@ -22,15 +23,15 @@ class WorkspaceView(Vertical):
     def compose(self) -> ComposeResult:
         yield Static(t("workspace_title"), classes="section-title")
         yield DataTable(id="workspace-table", cursor_type="row")
-        with Horizontal():
+        with Horizontal(classes="form-row"):
             yield Input(
                 placeholder=t("workspace_id_label") + " (a-z, 0-9, -)",
                 id="workspace-id-input",
             )
             yield Button(t("workspace_create"), id="workspace-create", classes="btn btn-primary")
             yield Button(t("workspace_select"), id="workspace-select", classes="btn btn-secondary")
-            yield Button(t("workspace_delete"), id="workspace-delete", classes="btn btn-danger")
             yield Button(t("refresh"), id="workspace-refresh", classes="btn btn-secondary")
+            yield Button(t("workspace_delete"), id="workspace-delete", classes="btn btn-danger")
         yield Static("", id="workspace-status")
 
     def on_mount(self) -> None:
@@ -56,13 +57,20 @@ class WorkspaceView(Vertical):
                 metadata = ws.get("metadata", {})
                 created_at = metadata.get("created_at", "")
                 table.add_row(ws["id"], ws["path"], str(created_at), key=ws["id"])
+            self._set_status(f"{t('workspace_list')}: {len(workspaces)}")
         except Exception as e:
-            self._set_status(f"{t('error')}: {e}")
-            self.app.notify(f"{t('error')}: {e}", severity="error")
+            self._set_error(e)
 
     def _set_status(self, message: str) -> None:
         status = self.query_one("#workspace-status", Static)
-        status.update(message)
+        safe_message = tui_redact_sensitive(message)
+        status.update(safe_message)
+        apply_status_style(status, safe_message)
+
+    def _set_error(self, error: Exception) -> None:
+        message = f"{t('error')}: {tui_redact_sensitive(str(error)) or t('safe_error_hint')}"
+        self._set_status(message)
+        self.app.notify(message, severity="error")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         input_widget = self.query_one("#workspace-id-input", Input)
@@ -88,8 +96,7 @@ class WorkspaceView(Vertical):
             self.app.notify(result.get("message", t("workspace_created")))
             self._load_workspaces()
         except Exception as e:
-            self._set_status(f"{t('error')}: {e}")
-            self.app.notify(f"{t('error')}: {e}", severity="error")
+            self._set_error(e)
 
     def _select_workspace(self, workspace_id: str) -> None:
         if not workspace_id:
@@ -101,12 +108,11 @@ class WorkspaceView(Vertical):
             self._set_status(result.get("message", t("workspace_selected")))
             self.app.notify(result.get("message", t("workspace_selected")))
         except Exception as e:
-            self._set_status(f"{t('error')}: {e}")
-            self.app.notify(f"{t('error')}: {e}", severity="error")
+            self._set_error(e)
 
     def _delete_workspace(self, workspace_id: str) -> None:
         if not workspace_id:
-            self._set_status(f"{t('error')}: {t('workspace_confirm_delete')}")
+            self._set_status(f"{t('error')}: {t('workspace_delete_requires_confirm')}")
             return
         controller = self._get_controller()
         try:
@@ -115,8 +121,7 @@ class WorkspaceView(Vertical):
             self.app.notify(result.get("message", t("workspace_deleted")))
             self._load_workspaces()
         except Exception as e:
-            self._set_status(f"{t('error')}: {e}")
-            self.app.notify(f"{t('error')}: {e}", severity="error")
+            self._set_error(e)
 
 
 # Backward-compatible alias

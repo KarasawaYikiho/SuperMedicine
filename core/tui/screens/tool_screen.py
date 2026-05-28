@@ -10,6 +10,8 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Input, Select, Static
 
+from core.redaction import redact_sensitive
+from core.tui.app import apply_status_style
 from core.tui.i18n import t
 
 
@@ -28,7 +30,7 @@ class ToolView(Vertical):
             id="tool-workspace-select",
         )
         yield DataTable(id="tool-table", cursor_type="row")
-        with Horizontal():
+        with Horizontal(classes="form-row"):
             yield Select(
                 [
                     (t("tool_language_python"), "python"),
@@ -38,7 +40,7 @@ class ToolView(Vertical):
                 id="tool-language-select",
             )
             yield Input(placeholder=t("tool_tool_id"), id="tool-id-input")
-        with Horizontal():
+        with Horizontal(classes="form-row"):
             yield Button(t("tool_init"), id="tool-init", classes="btn btn-secondary")
             yield Button(t("tool_add"), id="tool-add", classes="btn btn-primary")
             yield Button(t("tool_run"), id="tool-run", classes="btn btn-secondary")
@@ -61,7 +63,7 @@ class ToolView(Vertical):
             options = [(ws["label"], ws["id"]) for ws in workspaces]
             select_widget.set_options(options)
         except Exception as e:
-            self._set_status(f"{t('error')}: {e}")
+            self._set_error(e)
 
     def _get_selected_workspace(self) -> str | None:
         select_widget = self.query_one("#tool-workspace-select", Select)
@@ -86,13 +88,12 @@ class ToolView(Vertical):
 
     def _load_tools(self) -> None:
         workspace_path = self._get_workspace_path()
-        if not workspace_path:
-            self._set_status(t("paper_select_workspace"))
-            return
-
         table = self.query_one("#tool-table", DataTable)
         table.clear(columns=True)
         table.add_columns(t("tool_language"), "ID", t("dashboard_status"))
+        if not workspace_path:
+            self._set_status(t("paper_select_workspace"))
+            return
 
         tools_dir = workspace_path / "tools"
         if not tools_dir.is_dir():
@@ -122,7 +123,12 @@ class ToolView(Vertical):
 
     def _set_status(self, message: str) -> None:
         status = self.query_one("#tool-status", Static)
-        status.update(message)
+        safe_message = str(redact_sensitive(message))
+        status.update(safe_message)
+        apply_status_style(status, safe_message)
+
+    def _set_error(self, error: Exception) -> None:
+        self._set_status(f"{t('error')}: {redact_sensitive(str(error)) or t('safe_error_hint')}")
 
     def on_select_changed(self, event: Select.Changed) -> None:
         if event.select.id == "tool-workspace-select":

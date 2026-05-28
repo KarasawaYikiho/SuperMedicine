@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Any
+
+from core.redaction import redact_sensitive
+
 
 LABELS: dict[str, str] = {
     # Existing
@@ -11,7 +15,7 @@ LABELS: dict[str, str] = {
     "recent_workspace": "最近工作区",
     "no_recent_workspace": "尚未选择最近工作区",
     "permission_required": "需要权限确认",
-    "confirmation_required": "高风险操作需要显式确认",
+    "confirmation_required": "危险操作需要显式确认",
     "permission_denied": "权限策略拒绝该操作",
     "permission_allowed": "权限策略允许该操作",
     "dry_run_status": "TUI 基础组件已就绪（未启动交互界面）",
@@ -28,9 +32,14 @@ LABELS: dict[str, str] = {
     "nav_llm": "LLM 管理",
     "nav_quit": "退出",
     "nav_maximize": "最大化",
+    "layout_shortcuts": "快捷键",
+    "layout_current_view": "当前视图",
+    "layout_focus": "焦点",
+    "layout_sidebar_title": "SuperMedicine",
+    "layout_sidebar_subtitle": "智能医学工作台",
 
     # Dashboard
-    "dashboard_title": "仪表盘",
+    "dashboard_title": "运行上下文总览",
     "dashboard_version": "版本",
     "dashboard_status": "状态",
     "dashboard_plugins": "插件数",
@@ -42,6 +51,18 @@ LABELS: dict[str, str] = {
     "dashboard_quick_actions": "快捷操作",
     "dashboard_initialized": "已初始化",
     "dashboard_not_initialized": "未初始化",
+    "dashboard_init_status": "初始化状态",
+    "dashboard_llm_status": "当前 LLM 状态",
+    "dashboard_recent_hint": "最近工作区/会话",
+    "dashboard_action_hint": "可操作建议",
+    "dashboard_no_workspace_hint": "暂无工作区，请先创建",
+    "dashboard_recent_workspace_hint": "最近工作区",
+    "dashboard_llm_no_provider": "暂无 LLM Provider",
+    "dashboard_llm_missing": "缺少",
+    "dashboard_action_init": "请先运行初始化流程，生成 .supermedicine 配置目录。",
+    "dashboard_action_create_workspace": "建议创建工作区，并在 LLM 管理中配置 Provider。",
+    "dashboard_action_configure_llm": "建议在 LLM 管理中配置可用 Provider。",
+    "dashboard_action_ready": "运行上下文已就绪，可进入对话或工作区继续任务。",
 
     # Workspace
     "workspace_title": "工作区管理",
@@ -52,10 +73,12 @@ LABELS: dict[str, str] = {
     "workspace_id_label": "工作区 ID",
     "workspace_name_label": "显示名称（可选）",
     "workspace_confirm_delete": "输入工作区 ID 确认删除",
+    "workspace_delete_requires_confirm": "危险操作：删除工作区前，请在输入框输入完全一致的工作区 ID。此操作会硬删除工作区且不可恢复。",
     "workspace_no_workspaces": "暂无工作区，请先创建",
     "workspace_created": "工作区已创建",
     "workspace_selected": "已选择工作区",
     "workspace_deleted": "工作区已删除",
+    "workspace_refreshed": "工作区列表已刷新",
     "workspace_path": "路径",
     "workspace_created_at": "创建时间",
 
@@ -76,7 +99,8 @@ LABELS: dict[str, str] = {
     "paper_format": "格式",
     "paper_imported_at": "导入时间",
     "paper_enrich": "在线补全",
-    "paper_enrich_confirm": "确认在线补全？将发起网络请求。",
+    "paper_enrich_confirm": "在线补全将发起网络请求。请在 DOI 输入框输入选中论文 ID 后再点击在线补全。",
+    "paper_refreshed": "论文列表已刷新",
 
     # Experience
     "experience_title": "经验学习",
@@ -95,6 +119,8 @@ LABELS: dict[str, str] = {
     "experience_export": "导出经验",
     "experience_export_format": "导出格式",
     "experience_confirm_delete": "输入经验 ID 确认删除",
+    "experience_delete_requires_confirm": "危险操作：删除经验前，请在经验标题输入框输入完全一致的经验 ID。此操作不可恢复。",
+    "experience_refreshed": "经验列表已刷新",
 
     # Tool
     "tool_title": "工具管理",
@@ -110,6 +136,7 @@ LABELS: dict[str, str] = {
     "tool_initialized": "工具目录已初始化",
     "tool_added": "工具已添加",
     "tool_run": "运行工具",
+    "tool_refreshed": "工具列表已刷新",
 
     # Dialog
     "dialog_title": "对话历史",
@@ -117,6 +144,7 @@ LABELS: dict[str, str] = {
     "dialog_event": "事件",
     "dialog_summary": "摘要",
     "dialog_time": "时间",
+    "dialog_refreshed": "对话历史已刷新",
 
     # LLM
     "llm_title": "LLM 管理",
@@ -138,6 +166,8 @@ LABELS: dict[str, str] = {
     "llm_missing_provider": "请输入 Provider 名称",
     "llm_missing_selection": "请选择 Provider",
     "llm_secret_hidden": "密钥已隐藏，不会显示在状态栏或通知中",
+    "llm_refreshed": "LLM Provider 列表已刷新",
+    "safe_error_hint": "操作失败，敏感信息已隐藏。请检查输入、配置与权限后重试。",
 
     # Common
     "confirm": "确认",
@@ -161,11 +191,31 @@ LABELS: dict[str, str] = {
     "no_selection": "未选择",
     "status_workspaces": "工作区",
     "status_plugins": "插件",
+    "status_task_idle": "任务空闲",
+    "status_task_running": "任务执行中",
+    "status_focus_input": "输入栏",
+    "status_shortcuts_hint": "1-8 切换视图 · Tab/Shift+Tab 移动焦点 · Enter 提交 · ? 帮助 · F 最大化 · Q 退出",
     "thinking": "正在思考...",
-    "chat_help": "在下方输入框输入消息，按 Enter 发送。输入 /help 查看命令。",
+    "chat_separator": "────────────────────────────────────────",
+    "chat_user_label": "用户",
+    "chat_system_label": "系统",
+    "chat_assistant_label": "助手",
+    "chat_error_label": "错误",
+    "chat_status_label": "状态",
+    "chat_running": "任务已开始，正在调用内核执行...",
+    "chat_completed": "任务已完成",
+    "chat_no_output": "内核未返回可显示内容",
+    "chat_error_action": "请检查输入、插件配置与权限策略后重试。敏感信息已隐藏。",
+    "chat_result_status": "执行状态",
+    "chat_result_output": "输出",
+    "chat_help": "在下方输入框输入消息，按 Enter 提交当前输入。输入 /help 查看命令。",
     "help_title": "快捷键帮助",
-    "help_navigation": "导航：↑↓ 选择 | Enter 确认 | Esc 返回",
-    "help_global": "全局：Q 退出 | ? 帮助 | F 最大化 | Tab 切换焦点",
+    "help_navigation": "导航：1-8 数字键直接切换视图；↑↓ 在侧边栏选择；Tab/Shift+Tab 在输入框、按钮和列表间移动焦点。",
+    "help_submission": "提交：焦点在输入栏时按 Enter 提交消息；焦点在按钮/列表时按 Enter 激活当前项。",
+    "help_refresh": "刷新：各管理页的“刷新”按钮会重新读取当前工作区、论文、经验、工具、对话或 LLM Provider 列表。",
+    "help_danger": "危险操作：删除工作区、删除经验和在线补全等操作需要明确输入 ID 或点击确认；不可恢复操作会使用危险按钮样式提示。",
+    "help_status": "状态栏：左侧显示工作区和焦点；中间显示插件数、LLM 状态和任务运行状态（任务空闲/任务执行中）；右侧显示当前视图和版本。",
+    "help_global": "全局：Q 退出 | ? 帮助 | F 最大化/还原焦点组件 | Esc 退出最大化",
     "help_escape_hint": "按 Esc 可退出最大化",
 }
 
@@ -174,3 +224,14 @@ def t(key: str) -> str:
     """Return a Chinese UI label by key, falling back to the key itself."""
 
     return LABELS.get(key, key)
+
+
+def tui_redact_sensitive(value: Any) -> str:
+    """Return TUI-display-safe text with Chinese redaction copy.
+
+    The shared redaction utility intentionally uses the neutral ``[REDACTED]``
+    marker for API and non-UI surfaces.  Chinese TUI status lines and notices
+    should keep the same masking behavior while presenting localized copy.
+    """
+
+    return str(redact_sensitive(value)).replace("[REDACTED]", "[已隐藏]")
