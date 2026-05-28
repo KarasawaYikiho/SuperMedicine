@@ -14,6 +14,8 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Footer, Header, Input, ListItem, ListView, Static
 
+from core.config_center import ConfigCenter
+from core.llm_manager import LLMConfigManager
 from core.tui.i18n import LABELS, t
 
 
@@ -28,6 +30,8 @@ class TUIStatus:
     message: str
     labels: dict[str, str]
     interactive: bool
+    llm_ready: bool = False
+    llm_provider: str = ""
 
 
 class NavItem(ListItem):
@@ -59,6 +63,7 @@ class SuperMedicineTUI(App[Any]):
         Binding("5", "switch_view('experience')", t("nav_experience"), show=False),
         Binding("6", "switch_view('tool')", t("nav_tool"), show=False),
         Binding("7", "switch_view('dialog')", t("nav_dialog"), show=False),
+        Binding("8", "switch_view('llm')", t("nav_llm"), show=False),
     ]
 
     def __init__(self, project_root: Path | str | None = None, **kwargs: Any) -> None:
@@ -79,6 +84,7 @@ class SuperMedicineTUI(App[Any]):
                     NavItem(f"💡 {t('nav_experience')}", "experience"),
                     NavItem(f"🔧 {t('nav_tool')}", "tool"),
                     NavItem(f"📋 {t('nav_dialog')}", "dialog"),
+                    NavItem(f"🤖 {t('nav_llm')}", "llm"),
                     id="nav-list",
                 )
             with Vertical(id="main-area"):
@@ -102,6 +108,7 @@ class SuperMedicineTUI(App[Any]):
         from core.tui.screens.dashboard import DashboardView
         from core.tui.screens.dialog_screen import DialogView
         from core.tui.screens.experience_screen import ExperienceView
+        from core.tui.screens.llm_screen import LLMView
         from core.tui.screens.paper_screen import PaperView
         from core.tui.screens.tool_screen import ToolView
         from core.tui.screens.workspace_screen import WorkspaceView
@@ -114,6 +121,7 @@ class SuperMedicineTUI(App[Any]):
             "experience": ExperienceView(self.project_root),
             "tool": ToolView(self.project_root),
             "dialog": DialogView(self.project_root),
+            "llm": LLMView(self.project_root),
         }
         # Add all views to content pane, hide all except chat
         content_pane = self.query_one("#content-pane")
@@ -172,6 +180,7 @@ class SuperMedicineTUI(App[Any]):
             "experience": t("nav_experience"),
             "tool": t("nav_tool"),
             "dialog": t("nav_dialog"),
+            "llm": t("nav_llm"),
         }
         title_widget = self.query_one("#view-title", Static)
         title_widget.update(title_map.get(view_id, view_id))
@@ -200,7 +209,7 @@ class SuperMedicineTUI(App[Any]):
         status_right = self.query_one("#status-right", Static)
 
         status_left.update(f"  📁 {ws_count} {t('status_workspaces')}")
-        status_center.update(f"  🔌 {plugin_count} {t('status_plugins')}")
+        status_center.update(f"  🔌 {plugin_count} {t('status_plugins')}  |  {self._llm_status_label()}")
         try:
             from importlib.metadata import version as pkg_version
             ver = pkg_version("supermedicine")
@@ -268,6 +277,31 @@ class SuperMedicineTUI(App[Any]):
         except Exception as e:
             chat_view.add_error_message(f"{t('error')}: {e}")
 
+    def _llm_manager(self) -> LLMConfigManager:
+        config_path = self.project_root / ".supermedicine" / "config.yaml"
+        return LLMConfigManager(ConfigCenter(config_path))
+
+    def _llm_status_label(self) -> str:
+        try:
+            manager = self._llm_manager()
+            current = manager.get_current_provider(redacted=True)
+            provider = str(current.get("provider") or "")
+            if provider and manager.validate_provider(provider) is None:
+                return f"🤖 {provider} {t('llm_ready')}"
+            return f"🤖 {t('llm_not_ready')}"
+        except Exception:
+            return f"🤖 {t('llm_not_ready')}"
+
+    def _save_llm_exit_state(self) -> None:
+        try:
+            self._llm_manager().save_exit_state()
+        except Exception:
+            pass
+
+    def on_unmount(self) -> None:
+        """Persist the last selected LLM provider when the app closes."""
+        self._save_llm_exit_state()
+
 
 def launch_tui(*, dry_run: bool = False, project_root: Path | str | None = None) -> TUIStatus:
     """Launch or describe the Chinese TUI foundation.
@@ -276,11 +310,19 @@ def launch_tui(*, dry_run: bool = False, project_root: Path | str | None = None)
     message, which keeps command-line tests non-interactive.
     """
 
+    llm_ready, llm_provider = _describe_llm_status(project_root or Path.cwd())
+    status_message = t("dry_run_status") if dry_run else t("welcome")
+    if dry_run:
+        llm_text = f"{t('llm_ready')}: {llm_provider}" if llm_ready else t("llm_not_ready")
+        status_message = f"{status_message}；{llm_text}"
+
     status = TUIStatus(
         title=t("app_title"),
-        message=t("dry_run_status") if dry_run else t("welcome"),
+        message=status_message,
         labels=dict(LABELS),
         interactive=not dry_run,
+        llm_ready=llm_ready,
+        llm_provider=llm_provider,
     )
     console = Console()
     console.print(f"[bold]{status.title}[/bold]")
@@ -301,6 +343,19 @@ def launch_tui(*, dry_run: bool = False, project_root: Path | str | None = None)
             interactive=False,
         )
     return status
+
+
+def _describe_llm_status(project_root: Path | str) -> tuple[bool, str]:
+    try:
+        root = Path(project_root)
+        manager = LLMConfigManager(ConfigCenter(root / ".supermedicine" / "config.yaml"))
+        current = manager.get_current_provider(redacted=True)
+        provider = str(current.get("provider") or "")
+        if not provider:
+            return False, ""
+        return manager.validate_provider(provider) is None, provider
+    except Exception:
+        return False, ""
 
 
 def build_parser() -> argparse.ArgumentParser:

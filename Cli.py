@@ -31,21 +31,20 @@ class CLI:
         self.kernel = None
         self.orchestrator = None
 
-    def init(self, project_dir: Path) -> None:
+    def init(
+        self,
+        project_dir: Path,
+        *,
+        provider: str | None = None,
+        base_url: str | None = None,
+        api_key: str | None = None,
+        model: str | None = None,
+    ) -> None:
         """初始化项目"""
-        from permission.policy import ensure_default_policy
-        from Install import _default_config_text
+        from Install import init_config
 
-        config_dir = project_dir / ".supermedicine"
-        config_dir.mkdir(parents=True, exist_ok=True)
-        (config_dir / "config.yaml").write_text(
-            _default_config_text(),
-            encoding="utf-8",
-        )
-        (config_dir / "agents").mkdir(exist_ok=True)
-        (config_dir / "plugins").mkdir(exist_ok=True)
-        ensure_default_policy(project_dir, Path(__file__).parent)
-        logger.info("项目已初始化: %s", config_dir)
+        init_config(project_dir, provider=provider, base_url=base_url, api_key=api_key, model=model)
+        logger.info("项目已初始化: %s", project_dir / ".supermedicine")
 
     def status(self) -> None:
         """显示项目状态"""
@@ -312,6 +311,72 @@ class CLI:
             input_path=input_path,
             output_path=output_path,
         ).to_dict()
+        logger.info(json.dumps(result, ensure_ascii=False, indent=2))
+        return result
+
+    def llm_add(
+        self,
+        provider: str,
+        *,
+        api_format: str | None = None,
+        base_url: str | None = None,
+        api_key: str | None = None,
+        api_key_env: str | None = None,
+        model: str | None = None,
+        timeout: float | None = None,
+        headers: dict | None = None,
+        set_current: bool = False,
+    ) -> dict:
+        """Add or update an LLM provider through the shared manager."""
+        from core.config_center import ConfigCenter
+        from core.llm_manager import LLMConfigManager
+
+        values = _llm_provider_values(
+            api_format=api_format,
+            base_url=base_url,
+            api_key=api_key,
+            api_key_env=api_key_env,
+            model=model,
+            timeout=timeout,
+            headers=headers,
+        )
+        manager = LLMConfigManager(ConfigCenter(Path.cwd() / ".supermedicine" / "config.yaml"), restore_on_startup=False)
+        result = manager.add_provider(provider, values, set_current=set_current)
+        logger.info(json.dumps(result, ensure_ascii=False, indent=2))
+        return result
+
+    def llm_list(self) -> dict:
+        """List configured LLM providers with secret-safe output."""
+        from core.config_center import ConfigCenter
+        from core.llm_manager import LLMConfigManager
+
+        manager = LLMConfigManager(ConfigCenter(Path.cwd() / ".supermedicine" / "config.yaml"), restore_on_startup=False)
+        config = manager._config
+        result = {
+            "current_provider": config.get_llm_current_provider_name(),
+            "last_provider": config.get_llm_last_provider_name(),
+            "providers": manager.list_providers(redacted=True),
+        }
+        logger.info(json.dumps(result, ensure_ascii=False, indent=2))
+        return result
+
+    def llm_show(self, provider: str | None = None) -> dict:
+        """Show one LLM provider, defaulting to the current provider, redacted."""
+        from core.config_center import ConfigCenter
+        from core.llm_manager import LLMConfigManager
+
+        manager = LLMConfigManager(ConfigCenter(Path.cwd() / ".supermedicine" / "config.yaml"), restore_on_startup=True)
+        result = manager.get_provider(provider, redacted=True) if provider else manager.get_current_provider(redacted=True)
+        logger.info(json.dumps(result, ensure_ascii=False, indent=2))
+        return result
+
+    def llm_switch(self, provider: str) -> dict:
+        """Persistently switch the current LLM provider."""
+        from core.config_center import ConfigCenter
+        from core.llm_manager import LLMConfigManager
+
+        manager = LLMConfigManager(ConfigCenter(Path.cwd() / ".supermedicine" / "config.yaml"), restore_on_startup=False)
+        result = manager.switch_provider(provider, save=True)
         logger.info(json.dumps(result, ensure_ascii=False, indent=2))
         return result
 
@@ -645,6 +710,55 @@ def _resolve_run_params(params_json: str | None, params_file: str | None) -> dic
     return None
 
 
+def _parse_llm_headers(header_items: list[str] | None, headers_json: str | None) -> dict[str, str]:
+    """Resolve LLM headers from repeated key=value args and optional JSON object."""
+    headers: dict[str, str] = {}
+    if headers_json:
+        try:
+            parsed = json.loads(headers_json)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"--headers-json must be valid JSON: {exc.msg}") from exc
+        if not isinstance(parsed, dict):
+            raise ValueError("--headers-json must be a JSON object")
+        headers.update({str(key): str(value) for key, value in parsed.items()})
+    for item in header_items or []:
+        if "=" not in item:
+            raise ValueError("--header must use KEY=VALUE format")
+        key, value = item.split("=", 1)
+        key = key.strip()
+        if not key:
+            raise ValueError("--header key cannot be empty")
+        headers[key] = value
+    return headers
+
+
+def _llm_provider_values(
+    *,
+    api_format: str | None = None,
+    base_url: str | None = None,
+    api_key: str | None = None,
+    api_key_env: str | None = None,
+    model: str | None = None,
+    timeout: float | None = None,
+    headers: dict | None = None,
+) -> dict:
+    """Build provider values for LLMConfigManager without duplicating persistence logic."""
+    values: dict = {}
+    for key, value in {
+        "api_format": api_format,
+        "base_url": base_url,
+        "api_key": api_key,
+        "api_key_env": api_key_env,
+        "model": model,
+        "timeout": timeout,
+    }.items():
+        if value is not None:
+            values[key] = value
+    if headers:
+        values["headers"] = headers
+    return values
+
+
 def main(argv: list[str] | None = None) -> None:
     logging.basicConfig(level=logging.INFO, format='%(message)s')
     parser = argparse.ArgumentParser(
@@ -656,6 +770,10 @@ def main(argv: list[str] | None = None) -> None:
     # Init 命令
     init_parser = subparsers.add_parser("init", help="初始化项目")
     init_parser.add_argument("--dir", type=str, default=".", help="项目目录")
+    init_parser.add_argument("--provider", type=str, default=None, help="LLM provider（openai、anthropic 或自定义 OpenAI-compatible provider）")
+    init_parser.add_argument("--base-url", type=str, default=None, help="LLM provider BaseURL；也可使用 SM_LLM_BASE_URL")
+    init_parser.add_argument("--api-key", type=str, default=None, help="LLM provider API key；也可使用 SM_LLM_API_KEY 或 provider 专用环境变量")
+    init_parser.add_argument("--model", type=str, default=None, help="默认 LLM model；也可使用 SM_LLM_MODEL")
 
     # Status 命令
     subparsers.add_parser("status", help="显示项目状态")
@@ -731,6 +849,30 @@ def main(argv: list[str] | None = None) -> None:
     tool_run_parser.add_argument("--dry-run", action="store_true", help="只输出准备好的命令")
     tool_run_parser.add_argument("--input", type=str, default=None, help="工作区内输入路径")
     tool_run_parser.add_argument("--output", type=str, default=None, help="工作区内输出路径")
+
+    # LLM 命令
+    llm_parser = subparsers.add_parser("llm", help="管理 LLM API provider")
+    llm_subparsers = llm_parser.add_subparsers(dest="llm_command")
+
+    llm_add_parser = llm_subparsers.add_parser("add", help="添加或更新 LLM API provider")
+    llm_add_parser.add_argument("provider", type=str, help="Provider 名称")
+    llm_add_parser.add_argument("--api-format", type=str, default=None, help="API 格式，如 openai 或 anthropic")
+    llm_add_parser.add_argument("--base-url", type=str, default=None, help="Provider Base URL")
+    llm_add_parser.add_argument("--api-key", type=str, default=None, help="API key；输出默认脱敏。推荐改用 --api-key-env")
+    llm_add_parser.add_argument("--api-key-env", type=str, default=None, help="读取 API key 的环境变量名；可避免命令行明文 key")
+    llm_add_parser.add_argument("--model", type=str, default=None, help="默认模型")
+    llm_add_parser.add_argument("--timeout", type=float, default=None, help="请求超时秒数")
+    llm_add_parser.add_argument("--header", action="append", default=None, help="额外请求头 KEY=VALUE；可重复")
+    llm_add_parser.add_argument("--headers-json", type=str, default=None, help="额外请求头 JSON 对象")
+    llm_add_parser.add_argument("--set-current", action="store_true", help="添加后立即切换为当前默认 provider")
+
+    llm_subparsers.add_parser("list", help="列出 LLM provider（默认脱敏）")
+
+    llm_show_parser = llm_subparsers.add_parser("show", help="显示当前或指定 LLM provider（默认脱敏）")
+    llm_show_parser.add_argument("provider", nargs="?", default=None, help="可选 Provider 名称；缺省显示当前默认 provider")
+
+    llm_switch_parser = llm_subparsers.add_parser("switch", help="切换当前默认 LLM provider 并持久化")
+    llm_switch_parser.add_argument("provider", type=str, help="Provider 名称")
 
     # Paper 命令（全部要求显式 --workspace；不会读取 TUI 最近状态）
     paper_parser = subparsers.add_parser("paper", help="管理工作区论文导入与元数据")
@@ -833,7 +975,17 @@ def main(argv: list[str] | None = None) -> None:
     cli = CLI()
 
     if args.command == "init":
-        cli.init(Path(args.dir))
+        from Install import _normalize_provider, _resolve_api_key, _resolve_install_value
+
+        provider = _resolve_install_value("provider", args.provider)
+        base_url = _resolve_install_value("base_url", args.base_url)
+        model = _resolve_install_value("model", args.model)
+        normalized_provider = _normalize_provider(provider)
+        api_key = _resolve_api_key(normalized_provider, args.api_key)
+        try:
+            cli.init(Path(args.dir), provider=normalized_provider, base_url=base_url, api_key=api_key, model=model)
+        except ValueError as exc:
+            init_parser.error(str(exc))
     elif args.command == "status":
         cli.status()
     elif args.command == "test":
@@ -888,6 +1040,31 @@ def main(argv: list[str] | None = None) -> None:
             )
         else:
             tool_parser.print_help()
+    elif args.command == "llm":
+        try:
+            if args.llm_command == "add":
+                headers = _parse_llm_headers(args.header, args.headers_json)
+                cli.llm_add(
+                    args.provider,
+                    api_format=args.api_format,
+                    base_url=args.base_url,
+                    api_key=args.api_key,
+                    api_key_env=args.api_key_env,
+                    model=args.model,
+                    timeout=args.timeout,
+                    headers=headers,
+                    set_current=args.set_current,
+                )
+            elif args.llm_command == "list":
+                cli.llm_list()
+            elif args.llm_command == "show":
+                cli.llm_show(args.provider)
+            elif args.llm_command == "switch":
+                cli.llm_switch(args.provider)
+            else:
+                llm_parser.print_help()
+        except ValueError as exc:
+            llm_parser.error(str(exc))
     elif args.command == "paper":
         if args.paper_command == "import":
             cli.paper_import(

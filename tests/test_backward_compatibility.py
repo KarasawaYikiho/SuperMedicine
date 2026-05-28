@@ -34,6 +34,22 @@ def _write_policy(project_dir: Path, policy: dict | list[dict]) -> Path:
     return policies
 
 
+def _init_args(project_dir: Path) -> list[str]:
+    return [
+        "init",
+        "--dir",
+        str(project_dir),
+        "--provider",
+        "openai",
+        "--base-url",
+        "https://openai.compat.test/v1",
+        "--api-key",
+        "compat-test-secret",
+        "--model",
+        "gpt-compat",
+    ]
+
+
 def test_cli_help_preserves_legacy_commands_and_run_flags(capsys):
     with pytest.raises(SystemExit) as top_level:
         main(["--help"])
@@ -89,7 +105,7 @@ def test_cli_help_and_init_do_not_require_platform_runtime_or_config(monkeypatch
     assert "supermedicine" in top_help
 
     project_dir = tmp_path / "standalone-project"
-    main(["init", "--dir", str(project_dir)])
+    main(_init_args(project_dir))
 
     assert (project_dir / ".supermedicine" / "config.yaml").is_file()
     assert (project_dir / ".supermedicine" / "policies" / PermissionEngine.DEFAULT_POLICY_FILENAME).is_file()

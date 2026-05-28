@@ -4,7 +4,10 @@ from __future__ import annotations
 import json
 from unittest.mock import patch
 
-from core.llm_client import create_llm_client
+import yaml
+
+from core.config_center import ConfigCenter
+from core.llm_client import create_configured_llm_client, create_llm_client
 from core.llm_providers.base import AnthropicClient, OpenAIClient
 from core.llm_providers.config import LLMProviderConfig
 from core.llm_providers.openrouter import OpenRouterClient
@@ -74,12 +77,40 @@ class TestLLMFactory:
         assert client.model == "claude-test"
 
     def test_create_unsupported(self):
-        """不支持的 Provider 抛出 ValueError"""
+        """未配置 api_format 的自定义 Provider 抛出 ValueError"""
         try:
             create_llm_client("unsupported")
             assert False, "Should have raised ValueError"
         except ValueError as e:
             assert "Unsupported" in str(e)
+
+    def test_create_custom_openai_format_provider_from_config(self):
+        client = create_llm_client(
+            "local-openai-compatible",
+            config={
+                "api_format": "openai",
+                "base_url": "https://local-openai.test/v1",
+                "api_key": "test-key",
+                "model": "local-gpt",
+            },
+        )
+
+        assert isinstance(client, OpenAIClient)
+        assert client.model == "local-gpt"
+
+    def test_create_custom_anthropic_format_provider_from_config(self):
+        client = create_llm_client(
+            "local-anthropic-compatible",
+            config={
+                "api_format": "anthropic",
+                "base_url": "https://local-anthropic.test/v1",
+                "api_key": "test-key",
+                "model": "local-claude",
+            },
+        )
+
+        assert isinstance(client, AnthropicClient)
+        assert client.model == "local-claude"
 
 
 class TestUnifiedProviderConfig:
@@ -87,6 +118,12 @@ class TestUnifiedProviderConfig:
         client = create_llm_client("openai", api_key="", base_url="https://example.test/v1")
         result = client.complete("Hello")
         assert result["error"]["code"] == "missing_api_key"
+
+    def test_openai_config_does_not_inject_real_provider_defaults(self):
+        config = LLMProviderConfig.from_mapping("openai", {})
+
+        assert config.base_url == ""
+        assert config.model == ""
 
     def test_anthropic_missing_base_url_structured_error(self):
         client = create_llm_client("anthropic", api_key="test-key", base_url="")
@@ -222,3 +259,51 @@ class TestUnifiedProviderConfig:
         assert client.config.api_key == secret
         assert client.config.safe_dict()["api_key"] == "<redacted>"
         assert secret not in str(client.config.safe_dict())
+
+    def test_configured_factory_uses_config_center_runtime_provider(self, tmp_path):
+        config_path = tmp_path / "config.yaml"
+        config_path.write_text(
+            yaml.safe_dump(
+                {
+                    "llm": {
+                        "provider": "openai",
+                        "last_provider": "anthropic",
+                        "providers": {
+                            "openai": {"api_format": "openai", "base_url": "https://openai.test/v1", "api_key": "sk-openai", "model": "gpt-test"},
+                            "anthropic": {"api_format": "anthropic", "base_url": "https://anthropic.test/v1", "api_key": "sk-anthropic", "model": "claude-test"},
+                        },
+                    }
+                },
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
+
+        client = create_configured_llm_client(ConfigCenter(config_path))
+
+        assert isinstance(client, AnthropicClient)
+        assert client.config.provider == "anthropic"
+
+    def test_api_key_is_redacted_across_config_validation_and_client_error_path(self):
+        secret = "sk-full-redaction-secret"
+        provider_config = {
+            "api_format": "openai",
+            "base_url": "https://redaction.local.test/v1",
+            "api_key": secret,
+            "model": "gpt-redaction",
+            "headers": {"Authorization": f"Bearer {secret}", "X-Api-Key": secret},
+        }
+        config = LLMProviderConfig.from_mapping("openai", provider_config)
+        client = create_llm_client("openai", config=provider_config)
+
+        safe_config = config.safe_dict()
+        error = config.error("request_error", f"Authorization failed for Bearer {secret}; api_key={secret}")
+        client_error = client.config.error("request_error", f"token={secret}")
+
+        assert safe_config["api_key"] == "<redacted>"
+        assert safe_config["headers"]["Authorization"] == "<redacted>"
+        assert safe_config["headers"]["X-Api-Key"] == "<redacted>"
+        assert secret not in str(safe_config)
+        assert secret not in str(error)
+        assert secret not in str(client_error)
+        assert "<redacted>" in str(error) or "[REDACTED]" in str(error)

@@ -1,23 +1,23 @@
 # SuperMedicine 配置
-# LLM provider defaults. API keys may be injected into a local project
-# file by Install.py or loaded from environment variables. Do not commit
-# real secrets from local workspaces.
+# LLM provider template. Repository defaults intentionally keep API
+# provider, BaseURL, model, and key values empty. Install.py must be
+# supplied complete local LLM settings before first startup.
 project_name: supermedicine
 version: Beta0.3.0
 llm:
-  provider: openai
+  provider: ''
   providers:
     openai:
       api_format: openai
-      base_url: https://api.openai.com/v1
+      base_url: ''
       api_key_env: OPENAI_API_KEY
-      model: gpt-4o-mini
+      model: ''
       timeout: 60
       headers: {}
     anthropic:
       api_format: anthropic
-      base_url: https://api.anthropic.com/v1
+      base_url: ''
       api_key_env: ANTHROPIC_API_KEY
-      model: claude-3-5-sonnet-latest
+      model: ''
       timeout: 60
       headers: {}

@@ -28,21 +28,21 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "project_name": "supermedicine",
     "version": "Beta0.3.0",
     "llm": {
-        "provider": "openai",
+        "provider": "",
         "providers": {
             "openai": {
                 "api_format": "openai",
-                "base_url": "https://api.openai.com/v1",
+                "base_url": "",
                 "api_key_env": "OPENAI_API_KEY",
-                "model": "gpt-4o-mini",
+                "model": "",
                 "timeout": 60,
                 "headers": {},
             },
             "anthropic": {
                 "api_format": "anthropic",
-                "base_url": "https://api.anthropic.com/v1",
+                "base_url": "",
                 "api_key_env": "ANTHROPIC_API_KEY",
-                "model": "claude-3-5-sonnet-latest",
+                "model": "",
                 "timeout": 60,
                 "headers": {},
             },
@@ -66,9 +66,9 @@ INSTALL_ENV_NAMES = {
 def _default_config_text() -> str:
     header = (
         "# SuperMedicine 配置\n"
-        "# LLM provider defaults. API keys may be injected into this local project\n"
-        "# file by Install.py or loaded from environment variables. Do not commit\n"
-        "# real secrets from local workspaces.\n"
+        "# LLM provider template. Repository defaults intentionally keep API\n"
+        "# provider, BaseURL, model, and key values empty. Install.py must be\n"
+        "# supplied complete local LLM settings before first startup.\n"
     )
     return header + yaml.safe_dump(DEFAULT_CONFIG, sort_keys=False, allow_unicode=True)
 
@@ -108,9 +108,43 @@ def _normalize_provider(provider: str | None) -> str | None:
     if provider is None or not provider.strip():
         return None
     normalized = provider.strip().lower()
-    if normalized not in SUPPORTED_LLM_PROVIDERS:
-        raise ValueError("provider must be one of: openai, anthropic")
     return normalized
+
+
+def _provider_api_format(provider: str) -> str:
+    if provider == "anthropic":
+        return "anthropic"
+    return "openai"
+
+
+def _provider_api_key_env(provider: str) -> str:
+    return PROVIDER_ENV_NAMES.get(provider, "SM_LLM_API_KEY")
+
+
+def _require_complete_llm_config(
+    *,
+    provider: str | None,
+    base_url: str | None,
+    api_key: str | None,
+    model: str | None,
+) -> str:
+    normalized_provider = _normalize_provider(provider)
+    missing: list[str] = []
+    if normalized_provider is None:
+        missing.append("provider")
+    if not base_url or not base_url.strip():
+        missing.append("base_url")
+    if not api_key or not api_key.strip():
+        missing.append("api_key")
+    if not model or not model.strip():
+        missing.append("model")
+    if missing:
+        raise ValueError(
+            "完整 LLM Provider 配置是首次初始化必需项；请通过 --provider/--base-url/--api-key/--model、"
+            "SM_LLM_PROVIDER/SM_LLM_BASE_URL/SM_LLM_API_KEY/SM_LLM_MODEL 环境变量或 --interactive 提供: "
+            + ", ".join(missing)
+        )
+    return normalized_provider or ""
 
 
 def _redact(value: str | None) -> str:
@@ -130,7 +164,9 @@ def _resolve_api_key(provider: str | None, explicit: str | None) -> str | None:
     if generic:
         return generic
     if provider:
-        return os.environ.get(PROVIDER_ENV_NAMES[provider])
+        provider_env = PROVIDER_ENV_NAMES.get(provider)
+        if provider_env:
+            return os.environ.get(provider_env)
     return None
 
 
@@ -166,15 +202,15 @@ def _apply_llm_config(
         provider_config = {}
         providers[provider] = provider_config
 
-    provider_config.setdefault("api_format", provider)
-    provider_config.setdefault("api_key_env", PROVIDER_ENV_NAMES[provider])
+    provider_config.setdefault("api_format", _provider_api_format(provider))
+    provider_config.setdefault("api_key_env", _provider_api_key_env(provider))
     if base_url:
         provider_config["base_url"] = base_url
     if model:
         provider_config["model"] = model
     if api_key:
         provider_config["api_key"] = api_key
-        provider_config["api_key_env"] = PROVIDER_ENV_NAMES[provider]
+        provider_config["api_key_env"] = _provider_api_key_env(provider)
     llm["provider"] = provider
 
 
@@ -186,9 +222,12 @@ def write_llm_config(
     api_key: str | None = None,
     model: str | None = None,
 ) -> None:
-    normalized_provider = _normalize_provider(provider)
-    if normalized_provider is None:
-        return
+    normalized_provider = _require_complete_llm_config(
+        provider=provider,
+        base_url=base_url,
+        api_key=api_key,
+        model=model,
+    )
     config_file = project_dir / ".supermedicine" / "config.yaml"
     config = _load_config(config_file)
     _apply_llm_config(
@@ -229,14 +268,18 @@ def init_config(
     model: str | None = None,
 ) -> None:
     """Initialize standalone SuperMedicine project configuration only."""
-    normalized_provider = _normalize_provider(provider)
+    normalized_provider = _require_complete_llm_config(
+        provider=provider,
+        base_url=base_url,
+        api_key=api_key,
+        model=model,
+    )
     config_dir = project_dir / ".supermedicine"
     config_dir.mkdir(parents=True, exist_ok=True)
     config_file = config_dir / "config.yaml"
     if not config_file.exists():
         config_file.write_text(_default_config_text(), encoding="utf-8")
-    if normalized_provider is not None:
-        write_llm_config(project_dir, provider=normalized_provider, base_url=base_url, api_key=api_key, model=model)
+    write_llm_config(project_dir, provider=normalized_provider, base_url=base_url, api_key=api_key, model=model)
     (config_dir / "agents").mkdir(exist_ok=True)
     (config_dir / "plugins").mkdir(exist_ok=True)
     ensure_default_policy(project_dir, Path(__file__).parent)
@@ -254,8 +297,7 @@ def main() -> None:
     parser.add_argument("--init", action="store_true", help="Initialize core SuperMedicine config only")
     parser.add_argument(
         "--provider",
-        choices=sorted(SUPPORTED_LLM_PROVIDERS),
-        help="LLM provider to configure: openai or anthropic",
+        help="LLM provider to configure (openai, anthropic, or a custom OpenAI-compatible provider)",
     )
     parser.add_argument("--base-url", help="LLM provider BaseURL; may also use SM_LLM_BASE_URL")
     parser.add_argument("--api-key", help="LLM provider API key; may also use SM_LLM_API_KEY or provider env var")
@@ -273,10 +315,10 @@ def main() -> None:
         api_key = _resolve_api_key(normalized_provider, args.api_key)
         if args.interactive:
             normalized_provider = _normalize_provider(
-                _prompt_value("LLM provider (openai/anthropic)", normalized_provider or "openai")
+                _prompt_value("LLM provider", normalized_provider or "openai")
             )
             if normalized_provider is None:
-                raise ValueError("provider must be one of: openai, anthropic")
+                raise ValueError("provider is required")
             base_url = _prompt_value("BaseURL", base_url)
             model = _prompt_value("Default model", model)
             api_key = _prompt_value("API key", api_key, secret=True)
@@ -291,4 +333,7 @@ def main() -> None:
     parser.print_help()
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except ValueError as exc:
+        raise SystemExit(f"error: {exc}") from exc

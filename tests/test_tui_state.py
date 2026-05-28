@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import yaml
+
 from Cli import CLI
+from core.config_center import ConfigCenter
+from core.llm_manager import LLMConfigManager
 from core.tui.state import TUIState, load_recent_workspace, save_recent_workspace
 from core.workspace import WorkspaceManager
 
@@ -61,3 +65,33 @@ def test_tui_state_does_not_affect_cli_workspace_requirement(monkeypatch, tmp_pa
 
     assert captured["params"] == {"x": 1}
     assert "_workspace" not in captured["params"]
+
+
+def test_llm_startup_restore_is_separate_from_tui_workspace_session_state(tmp_path):
+    WorkspaceManager(tmp_path).initialize_workspace("trial-1")
+    save_recent_workspace("trial-1", project_root=tmp_path)
+    config_dir = tmp_path / ".supermedicine"
+    config_dir.mkdir(exist_ok=True)
+    config_path = config_dir / "config.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "llm": {
+                    "provider": "openai",
+                    "last_provider": "anthropic",
+                    "providers": {
+                        "openai": {"api_format": "openai", "base_url": "https://openai.test/v1", "api_key": "sk-openai-state", "model": "gpt-test"},
+                        "anthropic": {"api_format": "anthropic", "base_url": "https://anthropic.test/v1", "api_key": "sk-anthropic-state", "model": "claude-test"},
+                    },
+                }
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    manager = LLMConfigManager(ConfigCenter(config_path))
+
+    assert load_recent_workspace("trial-1", project_root=tmp_path) == "trial-1"
+    assert manager.get_current_provider()["provider"] == "anthropic"
+    assert ConfigCenter(config_path).get_llm_current_provider_name() == "anthropic"

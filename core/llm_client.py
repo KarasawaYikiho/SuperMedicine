@@ -6,6 +6,9 @@ from typing import Any, Mapping
 
 from core.redaction import redact_sensitive
 
+if False:  # pragma: no cover - typing-only without runtime import cycle
+    from core.config_center import ConfigCenter
+
 
 class LLMClient(ABC):
     """LLM 客户端抽象基类"""
@@ -51,12 +54,21 @@ def create_llm_client(provider: str, **kwargs: Any) -> LLMClient:
         ValueError: 不支持的 provider
     """
     config = kwargs.pop("config", None)
-    if isinstance(config, Mapping):
+    has_config_mapping = isinstance(config, Mapping)
+    if has_config_mapping:
         merged = dict(config)
         merged.update(kwargs)
         kwargs = merged
 
     normalized_provider = provider.lower()
+    if normalized_provider and normalized_provider not in {"openai", "anthropic", "openrouter"}:
+        api_format = str(kwargs.get("api_format") or kwargs.get("format") or "").lower()
+        if has_config_mapping and api_format == "anthropic":
+            normalized_provider = "anthropic"
+        elif has_config_mapping and api_format in {"openai", "openai_responses", "responses"}:
+            normalized_provider = "openai"
+        else:
+            raise ValueError(f"Unsupported LLM provider: {redact_sensitive(provider)}")
     if normalized_provider == "openai":
         from core.llm_providers.base import OpenAIClient
         return OpenAIClient(**kwargs)
@@ -67,3 +79,10 @@ def create_llm_client(provider: str, **kwargs: Any) -> LLMClient:
         from core.llm_providers.openrouter import OpenRouterClient
         return OpenRouterClient(**kwargs)
     raise ValueError(f"Unsupported LLM provider: {redact_sensitive(provider)}")
+
+
+def create_configured_llm_client(config_center: "ConfigCenter") -> LLMClient | dict[str, Any]:
+    """Create an LLM client from ConfigCenter runtime provider restoration logic."""
+    from core.llm_manager import LLMConfigManager
+
+    return LLMConfigManager(config_center).create_client()

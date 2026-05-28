@@ -9,7 +9,7 @@ import yaml
 import pytest
 
 from Cli import CLI, _resolve_run_params
-from Install import init_config, write_llm_config
+from Install import init_config, main as install_main, write_llm_config
 from core.kernel import Kernel
 from agents.orchestrator import Orchestrator
 from agents.base_agent import BaseAgent
@@ -20,6 +20,15 @@ from permission.policy import PermissionResult, default_policy_path
 from plugins.tools.python_stats.main import descriptive, ttest, regression
 from plugins.standards.medical_writing.checklists import get_consort_checklist
 from typing import Any
+
+
+def _llm_kwargs(provider: str = "openai") -> dict[str, str]:
+    return {
+        "provider": provider,
+        "base_url": f"https://{provider}.local.test/v1",
+        "api_key": f"{provider}-test-secret",
+        "model": f"{provider}-test-model",
+    }
 
 
 class MockAgent(BaseAgent):
@@ -41,7 +50,7 @@ class TestIntegration:
         """Install.py --init 应创建核心默认策略，并在重复初始化时保留用户策略。"""
         expected_policy = PermissionEngine.default_policy_path().read_text(encoding="utf-8")
 
-        init_config(tmp_path)
+        init_config(tmp_path, **_llm_kwargs())
 
         target_policy = default_policy_path(tmp_path)
         assert target_policy.exists()
@@ -49,7 +58,7 @@ class TestIntegration:
 
         custom_policy = "# user customized policy\n"
         target_policy.write_text(custom_policy, encoding="utf-8")
-        init_config(tmp_path)
+        init_config(tmp_path, **_llm_kwargs("anthropic"))
 
         assert target_policy.read_text(encoding="utf-8") == custom_policy
 
@@ -68,7 +77,7 @@ class TestIntegration:
 
         monkeypatch.setattr(PathClass, "joinpath", reject_platform_probe)
 
-        init_config(tmp_path)
+        init_config(tmp_path, **_llm_kwargs())
 
         assert (tmp_path / ".supermedicine" / "config.yaml").exists()
         assert default_policy_path(tmp_path).exists()
@@ -94,8 +103,8 @@ class TestIntegration:
         install_project = tmp_path / "install"
         install_project.mkdir()
 
-        CLI().init(cli_project)
-        init_config(install_project)
+        CLI().init(cli_project, **_llm_kwargs())
+        init_config(install_project, **_llm_kwargs())
 
         assert (cli_project / ".supermedicine").is_dir()
         assert default_policy_path(cli_project).read_text(encoding="utf-8") == default_policy_path(install_project).read_text(encoding="utf-8")
@@ -121,6 +130,57 @@ class TestIntegration:
         assert secret not in caplog.text
         assert "<redacted>" in caplog.text
 
+    def test_install_init_requires_complete_llm_config(self, tmp_path):
+        with pytest.raises(ValueError, match="完整 LLM Provider 配置"):
+            init_config(tmp_path)
+
+    def test_first_install_requires_complete_llm_setup_and_does_not_write_partial_config(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr("sys.argv", ["Install.py", "--init"])
+
+        with pytest.raises(ValueError, match="provider, base_url, api_key, model"):
+            install_main()
+
+        assert not (tmp_path / ".supermedicine" / "config.yaml").exists()
+        assert not (Path.home() / ".supermedicine" / "config.yaml").exists()
+
+    def test_provider_added_by_manual_config_file_is_used_without_home_or_network(self, tmp_path, monkeypatch):
+        secret = "sk-manual-file-secret"
+        init_config(tmp_path, **_llm_kwargs("openai"))
+        config_path = tmp_path / ".supermedicine" / "config.yaml"
+        config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+        config["llm"]["providers"]["file-provider"] = {
+            "api_format": "openai",
+            "base_url": "https://file-provider.local.test/v1",
+            "api_key": secret,
+            "model": "file-model",
+        }
+        config["llm"]["provider"] = "file-provider"
+        config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+
+        def reject_home_access():
+            raise AssertionError("manual provider path must not read real user home")
+
+        monkeypatch.setattr(Path, "home", reject_home_access)
+        policies_dir = tmp_path / ".supermedicine" / "policies"
+
+        kernel = Kernel(config_path=config_path, plugins_dir=tmp_path / "plugins", policies_dir=policies_dir)
+        context = kernel._llm_runtime_context()
+
+        assert context["configured"] is True
+        assert context["provider"] == "file-provider"
+        assert context["config"]["api_key"] == "[REDACTED]"
+        assert secret not in str(context)
+
+    def test_install_init_default_template_keeps_api_values_empty(self):
+        from Install import DEFAULT_CONFIG
+
+        assert DEFAULT_CONFIG["llm"]["provider"] == ""
+        assert DEFAULT_CONFIG["llm"]["providers"]["openai"]["base_url"] == ""
+        assert DEFAULT_CONFIG["llm"]["providers"]["openai"]["model"] == ""
+        assert DEFAULT_CONFIG["llm"]["providers"]["anthropic"]["base_url"] == ""
+        assert DEFAULT_CONFIG["llm"]["providers"]["anthropic"]["model"] == ""
+
     def test_install_init_writes_anthropic_llm_config(self, tmp_path):
         secret = "anthropic-test-install-secret"
 
@@ -138,6 +198,41 @@ class TestIntegration:
         assert anthropic["base_url"] == "https://anthropic.example.test/v1"
         assert anthropic["api_key"] == secret
         assert anthropic["model"] == "claude-test-install"
+
+    def test_install_init_accepts_custom_openai_compatible_provider(self, tmp_path):
+        init_config(
+            tmp_path,
+            provider="custom-ai",
+            base_url="https://custom.example.test/v1",
+            api_key="custom-secret",
+            model="custom-model",
+        )
+
+        config = yaml.safe_load((tmp_path / ".supermedicine" / "config.yaml").read_text(encoding="utf-8"))
+        custom = config["llm"]["providers"]["custom-ai"]
+        assert config["llm"]["provider"] == "custom-ai"
+        assert custom["api_format"] == "openai"
+        assert custom["api_key_env"] == "SM_LLM_API_KEY"
+        assert custom["base_url"] == "https://custom.example.test/v1"
+        assert custom["api_key"] == "custom-secret"
+        assert custom["model"] == "custom-model"
+
+    def test_install_cli_init_uses_environment_llm_config(self, tmp_path, monkeypatch):
+        secret = "sk-env-install-secret"
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("SM_LLM_PROVIDER", "openai")
+        monkeypatch.setenv("SM_LLM_BASE_URL", "https://env.example.test/v1")
+        monkeypatch.setenv("SM_LLM_API_KEY", secret)
+        monkeypatch.setenv("SM_LLM_MODEL", "gpt-env-install")
+        monkeypatch.setattr("sys.argv", ["Install.py", "--init"])
+
+        install_main()
+
+        config = yaml.safe_load((tmp_path / ".supermedicine" / "config.yaml").read_text(encoding="utf-8"))
+        assert config["llm"]["provider"] == "openai"
+        assert config["llm"]["providers"]["openai"]["base_url"] == "https://env.example.test/v1"
+        assert config["llm"]["providers"]["openai"]["api_key"] == secret
+        assert config["llm"]["providers"]["openai"]["model"] == "gpt-env-install"
 
     def test_install_llm_config_merges_existing_config_without_touching_home(self, tmp_path, monkeypatch, caplog):
         secret = "sk-test-merge-secret"
@@ -189,8 +284,8 @@ class TestIntegration:
         install_project.mkdir()
         cli_project.mkdir()
 
-        init_config(install_project)
-        CLI().init(cli_project)
+        init_config(install_project, **_llm_kwargs())
+        CLI().init(cli_project, **_llm_kwargs())
 
         assert default_policy_path(install_project).read_text(encoding="utf-8") == default_policy_path(cli_project).read_text(encoding="utf-8")
 
@@ -410,6 +505,40 @@ class TestIntegration:
         assert "contract_version" in result["metadata"]
         assert "not production/clinical medical advice" in result["medical_boundary"]
         assert "no production-grade statistical guarantee" in result["statistics_boundary"]
+
+    def test_kernel_runtime_llm_context_uses_restored_provider_without_secret_leak(self, tmp_path):
+        config_path = tmp_path / "config.yaml"
+        secret = "sk-anthropic-runtime-secret"
+        config_path.write_text(
+            yaml.safe_dump(
+                {
+                    "llm": {
+                        "provider": "openai",
+                        "last_provider": "anthropic",
+                        "providers": {
+                            "openai": {"api_format": "openai", "base_url": "https://openai.test/v1", "api_key": "sk-openai", "model": "gpt-test"},
+                            "anthropic": {"api_format": "anthropic", "base_url": "https://anthropic.test/v1", "api_key": secret, "model": "claude-test"},
+                        },
+                    }
+                },
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
+        policies_dir = tmp_path / "policies"
+        policies_dir.mkdir()
+        shutil.copyfile(
+            PermissionEngine.default_policy_path(),
+            policies_dir / PermissionEngine.DEFAULT_POLICY_FILENAME,
+        )
+
+        kernel = Kernel(config_path=config_path, plugins_dir=tmp_path / "plugins", policies_dir=policies_dir)
+        context = kernel._llm_runtime_context()
+
+        assert context["configured"] is True
+        assert context["provider"] == "anthropic"
+        assert context["config"]["api_key"] == "[REDACTED]"
+        assert secret not in str(context)
 
     def test_kernel_execute_task_permission_denied(self, tmp_path):
         (tmp_path / "config.yaml").write_text(yaml.dump({"project": "test"}), encoding="utf-8")

@@ -51,6 +51,8 @@ class LLMProviderConfig:
     timeout: float = 60.0
     headers: dict[str, str] = field(default_factory=dict)
 
+    REQUIRED_FIELDS = ("base_url", "api_key", "model")
+
     @classmethod
     def from_mapping(
         cls,
@@ -62,16 +64,16 @@ class LLMProviderConfig:
         raw = dict(values or {})
         raw.update({key: value for key, value in overrides.items() if value is not None})
 
-        normalized_provider = str(raw.get("provider") or provider).lower()
+        normalized_provider = str(raw.get("provider") or provider).strip().lower()
         api_format = str(raw.get("api_format") or raw.get("format") or _default_api_format(normalized_provider)).lower()
         raw_base_url = raw.get("base_url", raw.get("baseURL", None))
-        if raw_base_url is None:
+        if raw_base_url is None and normalized_provider == "openrouter":
             raw_base_url = _default_base_url(normalized_provider)
-        base_url = str(raw_base_url).strip()
+        base_url = "" if raw_base_url is None else str(raw_base_url).strip()
         raw_model = raw.get("model", None)
-        if raw_model is None:
+        if raw_model is None and normalized_provider == "openrouter":
             raw_model = _default_model(normalized_provider)
-        model = str(raw_model).strip()
+        model = "" if raw_model is None else str(raw_model).strip()
 
         api_key = raw.get("api_key")
         api_key_env = raw.get("api_key_env") or _default_api_key_env(normalized_provider)
@@ -97,6 +99,10 @@ class LLMProviderConfig:
             timeout=timeout,
             headers={str(key): str(value) for key, value in headers.items()},
         )
+
+    def missing_fields(self) -> list[str]:
+        """Return required fields missing after env resolution and normalization."""
+        return [field for field in self.REQUIRED_FIELDS if not str(getattr(self, field, "") or "").strip()]
 
     def validation_error(self) -> dict[str, Any] | None:
         """Return a structured validation error if required fields are missing."""
@@ -142,8 +148,6 @@ def _default_api_format(provider: str) -> str:
 
 def _default_base_url(provider: str) -> str:
     defaults = {
-        "openai": "https://api.openai.com/v1",
-        "anthropic": "https://api.anthropic.com/v1",
         "openrouter": "https://openrouter.ai/api/v1",
     }
     return defaults.get(provider, "")
@@ -151,8 +155,6 @@ def _default_base_url(provider: str) -> str:
 
 def _default_model(provider: str) -> str:
     defaults = {
-        "openai": "gpt-4o-mini",
-        "anthropic": "claude-3-5-sonnet-latest",
         "openrouter": "anthropic/claude-3.5-sonnet",
     }
     return defaults.get(provider, "")

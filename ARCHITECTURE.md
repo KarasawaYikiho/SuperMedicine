@@ -236,6 +236,14 @@ OpenCode/Claude Code:
   `Install.py --base-url`, `SM_LLM_BASE_URL`, or local project configuration.
 - Missing required provider fields produce structured validation errors;
   HTTP/request errors are sanitized with known API keys redacted.
+- Runtime provider selection is stateful but explicit: `llm.provider` is the
+  configured current/default provider, while `llm.last_provider` records the last
+  selected provider. `LLMConfigManager` restores `last_provider` on startup when
+  it still exists and otherwise falls back to the install-time default provider.
+- CLI and TUI provider management share the same manager. `supermedicine llm
+  switch <provider>` validates the target, persists both current and last
+  provider state, and the TUI saves its current provider on exit for the same
+  startup-restore path.
 - Documentation, manifests, tests, and adapter files must use fake keys or
   placeholders only and must not commit real API keys.
 
@@ -380,7 +388,7 @@ must still be completed.
 ## Quality Gate
 
 The minimal CI/local release gate is intentionally dependency-light and is kept
-canonical in [README.md](README.md#local-quality-gate-and-release-checklist).
+canonical in [README.md](README.md#local-quality-gate).
 
 Static type checking is not a required gate unless the project intentionally adds
 a dedicated mypy or pyright configuration.

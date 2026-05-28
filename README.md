@@ -20,7 +20,7 @@ detail, see [INSTALL.md](INSTALL.md); for system design, see
 - **Modular Architecture** — Microkernel plus multi-agent orchestration with a plugin system.
 - **P0 Permission Engine** — Runtime permission constraints with prompt-context safety guidance.
 - **Plugin Ecosystem** — RAG retrieval, Harness monitoring, Python/R statistics, and medical writing standards.
-- **Interactive TUI** — Chinese terminal UI with sidebar navigation, seven views, and keyboard shortcuts.
+- **Interactive TUI** — Chinese terminal UI with sidebar navigation, LLM management, and keyboard shortcuts.
 - **Workspace System** — Explicit workspace management with paper import, experience learning, and tool management.
 - **Standalone Core by Default** — No OpenCode, Claude Code, or platform runtime is required.
 - **Optional Platform Add-ons** — OpenCode and Claude Code adapters support platform-specific workflows.
@@ -41,6 +41,12 @@ detail, see [INSTALL.md](INSTALL.md); for system design, see
   - [Optional: Development Tools](#optional-development-tools)
 - [Quick Start](#quick-start)
 - [LLM Provider Configuration](#llm-provider-configuration)
+  - [First-run requirement](#first-run-requirement)
+  - [Configure by editing the file](#configure-by-editing-the-file)
+  - [Configure with the CLI](#configure-with-the-cli)
+  - [Configure in the TUI](#configure-in-the-tui)
+  - [Switching and startup restore](#switching-and-startup-restore)
+  - [Environment variables and secret safety](#environment-variables-and-secret-safety)
 - [CLI Reference](#cli-reference)
   - [Core Commands](#core-commands)
   - [Workspace Commands](#workspace-commands)
@@ -83,8 +89,9 @@ cd SuperMedicine
 # 2. Install
 pip install -e .
 
-# 3. Initialize
-python Install.py --init
+# 3. Initialize with a complete LLM provider
+$env:OPENAI_API_KEY = "<OPENAI_API_KEY>"
+python Install.py --init --provider openai --base-url https://api.openai.com/v1 --model gpt-4o-mini
 
 # 4. Verify
 python Cli.py status
@@ -100,8 +107,9 @@ cd SuperMedicine
 # 2. Install
 pip install -e .
 
-# 3. Initialize
-python3 Install.py --init
+# 3. Initialize with a complete LLM provider
+export OPENAI_API_KEY=<OPENAI_API_KEY>
+python3 Install.py --init --provider openai --base-url https://api.openai.com/v1 --model gpt-4o-mini
 
 # 4. Verify
 python3 Cli.py status
@@ -117,8 +125,9 @@ cd SuperMedicine
 # 2. Install
 pip install -e .
 
-# 3. Initialize
-python3 Install.py --init
+# 3. Initialize with a complete LLM provider
+export OPENAI_API_KEY=<OPENAI_API_KEY>
+python3 Install.py --init --provider openai --base-url https://api.openai.com/v1 --model gpt-4o-mini
 
 # 4. Verify
 python3 Cli.py status
@@ -137,7 +146,8 @@ source .venv/bin/activate
 
 # Then install
 pip install -e .
-python Install.py --init
+export OPENAI_API_KEY=<OPENAI_API_KEY>
+python Install.py --init --provider openai --base-url https://api.openai.com/v1 --model gpt-4o-mini
 ```
 
 To initialize with an LLM provider at the same time, pass OpenAI-compatible or
@@ -217,7 +227,8 @@ Includes: mypy, pytest, pytest-cov, ruff.
 git clone https://github.com/KarasawaYikiho/SuperMedicine.git
 cd SuperMedicine
 pip install -e .
-python Install.py --init
+export OPENAI_API_KEY=<OPENAI_API_KEY>
+python Install.py --init --provider openai --base-url https://api.openai.com/v1 --model gpt-4o-mini
 
 # Check status
 supermedicine status
@@ -252,12 +263,169 @@ Custom compatible endpoints are supported with `--base-url` or
 `SM_LLM_BASE_URL`. OpenAI-compatible requests post to `/chat/completions` by
 default; Anthropic-compatible requests post to `/messages`.
 
-### Configuration sources
+### First-run requirement
 
-Configuration can be injected in these ways, with examples using fake keys only:
+LLM-backed tasks require one complete provider before the runtime can create a
+client. A complete provider has `base_url`, `api_key` (or `api_key_env` that
+points to an environment variable), and `model`. If no provider is configured,
+runtime paths return a structured setup error and tell you to configure LLM via
+`Install.py --init`, `.supermedicine/config.yaml`, `supermedicine llm add/switch`,
+or the TUI LLM screen. This is intentional: first installation must explicitly
+choose a provider instead of silently using an unknown model.
+
+You can configure the first provider through any of the following channels. All
+examples use placeholders or environment-variable names only; replace them only
+in your private shell or local config.
+
+### Configure by editing the file
+
+After initialization, edit `.supermedicine/config.yaml` and adjust the `llm`
+section. Prefer `api_key_env` for real credentials so future file edits can stay
+secret-free:
+
+```yaml
+llm:
+  provider: openai
+  last_provider: openai
+  providers:
+    openai:
+      provider: openai
+      api_format: openai
+      base_url: https://api.openai.com/v1
+      api_key_env: OPENAI_API_KEY
+      model: gpt-4o-mini
+    anthropic:
+      provider: anthropic
+      api_format: anthropic
+      base_url: https://api.anthropic.com/v1
+      api_key_env: ANTHROPIC_API_KEY
+      model: claude-3-5-sonnet-latest
+```
+
+Then set the referenced key in your shell, not in Git-tracked files:
 
 ```bash
-# Command-line injection during project initialization
+export OPENAI_API_KEY=<OPENAI_API_KEY>
+```
+
+On Windows PowerShell:
+
+```powershell
+$env:OPENAI_API_KEY = "<OPENAI_API_KEY>"
+```
+
+### Configure with the CLI
+
+You can inject a provider during initialization. The example below assumes
+`OPENAI_API_KEY` is already set in your private shell; the installer resolves the
+provider-specific key variable when `--api-key` is not supplied:
+
+```bash
+export OPENAI_API_KEY=<OPENAI_API_KEY>
+python Install.py --init --provider openai \
+  --base-url https://api.openai.com/v1 \
+  --model gpt-4o-mini
+```
+
+Or add and switch providers after initialization:
+
+```bash
+# Add an OpenAI-compatible provider and make it current
+supermedicine llm add openai \
+  --api-format openai \
+  --base-url https://api.openai.com/v1 \
+  --api-key-env OPENAI_API_KEY \
+  --model gpt-4o-mini \
+  --set-current
+
+# Add an Anthropic-compatible provider without switching yet
+supermedicine llm add anthropic \
+  --api-format anthropic \
+  --base-url https://api.anthropic.com/v1 \
+  --api-key-env ANTHROPIC_API_KEY \
+  --model claude-3-5-sonnet-latest
+
+# Review redacted config and switch defaults
+supermedicine llm list
+supermedicine llm show openai
+supermedicine llm switch anthropic
+```
+
+`--api-key` exists for local throwaway setups but may persist the value in
+`.supermedicine/config.yaml`; use `--api-key-env` for real keys whenever possible.
+
+### Configure in the TUI
+
+Launch the TUI and open **LLM 管理** from the sidebar:
+
+```bash
+supermedicine tui
+```
+
+In the LLM screen you can:
+
+1. Fill provider name (`openai`, `anthropic`, or a compatible endpoint name),
+   BaseURL, model, API key, and optional API format.
+2. Click **添加 Provider** to save it. The API key input is password-style and is
+   cleared after submission.
+3. Select a provider from the dropdown and click **切换 Provider** to make it the
+   current default.
+4. Click refresh to reload the redacted provider table.
+
+The TUI uses the same `.supermedicine/config.yaml` and `LLMConfigManager` as the
+CLI, so provider changes are shared between CLI and TUI.
+
+### Switching and startup restore
+
+`supermedicine llm switch <provider>` validates the target provider, writes it as
+both `llm.provider` and `llm.last_provider`, and persists the change. On startup,
+SuperMedicine restores `llm.last_provider` when it still exists; otherwise it
+falls back to the install-time `llm.provider`. The TUI also saves the current
+provider on exit so the next launch resumes the most recently used LLM.
+
+Use these commands to inspect runtime state without exposing secrets:
+
+```bash
+supermedicine llm list       # current_provider, last_provider, providers; redacted
+supermedicine llm show       # current/restored provider; redacted
+supermedicine llm switch openai
+```
+
+### Environment variables and secret safety
+
+For shell-only configuration during initialization, set provider metadata and a
+provider-specific key variable:
+
+```bash
+# Environment-variable injection during initialization
+export SM_LLM_PROVIDER=anthropic
+export SM_LLM_BASE_URL=https://api.anthropic.com/v1
+export SM_LLM_MODEL=claude-3-5-sonnet-latest
+export ANTHROPIC_API_KEY=<ANTHROPIC_API_KEY>
+python Install.py --init
+```
+
+Equivalent one-shot POSIX form:
+
+```bash
+SM_LLM_PROVIDER=anthropic \
+SM_LLM_BASE_URL=https://api.anthropic.com/v1 \
+SM_LLM_MODEL=claude-3-5-sonnet-latest \
+ANTHROPIC_API_KEY=<ANTHROPIC_API_KEY> \
+python Install.py --init
+```
+
+`SM_LLM_API_KEY` is supported as a generic installer-time override, but it can be
+written to local config. Prefer `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or an
+`api_key_env` reference in `.supermedicine/config.yaml` for real credentials.
+
+### Configuration sources
+
+Configuration can also be injected in these ways, with examples using fake keys
+only:
+
+```bash
+# Command-line injection during project initialization with a placeholder key
 python Install.py --init --provider openai \
   --base-url https://api.openai.com/v1 \
   --api-key <OPENAI_API_KEY> \
@@ -283,10 +451,10 @@ after adding real secrets. Prefer provider environment variables
 ### Runtime use and validation
 
 Use `python Cli.py status` or `supermedicine status` to confirm the project is
-initialized. Provider validation is performed when an LLM client is used: missing
-BaseURL, API key, or model returns a structured error such as
-`missing_api_key`; request and HTTP errors are sanitized so known secret values
-are redacted.
+initialized. Provider validation is performed when an LLM client is used or when
+you switch providers: missing BaseURL, API key, or model returns a structured
+error such as `missing_api_key`; request and HTTP errors are sanitized so known
+secret values are redacted.
 
 Python callers can use the factory directly:
 
@@ -314,7 +482,8 @@ All commands are available via `supermedicine <command>` or `python Cli.py <comm
 ### Core Commands
 
 ```bash
-supermedicine init [--dir .]          # Initialize project configuration
+supermedicine init --provider openai --base-url https://api.openai.com/v1 --model gpt-4o-mini
+                                      # Initialize project configuration
 supermedicine status                  # Show project status (version, plugins, modules)
 supermedicine test                    # Run the test suite
 supermedicine run TASK [--workspace]  # Execute a task through the Kernel and plugins
@@ -431,6 +600,23 @@ supermedicine tui              # Launch interactive TUI
 supermedicine tui --dry-run    # Show TUI status without launching
 ```
 
+### LLM Commands
+
+```bash
+supermedicine llm add openai --api-format openai \
+  --base-url https://api.openai.com/v1 \
+  --api-key-env OPENAI_API_KEY \
+  --model gpt-4o-mini \
+  --set-current
+
+supermedicine llm list              # List providers; secrets are redacted
+supermedicine llm show [provider]   # Show current or named provider; redacted
+supermedicine llm switch anthropic  # Validate, switch, and persist default/last
+```
+
+For real credentials, prefer `--api-key-env` over `--api-key` so command history
+and local YAML do not receive plaintext secrets.
+
 ---
 
 ## TUI (Terminal UI)
@@ -455,6 +641,7 @@ supermedicine tui
 | `5` | Experience (经验学习) |
 | `6` | Tool (工具管理) |
 | `7` | Dialog (对话历史) |
+| `8` | LLM (LLM 管理) |
 | `↑` / `↓` | Navigate sidebar |
 | `Enter` | Send message |
 | `f` | Maximize/Minimize focused widget |
@@ -472,6 +659,7 @@ supermedicine tui
 | **Paper** | Import papers, view/edit metadata, run enrichment |
 | **Experience** | Suggest, confirm, list, edit, delete, export experience records |
 | **Tool** | Initialize tools, add templates, list, run |
+| **LLM** | Add providers, switch current default, inspect redacted readiness state |
 | **Dialog** | View session dialog history (read-only) |
 
 ### TUI vs CLI

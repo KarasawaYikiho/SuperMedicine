@@ -479,3 +479,18 @@ def test_dev_optional_dependencies_include_pyyaml_type_stubs():
     assert any(dep.split(";", maxsplit=1)[0].strip().lower().startswith("types-pyyaml") for dep in dev_dependencies), (
         "project.optional-dependencies.dev must include types-PyYAML so CI mypy has yaml stubs"
     )
+
+
+def test_ci_workflow_runs_full_quality_gates_without_hardcoded_secrets():
+    workflow_paths = sorted((REPO_ROOT / ".github" / "workflows").glob("*.yml")) + sorted((REPO_ROOT / ".github" / "workflows").glob("*.yaml"))
+    assert workflow_paths, "Expected at least one CI workflow"
+
+    combined = "\n".join(path.read_text(encoding="utf-8") for path in workflow_paths)
+
+    assert "pytest" in combined
+    assert "ruff" in combined
+    assert "mypy" in combined
+    assert re.search(r"pip\s+install\s+-e\s+(?:['\"])?\.\[dev\](?:['\"])?", combined)
+    assert not re.search(r"sk-[A-Za-z0-9_-]{12,}", combined)
+    assert not re.search(r"sk-ant-[A-Za-z0-9_-]{12,}", combined)
+    assert not re.search(r"(?:api[_-]?key|authorization|token)\s*[:=]\s*['\"][^'\"<{][^'\"]{8,}['\"]", combined, re.IGNORECASE)

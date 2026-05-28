@@ -25,6 +25,7 @@ LABELS: dict[str, str] = {
     "nav_experience": "经验学习",
     "nav_tool": "工具管理",
     "nav_dialog": "对话历史",
+    "nav_llm": "LLM 管理",
     "nav_quit": "退出",
     "nav_maximize": "最大化",
 
@@ -116,6 +117,27 @@ LABELS: dict[str, str] = {
     "dialog_event": "事件",
     "dialog_summary": "摘要",
     "dialog_time": "时间",
+
+    # LLM
+    "llm_title": "LLM 管理",
+    "llm_current": "当前默认 LLM",
+    "llm_ready": "LLM 已就绪",
+    "llm_not_ready": "LLM 未就绪",
+    "llm_provider": "Provider",
+    "llm_provider_name": "Provider 名称",
+    "llm_base_url": "Base URL",
+    "llm_model": "模型",
+    "llm_api_key": "API Key（输入隐藏）",
+    "llm_api_format": "API 格式",
+    "llm_add_provider": "添加/更新 Provider",
+    "llm_switch_provider": "切换 Provider",
+    "llm_no_providers": "暂无 LLM Provider",
+    "llm_provider_added": "Provider 已保存",
+    "llm_provider_switched": "默认 Provider 已切换",
+    "llm_saved_exit_state": "已保存最后使用的 LLM",
+    "llm_missing_provider": "请输入 Provider 名称",
+    "llm_missing_selection": "请选择 Provider",
+    "llm_secret_hidden": "密钥已隐藏，不会显示在状态栏或通知中",
 
     # Common
     "confirm": "确认",

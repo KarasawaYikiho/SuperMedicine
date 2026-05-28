@@ -123,8 +123,19 @@ Screen {
 #paper-table,
 #exp-table,
 #tool-table,
+#llm-table,
 #dialog-table {
     height: 1fr;
+}
+
+#llm-status {
+    height: auto;
+    padding: 1 0;
+}
+
+#llm-secret-hint {
+    color: $text-muted;
+    padding: 0 0 1 0;
 }
 
 /* Buttons */

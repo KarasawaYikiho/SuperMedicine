@@ -119,11 +119,25 @@ paths, and treat all external network/API access as permission-gated behavior.
 - Use environment variables or local private `.supermedicine/config.yaml` values
   for real API keys. Do not commit real OpenAI, Anthropic, OpenRouter, gateway, or
   platform credentials.
+- Prefer storing `api_key_env` (for example `OPENAI_API_KEY` or
+  `ANTHROPIC_API_KEY`) in `.supermedicine/config.yaml` instead of storing an
+  `api_key` value. The environment variable value should be set in a private
+  shell, profile, secret manager, or CI secret store outside the repository.
 - Documentation and tests must use non-realistic placeholders only, for example
   `<OPENAI_API_KEY>`, `<ANTHROPIC_API_KEY>`, or `<redacted>`.
 - `Install.py --api-key` and `SM_LLM_API_KEY` can write the supplied key to local
   project config. Prefer `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` for real keys
   when possible.
+- `supermedicine llm add --api-key` has the same persistence and command-history
+  risk as installer-time plaintext key injection. Prefer
+  `supermedicine llm add --api-key-env <ENV_VAR_NAME>` for real credentials.
+- `supermedicine llm list`, `supermedicine llm show`, capability reports, and
+  error messages must use redacted output. Do not paste unredacted local YAML,
+  terminal history, screenshots, audit logs, or traceback payloads into issues.
+- Switching providers persists both the current runtime provider and
+  `last_provider` for startup restore. Those fields are provider names, not
+  secrets, but custom provider names or private BaseURLs may still reveal internal
+  infrastructure; avoid committing private endpoint details.
 - LLM provider config snapshots intended for logs or capability reporting must use
   redacted paths such as `get_llm_provider_config(redacted=True)` or provider
   `safe_dict()` output.

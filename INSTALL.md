@@ -23,8 +23,13 @@ add-on adapter environments.
 git clone https://github.com/KarasawaYikiho/SuperMedicine.git
 cd SuperMedicine
 pip install -e ".[dev]"
-python Install.py --init
+export OPENAI_API_KEY=<OPENAI_API_KEY>
+python Install.py --init --provider openai --base-url https://api.openai.com/v1 --model gpt-4o-mini
 ```
+
+If you plan to run LLM-backed tasks, configure at least one LLM provider before
+the first run. SuperMedicine intentionally refuses to create an LLM client until a
+provider has `base_url`, API key source, and `model`.
 
 For a core-only user install, omit development tooling:
 
@@ -32,7 +37,8 @@ For a core-only user install, omit development tooling:
 git clone https://github.com/KarasawaYikiho/SuperMedicine.git
 cd SuperMedicine
 pip install -e .
-python Install.py --init
+export OPENAI_API_KEY=<OPENAI_API_KEY>
+python Install.py --init --provider openai --base-url https://api.openai.com/v1 --model gpt-4o-mini
 python Cli.py status
 python Cli.py run "summarize local context"
 ```
@@ -51,6 +57,27 @@ python Install.py --init --provider anthropic \
   --base-url https://api.anthropic.com/v1 \
   --api-key <ANTHROPIC_API_KEY> \
   --model claude-3-5-sonnet-latest
+```
+
+For real workstations, prefer environment variables over typing secrets directly
+on the command line. The installer resolves provider-specific key variables to
+satisfy the first-run completeness check; because that can write the resolved key
+to local config, keep `.supermedicine/config.yaml` private and then use
+`supermedicine llm add --api-key-env` if you want the saved provider to reference
+an environment variable instead of keeping plaintext local YAML:
+
+```bash
+export OPENAI_API_KEY=<OPENAI_API_KEY>
+python Install.py --init --provider openai \
+  --base-url https://api.openai.com/v1 \
+  --model gpt-4o-mini
+
+supermedicine llm add openai \
+  --api-format openai \
+  --base-url https://api.openai.com/v1 \
+  --api-key-env OPENAI_API_KEY \
+  --model gpt-4o-mini \
+  --set-current
 ```
 
 ## Step-by-Step Installation
@@ -79,13 +106,16 @@ release checks.
 ### 3. Initialize Project
 
 ```bash
-python Install.py --init
+export OPENAI_API_KEY=<OPENAI_API_KEY>
+python Install.py --init --provider openai --base-url https://api.openai.com/v1 --model gpt-4o-mini
 ```
 
 This creates the `.supermedicine/` directory with configuration and plugin settings.
 It does not require or create OpenCode/Claude Code configuration.
 
-Optional LLM settings can be injected during this same step:
+Optional LLM settings can be injected during this same step. These installer
+values become the initial runtime default. If no complete provider exists later,
+LLM runtime paths return a structured setup hint instead of guessing a model:
 
 ```bash
 # Command-line flags
@@ -105,12 +135,81 @@ python Install.py --init
 python Install.py --init --interactive
 ```
 
-`--provider` accepts only `openai` or `anthropic`. `SM_LLM_PROVIDER`,
+`--provider` accepts `openai`, `anthropic`, or a custom OpenAI-compatible
+provider name. Custom provider names default to OpenAI API format and use
+`SM_LLM_API_KEY` as their generic key environment variable unless you later add a
+provider-specific `api_key_env` with `supermedicine llm add`. `SM_LLM_PROVIDER`,
 `SM_LLM_BASE_URL`, `SM_LLM_API_KEY`, and `SM_LLM_MODEL` are installer-time
-generic overrides. Provider key variables are `OPENAI_API_KEY` and
-`ANTHROPIC_API_KEY`. If `--api-key` or `SM_LLM_API_KEY` is supplied, the value can
-be written to local `.supermedicine/config.yaml`; keep that file private after
-adding real secrets.
+generic overrides. Provider key variables for built-ins are `OPENAI_API_KEY` and
+`ANTHROPIC_API_KEY`. If `--api-key`, `SM_LLM_API_KEY`, or a provider-specific key
+variable is supplied during initialization, the resolved value can be written to
+local `.supermedicine/config.yaml`; keep that file private after adding real
+secrets.
+
+### 3a. Add Providers After Initialization
+
+Use the shared LLM manager through the CLI when you want to add, inspect, or
+switch providers after initialization:
+
+```bash
+# Add OpenAI-compatible provider and set it as current default
+supermedicine llm add openai \
+  --api-format openai \
+  --base-url https://api.openai.com/v1 \
+  --api-key-env OPENAI_API_KEY \
+  --model gpt-4o-mini \
+  --set-current
+
+# Add Anthropic-compatible provider for later use
+supermedicine llm add anthropic \
+  --api-format anthropic \
+  --base-url https://api.anthropic.com/v1 \
+  --api-key-env ANTHROPIC_API_KEY \
+  --model claude-3-5-sonnet-latest
+
+# Secret-safe inspection and switching
+supermedicine llm list
+supermedicine llm show openai
+supermedicine llm switch anthropic
+```
+
+`supermedicine llm switch <provider>` validates required fields, writes the
+selected provider as both `llm.provider` and `llm.last_provider`, and persists the
+change. On later startup the runtime restores `last_provider` when present;
+otherwise it falls back to the install-time default provider.
+
+### 3b. Configure by Editing `.supermedicine/config.yaml`
+
+Manual editing is also supported. Keep real secrets out of the file by using
+`api_key_env`:
+
+```yaml
+llm:
+  provider: openai
+  last_provider: openai
+  providers:
+    openai:
+      provider: openai
+      api_format: openai
+      base_url: https://api.openai.com/v1
+      api_key_env: OPENAI_API_KEY
+      model: gpt-4o-mini
+```
+
+Then set the environment variable outside the repository:
+
+```bash
+export OPENAI_API_KEY=<OPENAI_API_KEY>
+```
+
+### 3c. Configure in the TUI
+
+Run `supermedicine tui`, open **LLM 管理**, enter provider name, BaseURL, model,
+API key, and optional API format, then click **添加 Provider**. The key field is
+password-style and is cleared after submission. Select a provider and click
+**切换 Provider** to update the same current/default provider used by the CLI. On
+TUI exit, the current provider is saved as `last_provider` for automatic restore
+on the next startup.
 
 ### 4. Install Optional R Support
 
@@ -223,6 +322,10 @@ export ANTHROPIC_API_KEY=<ANTHROPIC_API_KEY>
 Use `SM_LLM_BASE_URL` or `--base-url` for compatible gateways. If you supplied a
 real key through `--api-key` or `SM_LLM_API_KEY`, treat `.supermedicine/config.yaml`
 as local private configuration and do not commit it.
+
+If switching fails, run `supermedicine llm list` to confirm the provider name and
+redacted fields, then add missing `base_url`, `api_key_env`/`api_key`, or `model`
+with `supermedicine llm add <provider> ... --set-current`.
 
 ## Platform Adapters
 

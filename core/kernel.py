@@ -7,6 +7,7 @@ from typing import Any, cast
 from agents.checkpoint import CheckpointManager
 from core.config_center import ConfigCenter
 from core.event_bus import EventBus
+from core.llm_manager import LLMConfigManager
 from core.plugin_registry import PluginRegistry
 from core.session_manager import SessionManager
 from permission.engine import PermissionEngine
@@ -40,6 +41,7 @@ class Kernel:
         self._policies_dir = policies_dir or DEFAULT_POLICY_RELATIVE_PATH.parent
 
         self._config = ConfigCenter(self._config_path)
+        self._llm_manager = LLMConfigManager(self._config)
         self._event_bus = EventBus()
         self._plugin_registry = PluginRegistry(self._plugins_dir)
         self._session_manager = SessionManager()
@@ -55,6 +57,10 @@ class Kernel:
     @property
     def config(self) -> ConfigCenter:
         return self._config
+
+    @property
+    def llm_manager(self) -> LLMConfigManager:
+        return self._llm_manager
 
     @property
     def event_bus(self) -> EventBus:
@@ -168,6 +174,7 @@ class Kernel:
             "agent_id": agent_id,
             "plugin": selected_plugin,
             "action": selected_action,
+            "llm": self._llm_runtime_context(),
             "permission_engine": self._permission_engine,
             "policy_path": str(self._policies_dir / self._permission_engine.DEFAULT_POLICY_FILENAME),
             "resource": {"kind": "plugin", "plugin": selected_plugin, "action": selected_action},
@@ -279,6 +286,23 @@ class Kernel:
         }
         self._checkpoint_task(task_id=task_id, agent_id=agent_id, state="completed", task=task, plugin=selected_plugin, action=selected_action, output=result, recoverable=False)
         return result
+
+    def _llm_runtime_context(self) -> dict[str, Any]:
+        """Expose secret-safe LLM runtime state to plugin/task paths."""
+        provider = self._llm_manager.get_current_provider(redacted=True)
+        if not provider:
+            return {
+                "configured": False,
+                "error": {
+                    "code": "missing_provider",
+                    "message": LLMConfigManager.SETUP_HINT,
+                },
+            }
+        return {
+            "configured": True,
+            "provider": provider.get("provider", self._config.get_llm_runtime_provider_name()),
+            "config": provider,
+        }
 
     def _select_plugin_action(self, task: str) -> tuple[str | None, str | None]:
         """基于任务文本选择当前阶段可控的真实插件路径。"""
