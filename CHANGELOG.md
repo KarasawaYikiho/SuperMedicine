@@ -11,7 +11,7 @@ are summarized here only when they affect a release; see [README.md](README.md),
 [INSTALL.md](INSTALL.md), and [ARCHITECTURE.md](ARCHITECTURE.md) for current user
 guidance.
 
-## [Beta0.3.0] — Release-Ready
+## [Beta0.3.5] — Release-Ready
 
 ### Added
 - Formal optional R/rpy2 backend support for `r-survival` Kaplan-Meier,
@@ -33,11 +33,11 @@ guidance.
   `rich>=13.7,<15` and `textual>=0.79,<2`).
 
 ### Release Readiness
-- Set the GitHub/release-ready label to `Beta0.3.0` without creating a tag,
+- Set the GitHub/release-ready label to `Beta0.3.5` without creating a tag,
   release, publish, or upload.
 - Audited Python packaging metadata for the same label; packaging validation
-  rejects `Beta0.3.0` because `project.version` must be PEP 440, so Python
-  metadata uses fallback version `0.3.0b0`.
+  rejects `Beta0.3.5` because `project.version` must be PEP 440, so Python
+  metadata uses fallback version `0.3.5b0`.
 - Final platform-integration audit summary records standalone core independence,
   OpenCode optional add-on status without native runtime subagent-bridge claims,
   and Claude Code minimal optional add-on status without native skill/subagent

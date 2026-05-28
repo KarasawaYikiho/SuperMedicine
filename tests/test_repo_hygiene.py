@@ -218,13 +218,13 @@ def test_release_label_and_package_version_stay_in_sync():
 
     package_version = re.search(r'^version\s*=\s*["\']([^"\']+)["\']\s*$', pyproject, re.MULTILINE)
 
-    assert install_manifest["version"] == "Beta0.3.0"
+    assert install_manifest["version"] == "Beta0.3.5"
     assert package_version is not None
-    assert package_version.group(1) == "0.3.0b0"
-    assert "Beta0.3.0" in readme
-    assert "0.3.0b0" in readme or "Beta0.3.0" in readme
-    assert "## [Beta0.3.0]" in changelog
-    assert "metadata uses fallback version `0.3.0b0`" in changelog
+    assert package_version.group(1) == "0.3.5b0"
+    assert "Beta0.3.5" in readme
+    assert "Beta0.3.5" in readme
+    assert "## [Beta0.3.5]" in changelog
+    assert "metadata uses fallback version `0.3.5b0`" in changelog
 
 
 def test_opencode_plugin_declared_entry_skills_and_agents_exist():

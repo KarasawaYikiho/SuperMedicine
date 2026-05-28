@@ -100,7 +100,8 @@ Footer {
 
 /* Input Bar */
 #input-bar {
-    height: 3;
+    min-height: 3;
+    height: auto;
     width: 100%;
     background: $surface;
     border-top: heavy $primary;
@@ -109,20 +110,20 @@ Footer {
 
 #prompt-prefix {
     width: 4;
-    height: 3;
-    content-align: left middle;
+    height: auto;
+    content-align: center middle;
     text-style: bold;
     color: $primary;
 }
 
 #prompt-input {
     width: 1fr;
-    height: 3;
-    border: tall $primary 40%;
+    height: auto;
+    border: wide $primary 40%;
 }
 
 #prompt-input:focus {
-    border: tall $accent;
+    border: wide $accent;
 }
 
 /* Status Bar */
@@ -198,7 +199,7 @@ DataTable:focus {
 
 Input,
 Select {
-    height: 3;
+    height: auto;
     min-width: 12;
 }
 

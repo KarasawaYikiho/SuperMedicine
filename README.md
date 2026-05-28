@@ -1,6 +1,6 @@
 # SuperMedicine
 
-![Version](https://img.shields.io/badge/version-Beta0.3.0-blue)
+![Version](https://img.shields.io/badge/version-Beta0.3.5-blue)
 ![CI](https://github.com/KarasawaYikiho/SuperMedicine/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)

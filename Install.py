@@ -26,7 +26,7 @@ SUPPORTED_LLM_PROVIDERS = {"openai", "anthropic"}
 
 DEFAULT_CONFIG: dict[str, Any] = {
     "project_name": "supermedicine",
-    "version": "Beta0.3.0",
+    "version": "Beta0.3.5",
     "llm": {
         "provider": "",
         "providers": {

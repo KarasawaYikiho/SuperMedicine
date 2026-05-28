@@ -3,7 +3,7 @@
 # provider, BaseURL, model, and key values empty. Install.py must be
 # supplied complete local LLM settings before first startup.
 project_name: supermedicine
-version: Beta0.3.0
+version: Beta0.3.5
 llm:
   provider: ''
   providers:

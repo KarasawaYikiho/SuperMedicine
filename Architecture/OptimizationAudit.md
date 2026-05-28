@@ -1,4 +1,4 @@
-# Optimization Audit Report — Step 1
+﻿# Optimization Audit Report — Step 1
 
 This documentation-only artifact records the Step 1 optimization audit so it can be reviewed and verified from the repository workspace.
 
@@ -88,7 +88,7 @@ The following semantics are protected during the optimization work and must not 
 - Preserve existing kernel, plugin, RAG, workspace, TUI, paper import, operation guard, path safety, and experience semantics unless a later reviewed task explicitly changes them.
 - Preserve existing test intent and coverage boundaries; this audit step does not update tests.
 
-## Naming review initial findings for “独立单词首字母大写”
+## Naming Review Initial Findings for “独立单词首字母大写”
 
 Initial naming review is limited to the paths visible in the workspace status and prior audit summary. Findings requiring follow-up review:
 
@@ -97,7 +97,7 @@ Initial naming review is limited to the paths visible in the workspace status an
 - Lowercase module paths such as `core/experience.py`, `core/operation_guard.py`, `core/path_safety.py`, `core/workspace.py`, `core/workspace_tools.py`, `plugins/rag/main.py`, and `tests/test_*.py` appear to follow Python module naming conventions rather than independent-word initial capitalization.
 - No renames were performed in this audit step.
 
-## Duplicate review initial findings
+## Duplicate Review Initial Findings
 
 Initial duplicate review is limited to the paths visible in the workspace status and prior audit summary. Findings requiring follow-up review:
 
@@ -107,32 +107,32 @@ Initial duplicate review is limited to the paths visible in the workspace status
 - Paper import related implementation and test paths appear in multiple related areas: `core/paper_import/`, `tests/test_paper_cli.py`, and `tests/test_paper_import_core.py`.
 - These are initial review findings only; no duplicate removal or consolidation was performed in this audit step.
 
-## Audit action boundary statement
+## Audit Action Boundary Statement
 
 This audit step did not modify, stage, commit, push, tag, release, publish, or upload anything beyond creating this documentation-only report artifact at `Architecture/OptimizationAudit.md`.
 
-## Step 2-6 semantic-neutral optimization review
+## Step 2-6 Semantic-Neutral Optimization Review
 
 This section records the follow-up safe optimization pass. The pass intentionally stayed documentation-only plus generated-artifact cleanup, because the working tree contains large feature, CLI, plugin, policy, TUI, workspace, paper-import, and test changes whose behavior and compatibility intent must be preserved.
 
-### Optimization decisions
+### Optimization Decisions
 
 - `git diff --check` reported no whitespace errors in the tracked diff, so no trailing-whitespace cleanup was applied.
 - No code imports, type hints, command handlers, result shapes, policy checks, adapter gates, plugin actions, package metadata entrypoints, or tests were edited. Import removal can be behavior-affecting in Python when modules expose re-exported names, runtime side effects, or test compatibility expectations, so no import cleanup was performed without a dedicated lint finding tied to a specific safe line.
 - Existing `.gitignore` rules already cover the generated artifacts found during this pass: Python bytecode caches, build and distribution outputs, package metadata, type/lint/test caches, coverage outputs, and SuperMedicine runtime audit/checkpoint artifacts. No `.gitignore` change was necessary.
 
-### Naming decisions
+### Naming Decisions
 
 - Documentation filenames already visible in the architecture area use independent-word initial capitalization where applicable, for example `ExecutionRoadmap.md`, `PhaseImplementationPlan.md`, `WorkspaceTuiRagGuide.md`, and `OptimizationAudit.md`.
 - Python modules, packages, test files, plugin paths, action identifiers, CLI flags, manifest-like package metadata, and import paths were not renamed. Renaming them would risk breaking import compatibility, package entrypoints, test discovery, user CLI expectations, or plugin/action IDs.
 - Prose/display capitalization was not bulk-normalized, because help text, README examples, security guidance, and tests may assert or document exact wording. Any future capitalization-only changes should be limited to reviewed documentation prose that is not coupled to CLI help output or assertions.
 
-### Duplicate decisions
+### Duplicate Decisions
 
 - Workspace, experience, TUI, paper-import, RAG, permission, and backward-compatibility test files that appear related were retained as separate files. Their overlap is potentially intentional coverage or compatibility scaffolding rather than semantic-neutral duplication.
 - No duplicate code or documentation blocks were removed. The current diff was treated as behaviorally meaningful until a narrower review identifies an exact redundant prose paragraph or duplicate import that can be removed without changing public API, test meaning, or compatibility behavior.
 
-### Generated artifact cleanup performed
+### Generated Artifact Cleanup Performed
 
 Removed ignored/generated artifacts where filesystem permissions allowed:
 
@@ -147,12 +147,12 @@ Removed ignored/generated artifacts where filesystem permissions allowed:
 
 Artifact cleanup intentionally did not remove source or planned untracked files such as `core/paper_import/`, `core/tui/`, new `core/*.py` modules, new tests, or architecture documentation.
 
-### Generated artifact cleanup not completed
+### Generated Artifact Cleanup Not Completed
 
 - `.pytest_cache/` was detected as an ignored generated artifact, but removal was denied by the operating system with a permission error. It remains ignored and should be removed manually or after releasing the lock/permission constraint if a fully clean ignored-artifact state is required.
 - `Planning/` remains ignored by repository rules. It was not removed because the task only authorized generated artifacts/caches and this path is documented as local-only planning notes, not necessarily generated output.
 
-## Platform documentation model update — Step 6
+## Platform Documentation Model Update — Step 6
 
 This documentation pass records the intended model as **core independent +
 platform add-ons**:
