@@ -32,6 +32,9 @@ Use this index as the canonical navigation layer for repeated repository-optimiz
 | 29 | Current Step 4 repository cleanliness execution | Ignored generated/local artifact cleanup | Removed safe ignored cache/build/runtime/local planning artifacts; changed no source/config/test/manifest semantics and left ignore rules unchanged. |
 | 30 | Current Step 5 verification preparation | Full consistency and regression gate plan | Recorded the validation gates Tester should run and the evidence/cleanup expectations; no verification command was run in this execution step. |
 | 31 | Current Step 6 Git review and submission | Final verification evidence, cleanup, commit, and push | Recorded Tester-reported full verification evidence, cleaned regenerated ignored artifacts, and limited final tracked changes to this audit document before submission. |
+| 32 | Current Step 6 repository cleanliness cleanup | Ignored generated artifact cleanup | Removed accessible ignored cache/build/package/runtime/local artifacts; preserved tracked `.supermedicine` config and policy inputs; left `.pytest_cache/` as the permission-denied boundary. |
+| 33 | Current Step 7 full regression validation cleanup | Full verification evidence and generated-artifact cleanup | Recorded Tester-reported pass evidence for install, lint, type, wheel/sdist, pytest, repo hygiene, path/case integrity, diff scope, and secret/local-state checks; cleaned regenerated ignored artifacts accessible with normal permissions. |
+| 34 | Current Step 8 diff review | Final diff semantic-preservation review | Confirmed the final tracked diff remains audit-document only, additive documentation/audit evidence only, and contains no functional semantic change. |
 
 ## 1. Current branch, remote, and working tree status
 
@@ -1218,3 +1221,241 @@ Submission policy:
   cleanup without implying functional behavior changes.
 - Push uses the current branch's configured remote tracking target and does not
   use force.
+
+## 32. Current Step 6 Repository Cleanliness Cleanup
+
+Date: 2026-05-28
+
+Scope: cleanup of ignored temporary, cache, build, package, runtime, local planning,
+and other generated artifacts after verification activity. This step does not
+change runtime source, tests, configuration semantics, manifests, package metadata
+inputs, policies, platform resources, staging, commit, push, release, publish,
+upload, path names, or functional behavior.
+
+Cleanup performed:
+
+- Removed accessible ignored generated artifacts when present, including
+  `.ruff_cache/`, `build/`, `dist/`, `supermedicine.egg-info/`,
+  `.supermedicine/checkpoints/`, `.supermedicine/policies/audit.jsonl`,
+  accessible `__pycache__/` directories, and accessible Python bytecode files.
+- Removed ignored local planning material under `Planning/` as part of repository
+  cleanliness cleanup; it was not tracked source-of-truth documentation.
+- Preserved tracked `.supermedicine/config.yaml` and
+  `.supermedicine/policies/default.yaml` as required runtime/bootstrap inputs.
+- Left `.pytest_cache/` as the documented permission-denied boundary when normal
+  cleanup could not remove it; no elevated or forced permission change was
+  attempted.
+
+Ignore-rule review:
+
+- `.gitignore` was not changed because existing ignore rules already cover the
+  cleaned Python bytecode, build/package outputs, tool caches, test caches,
+  SuperMedicine runtime audit/checkpoint outputs, local planning notes, logs,
+  environment files, workspace data, and common OS/editor artifacts.
+- No broader ignore pattern was added, avoiding the risk of hiding required source,
+  documentation, package data, manifest, adapter, plugin, or resource files.
+
+Preservation result:
+
+- Tracked source, tests, documentation other than this audit record,
+  configuration, policy defaults, manifests, package inputs, adapter resources,
+  plugin resources, and CI files were preserved.
+- No Markdown link target, path reference, import path, package-discovery path,
+  manifest path, or runtime configuration path was renamed or rewritten.
+- The only intended tracked change from this step is this audit record in
+  `Architecture/RepositoryOptimizationAudit.md`.
+
+## 33. Current Step 7 Full Regression and Path Integrity Verification Cleanup
+
+Date: 2026-05-28
+
+Scope: audit-only record of Tester-owned full regression and repository integrity
+validation after the cleanup and audit-record steps, followed by cleanup of
+validation-regenerated ignored artifacts. Coder did not run tests, builds,
+linters, type checks, Git validation commands, path scans, secret scans, staging,
+commit, push, release, publish, upload, or any runtime/source/configuration/
+manifest/test/package change. This section records the validation command set,
+Tester-reported pass evidence, and generated-artifact cleanup result.
+
+Tester command record:
+
+- Environment/install gate: in an isolated verification environment, run
+  `python -m pip install -e ".[dev]"` so `ruff`, `mypy`, `pytest`, and `build`
+  are available from the repository's declared development extra.
+- Ruff lint gate: run
+  `python -m ruff check --select=E,F,W --ignore=E501 .`.
+- Mypy type gate: run
+  `python -m mypy . --cache-dir <temp-mypy-cache>` with `<temp-mypy-cache>`
+  outside the repository or inside a disposable temp directory.
+- Wheel/package gate: run
+  `python -m pip wheel . --no-deps --wheel-dir <temp-wheel-dir>` with a
+  disposable `<temp-wheel-dir>`.
+- Source distribution gate: run
+  `python -m build --sdist --outdir <temp-dist-dir>` with a disposable
+  `<temp-dist-dir>`; if the build backend also produces metadata or cache output,
+  treat it as generated validation output to clean or report after evidence is
+  captured.
+- Repository hygiene pytest gate: run
+  `python -m pytest tests/test_repo_hygiene.py -q --override-ini addopts= -p no:cacheprovider --basetemp <temp-basetemp>`
+  with `<temp-basetemp>` as a disposable path outside persistent repository
+  state.
+- Full regression pytest gate: run
+  `python -m pytest tests/ -v --tb=short --override-ini addopts= -p no:cacheprovider --basetemp <temp-basetemp>`
+  with cacheprovider disabled and a safe disposable base temp directory.
+
+Repository integrity checks for Tester:
+
+- Repo hygiene/status: confirm `git status --short --branch`, `git diff --stat`,
+  `git diff --name-status`, and `git diff --cached --name-status` show only the
+  intended audit-document tracked change and no staged or unrelated tracked
+  change.
+- Diff scope: inspect the tracked diff and confirm it is limited to
+  `Architecture/RepositoryOptimizationAudit.md`, with documentation-only content
+  and no runtime/source/config/test/manifest/package/CI/policy/platform semantic
+  change.
+- Path/case collision check: confirm tracked paths have no lowercase-key
+  collision under a case-insensitive model and no case-only rename effect. A
+  suitable check is to compare `git ls-files` against each path lowercased and
+  report any key with more than one distinct tracked path.
+- Path/reference integrity: for each protected path family recorded in this audit
+  (`Cli.py`, `Install.py`, `core/**`, `permission/**`, `agents/**`, `plugins/**`,
+  `adapters/**`, `tests/**`, `.github/workflows/ci.yml`, `.supermedicine/**`,
+  `install.json`, `pyproject.toml`, `requirements.txt`, and `Architecture/**`),
+  confirm no referenced tracked path is missing, renamed with inconsistent case,
+  or broken by the no-rename decisions. Documentation links and manifest-declared
+  resource paths should be checked against actual tracked files where tooling or
+  tests do not already cover them.
+- Generated artifact check: after lint/type/build/pytest commands, inspect ignored
+  and untracked output for validation-generated artifacts such as `build/`,
+  `dist/`, `*.egg-info/`, `.ruff_cache/`, `.mypy_cache/`, accessible
+  `.pytest_cache/`, `__pycache__/`, `*.pyc`, `.supermedicine/checkpoints/`, and
+  `.supermedicine/policies/audit.jsonl`. Clean disposable artifacts with normal
+  permissions or record them as generated validation outputs; do not delete
+  tracked source-of-truth files.
+- Permission boundary: if `.pytest_cache/` still reports permission denied, record
+  it as the known non-semantic inaccessible cache boundary and do not force
+  ownership or permissions.
+- Secret/local-state check: confirm no secrets, credentials, environment files,
+  local assistant state, runtime audit logs, checkpoints, or generated package
+  artifacts are introduced into tracked changes. This includes checking that
+  `.supermedicine/config.yaml` and `.supermedicine/policies/default.yaml` remain
+  tracked policy/config inputs, while runtime outputs remain untracked/ignored.
+- Baseline-failure handling: if any verification command has a pre-existing
+  baseline failure, Tester should capture the failure, compare it against the
+  current diff scope, and prove this Step 7 audit-only change introduced no new
+  failure. Do not treat this audit section itself as proof that a command passed.
+
+Evidence requirements:
+
+- Record command outcomes for ruff, mypy, wheel build, sdist build, repository
+  hygiene pytest, and full pytest using the exact safe-temp/no-cache forms above
+  or equivalent paths that avoid persistent repository state.
+- Record repository status, diff scope, path/case collision results,
+  path/reference integrity results, secret/local-state results, and generated
+  artifact cleanup or preservation notes after verification.
+- Confirm that any regenerated artifacts are either removed with normal
+  permissions, left ignored and explicitly reported, or preserved only when they
+  are the known inaccessible `.pytest_cache/` boundary.
+- Confirm no file or directory rename occurred, no path reference has missing or
+  inconsistent case, no documentation link checked by this gate is broken, and no
+  functional semantics changed.
+
+Tester-reported Step 7 validation evidence:
+
+- Environment/install gate passed for the repository development install with the
+  declared development dependencies available for validation.
+- Ruff lint gate passed for `python -m ruff check --select=E,F,W --ignore=E501 .`.
+- Mypy type gate passed for `python -m mypy . --cache-dir <temp-mypy-cache>` with
+  a disposable cache path.
+- Wheel/package gate passed for `python -m pip wheel . --no-deps --wheel-dir
+  <temp-wheel-dir>`.
+- Source distribution gate passed for `python -m build --sdist --outdir
+  <temp-dist-dir>`.
+- Repository hygiene pytest gate passed for
+  `python -m pytest tests/test_repo_hygiene.py -q --override-ini addopts= -p no:cacheprovider --basetemp <temp-basetemp>`.
+- Full regression pytest gate passed for
+  `python -m pytest tests/ -v --tb=short --override-ini addopts= -p no:cacheprovider --basetemp <temp-basetemp>`.
+- Repository status, diff scope, path/case collision, path/reference integrity,
+  and secret/local-state checks passed, with the only intended tracked change
+  remaining this audit document and no runtime/source/config/test/manifest/
+  package/CI/policy/platform semantic change reported.
+- Generated-artifact hygiene initially failed because validation regenerated
+  ignored artifacts. The required follow-up was to remove safe ignored generated
+  outputs and preserve tracked `.supermedicine/config.yaml` and
+  `.supermedicine/policies/default.yaml`.
+
+Post-validation cleanup result:
+
+- Removed regenerated ignored artifacts accessible with normal permissions:
+  `.ruff_cache/`, `build/`, `supermedicine.egg-info/`,
+  `.supermedicine/checkpoints/`, and `.supermedicine/policies/audit.jsonl`.
+- Checked for and treated `dist/`, accessible `__pycache__/` directories, and
+  accessible `*.pyc` files as cleanup targets when present; no source-of-truth
+  file is part of this cleanup class.
+- Preserved tracked `.supermedicine/config.yaml` and
+  `.supermedicine/policies/default.yaml` as required runtime/bootstrap inputs.
+- Preserved the known `.pytest_cache/` permission-denied boundary if present;
+  no elevated permission change or forced cleanup is part of this step.
+
+Step 7 conclusion: Tester reported all full validation commands and repository
+integrity checks passed after evidence collection. The validation-generated
+ignored artifacts were cleaned where accessible with normal permissions, and the
+intended tracked change remains this audit-only verification and cleanup record.
+
+## 34. Current Step 8 Diff Review and Functional Invariance Confirmation
+
+Date: 2026-05-28
+
+Scope: final diff review after the naming, cleanup, duplicate-reduction,
+documentation-hygiene, verification-record, and generated-artifact cleanup steps.
+This step is audit-only and records the review conclusion; it does not change
+runtime source, tests, configuration semantics, manifests, package metadata
+inputs, policies, platform resources, CI, staging, commit, push, release,
+publish, upload, path names, or functional behavior.
+
+Diff review evidence:
+
+- `git status --short --branch` showed the current branch as
+  `master...origin/master` with only `Architecture/RepositoryOptimizationAudit.md`
+  modified.
+- `git diff --name-status` showed only
+  `M Architecture/RepositoryOptimizationAudit.md`.
+- `git diff --stat` showed one changed file,
+  `Architecture/RepositoryOptimizationAudit.md`, with documentation insertions.
+- The inspected diff consists of audit-pass index additions and new audit-record
+  sections for ignored-artifact cleanup, Tester-reported verification evidence,
+  and this final diff review.
+- Git repeated the known line-ending warning for this audit file (`LF will be
+  replaced by CRLF the next time Git touches it`); this is recorded as workspace
+  line-ending metadata noise and not as a runtime/source/config/test/manifest
+  semantic change.
+
+Functional invariance review:
+
+- No file or directory rename appears in the final tracked diff. The no-safe-rename
+  outcome for independent-word capitalization remains unchanged.
+- No runtime/source files are part of the tracked diff, including `Cli.py`,
+  `Install.py`, `core/**`, `permission/**`, `agents/**`, `plugins/**`, or
+  `adapters/**`.
+- No tests are part of the tracked diff, including `tests/**`; test intent and
+  assertions are unchanged by this review step.
+- No configuration, policy, manifest, dependency, package, CI, or platform
+  declaration inputs are part of the tracked diff, including `.supermedicine/**`,
+  `.gitignore`, `pyproject.toml`, `requirements.txt`, `install.json`,
+  `.github/workflows/**`, `adapters/opencode/plugin.json`, and
+  `plugins/**/plugin.yaml`.
+- Ignored generated-artifact cleanup records are documentation evidence only; the
+  cleanup category remains limited to caches, build/package outputs, runtime local
+  logs/checkpoints, and local planning material already treated as ignored
+  non-source artifacts. Tracked `.supermedicine` config and policy inputs remain
+  preserved, and the known `.pytest_cache/` permission boundary is not forced.
+- The Step 7 Tester-reported validation evidence is recorded as audit history; it
+  does not alter command behavior, verification gates, package metadata, or
+  runtime semantics.
+
+Review conclusion: the final diff is intentionally limited to
+`Architecture/RepositoryOptimizationAudit.md` and contains only audit trail,
+cleanup-record, validation-evidence, and diff-review documentation. No change in
+the diff alters public API behavior, CLI behavior, imports, package discovery,
+permissions, manifests, tests, runtime configuration, generated-artifact policy,
+platform contracts, path names, or functional semantics.
