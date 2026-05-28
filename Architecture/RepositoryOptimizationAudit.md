@@ -36,7 +36,7 @@ Use this index as the canonical navigation layer for repeated repository-optimiz
 | 33 | Current Step 7 full regression validation cleanup | Full verification evidence and generated-artifact cleanup | Recorded Tester-reported pass evidence for install, lint, type, wheel/sdist, pytest, repo hygiene, path/case integrity, diff scope, and secret/local-state checks; cleaned regenerated ignored artifacts accessible with normal permissions. |
 | 34 | Current Step 8 diff review | Final diff semantic-preservation review | Confirmed the final tracked diff remains audit-document only, additive documentation/audit evidence only, and contains no functional semantic change. |
 
-## 1. Current Branch, Remote, and Working Tree Status
+## 1. Current Branch, Remote, And Working Tree Status
 
 - Working directory: `D:\GIT\SuperMedicine`
 - Current branch: `master`
@@ -52,7 +52,7 @@ Use this index as the canonical navigation layer for repeated repository-optimiz
 - `git diff --stat` baseline summary: 33 files changed, 1354 insertions, 194 deletions.
 - Git emitted line-ending warnings that LF will be replaced by CRLF next time Git touches many modified files. Treat line-ending normalization as non-semantic only if already project-standard and do not mix it with runtime behavior edits.
 
-## 2. Current Tracked and Untracked Intended Changes Summary
+## 2. Current Tracked And Untracked Intended Changes Summary
 
 These pre-existing uncommitted changes are from earlier platform agent/model/version work that already passed final verification. Preserve them and do not discard, overwrite, or reinterpret them during optimization.
 
@@ -97,7 +97,7 @@ Untracked intended files at baseline:
 - `Architecture/PlatformIntegrationAudit.md`
 - `adapters/opencode/agents/supermedicine.md`
 
-## 3. Project Structure and Entry Points
+## 3. Project Structure And Entry Points
 
 Tracked top-level structure includes:
 
@@ -123,7 +123,7 @@ Entry points and discovery-sensitive paths:
 - OpenCode adapter metadata and agent/skill paths under `adapters/opencode/**`
 - Claude Code skill/adapter paths under `adapters/claude_code/**`
 
-## 4. Build, Test, Type, Lint, and Packaging Command Inventory
+## 4. Build, Test, Type, Lint, And Packaging Command Inventory
 
 Validation commands documented by repository files and CI for later steps:
 
@@ -139,7 +139,7 @@ Validation commands documented by repository files and CI for later steps:
 
 Do not run verification in this audit step; Tester owns verification.
 
-## 5. Generated and Ignored Artifacts Observed
+## 5. Generated And Ignored Artifacts Observed
 
 Ignored/generated artifacts observed by `git ls-files --others --ignored --exclude-standard` include:
 
@@ -196,7 +196,7 @@ Do not rename Python modules, tests, packages, package directories, or entry mod
 
 If independent word capitalization would imply changing any of the above paths or identifiers, document the skip rather than forcing the rename.
 
-## 9. Baseline Notes for Later Optimization
+## 9. Baseline Notes For Later Optimization
 
 - This audit file is the only intended file change in Step 1.
 - Pre-existing uncommitted changes are part of the protected baseline and must survive unchanged unless a later planned step explicitly modifies them within no-go boundaries.
@@ -261,7 +261,7 @@ The following mappings document what independent-word capitalization would imply
 | `pyproject.toml`, `requirements.txt` | `PyProject.toml`, `Requirements.txt` | Skip | Packaging tools, installers, CI, docs | Tooling expects conventional lowercase names. |
 | Conventional root docs `README.md`, `INSTALL.md`, `ARCHITECTURE.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`, `LICENSE` | `Readme.md`, `Install.md`, `Architecture.md`, etc. | Skip | GitHub rendering, packaging metadata, docs links, possible `Architecture/` case/name confusion | Conventional uppercase metadata names are intentional; `ARCHITECTURE.md` also risks confusion with `Architecture/` directory. |
 
-### 10.3 Case-Only and Path-Conflict Risk Notes
+### 10.3 Case-Only And Path-Conflict Risk Notes
 
 - Windows/Git case-only renames are unreliable unless performed carefully with an intermediate temporary name. This audit step intentionally did not perform any rename.
 - Mixed-case changes such as `core` -> `Core`, `plugins` -> `Plugins`, or `ARCHITECTURE.md` -> `Architecture.md` can appear unchanged to case-insensitive tooling while still changing behavior on Linux/macOS CI or package consumers.
@@ -269,7 +269,7 @@ The following mappings document what independent-word capitalization would imply
 - Hyphen-to-PascalCase renames under OpenCode agent/skill paths may also change platform IDs if filenames are treated as identifiers.
 - Generated/ignored mirrors under `build/lib/**`, `supermedicine.egg-info/**`, and caches must not be renamed because they should be cleaned/regenerated, not treated as source paths.
 
-### 10.4 Reference Synchronization Requirements if a Future Safe Candidate is Introduced
+### 10.4 Reference Synchronization Requirements If A Future Safe Candidate Is Introduced
 
 For any future rename that is judged truly safe, synchronize all of the following in the same step:
 
@@ -297,7 +297,7 @@ Execution result:
 
 Rationale: Step 2 identified no low-risk source-of-truth rename candidate. The only apparent capitalization opportunities are tied to Python imports, setuptools/pytest discovery, plugin or adapter platform discovery, configuration/runtime paths, conventional tooling filenames, or case-only Git behavior on Windows. Preserving those paths avoids behavior changes and avoids unnecessary churn.
 
-## 12. Step 4 Duplicate and Redundant Content Audit
+## 12. Step 4 Duplicate And Redundant Content Audit
 
 Scope: repository duplicate/redundant content audit only. No source, runtime, configuration, documentation, generated, or ignored files were deleted or modified in this step except this audit section.
 
@@ -315,7 +315,7 @@ No exact source-of-truth documentation, configuration, static text, export, empt
 
 Rationale: duplicate-looking source/content items either carry distinct placement/context meaning, are runtime/config/discovery-sensitive, are intentionally repeated across agent/platform documents, are tests/examples/fixtures, or are code-level repetition that this audit is explicitly not allowed to abstract or rewrite. The only clearly removable duplicate material found is generated/ignored artifact material listed separately in section 12.2.
 
-### 12.2 Generated/Ignored Artifacts Eligible for Cleanup in Step 5
+### 12.2 Generated/Ignored Artifacts Eligible For Cleanup In Step 5
 
 The following generated or ignored artifacts are eligible for cleanup because they are not source-of-truth files and are reproducible runtime/build/cache outputs:
 
@@ -397,13 +397,13 @@ Risky optimizations intentionally skipped:
 - No code imports, command handlers, output protocols, result schemas, permission/security policies, default values, package metadata, dependency versions, or tests were changed.
 - No additional generated-artifact cleanup was attempted in this step, including the previously inaccessible `.pytest_cache/` and the intentionally preserved ignored `Planning/` path.
 
-## 15. Current Repeated Optimization Pass Baseline Refresh at Commit `0fe238b`
+## 15. Current Repeated Optimization Pass Baseline Refresh At Commit `0fe238b`
 
 Date: 2026-05-27
 
 Scope: documentation-only repository baseline refresh for the repeated optimization request. This section records the current Git/project observations directly from the current repository state, not from older Architecture audit text. No runtime/source behavior files are to be changed in this step; this audit document is the only intended modification.
 
-### 15.1 Current Branch, Remote, HEAD, and Initial Worktree State
+### 15.1 Current Branch, Remote, HEAD, And Initial Worktree State
 
 - Working directory: `D:\GIT\SuperMedicine`
 - Current branch/tracking line from `git status --short --branch`: `## master...origin/master`
@@ -416,7 +416,7 @@ Scope: documentation-only repository baseline refresh for the repeated optimizat
   - `git status --short --branch` reported only `## master...origin/master`; no modified, staged, deleted, renamed, or untracked non-ignored files were shown.
   - `Architecture/RepositoryOptimizationAudit.md` is tracked at mode `100644` and is the only intended file to update for this step.
 
-### 15.2 Project Type, Major Structure, and Discovery-Sensitive Entry Points
+### 15.2 Project Type, Major Structure, And Discovery-Sensitive Entry Points
 
 - Project type: Python package/application named `supermedicine`, version `0.3.0b0`, with setuptools build backend (`setuptools>=68.0`, `wheel`) and Python requirement `>=3.10`.
 - Runtime model: standalone Python medical research agent framework with optional OpenCode, Claude Code, and standalone adapter surfaces around the core.
@@ -437,7 +437,7 @@ Scope: documentation-only repository baseline refresh for the repeated optimizat
   - Public direct CLI/documented commands include `python Install.py --init`, `python Cli.py status`, `python Cli.py run ...`, `supermedicine status`, `supermedicine init`, `supermedicine run ...`, `supermedicine workspace ...`, `supermedicine paper ...`, `supermedicine experience ...`, and `supermedicine tui`.
   - Platform/discovery paths include `install.json`, `adapters/opencode/plugin.json`, `adapters/opencode/agents/**`, `adapters/opencode/skills/**`, `adapters/claude_code/SKILL.md`, and `plugins/**/plugin.yaml`.
 
-### 15.3 Available Test, Lint, Type, Build, and Smoke Commands
+### 15.3 Available Test, Lint, Type, Build, And Smoke Commands
 
 Commands inventoried from `pyproject.toml`, CI, and documentation for later Tester/verification steps only; Coder must not run test commands in this audit step.
 
@@ -454,7 +454,7 @@ Commands inventoried from `pyproject.toml`, CI, and documentation for later Test
 - Type gate: `python -m mypy . --cache-dir <temp-mypy-cache>`.
 - CLI smoke commands documented for later verification: `python Install.py --init`, `python Cli.py status`, `python Cli.py run "..."`, `supermedicine status`, `supermedicine init`, `supermedicine run ...`, workspace/paper/experience commands, and `supermedicine tui`.
 
-### 15.4 Tracked, Untracked, Ignored, and Generated Artifact Observations
+### 15.4 Tracked, Untracked, Ignored, And Generated Artifact Observations
 
 - Tracked source-of-truth state at initial repeated-pass baseline: no tracked modifications were present before this audit edit.
 - Untracked non-ignored state at initial repeated-pass baseline: none reported by Git before this audit edit.
@@ -471,7 +471,7 @@ Commands inventoried from `pyproject.toml`, CI, and documentation for later Test
   - Preserve `Planning/` unless a later step explicitly confirms it is disposable local-only material.
   - Do not mix generated-artifact cleanup with source/runtime behavior changes.
 
-### 15.4.1 Complete Tracked Markdown Inventory at Current Baseline
+### 15.4.1 Complete Tracked Markdown Inventory At Current Baseline
 
 The current output of `git ls-files "*.md"` contains 29 tracked Markdown files:
 
@@ -505,7 +505,7 @@ The current output of `git ls-files "*.md"` contains 29 tracked Markdown files:
 - `plugins/standards/medical_writing/references/stard-checklist.md`
 - `plugins/standards/medical_writing/references/strobe-checklist.md`
 
-### 15.5 Hard No-Go Semantic Preservation Boundaries for the Repeated Pass
+### 15.5 Hard No-Go Semantic Preservation Boundaries For The Repeated Pass
 
 Absolute priority: do not change existing functionality or code meaning, even when code appears unused, duplicated, insecure, stylistically inconsistent, or suboptimal. Repeated optimization must remain conservative and must revalidate assumptions against current files.
 
@@ -536,7 +536,7 @@ Date: 2026-05-26
 
 Scope: fresh audit-only pass over the current working tree after the repeated-pass baseline section. This pass re-scanned the requested documentation, `Architecture/**`, `Planning/**`, adapters, plugins, agents, core, permission, tests, install manifest, packaging config, and ignore rules for duplicate docs/descriptions, generated artifacts, naming/capitalization risk, hardcoded path references in tests/docs/manifests/imports, and platform adapter declaration paths. No source/runtime behavior, deletion, rename, staging, commit, push, tag, release, publish, upload, or generated-artifact cleanup was performed.
 
-### 16.1 Concrete Cleanup, Formatting, and Documentation De-Duplication Candidates
+### 16.1 Concrete Cleanup, Formatting, And Documentation De-Duplication Candidates
 
 - `Architecture/RepositoryOptimizationAudit.md`: contains accumulated historical pass sections and repeated boundary language by design. Candidate: if a future docs-only optimization is explicitly requested, add a short index/table of prior optimization passes or move older closed-pass details into an archival document. Skip for now because this file is the authoritative audit trail and deleting/relocating sections could lose review context.
 - `README.md` and `INSTALL.md`: both include clone/install/init/status/run snippets and optional platform/R notes. Candidate: in a future docs-only pass, keep `README.md` as quick-start and make `INSTALL.md` the detailed install guide with cross-links to reduce repeated prose. Skip now because each document remains useful as a standalone entry point and command blocks differ by audience (`pip install -e .` quick path versus `pip install -e ".[dev]"` development path).
@@ -547,7 +547,7 @@ Scope: fresh audit-only pass over the current working tree after the repeated-pa
 - `plugins/standards/medical_writing/references/*-checklist.md`: checklist files are intentionally separate source references; do not merge. Candidate only for docs index/navigation if future users need a consolidated checklist map.
 - `Planning/NextSteps.md`: ignored local planning note is a concrete cleanup candidate only if a later cleanup step confirms it is disposable. Skip now because the user explicitly requested audit-only recording and previous scope preserved ignored Planning material unless explicitly known generated.
 
-### 16.2 Naming Capitalization and Path-Case Risk Findings
+### 16.2 Naming Capitalization And Path-Case Risk Findings
 
 - No safe rename/capitalization candidate was found in the requested source-of-truth scope. Current lowercase package/module paths (`core/**`, `permission/**`, `agents/**`, `plugins/**`, `adapters/**`) match Python import and packaging conventions and are referenced throughout code, tests, docs, manifests, and package discovery.
 - `Cli.py` and `Install.py` remain intentionally capitalized entry modules. Skip any further rename because `pyproject.toml` declares `py-modules = ["Cli", "Install"]`, the console script points to `Cli:main`, and docs/tests use direct `python Cli.py` / `python Install.py` workflows.
@@ -558,7 +558,7 @@ Scope: fresh audit-only pass over the current working tree after the repeated-pa
 - Test paths (`tests/**`, `tests/test_*.py`, `tests/conftest.py`, `tests/__init__.py`) are pytest-discovery-sensitive and contain hardcoded path assertions for manifests/docs/adapters. Skip renames because `pyproject.toml` defines `testpaths = ["tests"]` and `python_files = ["test_*.py"]`.
 - `.supermedicine/**`, `.gitignore`, `pyproject.toml`, `install.json`, `.github/workflows/**`, and conventional root docs remain tooling/config-sensitive. Skip aesthetics-driven capitalization because these names are loaded by tooling, runtime config, tests, docs, or platform installers.
 
-### 16.3 Generated/Cache Artifacts Observed and Cleanup Plan
+### 16.3 Generated/Cache Artifacts Observed And Cleanup Plan
 
 Observed ignored/generated artifacts in the fresh pass:
 
@@ -577,7 +577,7 @@ Cleanup plan for a later explicit cleanup step only:
 - Preserve `Planning/NextSteps.md` unless a later step explicitly decides ignored local planning notes are disposable.
 - Do not clean, delete, rename, or merge any tracked source, docs, tests, manifests, policies, plugin references, or adapter resources as part of generated-artifact cleanup.
 
-### 16.4 Duplicate-Looking Items Skipped with Rationale
+### 16.4 Duplicate-Looking Items Skipped With Rationale
 
 - `permission/default_policy.yaml` and `.supermedicine/policies/default.yaml`: duplicate-looking policy content is skipped because the first is package data and the second is local runtime bootstrap policy.
 - Repeated policy action names such as RAG, tool, workspace, and Claude scopes are skipped because rule meaning depends on agent, action, effect, and hard-limit context.
@@ -675,7 +675,7 @@ Skipped duplicate-looking items and rationale:
 
 Step 5 conclusion: the only strictly safe duplicate reduction in this pass was additive navigation/indexing inside the audit itself. All deletion/merge candidates were skipped because semantic identity and context preservation could not be proven under the hard constraints.
 
-## 20. Repeated-Pass Step 6 Repository Format and Text Hygiene Result
+## 20. Repeated-Pass Step 6 Repository Format And Text Hygiene Result
 
 Date: 2026-05-26
 
@@ -717,7 +717,7 @@ Test coverage decision:
 
 Step 7 conclusion: `tests/test_repo_hygiene.py` was intentionally left unchanged. The audit records why existing non-invasive coverage is sufficient for this docs-only repeated optimization pass, while preserving the rule that future functional/path/manifest changes should receive focused test coverage.
 
-## 22. Repeated-Pass Step 9 Final Diff Review and Semantic-Preservation Confirmation
+## 22. Repeated-Pass Step 9 Final Diff Review And Semantic-Preservation Confirmation
 
 Date: 2026-05-26
 
@@ -746,13 +746,13 @@ Semantic-preservation confirmation:
 
 Step 9 conclusion: final repeated-pass diff scope is intentionally restricted to `Architecture/RepositoryOptimizationAudit.md`. Accessible regenerated artifacts were cleaned or confirmed absent, inaccessible `.pytest_cache/` and ignored `Planning/` content were preserved, and no runtime/source/config/test/manifest semantics changed.
 
-## 23. Step 2 Markdown Rewrite and Deduplication Strategy
+## 23. Step 2 Markdown Rewrite And Deduplication Strategy
 
 Date: 2026-05-27
 
 Scope: strategy-only pass over the 29 tracked Markdown files listed in section 15.4.1. This section defines the concrete rewrite and deduplication rules for a later Markdown-only pass. No code/runtime files, configuration files, manifests, tests, package metadata, generated artifacts, staging, commit, push, tag, release, publish, or upload actions are part of this strategy step.
 
-### 23.1 Rewrite Goal and Preservation Rule
+### 23.1 Rewrite Goal And Preservation Rule
 
 The goal is conservative Markdown prose cleanup while preserving every original functional meaning, warning, command, identifier, platform contract, checklist item, and audit trace. The later rewrite pass should prefer the smallest local text edit that improves consistency or removes provably redundant prose. If a phrase is ambiguous, consumer-facing, or possibly asserted by tests/platform tooling, leave it unchanged and record the skip rather than normalize it.
 
@@ -810,7 +810,7 @@ Must remain duplicated:
 - Audit no-go boundaries and historical evidence in audit documents.
 - Manifest/path/action/API names repeated for clarity in docs and tests.
 
-### 23.6 Exact Verification Approach for the Later Rewrite Pass
+### 23.6 Exact Verification Approach For The Later Rewrite Pass
 
 Verification should be performed after the Markdown rewrite by Tester, not by the strategy writer. The expected verification approach is:
 
@@ -860,7 +860,7 @@ summary/cross-reference additions as the main deduplication mechanism. The audit
 record, platform boundaries, medical/statistical disclaimers, and protected
 identifiers remain local where standalone consumption requires them.
 
-## 25. Step 4 File and Directory Naming Normalization Review
+## 25. Step 4 File And Directory Naming Normalization Review
 
 Date: 2026-05-27
 
@@ -1098,7 +1098,7 @@ Semantic-preservation result:
 - The only intended tracked change from this step is this audit record in
   `Architecture/RepositoryOptimizationAudit.md`.
 
-## 30. Current Step 5 Full Consistency and Regression Verification Preparation
+## 30. Current Step 5 Full Consistency And Regression Verification Preparation
 
 Date: 2026-05-27
 
@@ -1181,7 +1181,7 @@ Tester verification evidence received for Step 5:
 
 Functional semantics changed: none.
 
-## 31. Current Step 6 Git Review and Submission
+## 31. Current Step 6 Git Review And Submission
 
 Date: 2026-05-27
 
@@ -1265,7 +1265,7 @@ Preservation result:
 - The only intended tracked change from this step is this audit record in
   `Architecture/RepositoryOptimizationAudit.md`.
 
-## 33. Current Step 7 Full Regression and Path Integrity Verification Cleanup
+## 33. Current Step 7 Full Regression And Path Integrity Verification Cleanup
 
 Date: 2026-05-28
 
@@ -1402,7 +1402,7 @@ integrity checks passed after evidence collection. The validation-generated
 ignored artifacts were cleaned where accessible with normal permissions, and the
 intended tracked change remains this audit-only verification and cleanup record.
 
-## 34. Current Step 8 Diff Review and Functional Invariance Confirmation
+## 34. Current Step 8 Diff Review And Functional Invariance Confirmation
 
 Date: 2026-05-28
 

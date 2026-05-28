@@ -247,7 +247,7 @@ OpenCode/Claude Code:
 - Documentation, manifests, tests, and adapter files must use fake keys or
   placeholders only and must not commit real API keys.
 
-### Workspace-Local Papers, Experience Learning, and TUI
+### Workspace-Local Papers, Experience Learning, And TUI
 
 Paper import and experience learning are workspace-aware support paths layered on
 top of the same permission and path-safety model:
@@ -328,13 +328,13 @@ OpenCode, Claude Code, `claude`, or platform configuration directories.
 | Native platform skill loading | Not applicable | Skill docs available to OpenCode setup | Not implemented |
 | LLM provider config | OpenAI/Anthropic via config/env/installer | Metadata only, from core config sources | Metadata only, from core config sources |
 
-### Standalone and CLI execution
+### Standalone And CLI Execution
 
 The CLI initializes the Kernel for `init`, `status`, `test`, and `run` paths. The
 `run` command uses the real component stack rather than a placeholder-only path,
 including plugin discovery and permission-gated execution where applicable.
 
-## Safety and Resource Metadata
+## Safety And Resource Metadata
 
 High-risk calls use a minimal, dependency-free safety model:
 
@@ -356,7 +356,7 @@ High-risk calls use a minimal, dependency-free safety model:
 - Experience learning rejects raw conversations and separates general method
   storage from workspace-local project details.
 
-## Medical Writing and Citation Constraints
+## Medical Writing And Citation Constraints
 
 Medical writing support provides reporting-checklist and citation-formatting
 constraints only. CONSORT, STROBE, PRISMA, and STARD helpers can identify missing
@@ -376,7 +376,7 @@ contains secrets or private endpoints.
 Phase documentation/help work does not create tags, releases, package publishes,
 paper uploads, or external artifact uploads.
 
-## Planning and Push Gate Rule
+## Planning And Push Gate Rule
 
 Plan-stage work does not need strict project-standard verification. Optimization
 and standardization are required before Push/finalization, not during early

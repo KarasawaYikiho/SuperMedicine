@@ -28,7 +28,7 @@ detail, see [INSTALL.md](INSTALL.md); for system design, see
 
 ---
 
-## Table of Contents
+## Table Of Contents
 
 - [Installation](#installation)
   - [Prerequisites](#prerequisites)
@@ -277,7 +277,7 @@ You can configure the first provider through any of the following channels. All
 examples use placeholders or environment-variable names only; replace them only
 in your private shell or local config.
 
-### Configure by editing the file
+### Configure By Editing The File
 
 After initialization, edit `.supermedicine/config.yaml` and adjust the `llm`
 section. Prefer `api_key_env` for real credentials so future file edits can stay
@@ -314,7 +314,7 @@ On Windows PowerShell:
 $env:OPENAI_API_KEY = "<OPENAI_API_KEY>"
 ```
 
-### Configure with the CLI
+### Configure With The CLI
 
 You can inject a provider during initialization. The example below assumes
 `OPENAI_API_KEY` is already set in your private shell; the installer resolves the
@@ -354,7 +354,7 @@ supermedicine llm switch anthropic
 `--api-key` exists for local throwaway setups but may persist the value in
 `.supermedicine/config.yaml`; use `--api-key-env` for real keys whenever possible.
 
-### Configure in the TUI
+### Configure In The TUI
 
 Launch the TUI and open **LLM 管理** from the sidebar:
 
@@ -375,7 +375,7 @@ In the LLM screen you can:
 The TUI uses the same `.supermedicine/config.yaml` and `LLMConfigManager` as the
 CLI, so provider changes are shared between CLI and TUI.
 
-### Switching and startup restore
+### Switching And Startup Restore
 
 `supermedicine llm switch <provider>` validates the target provider, writes it as
 both `llm.provider` and `llm.last_provider`, and persists the change. On startup,
@@ -391,7 +391,7 @@ supermedicine llm show       # current/restored provider; redacted
 supermedicine llm switch openai
 ```
 
-### Environment variables and secret safety
+### Environment Variables And Secret Safety
 
 For shell-only configuration during initialization, set provider metadata and a
 provider-specific key variable:
@@ -448,7 +448,7 @@ python Install.py --init --interactive
 after adding real secrets. Prefer provider environment variables
 (`OPENAI_API_KEY` or `ANTHROPIC_API_KEY`) for real credentials.
 
-### Runtime use and validation
+### Runtime Use And Validation
 
 Use `python Cli.py status` or `supermedicine status` to confirm the project is
 initialized. Provider validation is performed when an LLM client is used or when
@@ -643,7 +643,7 @@ area and bottom status bar:
   LLM status, and task running state in the center, and current view/version on
   the right.
 
-### Navigation and shortcuts
+### Navigation And Shortcuts
 
 | Key | Action |
 |-----|--------|
@@ -681,7 +681,7 @@ maximizes/restores the focused widget, and `q` exits.
 | **LLM** | Add providers, switch current default, inspect redacted readiness state |
 | **Dialog** | View session dialog history (read-only) |
 
-### Status and safety cues
+### Status And Safety Cues
 
 - **LLM 状态** appears in the center status segment. It shows whether the current
   provider is ready and names the active provider without exposing API keys.
@@ -905,7 +905,7 @@ This installs `textual` as a core dependency.
 
 ---
 
-## Safety and Security
+## Safety And Security
 
 - **Permission Engine** — All high-risk operations (bash, write, edit) are
   permission-gated through `PermissionEngine.check()` at runtime.

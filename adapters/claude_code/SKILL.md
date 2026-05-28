@@ -44,7 +44,7 @@ local so this optional skill remains self-contained.
   responses, and documentation; this skill document intentionally contains no
   real plaintext API key examples
 
-## When to Use
+## When To Use
 
 - Conducting systematic reviews or meta-analyses requiring literature search and evidence synthesis
 - Performing statistical analysis on clinical trial or observational study data

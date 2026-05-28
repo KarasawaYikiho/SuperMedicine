@@ -82,7 +82,7 @@ supermedicine llm add openai \
 
 ## Step-by-Step Installation
 
-### 1. Create a Virtual Environment (Recommended)
+### 1. Create A Virtual Environment (Recommended)
 
 ```bash
 python -m venv .venv
@@ -92,7 +92,7 @@ python -m venv .venv
 source .venv/bin/activate
 ```
 
-### 2. Clone and Install the Independent Python Core
+### 2. Clone And Install The Independent Python Core
 
 ```bash
 git clone https://github.com/KarasawaYikiho/SuperMedicine.git
@@ -178,7 +178,7 @@ selected provider as both `llm.provider` and `llm.last_provider`, and persists t
 change. On later startup the runtime restores `last_provider` when present;
 otherwise it falls back to the install-time default provider.
 
-### 3b. Configure by Editing `.supermedicine/config.yaml`
+### 3b. Configure By Editing `.supermedicine/config.yaml`
 
 Manual editing is also supported. Keep real secrets out of the file by using
 `api_key_env`:
@@ -202,7 +202,7 @@ Then set the environment variable outside the repository:
 export OPENAI_API_KEY=<OPENAI_API_KEY>
 ```
 
-### 3c. Configure in the TUI
+### 3c. Configure In The TUI
 
 Run `supermedicine tui`, open **LLM 管理**, enter provider name, BaseURL, model,
 API key, and optional API format, then click **添加 Provider**. The key field is
@@ -307,7 +307,7 @@ After adding Scripts to PATH, restart your terminal and verify:
 supermedicine --help
 ```
 
-### LLM provider missing key or endpoint
+### LLM Provider Missing Key Or Endpoint
 
 Use provider-specific environment variables for real credentials:
 
