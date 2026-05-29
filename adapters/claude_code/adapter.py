@@ -28,7 +28,7 @@ class ClaudeCodeAdapter(BaseAdapter):
         "config_sources": [
             "Installer/runtime injection flags: Install.py --provider openai|anthropic --base-url <url> --api-key <secret> --model <model>",
             "Generic environment variables: SM_LLM_PROVIDER, SM_LLM_BASE_URL, SM_LLM_API_KEY, SM_LLM_MODEL",
-            "Provider environment variables: OPENAI_API_KEY or ANTHROPIC_API_KEY",
+            "Provider environment variables: OPENAI_API_KEY, ANTHROPIC_API_KEY, or OPENROUTER_API_KEY",
             "Project-local config: .supermedicine/config.yaml llm.provider and llm.providers.*",
         ],
         "supported_api_formats": {
@@ -43,6 +43,13 @@ class ClaudeCodeAdapter(BaseAdapter):
                 "api_format": "anthropic",
                 "default_base_url": "https://api.anthropic.com/v1",
                 "provider_key_env": "ANTHROPIC_API_KEY",
+                "generic_key_env": "SM_LLM_API_KEY",
+                "custom_base_url": True,
+            },
+            "openrouter": {
+                "api_format": "openai",
+                "default_base_url": "https://openrouter.ai/api/v1",
+                "provider_key_env": "OPENROUTER_API_KEY",
                 "generic_key_env": "SM_LLM_API_KEY",
                 "custom_base_url": True,
             },

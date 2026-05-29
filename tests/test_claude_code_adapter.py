@@ -88,7 +88,7 @@ class TestClaudeCodeAdapter:
         assert adapter.registration["core"] is False
         assert adapter.registration["default"] is False
         assert adapter.registration["requires_core_runtime"] is False
-        assert set(adapter.registration["ai_provider_support"]["supported_api_formats"]) == {"openai", "anthropic"}
+        assert set(adapter.registration["ai_provider_support"]["supported_api_formats"]) == {"openai", "anthropic", "openrouter"}
         assert adapter.registration["ai_provider_support"]["secret_redaction"]["required"] is True
         assert "not imported" in adapter.registration["limitations"][0]
 
@@ -104,7 +104,7 @@ class TestClaudeCodeAdapter:
         assert result["result"]["features"]["ai_provider_config_discovery"] is True
         assert result["result"]["features"]["ai_provider_secret_redaction"] is True
         assert result["result"]["features"]["custom_ai_provider_base_url"] is True
-        assert set(result["result"]["ai_provider"]["supported_api_formats"]) == {"openai", "anthropic"}
+        assert set(result["result"]["ai_provider"]["supported_api_formats"]) == {"openai", "anthropic", "openrouter"}
         assert result["result"]["ai_provider"]["secret_redaction"]["plain_text_keys_in_manifest_or_docs"] is False
         assert result["result"]["optional"] is True
         assert result["result"]["status"] == "available"
@@ -138,7 +138,7 @@ class TestClaudeCodeAdapter:
         assert result["status"] == "unavailable"
         assert result["runtime"]["available"] is False
         assert result["runtime"]["required_for_core"] is False
-        assert result["runtime"]["ai_provider_configured"]["supported_api_formats"] == ["anthropic", "openai"]
+        assert result["runtime"]["ai_provider_configured"]["supported_api_formats"] == ["anthropic", "openai", "openrouter"]
         assert result["runtime"]["ai_provider_configured"]["secret_redaction_required"] is True
         assert result["runtime"]["ai_provider_configured"]["plaintext_api_keys_in_manifest_or_docs"] is False
         assert result["metadata"]["adapter"]["core_failure"] is False

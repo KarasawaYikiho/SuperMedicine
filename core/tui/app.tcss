@@ -1,6 +1,6 @@
 /* SuperMedicine TUI Stylesheet
    Variables ($primary, $surface, $background, etc.) are auto-generated
-   by Textual from the Theme registered in app.py.
+   by Textual from the Theme registered in the app module.
 */
 
 /* SuperMedicine TUI Stylesheet */

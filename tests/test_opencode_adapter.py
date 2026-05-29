@@ -86,7 +86,7 @@ class TestAdapterImport:
         assert capabilities["features"]["ai_provider_config_discovery"] is True
         assert capabilities["features"]["ai_provider_secret_redaction"] is True
         assert capabilities["features"]["custom_ai_provider_base_url"] is True
-        assert set(capabilities["ai_provider"]["supported_api_formats"]) == {"openai", "anthropic"}
+        assert set(capabilities["ai_provider"]["supported_api_formats"]) == {"openai", "anthropic", "openrouter"}
         assert capabilities["ai_provider"]["supported_api_formats"]["openai"]["custom_base_url"] is True
         assert capabilities["ai_provider"]["secret_redaction"]["required"] is True
         assert capabilities["ai_provider"]["secret_redaction"]["redacted_value"] == "<redacted>"
@@ -316,7 +316,7 @@ class TestPluginJson:
         assert (plugin_path.parent / data["install_entry_files"]["skill_documents_dir"]).is_dir()
         assert (plugin_path.parent / data["install_entry_files"]["internal_role_context_dir"]).is_dir()
         assert data["install_completeness_model"]["degraded_without_orchestrator"] is True
-        assert set(data["ai_provider"]["supported_api_formats"]) == {"openai", "anthropic"}
+        assert set(data["ai_provider"]["supported_api_formats"]) == {"openai", "anthropic", "openrouter"}
         assert data["ai_provider"]["supported_api_formats"]["anthropic"]["custom_base_url"] is True
         assert data["ai_provider"]["secret_redaction_required"] is True
         assert data["ai_provider"]["redacted_value"] == "<redacted>"
