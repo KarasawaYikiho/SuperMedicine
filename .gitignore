@@ -27,6 +27,7 @@ htmlcov/
 .claude/
 .opencode/
 superpowers/
+docs/superpowers/
 
 # Local-only planning notes
 /Planning/NextSteps.md

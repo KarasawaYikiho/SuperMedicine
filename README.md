@@ -66,84 +66,52 @@ pip install -e .       # use python3 on macOS/Linux
 supermedicine status   # or: python Cli.py status
 ```
 
-### Virtual Environment (Recommended)
-
-```bash
-python -m venv .venv
-# Windows: .venv\Scripts\activate
-# macOS/Linux: source .venv/bin/activate
-pip install -e .
-```
-
-### PATH Configuration
-
-After `pip install -e .`, the `supermedicine` command is installed as a Python
-console script. If the command is not found, add the Python Scripts directory to
-your PATH:
-
-| System | Path to add |
-|--------|-------------|
-| **Windows** | `%APPDATA%\Python\Python<version>\Scripts` |
-| **macOS** | `~/.local/bin` |
-| **Linux** | `~/.local/bin` |
-
-Restart your terminal and verify with `supermedicine --help`. Alternatively, use
-`python Cli.py` as a direct substitute for `supermedicine` throughout this guide.
-
-### Optional Dependencies
-
-For R survival analysis tools: `pip install -e ".[r]"` then install the R
-`survival` package. Use `backend="r"` in action parameters; without it, the
-plugin uses the pure-Python fallback.
-
-For development tools (mypy, pytest, pytest-cov, ruff): `pip install -e ".[dev]"`.
+For virtual environment setup, PATH configuration, and optional dependencies,
+see [INSTALL.md](INSTALL.md).
 
 ---
 
 ## Quick Start
 
 ```bash
-# Clone and install
 git clone https://github.com/KarasawaYikiho/SuperMedicine.git
 cd SuperMedicine
 pip install -e .
 export OPENAI_API_KEY=<OPENAI_API_KEY>
 python Install.py --init --provider openai --base-url https://api.openai.com/v1 --model gpt-4o-mini
-
-# Check status
 supermedicine status
-
-# Create a workspace
-supermedicine workspace init --workspace my-research --name "My Research"
-
-# Run a task
-supermedicine run "summarize local context" --workspace my-research
-
-# Launch the interactive TUI
 supermedicine tui
 ```
+
+See [INSTALL.md](INSTALL.md) for detailed provider configuration, virtual
+environment setup, and platform-specific instructions.
 
 ---
 
 ## LLM Provider Configuration
 
-SuperMedicine supports direct OpenAI-compatible and Anthropic-compatible LLM
-configuration through the standalone Python core. OpenCode and Claude Code are
-optional platform surfaces; they are not required.
+SuperMedicine supports multiple LLM API formats through the standalone Python
+core. `openai` (Chat Completions) and `anthropic` (Messages) are wire protocols,
+not vendor names — any provider can use either format. OpenRouter is also
+supported as a built-in gateway provider. OpenCode and Claude Code are optional
+platform surfaces; they are not required.
 
-### Supported Formats
+### Supported API Formats
 
-| Provider | API Format | Default BaseURL | Default Key Env | Default Model |
-|----------|------------|-----------------|-----------------|---------------|
-| `openai` | OpenAI Chat Completions | `https://api.openai.com/v1` | `OPENAI_API_KEY` | `gpt-4o-mini` |
-| `anthropic` | Anthropic Messages | `https://api.anthropic.com/v1` | `ANTHROPIC_API_KEY` | `claude-3-5-sonnet-latest` |
+| API Format | Protocol | Default BaseURL | Default Key Env | Default Model | Compatible Providers |
+|------------|----------|-----------------|-----------------|---------------|---------------------|
+| `openai` | OpenAI Chat Completions | `https://api.openai.com/v1` | `OPENAI_API_KEY` | `gpt-4o-mini` | OpenAI, DeepSeek, Zhipu GLM, Ollama, etc. |
+| `anthropic` | Anthropic Messages | `https://api.anthropic.com/v1` | `ANTHROPIC_API_KEY` | `claude-3-5-sonnet-latest` | Anthropic |
+| `openrouter` | OpenRouter Gateway (OpenAI format) | `https://openrouter.ai/api/v1` | `OPENROUTER_API_KEY` | `anthropic/claude-3.5-sonnet` | OpenRouter (multi-model gateway) |
 
 Custom endpoints are supported with `--base-url` or `SM_LLM_BASE_URL`.
 
-### Custom Providers
+### Custom Providers (Any Name)
 
 SuperMedicine accepts **any provider name**. The `api_format` field determines
-which HTTP client is used, not the provider name itself:
+which HTTP client is used, not the provider name itself. Built-in defaults exist
+for `openai`, `anthropic`, and `openrouter`; all other names default to OpenAI
+chat-completions format unless overridden with `--api-format`.
 
 | Example Provider | BaseURL | API Format | Model Example |
 |------------------|---------|------------|---------------|
@@ -170,6 +138,10 @@ python Install.py --init --provider ollama \
   --base-url http://localhost:11434/v1 \
   --api-key ollama \
   --model llama3
+
+# OpenRouter example (uses OPENROUTER_API_KEY by default)
+export OPENROUTER_API_KEY=<OPENROUTER_API_KEY>
+python Install.py --init --provider openrouter
 ```
 
 Provider names containing `anthropic` or `claude` auto-infer the Anthropic API
@@ -179,101 +151,28 @@ format; all others default to OpenAI chat-completions. Override with
 ### First-Run Requirement
 
 LLM-backed tasks require one complete provider (`base_url`, `api_key` or
-`api_key_env`, and `model`). If none is configured, runtime paths return a
-structured setup error. See [INSTALL.md](INSTALL.md) for runtime validation
-details and programmatic client creation examples.
+`api_key_env`, and `model`). See [INSTALL.md](INSTALL.md) for runtime
+validation details and programmatic client creation examples.
 
 ### Configure By Editing The File
 
-Edit `.supermedicine/config.yaml` after initialization. Prefer `api_key_env` for
-real credentials so file edits stay secret-free:
-
-```yaml
-llm:
-  provider: openai
-  last_provider: openai
-  providers:
-    openai:
-      provider: openai
-      api_format: openai
-      base_url: https://api.openai.com/v1
-      api_key_env: OPENAI_API_KEY
-      model: gpt-4o-mini
-    anthropic:
-      provider: anthropic
-      api_format: anthropic
-      base_url: https://api.anthropic.com/v1
-      api_key_env: ANTHROPIC_API_KEY
-      model: claude-3-5-sonnet-latest
-```
-
-Set the referenced key in your shell (`export OPENAI_API_KEY=<key>` on
-macOS/Linux, `$env:OPENAI_API_KEY = "<key>"` on Windows PowerShell).
+Edit `.supermedicine/config.yaml` directly; see [INSTALL.md](INSTALL.md#3b-configure-by-editing-supermedicineconfigyaml) for YAML examples.
 
 ### Configure With The CLI
 
-```bash
-# Initialize with a provider (installer resolves key variable when --api-key omitted)
-export OPENAI_API_KEY=<OPENAI_API_KEY>
-python Install.py --init --provider openai \
-  --base-url https://api.openai.com/v1 \
-  --model gpt-4o-mini
-
-# Add and switch providers after initialization
-supermedicine llm add openai \
-  --api-format openai \
-  --base-url https://api.openai.com/v1 \
-  --api-key-env OPENAI_API_KEY \
-  --model gpt-4o-mini \
-  --set-current
-supermedicine llm add anthropic \
-  --api-format anthropic \
-  --base-url https://api.anthropic.com/v1 \
-  --api-key-env ANTHROPIC_API_KEY \
-  --model claude-3-5-sonnet-latest
-
-# Review and switch
-supermedicine llm list
-supermedicine llm show openai
-supermedicine llm switch anthropic
-```
-
-Use `--api-key-env` for real keys; `--api-key` may persist plaintext in local
-YAML.
+Use `supermedicine llm add/switch/list`; see [INSTALL.md](INSTALL.md#3a-add-providers-after-initialization) for CLI examples.
 
 ### Configure In The TUI
 
-Launch with `supermedicine tui` and open **LLM 管理** from the sidebar. Fill
-provider name, BaseURL, model, and API key, then click **添加 Provider** to
-save. Select a provider and click **切换 Provider** to make it current.
+Launch `supermedicine tui` and open **LLM 管理**; see [INSTALL.md](INSTALL.md#3c-configure-in-the-tui) for details.
 
 ### Switching And Startup Restore
 
-`supermedicine llm switch <provider>` validates the target and persists it as
-both `llm.provider` and `llm.last_provider`. On startup, SuperMedicine restores
-`llm.last_provider` when it still exists; otherwise falls back to the
-install-time provider. The TUI also saves the current provider on exit.
-
-```bash
-supermedicine llm list       # current_provider, last_provider, providers; redacted
-supermedicine llm show       # current/restored provider; redacted
-supermedicine llm switch openai
-```
+Use `supermedicine llm switch <provider>`; see [INSTALL.md](INSTALL.md#3a-add-providers-after-initialization) for details.
 
 ### Environment Variables And Secret Safety
 
-For shell-only configuration during initialization:
-
-```bash
-export SM_LLM_PROVIDER=anthropic
-export SM_LLM_BASE_URL=https://api.anthropic.com/v1
-export SM_LLM_MODEL=claude-3-5-sonnet-latest
-export ANTHROPIC_API_KEY=<ANTHROPIC_API_KEY>
-python Install.py --init
-```
-
-`SM_LLM_API_KEY` is a generic override but may be written to local config.
-Prefer provider-specific env vars or `api_key_env` for real credentials.
+Use `SM_LLM_*` and provider-specific env vars; see [INSTALL.md](INSTALL.md) and [SECURITY.md](SECURITY.md) for the full list.
 
 ---
 
@@ -461,28 +360,14 @@ are optional adapters. See [INSTALL.md](INSTALL.md) for detailed setup steps.
 
 The OpenCode adapter (`adapters/opencode/`) provides plugin metadata, skill
 documents, agent definitions, and tool mapping for `bash`, `read`, `write`,
-`edit`, `glob`, `grep`, `skill`, `task`.
-
-| Capability | Status |
-|------------|--------|
-| Tool mapping (8 tools) | Implemented |
-| Permission-gated high-risk operations | Implemented |
-| Skill document loading | Provided for OpenCode use |
-| Native subagent runtime | Not implemented without injected orchestrator |
-| Capability reporting | Implemented |
+`edit`, `glob`, `grep`, `skill`, `task`. See [INSTALL.md](INSTALL.md) for
+setup details.
 
 ### Claude Code Add-On
 
 The Claude Code adapter (`adapters/claude_code/`) provides capability reporting,
 runtime status checking, and permission-checked `claude --print` invocation.
-
-| Capability | Status |
-|------------|--------|
-| `claude.capabilities` | Implemented |
-| `claude.runtime_status` | Implemented |
-| `claude.invoke` (when `claude` on PATH) | Implemented, permission-checked |
-| Native skill loading / subagent dispatch | Not implemented |
-| Missing `claude` runtime | Adapter unavailable, not core failure |
+See [INSTALL.md](INSTALL.md) for setup details.
 
 ### Capability Matrix
 
@@ -513,7 +398,7 @@ supermedicine/
 │   ├── paper_import/     # Paper import, metadata, enrichment
 │   ├── workspace.py      # Workspace identity and storage
 │   ├── experience.py     # Experience learning store
-│   └── llm_providers/    # OpenAI/Anthropic provider config and HTTP clients
+│   └── llm_providers/    # OpenAI/Anthropic/OpenRouter provider config and HTTP clients
 ├── permission/           # P0 policy, audit, engine, prompt constraints
 ├── agents/               # State machine, checkpoint, orchestrator, base agent
 ├── plugins/
@@ -566,10 +451,10 @@ pytest tests/ -v
 |-------|-----|
 | **"No module named 'yaml'"** | `pip install pyyaml` |
 | **"Permission denied" on Windows** | Run PowerShell as Administrator, or use `python -m venv .venv --without-pip` |
-| **CLI command not found** | Add Python Scripts to PATH (see [PATH Configuration](#path-configuration)), or use `python Cli.py` directly |
+| **CLI command not found** | Add Python Scripts to PATH (see [INSTALL.md](INSTALL.md#cli-command-not-found)), or use `python Cli.py` directly |
 
-For R survival backend setup, TUI launch issues, and additional troubleshooting,
-see [INSTALL.md](INSTALL.md).
+For R survival backend setup, TUI launch issues, LLM provider troubleshooting,
+and additional guidance, see [INSTALL.md](INSTALL.md#troubleshooting).
 
 ---
 

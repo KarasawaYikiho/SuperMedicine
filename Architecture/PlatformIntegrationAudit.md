@@ -284,8 +284,10 @@ secrets were added to source, tests, or documentation.
 - `core/llm_client.py` defines the abstract `LLMClient` contract with `chat(...)`
   and `complete(...)` methods returning dictionaries with `content`, `model`, and
   `usage` fields. The factory `create_llm_client(...)` accepts any provider name
-  and routes by `api_format` (openai/anthropic/openrouter). The
-  `_infer_api_format` helper auto-infers format from provider name.
+  and routes by `api_format` — the wire protocol, not the vendor name. Supported
+  `api_format` values are `openai` (Chat Completions), `anthropic` (Messages),
+  and `openrouter` (OpenRouter gateway, OpenAI format). The `_infer_api_format`
+  helper auto-infers format from provider name.
 - `core/llm_providers/base.py` implements configured OpenAI-compatible and
   Anthropic-compatible HTTP clients. `core/llm_providers/config.py` normalizes
   provider, API format, custom BaseURL, API key or API key environment variable,
@@ -294,12 +296,14 @@ secrets were added to source, tests, or documentation.
   `gpt-4o-mini`, and `https://api.anthropic.com/v1` with `ANTHROPIC_API_KEY` and
   `claude-3-5-sonnet-latest`. Custom compatible BaseURL values are supported by
   installer flags, `SM_LLM_BASE_URL`, and project configuration.
-- `Install.py --init` accepts `--provider openai|anthropic`, `--base-url`,
-  `--api-key`, `--model`, and `--interactive`. It also reads `SM_LLM_PROVIDER`,
-  `SM_LLM_BASE_URL`, `SM_LLM_API_KEY`, `SM_LLM_MODEL`, `OPENAI_API_KEY`, and
-  `ANTHROPIC_API_KEY`. Installer output redacts supplied API keys.
-- OpenRouter remains available as a legacy provider path with
-  `OPENROUTER_API_KEY`; it is not the only LLM provider path.
+- `Install.py --init` accepts `--provider <any-name>` (built-in defaults for
+  `openai`, `anthropic`, `openrouter`), `--base-url`, `--api-key`, `--model`,
+  and `--interactive`. It also reads `SM_LLM_PROVIDER`, `SM_LLM_BASE_URL`,
+  `SM_LLM_API_KEY`, `SM_LLM_MODEL`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, and
+  `OPENROUTER_API_KEY`. Installer output redacts supplied API keys.
+- OpenRouter is a fully implemented built-in provider with its own defaults
+  (`https://openrouter.ai/api/v1`, `OPENROUTER_API_KEY`,
+  `anthropic/claude-3.5-sonnet`). It uses the `openai` API format.
 - Missing provider values return structured validation errors such as
   `missing_api_key`, `missing_base_url`, and `missing_model`; request/HTTP errors
   sanitize known secret values.
@@ -389,9 +393,9 @@ secrets were added to source, tests, or documentation.
 
 ### 8.6 Current Implementation Boundary And Follow-Up Risks
 
-- Current AI/LLM functionality includes direct OpenAI-compatible and
-  Anthropic-compatible provider clients, custom BaseURL configuration, environment
-  variable and installer injection, and legacy OpenRouter support. Documentation
+- Current AI/LLM functionality includes OpenAI-format and Anthropic-format
+  provider clients, OpenRouter gateway support, custom BaseURL configuration,
+  and environment variable and installer injection. Documentation
   examples must continue to use placeholders only.
 - Platform adapters are packaged in the repository tree and tested in the default
   suite, but their docs and manifests label them optional. A future packaging or

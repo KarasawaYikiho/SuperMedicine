@@ -12,8 +12,8 @@
       "native_skill_loading": false,
       "native_subagent_runtime": false,
       "ai_provider": {
-        "config_sources": ["Install.py --provider openai|anthropic --base-url <url> --api-key <placeholder-or-secret> --model <model>", "SM_LLM_PROVIDER/SM_LLM_BASE_URL/SM_LLM_API_KEY/SM_LLM_MODEL", "OPENAI_API_KEY or ANTHROPIC_API_KEY", ".supermedicine/config.yaml llm.provider and llm.providers.*"],
-        "supported_api_formats": ["openai", "anthropic"],
+        "config_sources": ["Install.py --provider <any-name> --base-url <url> --api-key <placeholder-or-secret> --model <model>", "SM_LLM_PROVIDER/SM_LLM_BASE_URL/SM_LLM_API_KEY/SM_LLM_MODEL", "OPENAI_API_KEY, ANTHROPIC_API_KEY, or OPENROUTER_API_KEY", ".supermedicine/config.yaml llm.provider and llm.providers.*"],
+        "supported_api_formats": ["openai", "anthropic", "openrouter"],
         "custom_base_url": true,
         "secret_redaction_required": true,
         "plaintext_api_keys_in_manifest": false,
@@ -25,7 +25,7 @@
       "limitations": [
         "The standalone SuperMedicine core does not require Claude Code.",
         "Local Claude Code CLI is optional and required only for claude.invoke.",
-        "OpenAI/Anthropic provider configuration is supplied by installer/runtime/project config and must not be embedded as plaintext credentials.",
+        "OpenAI/Anthropic/OpenRouter provider configuration is supplied by installer/runtime/project config and must not be embedded as plaintext credentials.",
         "No native Claude Code skill loading or native subagent dispatch is implemented."
       ]
     },
@@ -38,8 +38,8 @@
       "native_skill_loading": "skill documents provided; adapter can load local declared files",
       "native_subagent_runtime": false,
       "ai_provider": {
-        "config_sources": ["Install.py --provider openai|anthropic --base-url <url> --api-key <placeholder-or-secret> --model <model>", "SM_LLM_PROVIDER/SM_LLM_BASE_URL/SM_LLM_API_KEY/SM_LLM_MODEL", "OPENAI_API_KEY or ANTHROPIC_API_KEY", ".supermedicine/config.yaml llm.provider and llm.providers.*"],
-        "supported_api_formats": ["openai", "anthropic"],
+        "config_sources": ["Install.py --provider <any-name> --base-url <url> --api-key <placeholder-or-secret> --model <model>", "SM_LLM_PROVIDER/SM_LLM_BASE_URL/SM_LLM_API_KEY/SM_LLM_MODEL", "OPENAI_API_KEY, ANTHROPIC_API_KEY, or OPENROUTER_API_KEY", ".supermedicine/config.yaml llm.provider and llm.providers.*"],
+        "supported_api_formats": ["openai", "anthropic", "openrouter"],
         "custom_base_url": true,
         "secret_redaction_required": true,
         "degraded_without_orchestrator": true
@@ -50,7 +50,7 @@
       "limitations": [
         "The standalone SuperMedicine core does not require OpenCode.",
         "Only SuperMedicine is user-facing; alpha/beta/gamma/delta are internal role contexts.",
-        "AI provider configuration supports OpenAI and Anthropic formats, custom BaseURL values, and redacted secret handling through installer/runtime/project config sources.",
+        "AI provider configuration supports OpenAI, Anthropic, and OpenRouter API formats, custom BaseURL values, and redacted secret handling through installer/runtime/project config sources.",
         "Task dispatch needs an injected SuperMedicine orchestrator/runtime bridge; otherwise it returns a degraded context result."
       ]
     }
@@ -71,7 +71,7 @@
     {"step": "clone", "command": "git clone https://github.com/KarasawaYikiho/SuperMedicine.git"},
     {"step": "install_deps", "command": "pip install -e ."},
     {"step": "detect_platform", "script": "Install.py --detect"},
-    {"step": "setup_config", "script": "Install.py --init", "notes": "Optional non-interactive LLM injection: --provider openai|anthropic --base-url <url> --api-key <placeholder-or-secret> --model <model>, or SM_LLM_PROVIDER/SM_LLM_BASE_URL/SM_LLM_API_KEY/SM_LLM_MODEL and provider API key env vars. Use fake placeholders in shared docs; do not commit real keys. Use --interactive to prompt. Installer output redacts API keys."},
+    {"step": "setup_config", "script": "Install.py --init", "notes": "Optional non-interactive LLM injection: --provider <any-name> --base-url <url> --api-key <placeholder-or-secret> --model <model>, or SM_LLM_PROVIDER/SM_LLM_BASE_URL/SM_LLM_API_KEY/SM_LLM_MODEL and provider API key env vars. Built-in defaults for openai, anthropic, openrouter. Use fake placeholders in shared docs; do not commit real keys. Use --interactive to prompt. Installer output redacts API keys."},
     {"step": "uninstall_local_artifacts", "script": "Uninstall.py --dry-run", "notes": "Safe local cleanup entry. By default it removes only project-owned .supermedicine/runtime artifacts and installer-created platform target paths recorded in .supermedicine/install-record.json or passed explicitly; it does not remove the source repository or pip package."}
   ],
   "uninstall": {

@@ -43,8 +43,9 @@ python Cli.py status
 python Cli.py run "summarize local context"
 ```
 
-To initialize and configure an LLM provider in one command, use OpenAI-compatible
-or Anthropic-compatible settings. The keys below are fake placeholders; do not
+To initialize and configure an LLM provider in one command, use settings for
+providers using the `openai` or `anthropic` API format. The keys below are fake
+placeholders; do not
 commit real keys to Git, docs, tests, manifests, or screenshots.
 
 ```bash
@@ -58,7 +59,7 @@ python Install.py --init --provider anthropic \
   --api-key <ANTHROPIC_API_KEY> \
   --model claude-3-5-sonnet-latest
 
-# Custom OpenAI-compatible providers (DeepSeek, 智谱 GLM, Ollama, etc.)
+# Custom providers using the `openai` API format (DeepSeek, 智谱 GLM, Ollama, etc.)
 python Install.py --init --provider deepseek \
   --base-url https://api.deepseek.com/v1 \
   --api-key <DEEPSEEK_API_KEY> \
@@ -68,6 +69,10 @@ python Install.py --init --provider zhipu \
   --base-url https://open.bigmodel.cn/api/paas/v4 \
   --api-key <ZHIPU_API_KEY> \
   --model glm-4-flash
+
+# OpenRouter gateway (uses OPENROUTER_API_KEY by default)
+export OPENROUTER_API_KEY=<OPENROUTER_API_KEY>
+python Install.py --init --provider openrouter
 ```
 
 For real workstations, prefer environment variables over typing secrets directly
@@ -135,7 +140,7 @@ python Install.py --init --provider openai \
   --api-key <OPENAI_API_KEY> \
   --model gpt-4o-mini
 
-# Custom OpenAI-compatible provider (e.g., DeepSeek)
+# Custom provider using the `openai` API format (e.g., DeepSeek)
 python Install.py --init --provider deepseek \
   --base-url https://api.deepseek.com/v1 \
   --api-key <DEEPSEEK_API_KEY> \
@@ -152,13 +157,14 @@ python Install.py --init
 python Install.py --init --interactive
 ```
 
-`--provider` accepts `openai`, `anthropic`, or a custom OpenAI-compatible
-provider name. Custom provider names default to OpenAI API format and use
-`SM_LLM_API_KEY` as their generic key environment variable unless you later add a
-provider-specific `api_key_env` with `supermedicine llm add`. `SM_LLM_PROVIDER`,
+`--provider` accepts any provider name. Built-in defaults exist for `openai`,
+`anthropic`, and `openrouter`. Custom provider names default to OpenAI API format
+unless inferred or overridden with `--api-format`. The generic key environment
+variable `SM_LLM_API_KEY` is used unless you later add a provider-specific
+`api_key_env` with `supermedicine llm add`. `SM_LLM_PROVIDER`,
 `SM_LLM_BASE_URL`, `SM_LLM_API_KEY`, and `SM_LLM_MODEL` are installer-time
-generic overrides. Provider key variables for built-ins are `OPENAI_API_KEY` and
-`ANTHROPIC_API_KEY`. If `--api-key`, `SM_LLM_API_KEY`, or a provider-specific key
+generic overrides. Provider key variables for built-ins are `OPENAI_API_KEY`,
+`ANTHROPIC_API_KEY`, and `OPENROUTER_API_KEY`. If `--api-key`, `SM_LLM_API_KEY`, or a provider-specific key
 variable is supplied during initialization, the resolved value can be written to
 local `.supermedicine/config.yaml`; keep that file private after adding real
 secrets.
@@ -169,7 +175,7 @@ Use the shared LLM manager through the CLI when you want to add, inspect, or
 switch providers after initialization:
 
 ```bash
-# Add OpenAI-compatible provider and set it as current default
+# Add provider using the `openai` API format and set it as current default
 supermedicine llm add openai \
   --api-format openai \
   --base-url https://api.openai.com/v1 \
@@ -177,19 +183,26 @@ supermedicine llm add openai \
   --model gpt-4o-mini \
   --set-current
 
-# Add Anthropic-compatible provider for later use
+# Add provider using the `anthropic` API format for later use
 supermedicine llm add anthropic \
   --api-format anthropic \
   --base-url https://api.anthropic.com/v1 \
   --api-key-env ANTHROPIC_API_KEY \
   --model claude-3-5-sonnet-latest
 
-# Add custom OpenAI-compatible provider (DeepSeek, 智谱 GLM, Ollama, etc.)
+# Add custom provider using the `openai` API format (DeepSeek, 智谱 GLM, Ollama, etc.)
 supermedicine llm add deepseek \
   --api-format openai \
   --base-url https://api.deepseek.com/v1 \
   --api-key-env DEEPSEEK_API_KEY \
   --model deepseek-chat
+
+# Add OpenRouter gateway
+supermedicine llm add openrouter \
+  --api-format openai \
+  --base-url https://openrouter.ai/api/v1 \
+  --api-key-env OPENROUTER_API_KEY \
+  --model anthropic/claude-3.5-sonnet
 
 # Secret-safe inspection and switching
 supermedicine llm list
@@ -336,11 +349,14 @@ supermedicine --help
 Use provider-specific environment variables for real credentials:
 
 ```bash
-# OpenAI-compatible
+# OpenAI API format
 export OPENAI_API_KEY=<OPENAI_API_KEY>
 
-# Anthropic-compatible
+# Anthropic API format
 export ANTHROPIC_API_KEY=<ANTHROPIC_API_KEY>
+
+# OpenRouter gateway
+export OPENROUTER_API_KEY=<OPENROUTER_API_KEY>
 ```
 
 Use `SM_LLM_BASE_URL` or `--base-url` for compatible gateways. If you supplied a
@@ -375,8 +391,8 @@ installed, the adapter reports a structured unavailable state. It does not expos
 native Claude Code subagents or native Claude Code skill loading.
 
 Claude Code uses SuperMedicine's optional provider metadata only. Configure
-OpenAI-compatible or Anthropic-compatible settings through `Install.py`,
-`SM_LLM_*`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or project-local config; never
+LLM settings through `Install.py`, `SM_LLM_*`, `OPENAI_API_KEY`,
+`ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`, or project-local config; never
 store real keys in `adapters/claude_code/SKILL.md`.
 
 ### OpenCode
@@ -391,8 +407,8 @@ Current limitation: `OpenCodeAdapter.subagent_dispatch(...)` does not launch an
 external native OpenCode subagent runtime by itself. Without an injected
 SuperMedicine orchestrator, it uses local metadata/fallback behavior.
 
-OpenCode add-on manifests and skills declare the same OpenAI/Anthropic provider
-formats and custom BaseURL support as the core configuration model. They contain
+OpenCode add-on manifests and skills declare the same API format support
+(openai, anthropic, openrouter) and custom BaseURL as the core configuration model. They contain
 metadata only and must not contain plaintext real API keys.
 
 ## Safety Boundaries

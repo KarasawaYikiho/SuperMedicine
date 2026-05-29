@@ -159,6 +159,10 @@ class SuperMedicineTUI(App[Any]):
             success="#A6E3A1",
             warning="#F9E2AF",
             error="#F38BA8",
+            variables={
+                "border": "#313244",
+                "text-muted": "#A6ADC8",
+            },
         )
         self.register_theme(custom_theme)
         self.theme = "supermedicine"

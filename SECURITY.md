@@ -106,13 +106,13 @@ paths, and treat all external network/API access as permission-gated behavior.
 |----------|---------|
 | `SM_CONFIG` | Override config file path |
 | `SM_<KEY>` | Override any config key (uppercase, `_` for `-`) |
-| `SM_LLM_PROVIDER` | Installer-time LLM provider override: `openai` or `anthropic` |
+| `SM_LLM_PROVIDER` | Installer-time LLM provider override (any provider name; built-in defaults for `openai`, `anthropic`, `openrouter`) |
 | `SM_LLM_BASE_URL` | Installer-time custom compatible provider BaseURL |
 | `SM_LLM_API_KEY` | Installer-time generic API key injection; may be written to local config, so avoid committing it |
 | `SM_LLM_MODEL` | Installer-time default model override |
 | `OPENAI_API_KEY` | Runtime/installer key for OpenAI-compatible provider configuration |
 | `ANTHROPIC_API_KEY` | Runtime/installer key for Anthropic-compatible provider configuration |
-| `OPENROUTER_API_KEY` | Optional key for legacy OpenRouter provider integration |
+| `OPENROUTER_API_KEY` | Runtime/installer key for OpenRouter gateway provider configuration |
 
 ## LLM Secret Handling
 
@@ -124,10 +124,10 @@ paths, and treat all external network/API access as permission-gated behavior.
   `api_key` value. The environment variable value should be set in a private
   shell, profile, secret manager, or CI secret store outside the repository.
 - Documentation and tests must use non-realistic placeholders only, for example
-  `<OPENAI_API_KEY>`, `<ANTHROPIC_API_KEY>`, or `<redacted>`.
+  `<OPENAI_API_KEY>`, `<ANTHROPIC_API_KEY>`, `<OPENROUTER_API_KEY>`, or `<redacted>`.
 - `Install.py --api-key` and `SM_LLM_API_KEY` can write the supplied key to local
-  project config. Prefer `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` for real keys
-  when possible.
+  project config. Prefer `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or
+  `OPENROUTER_API_KEY` for real keys when possible.
 - `supermedicine llm add --api-key` has the same persistence and command-history
   risk as installer-time plaintext key injection. Prefer
   `supermedicine llm add --api-key-env <ENV_VAR_NAME>` for real credentials.

@@ -1,19 +1,7 @@
-/* Custom Color Scheme — Dark medical theme inspired by OpenCode TUI */
-:root {
-    $primary: #0078D4;
-    $primary-lighten-1: #2899EA;
-    $primary-darken-1: #005A9E;
-    $surface: #1E1E2E;
-    $background: #11111B;
-    $panel: #181825;
-    $text: #CDD6F4;
-    $text-muted: #A6ADC8;
-    $accent: #89B4FA;
-    $success: #A6E3A1;
-    $warning: #F9E2AF;
-    $error: #F38BA8;
-    $border: #313244;
-}
+/* SuperMedicine TUI Stylesheet
+   Variables ($primary, $surface, $background, etc.) are auto-generated
+   by Textual from the Theme registered in app.py.
+*/
 
 /* SuperMedicine TUI Stylesheet */
 
@@ -24,7 +12,7 @@ Screen {
 
 Header {
     background: $primary;
-    color: $text;
+    color: $foreground;
     text-style: bold;
 }
 
@@ -102,7 +90,7 @@ Footer {
     width: 100%;
     padding: 0 2;
     background: $primary 25%;
-    color: $text;
+    color: $foreground;
     text-style: bold;
     content-align: left middle;
     border-bottom: tall $primary 50%;
@@ -299,7 +287,7 @@ Select {
 
 .btn-primary {
     background: $primary;
-    color: $text;
+    color: $foreground;
 }
 
 .btn-primary:hover {
@@ -308,7 +296,7 @@ Select {
 
 .btn-danger {
     background: $error;
-    color: $text;
+    color: $foreground;
 }
 
 .btn-danger:hover {

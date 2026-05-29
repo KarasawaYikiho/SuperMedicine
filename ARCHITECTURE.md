@@ -68,8 +68,8 @@ The Kernel is the central coordinator. All subsystems are instantiated and wired
 - YAML-based configuration file reader
 - Supports `SM_*` environment variable overrides
 - Default path: `.supermedicine/config.yaml`
-- Exposes `get_llm_provider_config(redacted=True)` for secret-safe OpenAI /
-  Anthropic provider configuration snapshots
+- Exposes `get_llm_provider_config(redacted=True)` for secret-safe provider
+  configuration snapshots (any api_format)
 
 ### EventBus (`event_bus.py`)
 - Publish/subscribe messaging between decoupled components
@@ -247,6 +247,9 @@ protocol), not the provider name:
   `OPENAI_API_KEY`, `gpt-4o-mini`) and Anthropic-compatible
   (`https://api.anthropic.com/v1`, `ANTHROPIC_API_KEY`,
   `claude-3-5-sonnet-latest`).
+- OpenRouter defaults are `https://openrouter.ai/api/v1`,
+  `OPENROUTER_API_KEY`, and `anthropic/claude-3.5-sonnet` using the `openai`
+  API format.
 - Custom BaseURL values are accepted for compatible endpoints through
   `Install.py --base-url`, `SM_LLM_BASE_URL`, or local project configuration.
   Any OpenAI-compatible endpoint (DeepSeek, 智谱 GLM, Ollama, etc.) works with
