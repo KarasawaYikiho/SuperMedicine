@@ -222,7 +222,7 @@ Verification results available for this execution set:
 
 - `ruff` pass.
 - `mypy` pass: `Success`, 150 source files.
-- `pytest`: 539 passed, 3 skipped.
+- `pytest`: 542 collected.
 - Build pass.
 - Installed wheel smoke pass.
 

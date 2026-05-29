@@ -23,7 +23,7 @@ injected orchestrator/runtime bridge. Do not include plaintext API keys in skill
 
 | Standard | Version | Items | Scope |
 |----------|---------|-------|-------|
-| CONSORT | 2010 | 23 | Randomized controlled trials |
+| CONSORT | 2010 | 25 | Randomized controlled trials |
 | STROBE | 2007 | 22 | Observational studies |
 | PRISMA | 2020 | 27 | Systematic reviews and meta-analyses |
 | STARD | 2015 | 27 | Diagnostic accuracy studies |

@@ -138,7 +138,7 @@ python Install.py --init --provider openai \
 - **R**: Kaplan-Meier survival curves, log-rank test, Cox proportional hazards model
 
 ### Medical Writing Standards
-- CONSORT 2010 (23 items) — Randomized controlled trials
+- CONSORT 2010 (25 items) — Randomized controlled trials
 - STROBE 2007 (22 items) — Observational studies
 - PRISMA 2020 (27 items) — Systematic reviews and meta-analyses
 - STARD 2015 (27 items) — Diagnostic accuracy studies
