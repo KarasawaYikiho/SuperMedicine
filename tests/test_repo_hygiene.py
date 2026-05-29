@@ -190,7 +190,7 @@ def test_install_manifest_platform_entries_point_to_existing_adapter_files():
     assert set(platforms["opencode"]["supported_tools"]) == OpenCodeAdapter.SUPPORTED_TOOLS
     assert platforms["claude-code"]["native_skill_loading"] is False
     assert platforms["claude-code"]["native_subagent_runtime"] is False
-    assert set(platforms["claude-code"]["ai_provider"]["supported_api_formats"]) == {"openai", "anthropic"}
+    assert set(platforms["claude-code"]["ai_provider"]["supported_api_formats"]) == {"openai", "anthropic", "openrouter"}
     assert platforms["claude-code"]["ai_provider"]["custom_base_url"] is True
     assert platforms["claude-code"]["ai_provider"]["secret_redaction_required"] is True
     assert platforms["claude-code"]["ai_provider"]["plaintext_api_keys_in_manifest"] is False
@@ -252,7 +252,7 @@ def test_opencode_plugin_declared_entry_skills_and_agents_exist():
     assert FORBIDDEN_PLATFORM_AGENT_NAMES.isdisjoint(user_facing_names)
     assert plugin["install_entry_files"]["single_user_facing_agent"] == "agents/supermedicine.md"
     assert plugin["install_completeness_model"]["single_user_facing_agent"] == "SuperMedicine"
-    assert set(plugin["ai_provider"]["supported_api_formats"]) == {"openai", "anthropic"}
+    assert set(plugin["ai_provider"]["supported_api_formats"]) == {"openai", "anthropic", "openrouter"}
     assert plugin["ai_provider"]["supported_api_formats"]["openai"]["custom_base_url"] is True
     assert plugin["ai_provider"]["secret_redaction_required"] is True
     assert plugin["ai_provider"]["plaintext_api_keys_in_manifest"] is False
