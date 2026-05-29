@@ -92,7 +92,7 @@ class LLMView(Vertical):
             yield Input(placeholder=t("llm_base_url"), id="llm-base-url-input")
             yield Input(placeholder=t("llm_model"), id="llm-model-input")
             yield Input(placeholder=t("llm_api_key"), password=True, id="llm-api-key-input")
-            yield Input(placeholder=t("llm_api_format"), id="llm-api-format-input")
+            yield Input(placeholder=t("llm_api_format_hint"), id="llm-api-format-input")
             yield Button(t("llm_add_provider"), id="llm-add", classes="btn btn-primary")
         yield Static("", id="llm-status")
 

@@ -1,6 +1,6 @@
 # SuperMedicine
 
-![Version](https://img.shields.io/badge/version-Beta0.3.5-blue)
+![Version](https://img.shields.io/badge/version-Beta0.3.6-blue)
 ![CI](https://github.com/KarasawaYikiho/SuperMedicine/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -41,12 +41,13 @@ detail, see [INSTALL.md](INSTALL.md); for system design, see
   - [Optional: Development Tools](#optional-development-tools)
 - [Quick Start](#quick-start)
 - [LLM Provider Configuration](#llm-provider-configuration)
-  - [First-run requirement](#first-run-requirement)
-  - [Configure by editing the file](#configure-by-editing-the-file)
-  - [Configure with the CLI](#configure-with-the-cli)
-  - [Configure in the TUI](#configure-in-the-tui)
-  - [Switching and startup restore](#switching-and-startup-restore)
-  - [Environment variables and secret safety](#environment-variables-and-secret-safety)
+  - [Custom Providers](#custom-providers)
+  - [First-Run Requirement](#first-run-requirement)
+  - [Configure By Editing The File](#configure-by-editing-the-file)
+  - [Configure With The CLI](#configure-with-the-cli)
+  - [Configure In The TUI](#configure-in-the-tui)
+  - [Switching And Startup Restore](#switching-and-startup-restore)
+  - [Environment Variables And Secret Safety](#environment-variables-and-secret-safety)
 - [CLI Reference](#cli-reference)
   - [Core Commands](#core-commands)
   - [Workspace Commands](#workspace-commands)
@@ -166,6 +167,12 @@ python Install.py --init --provider anthropic \
   --base-url https://api.anthropic.com/v1 \
   --api-key <ANTHROPIC_API_KEY> \
   --model claude-3-5-sonnet-latest
+
+# Custom OpenAI-compatible provider (DeepSeek, 智谱 GLM, Ollama, etc.)
+python Install.py --init --provider deepseek \
+  --base-url https://api.deepseek.com/v1 \
+  --api-key <DEEPSEEK_API_KEY> \
+  --model deepseek-chat
 ```
 
 Instead of `--api-key`, prefer environment variables for private workstations:
@@ -252,9 +259,9 @@ configuration through the standalone Python core. OpenCode and Claude Code are
 optional platform surfaces around the same configuration model; they are not
 required to use it.
 
-### Supported formats
+### Supported Formats
 
-| Provider | API format | Default BaseURL | Default key env | Default model |
+| Provider | API Format | Default BaseURL | Default Key Env | Default Model |
 |----------|------------|-----------------|-----------------|---------------|
 | `openai` | OpenAI Chat Completions | `https://api.openai.com/v1` | `OPENAI_API_KEY` | `gpt-4o-mini` |
 | `anthropic` | Anthropic Messages | `https://api.anthropic.com/v1` | `ANTHROPIC_API_KEY` | `claude-3-5-sonnet-latest` |
@@ -263,7 +270,47 @@ Custom compatible endpoints are supported with `--base-url` or
 `SM_LLM_BASE_URL`. OpenAI-compatible requests post to `/chat/completions` by
 default; Anthropic-compatible requests post to `/messages`.
 
-### First-run requirement
+### Custom Providers
+
+SuperMedicine accepts **any provider name** — not just `openai` or `anthropic`.
+The `api_format` field (or its auto-inferred equivalent) determines which HTTP
+client is used, not the provider name itself. This means you can configure
+DeepSeek, 智谱 GLM, Ollama, or any other OpenAI-compatible or
+Anthropic-compatible endpoint:
+
+| Example Provider | BaseURL | API Format | Model Example |
+|------------------|---------|------------|---------------|
+| DeepSeek | `https://api.deepseek.com/v1` | `openai` (auto) | `deepseek-chat` |
+| 智谱 GLM | `https://open.bigmodel.cn/api/paas/v4` | `openai` (auto) | `glm-4-flash` |
+| Ollama (local) | `http://localhost:11434/v1` | `openai` (auto) | `llama3` |
+| Any Anthropic-compatible | Custom URL | `anthropic` (explicit) | Custom model |
+
+```bash
+# DeepSeek example
+python Install.py --init --provider deepseek \
+  --base-url https://api.deepseek.com/v1 \
+  --api-key <DEEPSEEK_API_KEY> \
+  --model deepseek-chat
+
+# 智谱 GLM example
+python Install.py --init --provider zhipu \
+  --base-url https://open.bigmodel.cn/api/paas/v4 \
+  --api-key <ZHIPU_API_KEY> \
+  --model glm-4-flash
+
+# Local Ollama example (no API key required)
+python Install.py --init --provider ollama \
+  --base-url http://localhost:11434/v1 \
+  --api-key ollama \
+  --model llama3
+```
+
+Provider names containing `anthropic` or `claude` auto-infer the Anthropic API
+format; all other names default to the OpenAI chat-completions format. You can
+override this with an explicit `--api-format` flag or `api_format` field in
+`.supermedicine/config.yaml`.
+
+### First-Run Requirement
 
 LLM-backed tasks require one complete provider before the runtime can create a
 client. A complete provider has `base_url`, `api_key` (or `api_key_env` that
@@ -419,7 +466,7 @@ python Install.py --init
 written to local config. Prefer `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or an
 `api_key_env` reference in `.supermedicine/config.yaml` for real credentials.
 
-### Configuration sources
+### Configuration Sources
 
 Configuration can also be injected in these ways, with examples using fake keys
 only:
@@ -869,7 +916,7 @@ Run PowerShell as Administrator, or use:
 python -m venv .venv --without-pip
 ```
 
-### CLI command not found
+### CLI Command Not Found
 
 If `supermedicine` is not recognized after `pip install -e .`:
 
@@ -880,14 +927,14 @@ If `supermedicine` is not recognized after `pip install -e .`:
    python Cli.py status
    ```
 
-### R survival tools not working
+### R Survival Tools Not Working
 
 ```bash
 pip install -e ".[r]"
 R -e "install.packages('survival', repos='https://cran.r-project.org')"
 ```
 
-### TUI not launching
+### TUI Not Launching
 
 Ensure `textual` is installed:
 

@@ -12,6 +12,7 @@ from typing import Any
 
 from rich.console import Console
 from textual.app import App, ComposeResult
+from textual.theme import Theme
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Footer, Header, Input, ListItem, ListView, Static
@@ -146,6 +147,21 @@ class SuperMedicineTUI(App[Any]):
 
     def __init__(self, project_root: Path | str | None = None, **kwargs: Any) -> None:
         super().__init__(**kwargs)
+        custom_theme = Theme(
+            name="supermedicine",
+            primary="#0078D4",
+            secondary="#89B4FA",
+            accent="#89B4FA",
+            foreground="#CDD6F4",
+            background="#11111B",
+            surface="#1E1E2E",
+            panel="#181825",
+            success="#A6E3A1",
+            warning="#F9E2AF",
+            error="#F38BA8",
+        )
+        self.register_theme(custom_theme)
+        self.theme = "supermedicine"
         self.project_root = Path(project_root) if project_root else Path.cwd()
         self._current_view = "chat"
         self._views: dict[str, Any] = {}
@@ -329,7 +345,7 @@ class SuperMedicineTUI(App[Any]):
             from importlib.metadata import version as pkg_version
             return pkg_version("supermedicine")
         except Exception:
-            return "0.3.5b0"
+            return "0.3.6b0"
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
         """Handle sidebar navigation item selection."""

@@ -33,6 +33,7 @@ def collect_dashboard_context(project_root: Path | str | None = None) -> dict[st
         "module_count": _count_core_modules(root),
         "llm_status": llm_status,
         "llm_ready": llm_ready,
+        "token_stats": _safe_token_stats(root),
         "recent_hint": _recent_workspace_hint(root, workspace_infos),
         "version": _package_version(),
     }
@@ -51,12 +52,17 @@ class DashboardOverviewController:
 
     def overview_rows(self) -> list[tuple[str, str]]:
         context = self.context()
+        token_stats = context.get("token_stats", {})
+        total_tokens = token_stats.get("total_tokens", 0)
+        request_count = token_stats.get("request_count", 0)
+        token_display = f"{total_tokens:,} ({request_count} 次请求)" if total_tokens > 0 else t("dashboard_no_token_data")
         return [
             (t("dashboard_init_status"), str(context["init_status"])),
             (t("dashboard_workspaces"), str(context["workspace_count"])),
             (t("dashboard_plugins"), str(context["plugin_count"])),
             (t("dashboard_modules"), str(context["module_count"])),
             (t("dashboard_llm_status"), str(context["llm_status"])),
+            (t("dashboard_token_stats"), token_display),
             (t("dashboard_recent_hint"), str(context["recent_hint"])),
             (t("dashboard_version"), str(context["version"])),
         ]
@@ -88,6 +94,15 @@ def _count_core_modules(root: Path) -> int:
     if not core_dir.is_dir():
         return 0
     return sum(1 for item in core_dir.iterdir() if item.is_dir() and not item.name.startswith("_"))
+
+
+def _safe_token_stats(root: Path) -> dict[str, int]:
+    try:
+        from core.token_tracker import TokenTracker
+        tracker = TokenTracker(root / ".supermedicine" / "tokens.jsonl")
+        return tracker.summary()
+    except Exception:
+        return {"total_tokens": 0, "request_count": 0}
 
 
 def _safe_llm_status(root: Path) -> tuple[str, bool]:
@@ -131,7 +146,7 @@ def _package_version() -> str:
     try:
         return pkg_version("supermedicine")
     except Exception:
-        return "0.3.5b0"
+        return "0.3.6b0"
 
 
 def _action_hint(context: dict[str, Any]) -> str:

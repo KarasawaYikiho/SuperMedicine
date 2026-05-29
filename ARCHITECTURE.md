@@ -219,10 +219,25 @@ provides external-vector-store behavior without requiring a live service.
 ### LLM Provider Contract
 
 The LLM client layer is intentionally provider-neutral and independent of
-OpenCode/Claude Code:
+OpenCode/Claude Code. Client routing is based on **api_format** (the wire
+protocol), not the provider name:
 
-- `core.llm_client.create_llm_client(...)` supports `openai`, `anthropic`, and
-  legacy `openrouter` provider ids.
+- `core.llm_client.create_llm_client(provider, **kwargs)` accepts **any**
+  provider name. The `api_format` field determines which HTTP client is used:
+  - `openai` → `OpenAIClient` (chat-completions endpoint)
+  - `anthropic` → `AnthropicClient` (messages endpoint)
+  - `openrouter` → `OpenRouterClient` (OpenRouter gateway)
+- `core.llm_client._infer_api_format(provider, kwargs)` auto-infers the format:
+  an explicit `api_format` kwarg takes precedence; otherwise names containing
+  `anthropic` or `claude` map to `"anthropic"`, and all other names default to
+  `"openai"`. The config-layer mirror `core.llm_providers.config._infer_api_format`
+  uses a `_PROVIDER_FORMAT_HINTS` dict for the same lookup during YAML loading.
+- `TrackedLLMClient` wraps any `LLMClient` and records token usage after each
+  `chat()` or `complete()` call via a `TokenTracker`. It supports both
+  OpenAI-style (`prompt_tokens`/`completion_tokens`) and Anthropic-style
+  (`input_tokens`/`output_tokens`) usage dicts. `LLMConfigManager` automatically
+  wraps clients with `TrackedLLMClient` so the Dashboard can display cumulative
+  token consumption.
 - `core.llm_providers.config.LLMProviderConfig` normalizes `api_format`,
   `base_url`/`baseURL`, `api_key`, `api_key_env`, `model`, timeout, and headers.
 - OpenAI-compatible requests use bearer authorization and the chat-completions
@@ -234,6 +249,8 @@ OpenCode/Claude Code:
   `claude-3-5-sonnet-latest`).
 - Custom BaseURL values are accepted for compatible endpoints through
   `Install.py --base-url`, `SM_LLM_BASE_URL`, or local project configuration.
+  Any OpenAI-compatible endpoint (DeepSeek, 智谱 GLM, Ollama, etc.) works with
+  the default `openai` api_format.
 - Missing required provider fields produce structured validation errors;
   HTTP/request errors are sanitized with known API keys redacted.
 - Runtime provider selection is stateful but explicit: `llm.provider` is the

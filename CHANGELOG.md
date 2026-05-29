@@ -11,6 +11,19 @@ are summarized here only when they affect a release; see [README.md](README.md),
 [INSTALL.md](INSTALL.md), and [ARCHITECTURE.md](ARCHITECTURE.md) for current user
 guidance.
 
+## [Beta0.3.6] - 2026-05-29
+
+### Added
+- 自定义 LLM Provider 名称支持（不再限制为 openai/anthropic）
+- API Format 自动推断（根据 provider 名称）
+- Dashboard Token 消耗统计
+- TUI 自定义暗色主题
+
+### Changed
+- 移除 provider 白名单限制
+- 默认配置模板改为通用格式
+- Python package metadata uses fallback version `0.3.6b0`.
+
 ## [Beta0.3.5] — Release-Ready
 
 ### Added

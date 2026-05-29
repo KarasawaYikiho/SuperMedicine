@@ -22,38 +22,26 @@ from permission.policy import ensure_default_policy
 
 logger = logging.getLogger(__name__)
 
-SUPPORTED_LLM_PROVIDERS = {"openai", "anthropic"}
-
 DEFAULT_CONFIG: dict[str, Any] = {
     "project_name": "supermedicine",
-    "version": "Beta0.3.5",
+    "version": "Beta0.3.6",
     "llm": {
         "provider": "",
-        "providers": {
-            "openai": {
-                "api_format": "openai",
-                "base_url": "",
-                "api_key_env": "OPENAI_API_KEY",
-                "model": "",
-                "timeout": 60,
-                "headers": {},
-            },
-            "anthropic": {
-                "api_format": "anthropic",
-                "base_url": "",
-                "api_key_env": "ANTHROPIC_API_KEY",
-                "model": "",
-                "timeout": 60,
-                "headers": {},
-            },
-        },
+        "providers": {},
     },
 }
 
-PROVIDER_ENV_NAMES = {
+_PROVIDER_ENV_MAP: dict[str, str] = {
     "openai": "OPENAI_API_KEY",
     "anthropic": "ANTHROPIC_API_KEY",
 }
+
+_PROVIDER_FORMAT_HINTS: dict[str, str] = {
+    "anthropic": "anthropic",
+    "claude": "anthropic",
+}
+
+PROVIDER_ENV_NAMES = _PROVIDER_ENV_MAP
 
 INSTALL_ENV_NAMES = {
     "provider": "SM_LLM_PROVIDER",
@@ -66,9 +54,9 @@ INSTALL_ENV_NAMES = {
 def _default_config_text() -> str:
     header = (
         "# SuperMedicine 配置\n"
-        "# LLM provider template. Repository defaults intentionally keep API\n"
-        "# provider, BaseURL, model, and key values empty. Install.py must be\n"
-        "# supplied complete local LLM settings before first startup.\n"
+        "# LLM provider template. 支持任意 provider 名称。\n"
+        "# api_format 决定 HTTP 请求格式: openai (兼容 DeepSeek/智谱/Ollama 等) 或 anthropic\n"
+        "# 根据 provider 名称自动推断 api_format，也可手动指定。\n"
     )
     return header + yaml.safe_dump(DEFAULT_CONFIG, sort_keys=False, allow_unicode=True)
 
@@ -112,13 +100,15 @@ def _normalize_provider(provider: str | None) -> str | None:
 
 
 def _provider_api_format(provider: str) -> str:
-    if provider == "anthropic":
-        return "anthropic"
+    normalized = provider.strip().lower()
+    for hint, fmt in _PROVIDER_FORMAT_HINTS.items():
+        if hint in normalized:
+            return fmt
     return "openai"
 
 
 def _provider_api_key_env(provider: str) -> str:
-    return PROVIDER_ENV_NAMES.get(provider, "SM_LLM_API_KEY")
+    return _PROVIDER_ENV_MAP.get(provider, f"{provider.upper()}_API_KEY")
 
 
 def _require_complete_llm_config(
@@ -297,7 +287,7 @@ def main() -> None:
     parser.add_argument("--init", action="store_true", help="Initialize core SuperMedicine config only")
     parser.add_argument(
         "--provider",
-        help="LLM provider to configure (openai, anthropic, or a custom OpenAI-compatible provider)",
+        help="LLM provider to configure (e.g. openai, anthropic, deepseek, or any custom OpenAI-compatible provider)",
     )
     parser.add_argument("--base-url", help="LLM provider BaseURL; may also use SM_LLM_BASE_URL")
     parser.add_argument("--api-key", help="LLM provider API key; may also use SM_LLM_API_KEY or provider env var")

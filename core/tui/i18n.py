@@ -63,6 +63,12 @@ LABELS: dict[str, str] = {
     "dashboard_action_create_workspace": "建议创建工作区，并在 LLM 管理中配置 Provider。",
     "dashboard_action_configure_llm": "建议在 LLM 管理中配置可用 Provider。",
     "dashboard_action_ready": "运行上下文已就绪，可进入对话或工作区继续任务。",
+    "dashboard_token_stats": "Token 消耗统计",
+    "dashboard_total_tokens": "总 Token 数",
+    "dashboard_prompt_tokens": "输入 Token",
+    "dashboard_completion_tokens": "输出 Token",
+    "dashboard_token_requests": "请求次数",
+    "dashboard_no_token_data": "暂无 Token 消耗记录",
 
     # Workspace
     "workspace_title": "工作区管理",
@@ -157,6 +163,9 @@ LABELS: dict[str, str] = {
     "llm_model": "模型",
     "llm_api_key": "API Key（输入隐藏）",
     "llm_api_format": "API 格式",
+    "llm_api_format_hint": "留空自动推断（openai/anthropic）",
+    "llm_api_format_openai": "OpenAI 格式（兼容 DeepSeek、智谱、Ollama 等）",
+    "llm_api_format_anthropic": "Anthropic 格式",
     "llm_add_provider": "添加/更新 Provider",
     "llm_switch_provider": "切换 Provider",
     "llm_no_providers": "暂无 LLM Provider",

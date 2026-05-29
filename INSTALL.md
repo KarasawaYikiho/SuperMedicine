@@ -57,6 +57,17 @@ python Install.py --init --provider anthropic \
   --base-url https://api.anthropic.com/v1 \
   --api-key <ANTHROPIC_API_KEY> \
   --model claude-3-5-sonnet-latest
+
+# Custom OpenAI-compatible providers (DeepSeek, 智谱 GLM, Ollama, etc.)
+python Install.py --init --provider deepseek \
+  --base-url https://api.deepseek.com/v1 \
+  --api-key <DEEPSEEK_API_KEY> \
+  --model deepseek-chat
+
+python Install.py --init --provider zhipu \
+  --base-url https://open.bigmodel.cn/api/paas/v4 \
+  --api-key <ZHIPU_API_KEY> \
+  --model glm-4-flash
 ```
 
 For real workstations, prefer environment variables over typing secrets directly
@@ -80,7 +91,7 @@ supermedicine llm add openai \
   --set-current
 ```
 
-## Step-by-Step Installation
+## Step-By-Step Installation
 
 ### 1. Create A Virtual Environment (Recommended)
 
@@ -124,6 +135,12 @@ python Install.py --init --provider openai \
   --api-key <OPENAI_API_KEY> \
   --model gpt-4o-mini
 
+# Custom OpenAI-compatible provider (e.g., DeepSeek)
+python Install.py --init --provider deepseek \
+  --base-url https://api.deepseek.com/v1 \
+  --api-key <DEEPSEEK_API_KEY> \
+  --model deepseek-chat
+
 # Environment variables; provider-specific key variables are preferred for real secrets
 SM_LLM_PROVIDER=anthropic \
 SM_LLM_BASE_URL=https://api.anthropic.com/v1 \
@@ -146,7 +163,7 @@ variable is supplied during initialization, the resolved value can be written to
 local `.supermedicine/config.yaml`; keep that file private after adding real
 secrets.
 
-### 3a. Add Providers After Initialization
+### 3A. Add Providers After Initialization
 
 Use the shared LLM manager through the CLI when you want to add, inspect, or
 switch providers after initialization:
@@ -166,6 +183,13 @@ supermedicine llm add anthropic \
   --base-url https://api.anthropic.com/v1 \
   --api-key-env ANTHROPIC_API_KEY \
   --model claude-3-5-sonnet-latest
+
+# Add custom OpenAI-compatible provider (DeepSeek, 智谱 GLM, Ollama, etc.)
+supermedicine llm add deepseek \
+  --api-format openai \
+  --base-url https://api.deepseek.com/v1 \
+  --api-key-env DEEPSEEK_API_KEY \
+  --model deepseek-chat
 
 # Secret-safe inspection and switching
 supermedicine llm list
@@ -280,14 +304,14 @@ Run PowerShell as Administrator, or use:
 python -m venv .venv --without-pip
 ```
 
-### R survival tools not working
+### R Survival Tools Not Working
 Install R >= 4.3, the rpy2 package, and R's `survival` package:
 ```bash
 pip install -e ".[r]"
 R -e "install.packages('survival', repos='https://cran.r-project.org')"
 ```
 
-### CLI command not found
+### CLI Command Not Found
 
 If `supermedicine` is not recognized after `pip install -e .`, the Python Scripts
 directory may not be on PATH. Two solutions:

@@ -176,10 +176,7 @@ class TestIntegration:
         from Install import DEFAULT_CONFIG
 
         assert DEFAULT_CONFIG["llm"]["provider"] == ""
-        assert DEFAULT_CONFIG["llm"]["providers"]["openai"]["base_url"] == ""
-        assert DEFAULT_CONFIG["llm"]["providers"]["openai"]["model"] == ""
-        assert DEFAULT_CONFIG["llm"]["providers"]["anthropic"]["base_url"] == ""
-        assert DEFAULT_CONFIG["llm"]["providers"]["anthropic"]["model"] == ""
+        assert DEFAULT_CONFIG["llm"]["providers"] == {}
 
     def test_install_init_writes_anthropic_llm_config(self, tmp_path):
         secret = "anthropic-test-install-secret"
@@ -212,7 +209,7 @@ class TestIntegration:
         custom = config["llm"]["providers"]["custom-ai"]
         assert config["llm"]["provider"] == "custom-ai"
         assert custom["api_format"] == "openai"
-        assert custom["api_key_env"] == "SM_LLM_API_KEY"
+        assert custom["api_key_env"] == "CUSTOM-AI_API_KEY"
         assert custom["base_url"] == "https://custom.example.test/v1"
         assert custom["api_key"] == "custom-secret"
         assert custom["model"] == "custom-model"

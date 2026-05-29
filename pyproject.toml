@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "supermedicine"
-version = "0.3.5b0"
+version = "0.3.6b0"
 description = "Modular medical research Agent with RAG and Harness"
 readme = "README.md"
 license = {text = "MIT"}
@@ -77,8 +77,11 @@ markers = [
     "claude_code: optional Claude Code integration tests",
 ]
 
+[tool.ruff]
+exclude = ["GITSuperMedicine.pytest_tmp", ".pytest_tmp"]
+
 [tool.mypy]
-exclude = "^build/"
+exclude = "^build/|GITSuperMedicine\\.pytest_tmp|\\.pytest_tmp"
 
 [[tool.mypy.overrides]]
 module = [

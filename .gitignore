@@ -12,6 +12,7 @@ build/
 # Test/lint/type-check/coverage artifacts
 .pytest_cache/
 .pytest-tmp/
+GITSuperMedicine.pytest_tmp/
 .ruff_cache/
 .mypy_cache/
 .coverage

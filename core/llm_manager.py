@@ -4,9 +4,10 @@ from __future__ import annotations
 from typing import Any
 
 from core.config_center import ConfigCenter
-from core.llm_client import LLMClient, create_llm_client
+from core.llm_client import LLMClient, TrackedLLMClient, create_llm_client
 from core.llm_providers.config import LLMProviderConfig
 from core.redaction import redact_sensitive
+from core.token_tracker import TokenTracker
 
 
 class LLMConfigManager:
@@ -151,7 +152,9 @@ class LLMConfigManager:
         validation_error = self.validate_provider(provider_name, provider_config)
         if validation_error is not None:
             return validation_error
-        return create_llm_client(provider_name, config=provider_config)
+        client = create_llm_client(provider_name, config=provider_config)
+        tracker = TokenTracker(self._config.config_path.parent / "tokens.jsonl")
+        return TrackedLLMClient(client, provider_name, tracker)
 
     def _provider_exists(self, provider: str) -> bool:
         return provider in self._config.get_llm_providers()
@@ -162,9 +165,8 @@ class LLMConfigManager:
 
     @staticmethod
     def _default_api_format(provider: str) -> str:
-        if provider == "anthropic":
-            return "anthropic"
-        return "openai"
+        from core.llm_providers.config import _infer_api_format
+        return _infer_api_format(provider)
 
     @staticmethod
     def _error(

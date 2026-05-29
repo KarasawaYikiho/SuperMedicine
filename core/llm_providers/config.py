@@ -140,10 +140,22 @@ class LLMProviderConfig:
         }
 
 
-def _default_api_format(provider: str) -> str:
-    if provider == "anthropic":
-        return "anthropic"
+_PROVIDER_FORMAT_HINTS: dict[str, str] = {
+    "anthropic": "anthropic",
+    "claude": "anthropic",
+}
+
+
+def _infer_api_format(provider: str) -> str:
+    normalized = provider.strip().lower()
+    for hint, fmt in _PROVIDER_FORMAT_HINTS.items():
+        if hint in normalized:
+            return fmt
     return "openai"
+
+
+def _default_api_format(provider: str) -> str:
+    return _infer_api_format(provider)
 
 
 def _default_base_url(provider: str) -> str:
@@ -160,10 +172,12 @@ def _default_model(provider: str) -> str:
     return defaults.get(provider, "")
 
 
+_PROVIDER_ENV_MAP: dict[str, str] = {
+    "openai": "OPENAI_API_KEY",
+    "anthropic": "ANTHROPIC_API_KEY",
+    "openrouter": "OPENROUTER_API_KEY",
+}
+
+
 def _default_api_key_env(provider: str) -> str:
-    defaults = {
-        "openai": "OPENAI_API_KEY",
-        "anthropic": "ANTHROPIC_API_KEY",
-        "openrouter": "OPENROUTER_API_KEY",
-    }
-    return defaults.get(provider, "")
+    return _PROVIDER_ENV_MAP.get(provider, f"{provider.upper()}_API_KEY")

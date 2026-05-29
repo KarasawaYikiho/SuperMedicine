@@ -1,23 +1,9 @@
 # SuperMedicine 配置
-# LLM provider template. Repository defaults intentionally keep API
-# provider, BaseURL, model, and key values empty. Install.py must be
-# supplied complete local LLM settings before first startup.
+# LLM provider template. 支持任意 provider 名称。
+# api_format 决定 HTTP 请求格式: openai (兼容 DeepSeek/智谱/Ollama 等) 或 anthropic
+# 根据 provider 名称自动推断 api_format，也可手动指定。
 project_name: supermedicine
-version: Beta0.3.5
+version: Beta0.3.6
 llm:
   provider: ''
-  providers:
-    openai:
-      api_format: openai
-      base_url: ''
-      api_key_env: OPENAI_API_KEY
-      model: ''
-      timeout: 60
-      headers: {}
-    anthropic:
-      api_format: anthropic
-      base_url: ''
-      api_key_env: ANTHROPIC_API_KEY
-      model: ''
-      timeout: 60
-      headers: {}
+  providers: {}

@@ -77,12 +77,10 @@ class TestLLMFactory:
         assert client.model == "claude-test"
 
     def test_create_unsupported(self):
-        """未配置 api_format 的自定义 Provider 抛出 ValueError"""
-        try:
-            create_llm_client("unsupported")
-            assert False, "Should have raised ValueError"
-        except ValueError as e:
-            assert "Unsupported" in str(e)
+        """未配置 api_format 的自定义 Provider 默认使用 OpenAI 格式"""
+        client = create_llm_client("unsupported")
+        assert isinstance(client, OpenAIClient)
+        assert client.config.provider == "unsupported"
 
     def test_create_custom_openai_format_provider_from_config(self):
         client = create_llm_client(
@@ -281,7 +279,7 @@ class TestUnifiedProviderConfig:
 
         client = create_configured_llm_client(ConfigCenter(config_path))
 
-        assert isinstance(client, AnthropicClient)
+        assert isinstance(client._wrapped, AnthropicClient)
         assert client.config.provider == "anthropic"
 
     def test_api_key_is_redacted_across_config_validation_and_client_error_path(self):
