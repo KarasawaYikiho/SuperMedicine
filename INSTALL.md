@@ -163,7 +163,7 @@ variable is supplied during initialization, the resolved value can be written to
 local `.supermedicine/config.yaml`; keep that file private after adding real
 secrets.
 
-### 3A. Add Providers After Initialization
+### 3a. Add Providers After Initialization
 
 Use the shared LLM manager through the CLI when you want to add, inspect, or
 switch providers after initialization:

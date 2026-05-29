@@ -332,18 +332,16 @@ OpenCode, Claude Code, `claude`, or platform configuration directories.
 - OpenAI/Anthropic provider metadata follows the core LLM configuration model;
   the adapter must not embed plaintext credentials in skill docs or manifests
 
-### Core/Add-On Capability Matrix
+### Capability Matrix
 
-| Capability | Standalone Python core | OpenCode add-on | Claude Code add-on |
-|------------|------------------------|-----------------|--------------------|
-| Required for installation | Yes | No | No |
-| Required for `Kernel` / `Cli.py run` | Yes | No | No |
-| PermissionEngine checks | Core enforcement path | Used for high-risk adapter actions | Used before adapter actions |
-| Plugin discovery/execution | Native through Kernel | Adapter metadata/context only | Not native plugin runtime |
-| Platform tools | Not required | Declared adapter mappings | Minimal `claude.*` tools |
-| Native platform subagents | Not applicable | Not implemented without injected orchestrator | Not implemented |
-| Native platform skill loading | Not applicable | Skill docs available to OpenCode setup | Not implemented |
-| LLM provider config | OpenAI/Anthropic via config/env/installer | Metadata only, from core config sources | Metadata only, from core config sources |
+| Capability | Standalone Core | OpenCode Add-on | Claude Code Add-on |
+|------------|----------------|-----------------|-------------------|
+| CLI `init`/`status`/`run` | Supported | Can wrap/adapt | Minimal adapter path |
+| PermissionEngine | Supported | Used for adapter ops | Used before tool execution |
+| Plugin discovery/execution | Supported | Metadata integration | Not native |
+| RAG/harness/medical standards | Supported | Skill docs available | Conceptual docs only |
+| Native platform tool calls | Not required | 8 tools mapped | `claude.invoke` only |
+| Native subagent runtime | Not applicable | Not without orchestrator | Not implemented |
 
 ### Standalone And CLI Execution
 

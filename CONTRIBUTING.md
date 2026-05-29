@@ -24,7 +24,7 @@ Requirements: Python >= 3.10, Git
 ## Code Style
 
 We use **ruff** for linting and formatting. Run the local quality gate documented
-in [README.md](README.md#local-quality-gate-and-release-checklist) before
+in [README.md](README.md#local-quality-gate) before
 submitting changes.
 
 ```bash
@@ -76,8 +76,8 @@ Rules:
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/my-feature`
 3. Make your changes with clear, atomic commits
-4. Run the local quality gate documented in [README.md](README.md#local-quality-gate-and-release-checklist)
-5. Review repository/upload hygiene using the README release checklist before staging files
+4. Run the local quality gate documented in [README.md](README.md#local-quality-gate)
+5. Review repository/upload hygiene using the README local quality gate before staging files
 6. Push and open a Pull Request against `master`
 7. PR description should explain what and why
 
