@@ -298,7 +298,7 @@ The exact test count can change as optional adapter coverage evolves.
 pip install pyyaml
 ```
 
-### "Permission denied" on Windows
+### "Permission denied" On Windows
 Run PowerShell as Administrator, or use:
 ```bash
 python -m venv .venv --without-pip

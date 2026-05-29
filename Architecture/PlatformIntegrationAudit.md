@@ -22,7 +22,7 @@ The standalone core should be runnable without OpenCode, Claude Code, or any ass
 
 Standalone success criterion for later steps: a fresh install using only package/core dependencies can run `supermedicine init`, `supermedicine status`, and `supermedicine run ...` through `Kernel` and plugins without importing `adapters.opencode`, requiring `claude`, or requiring OpenCode configuration directories.
 
-## 2. Optional Platform Add-on Boundary
+## 2. Optional Platform Add-On Boundary
 
 Platform-specific support should be treated as optional integration layers around the core:
 
@@ -221,8 +221,8 @@ Step 9 closes the platform-integration clarification work with the following fin
 Verification results available for this execution set:
 
 - `ruff` pass.
-- `mypy` pass: `Success`, 126 source files.
-- `pytest`: 424 passed, 3 skipped.
+- `mypy` pass: `Success`, 150 source files.
+- `pytest`: 539 passed, 3 skipped.
 - Build pass.
 - Installed wheel smoke pass.
 
@@ -265,7 +265,7 @@ secrets were added to source, tests, or documentation.
   `--detect`, which checks for `~/.claude` and `~/.config/opencode` and returns a
   platform label only.
 - `.supermedicine/config.yaml` currently contains only bootstrap metadata:
-  project name and `Beta0.3.0` version. It contains no LLM endpoint, BaseURL,
+  project name and `Beta0.3.6` version. It contains no LLM endpoint, BaseURL,
   OpenAI/Anthropic/OpenRouter key, or private platform configuration.
 - Tracked `.supermedicine/**` is intentionally limited by
   `tests/test_repo_hygiene.py` to `.supermedicine/config.yaml` and
@@ -283,9 +283,9 @@ secrets were added to source, tests, or documentation.
 
 - `core/llm_client.py` defines the abstract `LLMClient` contract with `chat(...)`
   and `complete(...)` methods returning dictionaries with `content`, `model`, and
-  `usage` fields. The factory `create_llm_client(...)` supports `openai`,
-  `anthropic`, and legacy `openrouter`, and raises `ValueError` for unsupported
-  providers.
+  `usage` fields. The factory `create_llm_client(...)` accepts any provider name
+  and routes by `api_format` (openai/anthropic/openrouter). The
+  `_infer_api_format` helper auto-infers format from provider name.
 - `core/llm_providers/base.py` implements configured OpenAI-compatible and
   Anthropic-compatible HTTP clients. `core/llm_providers/config.py` normalizes
   provider, API format, custom BaseURL, API key or API key environment variable,
@@ -365,7 +365,7 @@ secrets were added to source, tests, or documentation.
   optional R support, platform add-ons, safety boundaries, and uninstall guidance
   separate. It notes that `Install.py --init` creates `.supermedicine/` core
   configuration only and does not create OpenCode/Claude Code configuration.
-- `ARCHITECTURE.md` documents `core/llm_providers/` as OpenRouter integration,
+- `ARCHITECTURE.md` documents `core/llm_providers/` as LLM provider abstraction,
   describes secrets as environment-variable references, and frames `adapters/` as
   optional platform add-ons rather than Kernel requirements.
 - `tests/test_opencode_adapter.py` verifies OpenCode adapter import, capability

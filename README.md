@@ -757,7 +757,7 @@ SuperMedicine's default model is **core independent + platform add-ons**. The
 standalone Python core is the default supported path. OpenCode and Claude Code
 are optional add-on adapters.
 
-### OpenCode Add-on
+### OpenCode Add-On
 
 The OpenCode adapter lives under `adapters/opencode/`. It provides:
 
@@ -792,7 +792,7 @@ The OpenCode adapter lives under `adapters/opencode/`. It provides:
 | Native OpenCode subagent runtime | Not implemented without injected orchestrator |
 | Capability reporting | Implemented |
 
-### Claude Code Add-on
+### Claude Code Add-On
 
 The Claude Code adapter lives under `adapters/claude_code/`. It provides:
 
@@ -868,7 +868,7 @@ supermedicine/
 ├── Cli.py                # CLI entry point
 ├── Install.py            # Project initializer
 ├── install.json          # Agent-readable installation manifest
-└── tests/                # Test suite (432+ tests)
+└── tests/                # Test suite (542+ tests)
 ```
 
 ---

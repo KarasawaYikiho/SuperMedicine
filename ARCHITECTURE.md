@@ -312,7 +312,7 @@ OpenCode, Claude Code, `claude`, or platform configuration directories.
 | `skill_load(skill_name)` | `str` | Load skill definition |
 | `subagent_dispatch(agent_id, task)` | `dict` | Dispatch to sub-agent |
 
-### OpenCode Adapter — Optional Implemented Add-on Surface
+### OpenCode Adapter — Optional Implemented Add-On Surface
 - Native tool mappings for bash, read, write, edit, glob, grep, skill, and task
 - Skill/agent metadata for RAG, Harness, medical writing/citation, and prototype statistics workflows
 - Plugin metadata with permissions, capabilities, and tool declarations
@@ -332,7 +332,7 @@ OpenCode, Claude Code, `claude`, or platform configuration directories.
 - OpenAI/Anthropic provider metadata follows the core LLM configuration model;
   the adapter must not embed plaintext credentials in skill docs or manifests
 
-### Core/Add-on Capability Matrix
+### Core/Add-On Capability Matrix
 
 | Capability | Standalone Python core | OpenCode add-on | Claude Code add-on |
 |------------|------------------------|-----------------|--------------------|
