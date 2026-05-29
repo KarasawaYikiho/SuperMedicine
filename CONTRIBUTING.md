@@ -1,4 +1,4 @@
-# Contributing To SuperMedicine
+# Contributing to SuperMedicine
 
 Thank you for your interest in contributing. This guide summarizes the local
 development workflow, code-style expectations, testing expectations, and Pull

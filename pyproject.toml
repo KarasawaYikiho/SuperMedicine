@@ -78,10 +78,10 @@ markers = [
 ]
 
 [tool.ruff]
-exclude = ["GITSuperMedicine.pytest_tmp", ".pytest_tmp"]
+exclude = [".pytest-tmp", ".pytest_tmp"]
 
 [tool.mypy]
-exclude = "^build/|GITSuperMedicine\\.pytest_tmp|\\.pytest_tmp"
+exclude = "^build/|\\.pytest-tmp|\\.pytest_tmp"
 
 [[tool.mypy.overrides]]
 module = [

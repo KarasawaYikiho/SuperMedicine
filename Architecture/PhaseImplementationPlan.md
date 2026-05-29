@@ -1,6 +1,6 @@
 # Phase Implementation Baseline
 
-## Purpose And Scope
+## Purpose and Scope
 
 This document is the verifiable repository artifact for the phase implementation baseline. It maps the current SuperMedicine repository structure and compatibility boundaries before follow-on phase work.
 
@@ -36,7 +36,7 @@ The current repository is organized around top-level modules plus first-party pa
 - `agents/` — base agent abstractions, orchestrator, checkpointing, task state machine.
 - `tests/` — pytest test suite using `test_*.py` modules and shared fixtures.
 
-## CLI Commands And Run Flags
+## CLI Commands and Run Flags
 
 CLI implementation is in `Cli.py`:
 
@@ -79,7 +79,7 @@ Workspace-aware command baseline:
 - `supermedicine experience ... --workspace <id>` suggests, adds, lists, views,
   edits, deletes, and exports user-confirmed experience records.
 
-## Kernel And Execution Baseline
+## Kernel and Execution Baseline
 
 Runtime task execution is centralized in `core/kernel.py`:
 
@@ -99,7 +99,7 @@ The shared plugin execution contract is in `plugins/base_plugin.py`:
 - `plugin_result(...)`
 - `redact_sensitive(...)`
 
-## PermissionEngine And Audit Logging Locations
+## PermissionEngine and Audit Logging Locations
 
 Permission implementation:
 
@@ -115,7 +115,7 @@ Audit implementation:
 - Adapter permission checks in `adapters/base_adapter.py` also initialize `PermissionEngine(..., audit.jsonl)`.
 - Harness audit inspection actions are implemented in `plugins/harness/main.py` and helper logic under `plugins/harness/monitor.py`.
 
-## Adapter Sandbox And Gated Tools
+## Adapter Sandbox and Gated Tools
 
 Shared adapter logic is in `adapters/base_adapter.py`:
 
@@ -131,7 +131,7 @@ Concrete adapters:
 - `adapters/claude_code/adapter.py` — `ClaudeCodeAdapter`; supports `claude.capabilities`, `claude.runtime_status`, `claude.invoke`.
 - `adapters/standalone/adapter.py` — `StandaloneAdapter`; local tool handling and simulated subagent dispatch.
 
-## RAG Providers And Actions
+## RAG Providers and Actions
 
 RAG manifest and executable entrypoint:
 
@@ -150,7 +150,7 @@ RAG provider contract and implementations:
 - `plugins/rag/local_provider.py` — `LocalRAGProvider` and `MockExternalVectorStoreProvider`.
 - `plugins/rag/pubmed_provider.py` — `PubmedRAGProvider` with permission-gated external HTTP access.
 
-## Workspace, Paper Import, And Experience Baseline
+## Workspace, Paper Import, and Experience Baseline
 
 - Workspaces are stored at `workspaces/<id>` with slug ids only. CLI workspace
   use is explicit; workspace-scoped commands require or accept `--workspace` and
@@ -170,7 +170,7 @@ RAG provider contract and implementations:
   part of this baseline; no tag, release, publish, package upload, paper upload,
   or external artifact upload is performed.
 
-## Checkpoints And Sessions
+## Checkpoints and Sessions
 
 Checkpointing:
 
@@ -184,7 +184,7 @@ Sessions:
 
 - `core/session_manager.py` — in-memory UUID `Session` and `SessionManager`, optional TTL cleanup, active-session listing.
 
-## Plugin Manifests And Actions Overview
+## Plugin Manifests and Actions Overview
 
 Plugin discovery uses `plugin.yaml` manifests under `plugins/`.
 
@@ -230,7 +230,7 @@ Current pytest settings:
 
 The test suite lives under `tests/`, with shared fixtures in `tests/conftest.py`.
 
-## Compatibility Invariants For Future Phases
+## Compatibility Invariants for Future Phases
 
 Future phase work should preserve these compatibility boundaries unless a phase explicitly supersedes them:
 

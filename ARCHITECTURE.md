@@ -267,7 +267,7 @@ protocol), not the provider name:
 - Documentation, manifests, tests, and adapter files must use fake keys or
   placeholders only and must not commit real API keys.
 
-### Workspace-Local Papers, Experience Learning, And TUI
+### Workspace-Local Papers, Experience Learning, and TUI
 
 Paper import and experience learning are workspace-aware support paths layered on
 top of the same permission and path-safety model:
@@ -346,13 +346,13 @@ OpenCode, Claude Code, `claude`, or platform configuration directories.
 | Native platform tool calls | Not required | 8 tools mapped | `claude.invoke` only |
 | Native subagent runtime | Not applicable | Not without orchestrator | Not implemented |
 
-### Standalone And CLI Execution
+### Standalone and CLI Execution
 
 The CLI initializes the Kernel for `init`, `status`, `test`, and `run` paths. The
 `run` command uses the real component stack rather than a placeholder-only path,
 including plugin discovery and permission-gated execution where applicable.
 
-## Safety And Resource Metadata
+## Safety and Resource Metadata
 
 High-risk calls use a minimal, dependency-free safety model:
 
@@ -374,7 +374,7 @@ High-risk calls use a minimal, dependency-free safety model:
 - Experience learning rejects raw conversations and separates general method
   storage from workspace-local project details.
 
-## Medical Writing And Citation Constraints
+## Medical Writing and Citation Constraints
 
 Medical writing support provides reporting-checklist and citation-formatting
 constraints only. CONSORT, STROBE, PRISMA, and STARD helpers can identify missing
@@ -394,7 +394,7 @@ contains secrets or private endpoints.
 Phase documentation/help work does not create tags, releases, package publishes,
 paper uploads, or external artifact uploads.
 
-## Planning And Push Gate Rule
+## Planning and Push Gate Rule
 
 Plan-stage work does not need strict project-standard verification. Optimization
 and standardization are required before Push/finalization, not during early

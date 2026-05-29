@@ -95,9 +95,9 @@ Current documentation status after Step 6:
 - Native Claude Code skill loading and native subagent dispatch remain
   documented as unavailable.
 
-## 5. Coupling Risks And Exact File-Level Modification Targets For Steps 2-7
+## 5. Coupling Risks and Exact File-Level Modification Targets for Steps 2-7
 
-### Risk A — Default Package/Distribution Blurs Core And Adapters
+### Risk A — Default Package/Distribution Blurs Core and Adapters
 
 - Evidence: `pyproject.toml` includes `adapters*` in `[tool.setuptools.packages.find].include`.
 - Risk: a base SuperMedicine install ships platform adapters as default package content, making optional integrations look like core runtime.
@@ -127,7 +127,7 @@ Current documentation status after Step 6:
   - `tests/test_standalone_adapter.py` — assert no dependency on `adapters/opencode/skills` for standalone behavior.
   - Optional new target: `adapters/standalone/skills/**` or core-neutral docs if standalone skill loading remains supported.
 
-### Risk D — Installer Platform Detection Is Mixed Into The Core Installer
+### Risk D — Installer Platform Detection is Mixed Into the Core Installer
 
 - Evidence: `Install.py` detects `~/.claude` and `~/.config/opencode` via `detect_platform()`.
 - Risk: a core installer script contains assistant-platform discovery logic and may imply platform setup is part of core initialization.
@@ -159,7 +159,7 @@ Current documentation status after Step 6:
   - `Architecture/PhaseImplementationPlan.md` — update compatibility invariants to preserve standalone core and optional add-on separation.
   - `Architecture/WorkspaceTuiRagGuide.md` — only if platform assumptions are found in user workflows.
 
-### Risk G — Adapter Tests Are Mixed Into The Single Default Test Suite
+### Risk G — Adapter Tests are Mixed Into the Single Default Test Suite
 
 - Evidence: `pyproject.toml` sets all `tests/test_*.py` as one suite; adapter tests import `adapters.opencode` and `adapters.claude_code` directly.
 - Risk: core-only verification cannot be distinguished from optional adapter verification.
@@ -169,7 +169,7 @@ Current documentation status after Step 6:
   - `tests/test_backward_compatibility.py`, `tests/test_integration.py`, `tests/test_kernel.py`, `tests/test_plugin_registry.py`, `tests/test_permission_engine.py` — identify as core verification set.
   - `README.md` — document core verification versus optional adapter verification commands.
 
-### Risk H — Architecture Wording Can Imply Kernel Depends On Adapters
+### Risk H — Architecture Wording can Imply Kernel Depends on Adapters
 
 - Evidence: `ARCHITECTURE.md` overview says Kernel integrates “plugins, adapters, and agents”; data-flow diagram starts with `CLI / Platform Adapter`.
 - Risk: readers may believe adapters are part of Kernel initialization.
@@ -178,7 +178,7 @@ Current documentation status after Step 6:
   - `core/kernel.py` — no runtime behavior change appears necessary; keep it adapter-free.
   - `tests/test_kernel.py` and `tests/test_backward_compatibility.py` — protect no adapter import/requirement in kernel execution if a regression test is added later.
 
-## 6. Verification Checklist For Later Steps
+## 6. Verification Checklist for Later Steps
 
 Use this checklist after Steps 2-7 modify code/docs:
 
@@ -239,7 +239,7 @@ Follow-up recommendations:
 - Add explicit test markers or documented commands for core-only, OpenCode-adapter, Claude-Code-adapter, and full-suite verification.
 - If native platform integration is desired later, implement it as new adapter functionality with tests before changing support claims in user documentation or manifests.
 
-## 8. AI/LLM, Installation, Platform Adapter, And Configuration Boundary Audit
+## 8. AI/LLM, Installation, Platform Adapter, and Configuration Boundary Audit
 
 Date: 2026-05-27
 
@@ -248,7 +248,7 @@ OpenCode, Claude Code, permission, documentation, and test contracts. No runtime
 feature implementation was performed, and no real API keys, private endpoints, or
 secrets were added to source, tests, or documentation.
 
-### 8.1 Installation And Local Configuration Contracts
+### 8.1 Installation and Local Configuration Contracts
 
 - `install.json` is the agent-readable installation manifest. It declares the
   standalone core install steps (`git clone`, `pip install -e .`, optional
@@ -279,7 +279,7 @@ secrets were added to source, tests, or documentation.
   and removal of `.supermedicine/`; it does not instruct users to remove or alter
   user-local assistant-platform configuration directories.
 
-### 8.2 LLM Provider And Secret-Boundary Contracts
+### 8.2 LLM Provider and Secret-Boundary Contracts
 
 - `core/llm_client.py` defines the abstract `LLMClient` contract with `chat(...)`
   and `complete(...)` methods returning dictionaries with `content`, `model`, and
@@ -359,7 +359,7 @@ secrets were added to source, tests, or documentation.
   one user-facing `SuperMedicine` surface, and internal role contexts. It does not
   claim native Claude Code skill loading or native subagent dispatch.
 
-### 8.5 Documentation And Test Coverage Contracts
+### 8.5 Documentation and Test Coverage Contracts
 
 - `README.md` contains user-facing installation, quick start, optional platform
   add-on setup, capability matrix, testing commands, and safety/security notes.
@@ -391,7 +391,7 @@ secrets were added to source, tests, or documentation.
   Existing test strings such as `test-key`, `secret-key`, and redaction payloads
   are dummy fixtures used to exercise missing-key and redaction behavior.
 
-### 8.6 Current Implementation Boundary And Follow-Up Risks
+### 8.6 Current Implementation Boundary and Follow-Up Risks
 
 - Current AI/LLM functionality includes OpenAI-format and Anthropic-format
   provider clients, OpenRouter gateway support, custom BaseURL configuration,

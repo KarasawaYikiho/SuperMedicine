@@ -28,7 +28,7 @@ detail, see [INSTALL.md](INSTALL.md); for system design, see
 
 ---
 
-## Table Of Contents
+## Table of Contents
 
 - [Installation](#installation)
 - [Quick Start](#quick-start)
@@ -154,23 +154,23 @@ LLM-backed tasks require one complete provider (`base_url`, `api_key` or
 `api_key_env`, and `model`). See [INSTALL.md](INSTALL.md) for runtime
 validation details and programmatic client creation examples.
 
-### Configure By Editing The File
+### Configure by Editing the File
 
 Edit `.supermedicine/config.yaml` directly; see [INSTALL.md](INSTALL.md#3b-configure-by-editing-supermedicineconfigyaml) for YAML examples.
 
-### Configure With The CLI
+### Configure with the CLI
 
 Use `supermedicine llm add/switch/list`; see [INSTALL.md](INSTALL.md#3a-add-providers-after-initialization) for CLI examples.
 
-### Configure In The TUI
+### Configure in the TUI
 
 Launch `supermedicine tui` and open **LLM 管理**; see [INSTALL.md](INSTALL.md#3c-configure-in-the-tui) for details.
 
-### Switching And Startup Restore
+### Switching and Startup Restore
 
 Use `supermedicine llm switch <provider>`; see [INSTALL.md](INSTALL.md#3a-add-providers-after-initialization) for details.
 
-### Environment Variables And Secret Safety
+### Environment Variables and Secret Safety
 
 Use `SM_LLM_*` and provider-specific env vars; see [INSTALL.md](INSTALL.md) and [SECURITY.md](SECURITY.md) for the full list.
 
@@ -300,7 +300,7 @@ area and bottom status bar:
   LLM status, and task running state in the center, and current view/version on
   the right.
 
-### Navigation And Shortcuts
+### Navigation and Shortcuts
 
 | Key | Action |
 |-----|--------|
@@ -334,7 +334,7 @@ area and bottom status bar:
 | **LLM** | Add providers, switch current default, inspect redacted readiness state |
 | **Dialog** | View session dialog history (read-only) |
 
-### Status And Safety Cues
+### Status and Safety Cues
 
 - **LLM 状态** shows provider readiness without exposing API keys.
 - **任务运行状态** appears as `任务空闲` or `任务执行中` for long-running work.
@@ -458,7 +458,7 @@ and additional guidance, see [INSTALL.md](INSTALL.md#troubleshooting).
 
 ---
 
-## Safety And Security
+## Safety and Security
 
 - **Permission Engine** — All high-risk operations (bash, write, edit) are
   permission-gated through `PermissionEngine.check()` at runtime.

@@ -48,7 +48,7 @@ Policies are defined in YAML files under `.supermedicine/policies/`. Each policy
 | `denied` | Explicitly forbidden actions (takes precedence over allowed) |
 | `hard_limits` | Quantitative limits (rate limiting, resource caps) |
 
-## Principle Of Least Privilege
+## Principle of Least Privilege
 
 Configure agents with the minimum permissions needed:
 
@@ -67,7 +67,7 @@ All permission checks are logged to `.supermedicine/policies/audit.jsonl` in JSO
 
 Use `plugins/harness/monitor.py` to analyze audit logs for anomalies.
 
-## Workspace, Paper, And Experience Boundaries
+## Workspace, Paper, and Experience Boundaries
 
 - Workspace ids are slug-only identifiers and resolve to project-local
   `workspaces/<id>` paths. Workspace-scoped CLI commands require explicit
@@ -90,7 +90,7 @@ Use `plugins/harness/monitor.py` to analyze audit logs for anomalies.
   workspace/project details; workspace-specific experiences remain under the
   selected workspace and can be viewed, edited, deleted, or exported by the user.
 
-## Safety, Privacy, And Medical-Use Boundaries
+## Safety, Privacy, and Medical-Use Boundaries
 
 SuperMedicine is a research-assistance framework, not a clinical decision system.
 Plugin outputs, RAG results, paper metadata, writing checklists, citation
@@ -146,7 +146,7 @@ paths, and treat all external network/API access as permission-gated behavior.
   degrade to unavailable/degraded states rather than bypassing the core security
   model.
 
-## Reporting A Vulnerability
+## Reporting a Vulnerability
 
 Please report security vulnerabilities by opening a GitHub Issue with the label `security`. Do not disclose vulnerabilities publicly until they have been addressed.
 

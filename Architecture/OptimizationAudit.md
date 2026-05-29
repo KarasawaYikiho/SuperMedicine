@@ -88,7 +88,7 @@ The following semantics are protected during the optimization work and must not 
 - Preserve existing kernel, plugin, RAG, workspace, TUI, paper import, operation guard, path safety, and experience semantics unless a later reviewed task explicitly changes them.
 - Preserve existing test intent and coverage boundaries; this audit step does not update tests.
 
-## Naming Review Initial Findings For “独立单词首字母大写”
+## Naming Review Initial Findings for “独立单词首字母大写”
 
 Initial naming review is limited to the paths visible in the workspace status and prior audit summary. Findings requiring follow-up review:
 

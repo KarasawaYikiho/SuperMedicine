@@ -1,4 +1,4 @@
-# Workspace, TUI, Paper Import, And Experience Guide
+# Workspace, TUI, Paper Import, and Experience Guide
 
 This guide documents the user-facing workspace/TUI/RAG-adjacent workflows added
 for the current phase. It is documentation only: no tag, release, publish,
@@ -26,7 +26,7 @@ sessions, checkpoints, local RAG data, papers, notes, and outputs. CLI commands
 do not silently infer a workspace from the TUI. Use `--workspace <id>` whenever a
 command operates on workspace-local state.
 
-## CLI And Chinese TUI
+## CLI and Chinese TUI
 
 `supermedicine tui` launches the Chinese terminal UI workbench. TUI recent
 selection is saved as workspace/session state for the TUI experience only; it is
@@ -38,7 +38,7 @@ supermedicine run "query local context" --workspace hypertension-review
 supermedicine tui
 ```
 
-### Current TUI Structure Audit And Execution Boundary
+### Current TUI Structure Audit and Execution Boundary
 
 This audit records the current Textual TUI structure before follow-up UI work. It
 is documentation-only: no TUI source, style, controller, test, CLI, permission, or
@@ -115,7 +115,7 @@ Existing TUI test boundary:
 - `tests/test_tui_llm_screen.py` covers redacted provider add/switch/list,
   startup restore of the last provider, and secret-safe controller errors.
 
-### OpenCode-aligned TUI Experience Principles For This Round
+### OpenCode-aligned TUI Experience Principles for This Round
 
 This round uses `anomalyco/opencode` only as an experience reference for modern
 TUI/CLI interaction patterns. The transferable target is not code reuse and not a
@@ -246,7 +246,7 @@ checked through PermissionEngine using `tool.run` and audit events are written
 for allowed or denied decisions. CLI tool commands require explicit
 `--workspace` and do not read TUI recent selection.
 
-## Paper Import And Metadata
+## Paper Import and Metadata
 
 Paper import is copy-only. SuperMedicine reads the local source file and copies
 it into the selected workspace; it does not move the source, publish it, upload
@@ -310,7 +310,7 @@ supermedicine experience list --workspace hypertension-review --include-general
 supermedicine experience export --workspace hypertension-review --format md --include-general
 ```
 
-## Safety, Privacy, And Medical Boundary
+## Safety, Privacy, and Medical Boundary
 
 SuperMedicine is for medical research assistance, not clinical decision support.
 RAG results, paper metadata, writing checklist output, citation formatting, and
