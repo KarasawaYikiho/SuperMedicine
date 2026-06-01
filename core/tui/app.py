@@ -123,6 +123,16 @@ class NavItem(ListItem):
 class PromptInput(Input):
     """Prompt input that preserves app-level numeric navigation shortcuts."""
 
+    ANSI_CONTROL_SEQUENCE_PATTERN = re.compile(
+        r"(?:\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-Z\\-_])"
+        r"|(?:\[<\d+(?:;\d+){0,2}[mM]|\[\?\d+(?:;\d+)*[hl]|\[\d+(?:;\d+)*[~A-Za-z])"
+    )
+    RAW_CONTROL_CHARS_PATTERN = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+    INCOMPLETE_CONTROL_SEQUENCE_PATTERN = re.compile(
+        r"(?:\x1b(?:\[[0-?;<>]*[ -/]*|\][^\x07\x1b]*|)$|(?:\[<\d*(?:;\d*){0,2}|\[\?\d*(?:;\d*)*|\[\d+(?:;\d*)*)$)"
+    )
+    CONTROL_SEQUENCE_FINAL_CHARS = frozenset("@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~")
+
     NUMERIC_NAVIGATION: dict[str, str] = {
         "1": "chat",
         "2": "dashboard",
@@ -139,12 +149,90 @@ class PromptInput(Input):
     def on_key(self, event: events.Key) -> None:
         """Route numeric navigation before the focused input consumes digits."""
 
+        if self._is_terminal_control_key(event):
+            self._consume_key_event(event)
+            event.stop()
+            return
+
         view_id = self.NUMERIC_NAVIGATION.get(event.key)
         if view_id is None:
             return
+        if self._value_has_incomplete_terminal_sequence():
+            self._consume_key_event(event)
+            event.stop()
+            self.value = self._clean_terminal_control_text(self.value)
+            return
+        self._consume_key_event(event)
         event.stop()
+        self._discard_shortcut_digit_residue(event.key)
         if hasattr(self.app, "action_switch_view"):
             self.app.action_switch_view(view_id)
+        self._discard_shortcut_digit_residue(event.key)
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        """Drop terminal/mouse control bytes if they reach the prompt value."""
+
+        if event.input is not self:
+            return
+        clean_value = self._clean_terminal_control_text(event.value)
+        if clean_value != event.value:
+            self.value = clean_value
+
+    def _is_terminal_control_key(self, event: events.Key) -> bool:
+        """Return True when a key event is part of a terminal control sequence."""
+
+        key = event.key
+        char = getattr(event, "character", None) or getattr(event, "char", "") or ""
+        if key in {"escape", "ctrl+["} or char == "\x1b":
+            return True
+        if char and self.RAW_CONTROL_CHARS_PATTERN.search(char):
+            return True
+        if char and self.ANSI_CONTROL_SEQUENCE_PATTERN.search(char):
+            return True
+        return False
+
+    def _consume_key_event(self, event: events.Key) -> None:
+        """Prevent Textual's Input default handler from inserting consumed keys."""
+
+        prevent_default = getattr(event, "prevent_default", None)
+        if callable(prevent_default):
+            prevent_default()
+
+    def _discard_shortcut_digit_residue(self, key: str) -> None:
+        """Clear a shortcut digit if Textual inserted it before shortcut routing."""
+
+        if self.value == key:
+            self.value = ""
+
+    def _value_has_incomplete_terminal_sequence(self) -> bool:
+        """Detect orphan CSI/mouse prefixes before numeric navigation handles digits."""
+
+        value = self.value
+        if not value:
+            return False
+        escape_index = value.rfind("\x1b")
+        if escape_index >= 0:
+            tail = value[escape_index:]
+            return not self.ANSI_CONTROL_SEQUENCE_PATTERN.fullmatch(tail)
+        csi_index = value.rfind("[")
+        if csi_index < 0:
+            return False
+        tail = value[csi_index:]
+        if self.ANSI_CONTROL_SEQUENCE_PATTERN.fullmatch(tail):
+            return False
+        if len(tail) == 1:
+            return True
+        if tail.startswith(("[<", "[?")):
+            return tail[-1] not in self.CONTROL_SEQUENCE_FINAL_CHARS
+        return bool(re.fullmatch(r"\[\d*(?:;\d*)*", tail))
+
+    @classmethod
+    def _clean_terminal_control_text(cls, value: str) -> str:
+        """Remove terminal control/mouse escape sequences while preserving normal text."""
+
+        without_sequences = cls.ANSI_CONTROL_SEQUENCE_PATTERN.sub("", value)
+        without_incomplete_sequences = cls.INCOMPLETE_CONTROL_SEQUENCE_PATTERN.sub("", without_sequences)
+        return cls.RAW_CONTROL_CHARS_PATTERN.sub("", without_incomplete_sequences)
 
 
 class SuperMedicineTUI(App[Any]):
@@ -279,7 +367,7 @@ class SuperMedicineTUI(App[Any]):
     def action_switch_view(self, view_id: str) -> None:
         """Switch the visible content view."""
         if view_id == self._current_view:
-            self._focus_prompt_input()
+            self._focus_current_view_default()
             self._update_status_bar()
             return
         # Hide current, show new
@@ -296,7 +384,7 @@ class SuperMedicineTUI(App[Any]):
                 if item.view_id == view_id:
                     nav_list.index = i
                     break
-            self._focus_prompt_input()
+            self._focus_current_view_default()
 
     @classmethod
     def nav_items(cls) -> tuple[NavMetadata, ...]:
@@ -335,6 +423,19 @@ class SuperMedicineTUI(App[Any]):
             self.query_one("#prompt-input", Input).focus()
         except Exception:
             pass
+
+    def _focus_current_view_default(self) -> None:
+        """Focus the active view's default control, falling back to chat prompt."""
+
+        view = self._views.get(self._current_view)
+        focus_default = getattr(view, "focus_default", None)
+        if callable(focus_default):
+            try:
+                focus_default()
+                return
+            except Exception:
+                pass
+        self._focus_prompt_input()
 
     def action_toggle_maximize(self) -> None:
         """Toggle maximize on the focused widget."""
@@ -580,7 +681,7 @@ def launch_tui(*, dry_run: bool = False, project_root: Path | str | None = None)
     console = Console()
     try:
         app = SuperMedicineTUI(project_root=project_root or Path.cwd())
-        app.run(mouse=False)
+        app.run(mouse=True)
     except ImportError:
         logger.error("TUI launch failed: stage=import textual_missing project_root=%s", project_root or Path.cwd())
         console.print("Textual 未安装，无法启动交互界面。")

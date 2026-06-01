@@ -83,6 +83,8 @@ LABELS: dict[str, str] = {
     "workspace_confirm_delete": "输入工作区 ID 确认删除",
     "workspace_delete_requires_confirm": "危险操作：删除工作区前，请在输入框输入完全一致的工作区 ID。此操作会硬删除工作区且不可恢复。",
     "workspace_no_workspaces": "暂无工作区，请先创建",
+    "workspace_manual_create_hint": "手动创建：在“工作区 ID”输入框输入小写 slug，按 Enter 或点击“创建工作区”。快捷键 Ctrl+N 聚焦输入框；可用鼠标点击输入框、按钮或列表。",
+    "workspace_create_placeholder": "工作区 ID（小写字母、数字、连字符；例如 study-a）",
     "workspace_created": "工作区已创建",
     "workspace_selected": "已选择工作区",
     "workspace_deleted": "工作区已删除",

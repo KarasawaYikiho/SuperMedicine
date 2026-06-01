@@ -2,15 +2,17 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import cast
 
 import pytest
 import yaml
+from textual import events
 
 from Install import init_config
 from Uninstall import uninstall
 from core.config_center import ConfigCenter
 from core.llm_client import create_configured_llm_client
-from core.tui.app import SuperMedicineTUI, launch_tui
+from core.tui.app import PromptInput, SuperMedicineTUI, launch_tui
 
 
 def test_llm_client_must_really_call_configured_provider_or_return_explicit_failure(tmp_path, monkeypatch):
@@ -89,6 +91,53 @@ def test_llm_client_missing_configuration_is_explicit_failure_not_success(tmp_pa
     assert "Install.py --init" in result["error"]["message"]
 
 
+def test_tui_visible_logging_does_not_show_llm_client_creation_noise(tmp_path, caplog):
+    """Regression baseline: ordinary TUI-facing INFO logs must not expose internal LLM creation chatter."""
+
+    config_dir = tmp_path / ".supermedicine"
+    config_dir.mkdir()
+    config_path = config_dir / "config.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "llm": {
+                    "provider": "baseline-openai",
+                    "providers": {
+                        "baseline-openai": {
+                            "api_format": "openai",
+                            "base_url": "https://llm-baseline.local.test/v1",
+                            "api_key": "sk-baseline-llm-secret",
+                            "model": "baseline-model",
+                        }
+                    },
+                }
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    forbidden_fragments = (
+        "LLM Manager_create_client",
+        "LLM manager create_client",
+        "Creating LLM client",
+    )
+
+    caplog.set_level("INFO", logger="core.llm_manager")
+    caplog.set_level("INFO", logger="core.llm_client")
+    create_configured_llm_client(ConfigCenter(config_path))
+
+    assert not any(fragment in caplog.text for fragment in forbidden_fragments)
+
+    caplog.clear()
+    caplog.set_level("DEBUG", logger="core.llm_manager")
+    caplog.set_level("DEBUG", logger="core.llm_client")
+    create_configured_llm_client(ConfigCenter(config_path))
+
+    assert "LLM manager create_client" in caplog.text
+    assert "Creating LLM client" in caplog.text
+    assert "sk-baseline-llm-secret" not in caplog.text
+
+
 def test_tui_input_submission_clears_input_without_raw_terminal_echo_or_screen_clear(tmp_path, capsys, monkeypatch):
     """Regression baseline: submitted input stays inside TUI state and is not echoed to the raw terminal."""
 
@@ -148,8 +197,108 @@ def test_tui_interactive_launch_does_not_print_status_before_alternate_screen(tm
     status = launch_tui(dry_run=False, project_root=tmp_path)
 
     assert status.interactive is True
-    assert run_kwargs == {"mouse": False}
+    assert run_kwargs == {"mouse": True}
     assert capsys.readouterr().out == ""
+
+
+@pytest.mark.parametrize(
+    ("shortcut", "expected_view"),
+    [
+        ("1", "chat"),
+        ("2", "dashboard"),
+        ("3", "workspace"),
+        ("4", "paper"),
+        ("5", "experience"),
+        ("6", "tool"),
+        ("7", "dialog"),
+        ("8", "llm"),
+        ("9", "experiment"),
+        ("0", "log"),
+    ],
+)
+def test_tui_prompt_starts_clean_and_numeric_shortcuts_do_not_enter_prompt(tmp_path, shortcut, expected_view):
+    """Regression baseline: startup focus/nav keys must not seed prompt text with shortcut digits."""
+
+    import asyncio
+
+    async def scenario() -> None:
+        app = SuperMedicineTUI(project_root=tmp_path)
+        async with app.run_test(size=(140, 45)) as pilot:
+            prompt = app.query_one("#prompt-input", PromptInput)
+            assert prompt.value == ""
+
+            await pilot.press(shortcut)
+            await pilot.pause()
+
+            assert app._current_view == expected_view
+            assert prompt.value == ""
+            if expected_view == "workspace":
+                assert not prompt.has_focus
+            else:
+                assert prompt.has_focus
+
+    asyncio.run(scenario())
+
+
+def test_tui_prompt_filters_terminal_control_sequences_but_preserves_pasted_digits():
+    """Regression baseline: mouse/CSI bytes are not prompt text; pasted numeric text is."""
+
+    prompt = PromptInput()
+
+    assert prompt._clean_terminal_control_text("\x1b[<0;12;34M") == ""
+    assert prompt._clean_terminal_control_text("[<0;12;34M") == ""
+    assert prompt._clean_terminal_control_text("\x1b[200~abc123\x1b[201~") == "abc123"
+    assert prompt._clean_terminal_control_text("ordinary 123 text") == "ordinary 123 text"
+
+
+def test_tui_prompt_swallow_digits_while_terminal_sequence_is_incomplete():
+    """Regression baseline: raw mouse sequence digits must not trigger view navigation."""
+
+    import asyncio
+
+    async def scenario() -> None:
+        app = SuperMedicineTUI()
+        async with app.run_test(size=(140, 45)):
+            prompt = app.query_one("#prompt-input", PromptInput)
+            prompt.value = "[<"
+
+            class FakeKey:
+                key = "7"
+                character = "7"
+                stopped = False
+                prevented = False
+
+                def stop(self) -> None:
+                    self.stopped = True
+
+                def prevent_default(self) -> None:
+                    self.prevented = True
+
+            event = FakeKey()
+            prompt.on_key(cast(events.Key, event))
+
+            assert event.stopped is True
+            assert event.prevented is True
+            assert prompt.value == ""
+
+    asyncio.run(scenario())
+
+
+def test_tui_prompt_key_filter_uses_textual_character_attribute_shape():
+    """Regression baseline: Textual Key events expose character, not char."""
+
+    prompt = PromptInput()
+
+    class EscapeKey:
+        key = "escape"
+        character = None
+
+    class DigitKey:
+        key = "7"
+        character = "7"
+
+    assert prompt._is_terminal_control_key(cast(events.Key, EscapeKey())) is True
+    assert prompt._is_terminal_control_key(cast(events.Key, DigitKey())) is False
 
 
 def test_tui_status_bar_skips_unchanged_widget_updates(tmp_path):

@@ -161,7 +161,7 @@ class LLMConfigManager:
     def create_client(self, provider: str | None = None) -> LLMClient | dict[str, Any]:
         """基于当前/恢复 provider 创建 LLMClient；配置异常时返回结构化错误。"""
         if provider is None:
-            logger.info("LLM manager create_client: stage=restore path=%s", self._config.config_path)
+            logger.debug("LLM manager create_client: stage=restore path=%s", self._config.config_path)
             restore_result = self.restore_startup_provider(save=False)
             if not restore_result["ok"]:
                 return restore_result
@@ -179,7 +179,7 @@ class LLMConfigManager:
         if validation_error is not None:
             return validation_error
         try:
-            logger.info("LLM manager create_client: stage=create provider=%s path=%s", provider_name, self._config.config_path)
+            logger.debug("LLM manager create_client: stage=create provider=%s path=%s", provider_name, self._config.config_path)
             client = create_llm_client(provider_name, config=provider_config)
         except Exception as exc:
             return self._error(

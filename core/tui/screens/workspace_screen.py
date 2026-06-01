@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from textual import events
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Input, Static
@@ -22,10 +23,11 @@ class WorkspaceView(Vertical):
 
     def compose(self) -> ComposeResult:
         yield Static(t("workspace_title"), classes="section-title")
+        yield Static(t("workspace_manual_create_hint"), id="workspace-create-hint", classes="hint")
         yield DataTable(id="workspace-table", cursor_type="row")
         with Horizontal(classes="form-row"):
             yield Input(
-                placeholder=t("workspace_id_label") + " (a-z, 0-9, -)",
+                placeholder=t("workspace_create_placeholder"),
                 id="workspace-id-input",
             )
             yield Button(t("workspace_create"), id="workspace-create", classes="btn btn-primary")
@@ -37,13 +39,28 @@ class WorkspaceView(Vertical):
     def on_mount(self) -> None:
         self._load_workspaces()
 
+    def focus_default(self) -> None:
+        self.query_one("#workspace-id-input", Input).focus()
+
+    def on_key(self, event: events.Key) -> None:
+        if event.key == "ctrl+n":
+            event.stop()
+            self.query_one("#workspace-id-input", Input).focus()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id != "workspace-id-input":
+            return
+        event.stop()
+        self._create_workspace(event.value.strip())
+
     def _get_controller(self):
         from core.tui.screens.workspaces import WorkspaceScreenController
 
         return WorkspaceScreenController(project_root=self._project_root)
 
-    def _load_workspaces(self) -> None:
+    def _load_workspaces(self, *, preserve_status: bool = False) -> None:
         table = self.query_one("#workspace-table", DataTable)
+        selected_key = self._selected_workspace_id()
         table.clear(columns=True)
         table.add_columns("ID", t("workspace_path"), t("workspace_created_at"))
 
@@ -57,7 +74,10 @@ class WorkspaceView(Vertical):
                 metadata = ws.get("metadata", {})
                 created_at = metadata.get("created_at", "")
                 table.add_row(ws["id"], ws["path"], str(created_at), key=ws["id"])
-            self._set_status(f"{t('workspace_list')}: {len(workspaces)}")
+            if selected_key is not None:
+                self._select_table_row(selected_key)
+            if not preserve_status:
+                self._set_status(f"{t('workspace_list')}: {len(workspaces)}")
         except Exception as e:
             self._set_error(e)
 
@@ -85,6 +105,14 @@ class WorkspaceView(Vertical):
         elif event.button.id == "workspace-refresh":
             self._load_workspaces()
 
+    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
+        if event.data_table.id != "workspace-table":
+            return
+        workspace_id = str(event.row_key.value)
+        input_widget = self.query_one("#workspace-id-input", Input)
+        input_widget.value = workspace_id
+        self._select_workspace(workspace_id)
+
     def _create_workspace(self, workspace_id: str) -> None:
         if not workspace_id:
             self._set_status(f"{t('error')}: {t('workspace_id_label')}")
@@ -92,11 +120,34 @@ class WorkspaceView(Vertical):
         controller = self._get_controller()
         try:
             result = controller.create_workspace(workspace_id)
-            self._set_status(result.get("message", t("workspace_created")))
-            self.app.notify(result.get("message", t("workspace_created")))
-            self._load_workspaces()
+            created_id = result.get("id", workspace_id)
+            message = f"{result.get('message', t('workspace_created'))}：{created_id}"
+            self._set_status(message)
+            self.app.notify(message)
+            self._load_workspaces(preserve_status=True)
+            self._select_table_row(str(created_id))
+            input_widget = self.query_one("#workspace-id-input", Input)
+            input_widget.value = str(created_id)
+            input_widget.focus()
         except Exception as e:
             self._set_error(e)
+
+    def _selected_workspace_id(self) -> str | None:
+        table = self.query_one("#workspace-table", DataTable)
+        try:
+            row_key = table.coordinate_to_cell_key(table.cursor_coordinate).row_key
+        except Exception:
+            return None
+        value = getattr(row_key, "value", None)
+        return str(value) if value is not None else None
+
+    def _select_table_row(self, workspace_id: str) -> None:
+        table = self.query_one("#workspace-table", DataTable)
+        try:
+            row_index = table.get_row_index(workspace_id)
+        except Exception:
+            return
+        table.move_cursor(row=row_index, column=0)
 
     def _select_workspace(self, workspace_id: str) -> None:
         if not workspace_id:

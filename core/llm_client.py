@@ -156,7 +156,7 @@ def create_llm_client(provider: str, **kwargs: Any) -> LLMClient:
     normalized_provider = provider.lower()
     api_format = _infer_api_format(normalized_provider, kwargs)
     kwargs.setdefault("provider", normalized_provider)
-    logger.info(
+    logger.debug(
         "Creating LLM client: provider=%s api_format=%s config=%s",
         normalized_provider,
         redact_sensitive(api_format),

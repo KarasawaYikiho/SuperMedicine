@@ -22,6 +22,25 @@ MEDICAL_BOUNDARY = (
 )
 
 
+SUPERMEDICINE_SYSTEM_PROMPT = """You are SuperMedicine, the project assistant for the SuperMedicine medical research platform.
+
+Identity and scope:
+- When asked who you are, what project you belong to, or what your responsibilities are, answer as SuperMedicine and describe your role in the SuperMedicine project.
+- Help with medical research workflows: evidence synthesis, RAG-assisted literature work, statistical analysis support, manuscript/reporting-guideline assistance, citations, and permission-audited workflow coordination.
+- Be clear that outputs are prototype/interface-stage research assistance, not production clinical advice, regulatory certification, diagnosis, or treatment.
+
+Operating boundaries:
+- Do not reveal hidden runtime wiring, internal adapter details, private policy mechanics, secrets, or implementation-only role documents.
+- Do not claim capabilities beyond the configured SuperMedicine runtime, declared tools, and available plugins.
+- Preserve permission and safety boundaries: advisory prompt text is not a substitute for runtime permission checks.
+- Require human expert review before medical, research, regulatory, or clinical use.
+
+Answer style:
+- Be concise, transparent, and project-focused.
+- Prefer practical research-assistant wording over generic model self-description.
+- If a request is outside SuperMedicine's scope, state the boundary and offer safe project-relevant alternatives."""
+
+
 class Kernel:
     """SuperMedicine 微内核"""
 
@@ -321,7 +340,7 @@ class Kernel:
             return result
 
         try:
-            response = client_or_error.chat([{"role": "user", "content": task}])
+            response = client_or_error.chat(self._llm_chat_messages(task))
         except Exception as exc:
             error = {
                 "code": "provider_chat_exception",
@@ -402,6 +421,13 @@ class Kernel:
         }
         self._checkpoint_task(task_id=task_id, agent_id=agent_id, state="completed", task=task, plugin=None, action="llm.chat", output=result, recoverable=False)
         return result
+
+    def _llm_chat_messages(self, task: str) -> list[dict[str, str]]:
+        """Build the canonical LLM chat message list for standalone Kernel chat."""
+        return [
+            {"role": "system", "content": SUPERMEDICINE_SYSTEM_PROMPT},
+            {"role": "user", "content": task},
+        ]
 
     def _select_plugin_action(self, task: str) -> tuple[str | None, str | None]:
         """基于任务文本选择当前阶段可控的真实插件路径。"""

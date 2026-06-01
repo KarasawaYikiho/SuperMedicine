@@ -10,7 +10,13 @@ from typing import Any
 from core.operation_guard import authorize_dangerous_operation
 from core.path_safety import validate_destructive_path
 from core.tui.state import TUIState
-from core.workspace import WorkspaceInfo, WorkspaceManager, validate_workspace_id
+from core.workspace import (
+    InvalidWorkspaceId,
+    WorkspaceInfo,
+    WorkspaceManager,
+    WorkspaceNotFoundError,
+    validate_workspace_id,
+)
 from permission.audit import AuditLogger
 from permission.engine import PermissionEngine
 
@@ -48,7 +54,20 @@ class WorkspaceScreenController:
     def create_workspace(self, workspace_id: str) -> dict[str, Any]:
         """Create a workspace through the shared WorkspaceManager service."""
 
-        info = self.workspace_manager.initialize_workspace(workspace_id)
+        try:
+            slug = validate_workspace_id(workspace_id)
+        except InvalidWorkspaceId as exc:
+            raise ValueError("工作区 ID 只能使用小写字母、数字和连字符，且不能以连字符开头或结尾") from exc
+
+        manager = self.workspace_manager
+        try:
+            manager.get_workspace(slug)
+        except WorkspaceNotFoundError:
+            pass
+        else:
+            raise ValueError(f"工作区已存在：{slug}")
+
+        info = manager.initialize_workspace(slug)
         TUIState(self.root).save_recent_workspace(info.id, info.id)
         return self._workspace_payload(info, selected=True, message="已创建并选择工作区")
 

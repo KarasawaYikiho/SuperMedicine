@@ -492,6 +492,9 @@ class TestAgentsExist:
         assert "name: SuperMedicine" in user_facing_content
         assert "user_facing: true" in user_facing_content
         assert "AI Provider Configuration" in user_facing_content
+        assert "## Identity" in user_facing_content
+        assert "answer as SuperMedicine" in user_facing_content
+        assert "do not expose internal adapter wiring" in user_facing_content
         assert "<redacted>" in user_facing_content
 
         expected_contexts = [

@@ -3,12 +3,14 @@ from __future__ import annotations
 import inspect
 
 import pytest
+from textual.widgets import DataTable, Input, Static
 
 from core.tui.screens.workspaces import WorkspaceScreenController
 from core.tui.i18n import t
 from core.tui.screens.dialog_screen import DialogView
 from core.tui.screens.tool_screen import ToolView
 from core.tui.screens.workspace_screen import WorkspaceView
+from core.tui.app import SuperMedicineTUI
 
 
 def _allow_delete_policy(tmp_path):
@@ -30,6 +32,17 @@ def test_workspace_screen_create_select_and_recent_state(tmp_path):
     assert selected["message"] == "已选择工作区"
     assert controller.recent_workspace("study-a") == "study-a"
     assert controller.list_workspaces()[0]["id"] == "study-a"
+
+
+def test_workspace_screen_create_rejects_duplicate_and_invalid_ids(tmp_path):
+    controller = WorkspaceScreenController(tmp_path)
+    controller.create_workspace("study-a")
+
+    with pytest.raises(ValueError, match="已存在"):
+        controller.create_workspace("study-a")
+
+    with pytest.raises(ValueError, match="小写字母"):
+        controller.create_workspace("Study_A")
 
 
 def test_workspace_screen_create_does_not_enter_kernel_or_llm(tmp_path, monkeypatch):
@@ -95,6 +108,78 @@ def test_workspace_view_delete_does_not_auto_confirm_source():
 def test_workspace_delete_copy_describes_exact_irreversible_confirmation():
     assert "完全一致" in t("workspace_delete_requires_confirm")
     assert "不可恢复" in t("workspace_delete_requires_confirm")
+
+
+def test_workspace_manual_create_entry_copy_is_visible_and_keyboard_mouse_friendly():
+    assert "手动创建" in t("workspace_manual_create_hint")
+    assert "Enter" in t("workspace_manual_create_hint")
+    assert "Ctrl+N" in t("workspace_manual_create_hint")
+    assert "鼠标" in t("workspace_manual_create_hint")
+    assert "小写字母" in t("workspace_create_placeholder")
+
+
+def test_workspace_view_supports_enter_shortcut_and_keeps_focus_after_create():
+    compose_source = inspect.getsource(WorkspaceView.compose)
+    create_source = inspect.getsource(WorkspaceView._create_workspace)
+    load_source = inspect.getsource(WorkspaceView._load_workspaces)
+    key_source = inspect.getsource(WorkspaceView.on_key)
+    submit_source = inspect.getsource(WorkspaceView.on_input_submitted)
+    row_source = inspect.getsource(WorkspaceView.on_data_table_row_selected)
+
+    assert "workspace_manual_create_hint" in compose_source
+    assert "workspace_create_placeholder" in compose_source
+    assert "ctrl+n" in key_source
+    assert "workspace-id-input" in submit_source
+    assert "_create_workspace(event.value.strip())" in submit_source
+    assert "input_widget.focus()" in create_source
+    assert "_load_workspaces(preserve_status=True)" in create_source
+    assert "_select_table_row" in create_source
+    assert "move_cursor" in inspect.getsource(WorkspaceView._select_table_row)
+    assert "preserve_status" in load_source
+    assert "_select_workspace(workspace_id)" in row_source
+
+
+def test_workspace_view_manual_create_is_visible_and_usable_in_running_tui(tmp_path):
+    """Regression baseline: manual workspace creation is visible, focusable, and creates a selectable row."""
+
+    import asyncio
+
+    async def scenario() -> None:
+        app = SuperMedicineTUI(project_root=tmp_path)
+        async with app.run_test(size=(140, 45)) as pilot:
+            await pilot.press("3")
+            await pilot.pause()
+
+            view = app._views["workspace"]
+            hint = view.query_one("#workspace-create-hint", Static)
+            input_widget = view.query_one("#workspace-id-input", Input)
+            table = view.query_one("#workspace-table", DataTable)
+            status = view.query_one("#workspace-status", Static)
+
+            assert "手动创建" in str(hint.renderable)
+            assert input_widget.has_focus
+
+            view._create_workspace("manual-a")
+            await pilot.pause()
+
+            assert (tmp_path / "workspaces" / "manual-a" / "workspace.yaml").is_file()
+            assert input_widget.value == "manual-a"
+            assert input_widget.has_focus
+            assert table.get_row("manual-a")[0] == "manual-a"
+            assert "manual-a" in str(status.renderable)
+
+    asyncio.run(scenario())
+
+
+def test_workspace_view_prevents_global_prompt_from_stealing_workspace_focus():
+    app_switch_source = inspect.getsource(SuperMedicineTUI.action_switch_view)
+    app_focus_source = inspect.getsource(SuperMedicineTUI._focus_current_view_default)
+    prompt_focus_source = inspect.getsource(SuperMedicineTUI._focus_prompt_input)
+
+    assert "_focus_current_view_default" in app_switch_source
+    assert "focus_default" in app_focus_source
+    assert "self._focus_prompt_input()" in app_focus_source
+    assert "#prompt-input" in prompt_focus_source
 
 
 def test_workspace_view_error_path_redacts_secret_and_notifies(monkeypatch, tmp_path):
