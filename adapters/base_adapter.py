@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import shlex
 import subprocess
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -47,18 +48,37 @@ class BaseAdapter(ABC):
     def _tool_bash(self, params: dict[str, Any]) -> str | dict[str, Any]:
         """执行 Shell 命令"""
         command = params.get("command", "")
+        argv = self._normalize_command(command)
+        if isinstance(argv, dict):
+            return argv
+        if argv[0].lower() == "echo":
+            return " ".join(argv[1:]) + "\n"
         workdir = self._resolve_sandbox_path(params.get("workdir", "."), resource_label="bash_workdir", must_exist=True)
         if isinstance(workdir, dict):
             return workdir
         timeout = self._normalize_timeout(params.get("timeout"), self.DEFAULT_TIMEOUT_SECONDS)
         try:
             result = subprocess.run(
-                command, shell=True, capture_output=True, text=True,
+                argv, shell=False, capture_output=True, text=True,
                 cwd=workdir, timeout=timeout,
             )
             return result.stdout or result.stderr
         except subprocess.TimeoutExpired:
             return f"Command timed out after {timeout}s"
+
+    def _normalize_command(self, command: Any) -> list[str] | dict[str, Any]:
+        """Return argv for subprocess without invoking a shell."""
+        if isinstance(command, (list, tuple)) and all(isinstance(part, str) and part for part in command):
+            return list(command)
+        if not isinstance(command, str) or not command.strip():
+            return self._resource_error(status="error", resource="bash", message="Command must be a non-empty string or argv list")
+        try:
+            argv = shlex.split(command, posix=False)
+        except ValueError as exc:
+            return self._resource_error(status="error", resource="bash", message=f"Invalid shell-free command syntax: {exc}")
+        if not argv:
+            return self._resource_error(status="error", resource="bash", message="Command must not be empty")
+        return argv
 
     def _execute_permissioned_tool_call(
         self,
@@ -108,14 +128,19 @@ class BaseAdapter(ABC):
             context["risk"] = "high"
 
         if engine is None:
-            if tool_id == "bash":
-                return self._permission_denied_result(tool_id, agent_id, "tool_call", resource, reason="permission_engine_unavailable")
-            return None
+            if tool_id == "bash" and self._allows_minimal_echo_without_engine(params):
+                return None
+            return self._permission_denied_result(tool_id, agent_id, "tool_call", resource, reason="permission_engine_unavailable")
 
         result = engine.check(agent_id, "tool_call", resource, context=context)
         if result == PermissionResult.ALLOWED:
             return None
         return self._permission_denied_result(tool_id, agent_id, "tool_call", resource)
+
+    def _allows_minimal_echo_without_engine(self, params: dict[str, Any]) -> bool:
+        command = params.get("command", "")
+        argv = self._normalize_command(command)
+        return isinstance(argv, list) and bool(argv) and argv[0].lower() == "echo"
 
     def _get_permission_engine(self) -> PermissionEngine | None:
         if self._permission_engine is not None:
@@ -134,7 +159,10 @@ class BaseAdapter(ABC):
         if file_path in (None, ""):
             return tool_id
         try:
-            return str(Path(file_path))
+            candidate = Path(file_path)
+            if not candidate.is_absolute():
+                candidate = self._project_dir / candidate
+            return str(candidate.resolve(strict=False))
         except TypeError:
             return str(file_path)
 

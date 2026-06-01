@@ -111,12 +111,23 @@ class WorkspaceView(Vertical):
             self._set_error(e)
 
     def _delete_workspace(self, workspace_id: str) -> None:
+        confirm_prefix = "delete:"
         if not workspace_id:
+            self._set_status(f"{t('error')}: {t('workspace_delete_requires_confirm')}")
+            return
+        if not workspace_id.startswith(confirm_prefix):
+            self._set_status(
+                f"{t('error')}: {t('workspace_delete_requires_confirm')}；"
+                f"请在输入框手动输入 {confirm_prefix}<workspace-id> 后再删除"
+            )
+            return
+        confirmed_workspace_id = workspace_id[len(confirm_prefix):].strip()
+        if not confirmed_workspace_id:
             self._set_status(f"{t('error')}: {t('workspace_delete_requires_confirm')}")
             return
         controller = self._get_controller()
         try:
-            result = controller.delete_workspace(workspace_id, confirm=workspace_id)
+            result = controller.delete_workspace(confirmed_workspace_id, confirm=confirmed_workspace_id)
             self._set_status(result.get("message", t("workspace_deleted")))
             self.app.notify(result.get("message", t("workspace_deleted")))
             self._load_workspaces()

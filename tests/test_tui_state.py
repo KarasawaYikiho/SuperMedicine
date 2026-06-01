@@ -156,7 +156,7 @@ def test_tui_shell_status_object_exposes_workspace_plugin_llm_version_and_task_s
 def test_tui_navigation_metadata_preserves_numeric_shortcuts_and_chinese_titles(tmp_path):
     app = SuperMedicineTUI(project_root=tmp_path)
 
-    assert [item.key for item in app.nav_items()] == ["1", "2", "3", "4", "5", "6", "7", "8"]
+    assert [item.key for item in app.nav_items()] == ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]
     assert [item.view_id for item in app.nav_items()] == [
         "chat",
         "dashboard",
@@ -166,6 +166,9 @@ def test_tui_navigation_metadata_preserves_numeric_shortcuts_and_chinese_titles(
         "tool",
         "dialog",
         "llm",
+        "experiment",
+        "log",
     ]
     assert app.nav_items()[0].label == "对话"
-    assert app.nav_items()[-1].label == "LLM 管理"
+    assert app.nav_items()[-2].label == "实验指导器"
+    assert app.nav_items()[-1].label == "Log 报告"

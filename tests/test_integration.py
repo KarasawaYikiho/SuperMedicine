@@ -135,14 +135,17 @@ class TestIntegration:
             init_config(tmp_path)
 
     def test_first_install_requires_complete_llm_setup_and_does_not_write_partial_config(self, tmp_path, monkeypatch):
+        fake_home = tmp_path / "home"
+        fake_home.mkdir()
         monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(Path, "home", lambda: fake_home)
         monkeypatch.setattr("sys.argv", ["Install.py", "--init"])
 
         with pytest.raises(ValueError, match="provider, base_url, api_key, model"):
             install_main()
 
         assert not (tmp_path / ".supermedicine" / "config.yaml").exists()
-        assert not (Path.home() / ".supermedicine" / "config.yaml").exists()
+        assert not (fake_home / ".supermedicine" / "config.yaml").exists()
 
     def test_provider_added_by_manual_config_file_is_used_without_home_or_network(self, tmp_path, monkeypatch):
         secret = "sk-manual-file-secret"
@@ -263,6 +266,71 @@ class TestIntegration:
         assert config["llm"]["providers"]["openai"]["model"] == "gpt-merge"
         assert secret not in caplog.text
         assert "<redacted>" in caplog.text
+
+    def test_cli_diagnose_returns_actionable_secret_safe_config_llm_and_audit_snapshot(self, tmp_path, monkeypatch):
+        secret = "sk-cli-diagnose-secret"
+        env_secret = "cli-diagnose-env-api-key-value-not-real"
+        init_config(
+            tmp_path,
+            provider="openai",
+            base_url="https://diagnose.example.test/v1",
+            api_key=secret,
+            model="gpt-diagnose",
+        )
+        audit_log = tmp_path / ".supermedicine" / "policies" / "audit.jsonl"
+        audit_log.write_text("", encoding="utf-8")
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("SM_LLM_API_KEY", env_secret)
+
+        result = CLI().diagnose()
+
+        assert result["ok"] is True
+        assert result["stage"] == "diagnose"
+        assert result["config"]["exists"] is True
+        assert result["config"]["load_error"] == ""
+        assert result["llm"]["ok"] is True
+        assert result["llm"]["provider"] == "openai"
+        assert result["audit"] == {
+            "path": str(audit_log),
+            "exists": True,
+            "writable_parent": True,
+        }
+        assert "--api-key-env" not in result["commands"]["init"]
+        assert "supermedicine init --provider <name> --base-url <url> --model <model>" in result["commands"]["init"]
+        assert "supermedicine llm switch <provider>" == result["commands"]["llm_switch"]
+        assert "python Uninstall.py --dry-run" == result["commands"]["uninstall_dry_run"]
+        assert secret not in str(result)
+        assert env_secret not in str(result)
+        assert result["config"]["config"]["llm-api-key"] == "[REDACTED]"
+        assert result["llm"]["providers"]["openai"]["api_key"] == "[REDACTED]"
+
+    def test_cli_diagnose_reports_unconfigured_llm_template_as_actionable_failure(self, tmp_path, monkeypatch):
+        secret = "sk-unconfigured-diagnose-secret"
+        config_dir = tmp_path / ".supermedicine"
+        config_dir.mkdir()
+        (config_dir / "config.yaml").write_text(
+            yaml.safe_dump({"llm": {"provider": "", "providers": {}, "note": f"api_key={secret}"}}),
+            encoding="utf-8",
+        )
+        monkeypatch.chdir(tmp_path)
+
+        result = CLI().diagnose()
+
+        assert result["ok"] is False
+        assert result["stage"] == "diagnose"
+        assert result["config"]["exists"] is True
+        assert result["config"]["load_error"] == ""
+        assert result["llm"]["ok"] is False
+        assert result["llm"]["stage"] == "config.llm"
+        assert result["llm"]["missing"] == ["provider"]
+        assert "Set llm.provider" in result["llm"]["hints"]["provider"]
+        assert "api_key" in result["llm"]["hints"]
+        assert "base_url" in result["llm"]["hints"]
+        assert "model" in result["llm"]["hints"]
+        assert "supermedicine init --provider <name> --base-url <url> --model <model>" in result["commands"]["init"]
+        assert "Traceback" not in str(result)
+        assert secret not in str(result)
+        assert "[REDACTED]" in str(result)
 
     def test_init_paths_write_unicode_config_with_explicit_utf8(self, tmp_path, monkeypatch):
         """初始化入口写入含中文的配置时不应依赖平台默认编码。"""

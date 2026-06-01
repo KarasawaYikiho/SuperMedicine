@@ -1,13 +1,43 @@
 """SuperMedicine 微内核"""
 from __future__ import annotations
 
-from core.kernel import Kernel
-from core.config_center import ConfigCenter
-from core.event_bus import EventBus
-from core.plugin_registry import PluginRegistry
-from core.session_manager import SessionManager
-from core.llm_client import LLMClient, create_llm_client
-from core.workspace import WorkspaceManager
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from core.config_center import ConfigCenter
+    from core.event_bus import EventBus
+    from core.kernel import Kernel
+    from core.llm_client import LLMClient
+    from core.plugin_registry import PluginRegistry
+    from core.session_manager import SessionManager
+    from core.workspace import WorkspaceManager
+
+    def create_llm_client(*args: Any, **kwargs: Any) -> LLMClient: ...
+
+
+_EXPORTS: dict[str, tuple[str, str]] = {
+    "Kernel": ("core.kernel", "Kernel"),
+    "ConfigCenter": ("core.config_center", "ConfigCenter"),
+    "EventBus": ("core.event_bus", "EventBus"),
+    "PluginRegistry": ("core.plugin_registry", "PluginRegistry"),
+    "SessionManager": ("core.session_manager", "SessionManager"),
+    "LLMClient": ("core.llm_client", "LLMClient"),
+    "create_llm_client": ("core.llm_client", "create_llm_client"),
+    "WorkspaceManager": ("core.workspace", "WorkspaceManager"),
+}
+
+
+def __getattr__(name: str) -> Any:
+    """Lazily expose public core symbols without eager permission imports."""
+
+    if name not in _EXPORTS:
+        raise AttributeError(f"module 'core' has no attribute {name!r}")
+    module_name, attr_name = _EXPORTS[name]
+    from importlib import import_module
+
+    value = getattr(import_module(module_name), attr_name)
+    globals()[name] = value
+    return value
 
 __all__ = [
     "Kernel",

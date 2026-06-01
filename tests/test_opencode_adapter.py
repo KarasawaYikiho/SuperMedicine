@@ -139,8 +139,9 @@ class TestToolCall:
     def test_tool_call_read_write(self, adapter):
         """验证 Read/Write 工具调用在临时目录中正确工作"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            adapter = OpenCodeAdapter(project_dir=Path(tmpdir))
+            project_dir = Path(tmpdir)
             file_path = Path(tmpdir) / "test.txt"
+            adapter = _adapter_with_policy(project_dir, allowed=[{"action": "tool_call", "scope": str(file_path)}])
             # Write
             write_result = adapter.tool_call("write", {
                 "filePath": str(file_path),
@@ -247,6 +248,17 @@ class TestToolCall:
 
         assert result["status"] == "denied"
         assert result["resource"] == "bash"
+
+    def test_bash_uses_shell_free_argv_and_does_not_expand_metacharacters(self, tmp_path):
+        marker = tmp_path / "shell-injection-marker"
+        adapter = _adapter_with_policy(tmp_path, allowed=[{"action": "tool_call", "scope": "bash"}])
+
+        result = adapter.tool_call("bash", {"command": ["python", "-c", "print('safe')"], "workdir": str(tmp_path)})
+        injected = adapter.tool_call("bash", {"command": f"echo safe && python -c \"open(r'{marker}', 'w').write('bad')\"", "workdir": str(tmp_path)})
+
+        assert result["status"] == "ok"
+        assert "safe" in result["result"]
+        assert injected["status"] == "ok"
         assert not marker.exists()
 
 

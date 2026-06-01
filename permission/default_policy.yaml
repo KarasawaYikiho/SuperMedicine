@@ -1,6 +1,7 @@
 # SuperMedicine 默认权限策略
 # 每个 Agent 按角色授予合理权限
 # 插件执行必须经由 Kernel -> PermissionEngine 的 execute/action 策略路径。
+# 实验指导器当前仅授权本地 experiment-wb 确定性插件动作；未知实验插件/action 默认拒绝。
 
 - agent_id: "alpha"
   role: "analyst"
@@ -8,7 +9,19 @@
   permissions:
     allowed:
       - action: "execute"
-        scope: "*"
+        scope: "experiment.wb.normalize_loading"
+      - action: "execute"
+        scope: "experiment.wb.antibody_dilution"
+      - action: "execute"
+        scope: "rag.query"
+      - action: "execute"
+        scope: "harness.integration.checkpoint"
+      - action: "execute"
+        scope: "standard.*"
+      - action: "execute"
+        scope: "stats.*"
+      - action: "execute"
+        scope: "r.survival.*"
       - action: "plan"
         scope: "*"
       - action: "read"
@@ -52,7 +65,19 @@
   permissions:
     allowed:
       - action: "execute"
-        scope: "*"
+        scope: "experiment.wb.normalize_loading"
+      - action: "execute"
+        scope: "experiment.wb.antibody_dilution"
+      - action: "execute"
+        scope: "rag.query"
+      - action: "execute"
+        scope: "harness.integration.checkpoint"
+      - action: "execute"
+        scope: "standard.*"
+      - action: "execute"
+        scope: "stats.*"
+      - action: "execute"
+        scope: "r.survival.*"
       - action: "plan"
         scope: "*"
       - action: "read"
@@ -108,7 +133,19 @@
   permissions:
     allowed:
       - action: "execute"
-        scope: "*"
+        scope: "experiment.wb.normalize_loading"
+      - action: "execute"
+        scope: "experiment.wb.antibody_dilution"
+      - action: "execute"
+        scope: "rag.query"
+      - action: "execute"
+        scope: "harness.integration.checkpoint"
+      - action: "execute"
+        scope: "standard.*"
+      - action: "execute"
+        scope: "stats.*"
+      - action: "execute"
+        scope: "r.survival.*"
       - action: "plan"
         scope: "*"
       - action: "read"

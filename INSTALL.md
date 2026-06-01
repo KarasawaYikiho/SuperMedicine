@@ -1,37 +1,26 @@
 # SuperMedicine Installation Guide
 
-This guide is the detailed installation reference. For a shorter orientation,
-start with [README.md](README.md); for optional adapter design boundaries, see
-[ARCHITECTURE.md](ARCHITECTURE.md#layer-5-platform-adapters-adapters).
+This guide covers installation, initialization, provider configuration, optional
+R support, platform adapter notes, troubleshooting, and uninstall behavior for
+SuperMedicine **Beta0.4.0**. The Python package fallback version is **0.4.0b0**.
+
+For a shorter overview, start with [README.md](README.md). For design and
+security boundaries, see [ARCHITECTURE.md](ARCHITECTURE.md) and
+[SECURITY.md](SECURITY.md).
 
 ## Prerequisites
 
 | Requirement | Version | Notes |
 |-------------|---------|-------|
 | Python | >= 3.10 | Required |
-| Git | any | For cloning the repository |
-| pip | >= 21.0 | For package installation |
-| R | >= 4.3 | Optional, for survival analysis tools |
+| Git | any | Required for cloning |
+| pip | >= 21.0 | Required for installation |
+| R | >= 4.3 | Optional, for R survival backend |
 
-OpenCode, Claude Code, and other assistant platforms are **not** prerequisites
-for installing or running the SuperMedicine Python core. They are optional
-add-on adapter environments.
+OpenCode, Claude Code, and other assistant platforms are optional add-ons, not
+requirements for the standalone Python core.
 
 ## Quick Install
-
-```bash
-git clone https://github.com/KarasawaYikiho/SuperMedicine.git
-cd SuperMedicine
-pip install -e ".[dev]"
-export OPENAI_API_KEY=<OPENAI_API_KEY>
-python Install.py --init --provider openai --base-url https://api.openai.com/v1 --model gpt-4o-mini
-```
-
-If you plan to run LLM-backed tasks, configure at least one LLM provider before
-the first run. SuperMedicine intentionally refuses to create an LLM client until a
-provider has `base_url`, API key source, and `model`.
-
-For a core-only user install, omit development tooling:
 
 ```bash
 git clone https://github.com/KarasawaYikiho/SuperMedicine.git
@@ -40,65 +29,22 @@ pip install -e .
 export OPENAI_API_KEY=<OPENAI_API_KEY>
 python Install.py --init --provider openai --base-url https://api.openai.com/v1 --model gpt-4o-mini
 python Cli.py status
-python Cli.py run "summarize local context"
 ```
 
-To initialize and configure an LLM provider in one command, use settings for
-providers using the `openai` or `anthropic` API format. The keys below are fake
-placeholders; do not
-commit real keys to Git, docs, tests, manifests, or screenshots.
+For development tooling:
 
 ```bash
-python Install.py --init --provider openai \
-  --base-url https://api.openai.com/v1 \
-  --api-key <OPENAI_API_KEY> \
-  --model gpt-4o-mini
-
-python Install.py --init --provider anthropic \
-  --base-url https://api.anthropic.com/v1 \
-  --api-key <ANTHROPIC_API_KEY> \
-  --model claude-3-5-sonnet-latest
-
-# Custom providers using the `openai` API format (DeepSeek, 智谱 GLM, Ollama, etc.)
-python Install.py --init --provider deepseek \
-  --base-url https://api.deepseek.com/v1 \
-  --api-key <DEEPSEEK_API_KEY> \
-  --model deepseek-chat
-
-python Install.py --init --provider zhipu \
-  --base-url https://open.bigmodel.cn/api/paas/v4 \
-  --api-key <ZHIPU_API_KEY> \
-  --model glm-4-flash
-
-# OpenRouter gateway (uses OPENROUTER_API_KEY by default)
-export OPENROUTER_API_KEY=<OPENROUTER_API_KEY>
-python Install.py --init --provider openrouter
+pip install -e ".[dev]"
 ```
 
-For real workstations, prefer environment variables over typing secrets directly
-on the command line. The installer resolves provider-specific key variables to
-satisfy the first-run completeness check; because that can write the resolved key
-to local config, keep `.supermedicine/config.yaml` private and then use
-`supermedicine llm add --api-key-env` if you want the saved provider to reference
-an environment variable instead of keeping plaintext local YAML:
+Installation and initialization are intentionally LLM-complete. A provider must
+have `provider`, `base_url`, `model`, and an API key source (`api_key` or
+`api_key_env`). If initialization fails, the installer restores the previous
+`.supermedicine/` state or removes the partial directory.
 
-```bash
-export OPENAI_API_KEY=<OPENAI_API_KEY>
-python Install.py --init --provider openai \
-  --base-url https://api.openai.com/v1 \
-  --model gpt-4o-mini
+## Step-by-Step Setup
 
-supermedicine llm add openai \
-  --api-format openai \
-  --base-url https://api.openai.com/v1 \
-  --api-key-env OPENAI_API_KEY \
-  --model gpt-4o-mini \
-  --set-current
-```
-
-## Step-by-Step Installation
-
-### 1. Create a Virtual Environment (Recommended)
+### 1. Create a Virtual Environment
 
 ```bash
 python -m venv .venv
@@ -108,7 +54,7 @@ python -m venv .venv
 source .venv/bin/activate
 ```
 
-### 2. Clone and Install the Independent Python Core
+### 2. Clone and Install
 
 ```bash
 git clone https://github.com/KarasawaYikiho/SuperMedicine.git
@@ -116,66 +62,56 @@ cd SuperMedicine
 pip install -e .
 ```
 
-Use `pip install -e ".[dev]"` only for development, testing, linting, or local
-release checks.
-
-### 3. Initialize Project
+### 3. Initialize the Project
 
 ```bash
 export OPENAI_API_KEY=<OPENAI_API_KEY>
 python Install.py --init --provider openai --base-url https://api.openai.com/v1 --model gpt-4o-mini
 ```
 
-This creates the `.supermedicine/` directory with configuration and plugin settings.
-It does not require or create OpenCode/Claude Code configuration.
+This creates local `.supermedicine/` configuration. It does not require or create
+OpenCode or Claude Code configuration.
 
-Optional LLM settings can be injected during this same step. These installer
-values become the initial runtime default. If no complete provider exists later,
-LLM runtime paths return a structured setup hint instead of guessing a model:
+Alternative initialization examples:
 
 ```bash
-# Command-line flags
-python Install.py --init --provider openai \
-  --base-url https://api.openai.com/v1 \
-  --api-key <OPENAI_API_KEY> \
-  --model gpt-4o-mini
+# Anthropic format
+export ANTHROPIC_API_KEY=<ANTHROPIC_API_KEY>
+python Install.py --init --provider anthropic \
+  --base-url https://api.anthropic.com/v1 \
+  --model claude-3-5-sonnet-latest
 
-# Custom provider using the `openai` API format (e.g., DeepSeek)
+# Custom OpenAI-compatible provider
+export DEEPSEEK_API_KEY=<DEEPSEEK_API_KEY>
 python Install.py --init --provider deepseek \
   --base-url https://api.deepseek.com/v1 \
-  --api-key <DEEPSEEK_API_KEY> \
+  --api-format openai \
   --model deepseek-chat
 
-# Environment variables; provider-specific key variables are preferred for real secrets
-SM_LLM_PROVIDER=anthropic \
-SM_LLM_BASE_URL=https://api.anthropic.com/v1 \
-SM_LLM_MODEL=claude-3-5-sonnet-latest \
-ANTHROPIC_API_KEY=<ANTHROPIC_API_KEY> \
-python Install.py --init
+# OpenRouter gateway
+export OPENROUTER_API_KEY=<OPENROUTER_API_KEY>
+python Install.py --init --provider openrouter
 
-# Prompt for values; API key input is hidden
+# Interactive prompt; API key input is hidden
 python Install.py --init --interactive
 ```
 
-`--provider` accepts any provider name. Built-in defaults exist for `openai`,
-`anthropic`, and `openrouter`. Custom provider names default to OpenAI API format
-unless inferred or overridden with `--api-format`. The generic key environment
-variable `SM_LLM_API_KEY` is used unless you later add a provider-specific
-`api_key_env` with `supermedicine llm add`. `SM_LLM_PROVIDER`,
-`SM_LLM_BASE_URL`, `SM_LLM_API_KEY`, and `SM_LLM_MODEL` are installer-time
-generic overrides. Provider key variables for built-ins are `OPENAI_API_KEY`,
-`ANTHROPIC_API_KEY`, and `OPENROUTER_API_KEY`. If `--api-key`, `SM_LLM_API_KEY`, or a provider-specific key
-variable is supplied during initialization, the resolved value can be written to
-local `.supermedicine/config.yaml`; keep that file private after adding real
-secrets.
+Use placeholders in shared examples. Replace them only in private shells, secret
+managers, CI secrets, or untracked local files.
 
-### 3a. Add Providers After Initialization
+## LLM Provider Management
 
-Use the shared LLM manager through the CLI when you want to add, inspect, or
-switch providers after initialization:
+Provider names are flexible. The `api_format` decides which HTTP protocol is used:
+
+| API Format | Default Base URL | Default Key Env | Default Model |
+|------------|------------------|-----------------|---------------|
+| `openai` | `https://api.openai.com/v1` | `OPENAI_API_KEY` | `gpt-4o-mini` |
+| `anthropic` | `https://api.anthropic.com/v1` | `ANTHROPIC_API_KEY` | `claude-3-5-sonnet-latest` |
+| `openrouter` | `https://openrouter.ai/api/v1` | `OPENROUTER_API_KEY` | `anthropic/claude-3.5-sonnet` |
+
+Add, inspect, and switch providers through the CLI:
 
 ```bash
-# Add provider using the `openai` API format and set it as current default
 supermedicine llm add openai \
   --api-format openai \
   --base-url https://api.openai.com/v1 \
@@ -183,42 +119,24 @@ supermedicine llm add openai \
   --model gpt-4o-mini \
   --set-current
 
-# Add provider using the `anthropic` API format for later use
 supermedicine llm add anthropic \
   --api-format anthropic \
   --base-url https://api.anthropic.com/v1 \
   --api-key-env ANTHROPIC_API_KEY \
   --model claude-3-5-sonnet-latest
 
-# Add custom provider using the `openai` API format (DeepSeek, 智谱 GLM, Ollama, etc.)
-supermedicine llm add deepseek \
-  --api-format openai \
-  --base-url https://api.deepseek.com/v1 \
-  --api-key-env DEEPSEEK_API_KEY \
-  --model deepseek-chat
-
-# Add OpenRouter gateway
-supermedicine llm add openrouter \
-  --api-format openai \
-  --base-url https://openrouter.ai/api/v1 \
-  --api-key-env OPENROUTER_API_KEY \
-  --model anthropic/claude-3.5-sonnet
-
-# Secret-safe inspection and switching
 supermedicine llm list
 supermedicine llm show openai
 supermedicine llm switch anthropic
 ```
 
-`supermedicine llm switch <provider>` validates required fields, writes the
-selected provider as both `llm.provider` and `llm.last_provider`, and persists the
-change. On later startup the runtime restores `last_provider` when present;
-otherwise it falls back to the install-time default provider.
+`supermedicine llm switch <provider>` validates required fields, persists the
+current provider, and records `last_provider` for startup restore.
 
-### 3b. Configure by Editing `.supermedicine/config.yaml`
+### Manual YAML Configuration
 
-Manual editing is also supported. Keep real secrets out of the file by using
-`api_key_env`:
+You may edit `.supermedicine/config.yaml` directly. Prefer environment variable
+references over plaintext keys:
 
 ```yaml
 llm:
@@ -239,208 +157,139 @@ Then set the environment variable outside the repository:
 export OPENAI_API_KEY=<OPENAI_API_KEY>
 ```
 
-### 3c. Configure in the TUI
+### TUI Configuration
 
 Run `supermedicine tui`, open **LLM 管理**, enter provider name, BaseURL, model,
-API key, and optional API format, then click **添加 Provider**. The key field is
-password-style and is cleared after submission. Select a provider and click
-**切换 Provider** to update the same current/default provider used by the CLI. On
-TUI exit, the current provider is saved as `last_provider` for automatic restore
-on the next startup.
+API key, and optional API format, then add or switch the provider. Key fields are
+password-style and cleared after submission.
 
-### 4. Install Optional R Support
+## Optional R Support
 
-```bash
-pip install -e ".[r]"
-```
-
-This installs rpy2. You must also install local R and the R `survival` package.
-When available, request the R backend with `backend="r"` in r-survival action
-parameters. If rpy2, R, or `survival` is unavailable, requested R backend calls
-return a structured `plugin_unavailable` result instead of silently using R.
-Without `backend="r"`, the plugin keeps using the deterministic pure-Python
-fallback path.
-
-## Verify Installation
-
-Run the status command to check everything is working:
-
-```bash
-python Cli.py status
-```
-
-### Global CLI Access
-
-After `pip install -e .`, the `supermedicine` command is installed as a Python
-console script. If the command is not found, add the Python Scripts directory to
-your PATH:
-
-- **Windows**: `%APPDATA%\Python\Python<版本>\Scripts`
-  (e.g., `C:\Users\<username>\AppData\Roaming\Python\Python314\Scripts`)
-- **Linux/macOS**: `~/.local/bin`
-
-Alternatively, use `python Cli.py` as a direct substitute for the `supermedicine`
-command throughout this guide.
-
-Expected output shows:
-- SuperMedicine version
-- Configuration initialized status
-- Number of discovered plugins
-- Number of test modules
-
-To inspect LLM configuration without exposing secrets, use code paths that call
-`ConfigCenter.get_llm_provider_config(redacted=True)` or review only placeholder
-values in `.supermedicine/config.yaml`. LLM client calls return structured
-validation errors such as `missing_api_key`, `missing_base_url`, or
-`missing_model` when required values are absent.
-
-For development environments, run the test suite:
-
-```bash
-python Cli.py test
-# or directly:
-pytest tests/ -v
-```
-
-The exact test count can change as optional adapter coverage evolves.
-
-## Troubleshooting
-
-### "No module named 'yaml'"
-```bash
-pip install pyyaml
-```
-
-### "Permission denied" on Windows
-Run PowerShell as Administrator, or use:
-```bash
-python -m venv .venv --without-pip
-```
-
-### R Survival Tools Not Working
-Install R >= 4.3, the rpy2 package, and R's `survival` package:
 ```bash
 pip install -e ".[r]"
 R -e "install.packages('survival', repos='https://cran.r-project.org')"
 ```
 
-### CLI Command Not Found
+The R survival backend requires local R, rpy2, and the R `survival` package. If
+requested R dependencies are unavailable, SuperMedicine returns a structured
+`plugin_unavailable` result instead of silently using R. Without `backend="r"`,
+the deterministic pure-Python fallback remains available.
 
-If `supermedicine` is not recognized after `pip install -e .`, the Python Scripts
-directory may not be on PATH. Two solutions:
+## Verify Basic Installation
 
-1. **Add Scripts to PATH** (recommended):
-   - Windows: Add `%APPDATA%\Python\Python<版本>\Scripts` to your user PATH
-   - Linux/macOS: Add `~/.local/bin` to your PATH
+Use the status and diagnostic commands:
 
-2. **Use python Cli.py directly**:
-   ```bash
-   cd SuperMedicine
-   python Cli.py status
-   ```
+```bash
+python Cli.py status
+supermedicine diagnose
+supermedicine llm list
+```
 
-After adding Scripts to PATH, restart your terminal and verify:
+Expected status output includes the SuperMedicine version, configuration state,
+plugin discovery status, and test-module count. Diagnostic output redacts API
+keys, authorization headers, key-like URL tokens, and secret-looking fields while
+preserving information needed for repair.
+
+For development environments, run the local quality gate described in
+[README.md](README.md#local-quality-gate).
+
+## Global CLI Access
+
+After `pip install -e .`, the `supermedicine` command is installed as a console
+script. If it is not recognized, add the Python Scripts directory to PATH:
+
+- Windows: `%APPDATA%\Python\Python<版本>\Scripts`
+- Linux/macOS: `~/.local/bin`
+
+You can always use `python Cli.py` as a direct substitute.
+
+## Platform Adapters
+
+Adapters are optional add-ons around the standalone Python framework.
+
+| Area | Core install required? | Status |
+|------|------------------------|--------|
+| Standalone Python CLI/Kernel | Yes | Default supported path |
+| OpenCode add-on | No | Metadata, skills, agents, and tool mapping; no native external subagent runtime bridge by itself |
+| Claude Code add-on | No | Minimal capabilities/runtime/local CLI invocation adapter; no native Claude Code skill or subagent support |
+
+OpenCode add-on content lives under `adapters/opencode/`. Claude Code add-on
+content lives under `adapters/claude_code/`. These files contain metadata and
+must not contain real API keys.
+
+## Troubleshooting
+
+### `No module named 'yaml'`
+
+Install project dependencies:
+
+```bash
+pip install -e .
+```
+
+### Permission denied on Windows
+
+Run PowerShell as Administrator, or create a virtual environment with:
+
+```bash
+python -m venv .venv --without-pip
+```
+
+### CLI command not found
+
+Use `python Cli.py` or add the Python Scripts directory to PATH, then restart the
+terminal and run:
+
 ```bash
 supermedicine --help
 ```
 
-### LLM Provider Missing Key or Endpoint
+### Missing LLM key, endpoint, or model
 
-Use provider-specific environment variables for real credentials:
+Set provider-specific variables for real credentials:
 
 ```bash
-# OpenAI API format
 export OPENAI_API_KEY=<OPENAI_API_KEY>
-
-# Anthropic API format
 export ANTHROPIC_API_KEY=<ANTHROPIC_API_KEY>
-
-# OpenRouter gateway
 export OPENROUTER_API_KEY=<OPENROUTER_API_KEY>
 ```
 
-Use `SM_LLM_BASE_URL` or `--base-url` for compatible gateways. If you supplied a
-real key through `--api-key` or `SM_LLM_API_KEY`, treat `.supermedicine/config.yaml`
-as local private configuration and do not commit it.
+If switching fails, inspect redacted state with `supermedicine llm list` and add
+missing `base_url`, `api_key_env`/`api_key`, or `model` values with
+`supermedicine llm add ... --set-current`.
 
-If switching fails, run `supermedicine llm list` to confirm the provider name and
-redacted fields, then add missing `base_url`, `api_key_env`/`api_key`, or `model`
-with `supermedicine llm add <provider> ... --set-current`.
+### Initialization fails and no `.supermedicine/` remains
 
-## Platform Adapters
+This is expected when first-run LLM configuration is incomplete. Re-run init with
+all required fields. If a previous config existed, failed initialization restores
+it; otherwise the partial directory is removed.
 
-Platform adapters are optional add-ons around the standalone Python framework.
-Do not install or configure them unless you want platform-specific integration.
+### TUI launch or terminal recovery
 
-| Area | Core install required? | Current status |
-|------|------------------------|----------------|
-| Standalone Python CLI/Kernel | Yes | Default supported path |
-| OpenCode add-on | No | Adapter surface, plugin metadata, skills, and agent role documents are present; no native OpenCode subagent runtime bridge unless a SuperMedicine orchestrator is injected |
-| Claude Code add-on | No | Minimal capability/runtime/local-CLI invocation adapter; no native Claude Code skill loading or native subagent dispatch |
-
-### Claude Code
-Optional minimal adapter. Copy the skill directory only if you want local Claude
-Code-facing documentation/metadata:
 ```bash
-cp -r adapters/claude_code/ ~/.claude/skills/supermedicine/
+supermedicine tui --dry-run
+supermedicine tui
 ```
 
-The Python adapter supports `claude.capabilities`, `claude.runtime_status`, and
-permission-checked `claude.invoke` when `claude` is on PATH. If `claude` is not
-installed, the adapter reports a structured unavailable state. It does not expose
-native Claude Code subagents or native Claude Code skill loading.
-
-Claude Code uses SuperMedicine's optional provider metadata only. Configure
-LLM settings through `Install.py`, `SM_LLM_*`, `OPENAI_API_KEY`,
-`ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`, or project-local config; never
-store real keys in `adapters/claude_code/SKILL.md`.
-
-### OpenCode
-Optional OpenCode add-on content lives under `adapters/opencode/`. Copy or
-reference `adapters/opencode/plugin.json`, `adapters/opencode/skills/*.md`, and
-`adapters/opencode/agents/*.md` according to your OpenCode installation. The
-adapter maps declared tools such as `bash`, `read`, `write`, `edit`, `glob`,
-`grep`, `skill`, and `task`, with high-risk mutations/execution checked by the
-SuperMedicine permission model.
-
-Current limitation: `OpenCodeAdapter.subagent_dispatch(...)` does not launch an
-external native OpenCode subagent runtime by itself. Without an injected
-SuperMedicine orchestrator, it uses local metadata/fallback behavior.
-
-OpenCode add-on manifests and skills declare the same API format support
-(openai, anthropic, openrouter) and custom BaseURL as the core configuration model. They contain
-metadata only and must not contain plaintext real API keys.
-
-## Safety Boundaries
-
-- Core and adapter execution paths remain subject to the runtime
-  `PermissionEngine` where actions cross execution, mutation, deletion, network,
-  external API, or other high-risk resource boundaries.
-- The prompt-context safety layer is advisory; the runtime code-layer permission
-  check is the enforcement path.
-- Medical statistics, writing, and citation helpers are research-support
-  interfaces only. They do not provide clinical, regulatory, decision-support, or
-  production-grade guarantees, and outputs require qualified human review.
+Use dry-run before launching on new terminals or after a crash. Normal exit is
+`q`; if the terminal is interrupted, reopen the shell before relaunching.
 
 ## Uninstall
 
 ```bash
 python Uninstall.py --dry-run
 python Uninstall.py --force
+python Uninstall.py --force --preserve-user-data
 python Uninstall.py --target .opencode/skills/supermedicine --dry-run
 ```
 
-The uninstaller removes only SuperMedicine-owned local artifacts inside the
-current project: `.supermedicine/`, runtime artifacts, repository-scoped
-`.opencode/`, `.claude/`, and `superpowers/` copies ignored by this repository,
-installer-created platform target copies recorded in
-`.supermedicine/install-record.json`, and explicit `--target` paths. It does not
-delete the source repository itself or unrecorded user-owned global OpenCode /
-Claude Code configuration. Use `pip uninstall supermedicine` separately if you
-installed the Python package and want to remove that package from the Python
-environment.
+The uninstaller removes SuperMedicine-owned local artifacts in the current
+project, including `.supermedicine/`, repository-scoped adapter copies, recorded
+installer targets, and explicit `--target` paths. It does not delete the source
+repository or unrecorded user-owned global OpenCode/Claude Code configuration.
+Use `pip uninstall supermedicine` separately if you installed the package and
+want to remove it from the Python environment.
 
-Uninstall logs redact secret-looking fields. If you manually created environment
-variables such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `SM_LLM_API_KEY`,
-remove them from your shell/profile separately; the project uninstaller does not
-edit user shell startup files.
+Uninstall logs redact secret-looking fields. Manually remove shell/profile
+variables such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`, or
+`SM_LLM_API_KEY` if you no longer need them.

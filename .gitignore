@@ -22,12 +22,22 @@ htmlcov/
 # SuperMedicine runtime artifacts
 .supermedicine/policies/audit.jsonl
 .supermedicine/checkpoints/
+.supermedicine/experiments/
+.supermedicine/logs/
+.supermedicine/rag/
+.supermedicine/sessions/
+.supermedicine/tokens.jsonl
 
 # External assistant platform local config/artifacts
 .claude/
 .opencode/
 superpowers/
 docs/superpowers/
+
+# Local engineering/audit documentation excluded from final release/upload sets
+Docs/
+docs/
+Architecture/
 
 # Local-only planning notes
 /Planning/NextSteps.md

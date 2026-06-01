@@ -80,6 +80,19 @@ class TestPluginRegistry:
         r = PluginRegistry(tmp_path)
         assert r.get("nope") is None and r.get_meta("nope") is None
 
+    def test_bad_manifest_is_skipped_without_blocking_other_plugins(self, tmp_path):
+        self._create_plugin(tmp_path, "good")
+        bad = tmp_path / "bad"
+        bad.mkdir()
+        (bad / "plugin.yaml").write_text("name: [unterminated\n", encoding="utf-8")
+
+        r = PluginRegistry(tmp_path)
+        metas = r.discover()
+
+        assert [m.name for m in metas] == ["good"]
+        assert r.get("good") is not None
+        assert r.diagnostics()[0]["status"] == "skipped"
+
     def test_python_entry_execute_success(self, tmp_path):
         d = self._create_plugin(tmp_path, "entry-plugin")
         (d / "main.py").write_text(
@@ -94,6 +107,28 @@ class TestPluginRegistry:
         assert result["output"] == {"ok": True}
         assert result["error"] is None
         assert "contract_version" in result["metadata"]
+
+    def test_direct_plugin_execution_requires_permission_proof_outside_dev_test(self, tmp_path, monkeypatch):
+        d = self._create_plugin(tmp_path, "secured-plugin")
+        (d / "main.py").write_text(
+            "def execute(action, params, context=None):\n"
+            "    return {'status': 'success', 'action': action, 'result': params}\n",
+            encoding="utf-8",
+        )
+        monkeypatch.delenv("SUPERMEDICINE_ALLOW_PLUGIN_DIRECT_EXECUTION", raising=False)
+        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+        r = PluginRegistry(tmp_path)
+        r.discover()
+
+        denied = r.get("secured-plugin").execute("demo.action", {"ok": True})
+        allowed = r.get("secured-plugin").execute(
+            "demo.action",
+            {"ok": True},
+            {"security": {"permission_checked": True, "permission_entrypoint": "kernel"}},
+        )
+
+        assert denied["status"] == "denied"
+        assert allowed["status"] == "success"
 
     def test_python_entry_missing_execute_returns_plugin_error(self, tmp_path):
         d = self._create_plugin(tmp_path, "bad-entry-plugin")

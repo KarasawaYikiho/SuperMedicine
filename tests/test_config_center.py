@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 
-from core.config_center import ConfigCenter
+from core.config_center import ConfigCenter, DEFAULT_EXPERIMENT_GUIDE_CONFIG, DEFAULT_LOG_REPORT_CONFIG
 
 
 class TestConfigCenter:
@@ -15,6 +15,37 @@ class TestConfigCenter:
         assert cc.get("key1") == "value1"
         assert cc.get("nonexistent") is None
         assert cc.get("nonexistent", "default") == "default"
+
+    def test_experiment_guide_and_log_report_defaults_when_config_missing(self, tmp_path):
+        """验证缺失用户配置时返回完整安全默认值。"""
+        cc = ConfigCenter(tmp_path / "config.yaml")
+
+        assert cc.get_experiment_guide_config() == DEFAULT_EXPERIMENT_GUIDE_CONFIG
+        assert cc.get_log_report_config() == DEFAULT_LOG_REPORT_CONFIG
+
+    def test_default_sections_merge_user_config_with_safe_defaults(self, tmp_path):
+        """验证用户配置与默认值兼容合并。"""
+        import yaml
+
+        config_path = tmp_path / "config.yaml"
+        config_path.write_text(
+            yaml.safe_dump(
+                {
+                    "experiment_guide": {"enabled": False},
+                    "log_report": {"max_message_length": 123},
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        cc = ConfigCenter(config_path)
+
+        experiment_guide = cc.get_experiment_guide_config()
+        log_report = cc.get_log_report_config()
+        assert experiment_guide["enabled"] is False
+        assert experiment_guide["max_steps"] == DEFAULT_EXPERIMENT_GUIDE_CONFIG["max_steps"]
+        assert log_report["max_message_length"] == 123
+        assert log_report["max_records_per_session"] == DEFAULT_LOG_REPORT_CONFIG["max_records_per_session"]
 
     def test_save_and_reload(self, tmp_path):
         """验证 save() 持久化后重新加载正确"""
@@ -181,3 +212,61 @@ class TestConfigCenter:
         assert redacted["headers"]["Authorization"] == "<redacted>"
         assert redacted["headers"]["X-Trace"] == "safe"
         assert secret not in str(redacted)
+
+    def test_safe_all_redacts_query_params_authorization_and_passwd(self, tmp_path, monkeypatch):
+        config_path = tmp_path / "config.yaml"
+        cc = ConfigCenter(config_path)
+        secret = "sk-safe-all-secret"
+        cc.set("callback", f"https://example.test/cb?api_key={secret}&ok=1")
+        cc.set("database", {"passwd": secret, "url": f"postgres://u:password={secret}@db"})
+        monkeypatch.setenv("SM_AUTHORIZATION", f"Bearer {secret}")
+
+        safe = cc.safe_all()
+
+        assert secret not in str(safe)
+        assert "[REDACTED]" in str(safe)
+
+    def test_diagnostics_reports_config_load_state_env_precedence_and_redacts(self, tmp_path, monkeypatch):
+        config_path = tmp_path / "config.yaml"
+        secret = "diagnostics-env-api-key-value-not-real"
+        config_path.write_text(f"callback: https://example.test/cb?api_key={secret}\n", encoding="utf-8")
+        monkeypatch.setenv("SM_LLM_API_KEY", secret)
+
+        diagnostics = ConfigCenter(config_path).diagnostics()
+
+        assert diagnostics["config_path"] == str(config_path)
+        assert diagnostics["exists"] is True
+        assert diagnostics["load_error"] == ""
+        assert "SM_LLM_API_KEY" in diagnostics["env_override_keys"]
+        assert diagnostics["precedence"] == ["SM_* environment variables", "config file", "code defaults"]
+        assert secret not in str(diagnostics)
+        assert diagnostics["config"]["llm-api-key"] == "[REDACTED]"
+        assert "[REDACTED]" in str(diagnostics)
+
+    def test_diagnose_llm_config_reports_missing_fields_and_redacts_provider(self, tmp_path):
+        config_path = tmp_path / "config.yaml"
+        secret = "sk-llm-diagnostic-secret"
+        config_path.write_text(
+            "\n".join(
+                [
+                    "llm:",
+                    "  provider: openai",
+                    "  providers:",
+                    "    openai:",
+                    "      api_key: " + secret,
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        diagnostic = ConfigCenter(config_path).diagnose_llm_config()
+
+        assert diagnostic["ok"] is False
+        assert diagnostic["stage"] == "config.llm"
+        assert diagnostic["config_path"] == str(config_path)
+        assert diagnostic["provider"] == "openai"
+        assert "base_url" in diagnostic["missing"]
+        assert "model" in diagnostic["missing"]
+        assert diagnostic["hints"]["api_key"].startswith("Set providers.<provider>.api_key")
+        assert secret not in str(diagnostic)
+        assert diagnostic["providers"]["openai"]["api_key"] == "[REDACTED]"

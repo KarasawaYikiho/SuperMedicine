@@ -1,0 +1,13 @@
+name: "experiment-wb"
+version: "0.1.0"
+type: "tool"
+language: "python"
+description: "Western Blot 实验确定性计算工具"
+
+provides:
+  - id: "experiment.wb.normalize_loading"
+    description: "根据样本浓度、目标蛋白量和体积限制计算每孔样本体积与补液体积"
+  - id: "experiment.wb.antibody_dilution"
+    description: "根据总孵育体积和稀释比例计算抗体与稀释液用量"
+
+entry: "main.py"

@@ -2,9 +2,13 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+import logging
 from typing import Any, Mapping
 
 from core.redaction import redact_sensitive
+
+
+logger = logging.getLogger(__name__)
 
 if False:  # pragma: no cover - typing-only without runtime import cycle
     from core.config_center import ConfigCenter
@@ -80,12 +84,14 @@ class TrackedLLMClient(LLMClient):
         """Extract usage from *response* and record it via the tracker."""
         usage: Any = response.get("usage")
         if not usage or not isinstance(usage, dict):
+            logger.debug("LLM usage unavailable or malformed: provider=%s model=%s usage_type=%s", self._provider, response.get("model", "unknown"), type(usage).__name__)
             return
 
         # Support both OpenAI-style and Anthropic-style usage dicts.
         prompt_tokens = int(usage.get("prompt_tokens") or usage.get("input_tokens") or 0)
         completion_tokens = int(usage.get("completion_tokens") or usage.get("output_tokens") or 0)
         if prompt_tokens == 0 and completion_tokens == 0:
+            logger.debug("LLM usage contains zero tokens: provider=%s model=%s", self._provider, response.get("model", "unknown"))
             return
 
         model = str(response.get("model") or "unknown")
@@ -150,6 +156,12 @@ def create_llm_client(provider: str, **kwargs: Any) -> LLMClient:
     normalized_provider = provider.lower()
     api_format = _infer_api_format(normalized_provider, kwargs)
     kwargs.setdefault("provider", normalized_provider)
+    logger.info(
+        "Creating LLM client: provider=%s api_format=%s config=%s",
+        normalized_provider,
+        redact_sensitive(api_format),
+        redact_sensitive(kwargs),
+    )
 
     if api_format in ("openai", "openai_responses", "responses"):
         from core.llm_providers.base import OpenAIClient

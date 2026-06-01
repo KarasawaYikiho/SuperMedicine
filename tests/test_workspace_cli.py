@@ -35,6 +35,27 @@ def test_workspace_init_list_show_use_explicit_workspace(tmp_path, monkeypatch):
     assert not (tmp_path / ".supermedicine" / "sessions").exists()
 
 
+def test_workspace_init_does_not_enter_kernel_or_llm(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    imported: list[str] = []
+    original_import = __import__
+
+    def guarded_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name.startswith(("core.kernel", "core.llm_client", "core.llm_providers")):
+            imported.append(name)
+            raise AssertionError(f"workspace init must not import Kernel/LLM module: {name}")
+        return original_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr("builtins.__import__", guarded_import)
+
+    result = CLI().workspace_init("direct-cli", name="Direct CLI")
+
+    assert result["id"] == "direct-cli"
+    assert result["name"] == "Direct CLI"
+    assert (tmp_path / "workspaces" / "direct-cli" / "workspace.yaml").is_file()
+    assert imported == []
+
+
 def test_workspace_subcommands_require_explicit_workspace(monkeypatch):
     monkeypatch.setattr("sys.argv", ["supermedicine", "workspace", "show"])
 

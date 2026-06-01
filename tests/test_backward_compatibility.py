@@ -191,6 +191,7 @@ def test_cli_run_without_workspace_preserves_params_identity_and_ignores_tui_rec
 def test_plugin_manifest_names_and_action_ids_are_unchanged():
     expected_actions = {
         "python-stats": {"stats.descriptive", "stats.ttest", "stats.anova", "stats.regression"},
+        "experiment-wb": {"experiment.wb.normalize_loading", "experiment.wb.antibody_dilution"},
         "r-survival": {"r.survival.km", "r.survival.logrank", "r.survival.cox"},
         "rag-interface": {"rag.query", "rag.context.store", "rag.context.retrieve"},
         "medical-writing": {"standard.consort", "standard.strobe", "standard.prisma", "standard.stard"},

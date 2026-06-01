@@ -1,14 +1,13 @@
 # Contributing to SuperMedicine
 
-Thank you for your interest in contributing. This guide summarizes the local
-development workflow, code-style expectations, testing expectations, and Pull
-Request process. User installation details remain in [INSTALL.md](INSTALL.md),
-while the release-quality gate is linked from [README.md](README.md).
+Thank you for contributing to SuperMedicine. This guide summarizes the local
+development workflow for the **Beta0.4.0** codebase. User installation details
+are in [INSTALL.md](INSTALL.md), and the local quality gate is in
+[README.md](README.md#local-quality-gate).
 
 ## Development Environment
 
 ```bash
-# Clone and set up
 git clone https://github.com/KarasawaYikiho/SuperMedicine.git
 cd SuperMedicine
 python -m venv .venv
@@ -19,87 +18,86 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-Requirements: Python >= 3.10, Git
+Requirements: Python >= 3.10 and Git.
 
 ## Code Style
 
-We use **ruff** for linting and formatting. Run the local quality gate documented
-in [README.md](README.md#local-quality-gate) before
-submitting changes.
+- Follow existing module patterns and public interfaces.
+- Use type annotations for new Python code.
+- Prefer `logging.getLogger(__name__)` over `print()` in application code.
+- Use Ruff for linting and formatting; E501 line length is ignored by the local
+  lint command documented in the README.
+- Do not commit real API keys, private endpoints, audit logs with sensitive
+  paths, or local `.supermedicine/` secrets.
+
+Optional cleanup command:
 
 ```bash
-# Optional local cleanup/formatting aid
 ruff check --fix .
 ```
 
-Guidelines:
-- All new code must have type annotations (`from __future__ import annotations`)
-- Use `logging.getLogger(__name__)` instead of `print()`
-- Follow existing code patterns in the module you are modifying
-- Maximum line length: 120 characters (E501 is ignored)
+## Testing Expectations
 
-### New File Naming
-
-For future non-Python files and directories, prefer independent-word initial capitalization: each separate word should start with an uppercase letter while preserving clear word boundaries (for example, `ReleaseNotes.md`, `UserGuide.md`, or `ExampleAssets/`).
-
-Python import compatibility takes priority over this style rule. Do **not** rename Python modules, packages, tests, plugin manifests, or files that are part of an existing public API only to satisfy capitalization preferences. Python paths must continue to support package discovery, pytest discovery, plugin loading, and stable imports.
-
-Examples:
-- Keep package and module paths import-safe, such as `supermedicine/`, `tests/test_kernel.py`, and any existing snake_case module names.
-- Keep pytest-compatible test names such as `test_*.py`; do not change them to capitalized names if that would affect discovery.
-- Keep plugin manifests, entry-point targets, and documented import paths stable unless a migration explicitly updates all consumers.
-- When adding a new Python module or package, choose the name that is safest for imports and tooling first; use the capitalization convention only when it does not affect compatibility.
-
-## Testing
-
-All changes must include tests and pass the existing test suite:
+All functional changes should include appropriate tests and pass the existing
+suite before a pull request is submitted:
 
 ```bash
-# Run all tests
 pytest tests/ -v
-
-# Run specific test file
 pytest tests/test_kernel.py -v
-
-# With coverage
 pytest tests/ --cov=. --cov-report=term
 ```
 
-Rules:
-- New features require tests
-- Bug fixes require regression tests
-- The full regression suite must pass before submitting a PR
-- Use `tmp_path` fixture for temporary file tests
+Use `tmp_path` for temporary filesystem tests, keep tests deterministic, and avoid
+live external provider calls unless a test is explicitly designed and gated for
+that purpose.
+
+## Documentation and Upload Scope
+
+- Root Markdown files are the user-facing documentation intended for release
+  upload.
+- Do not add final-upload dependencies on excluded engineering folders such as
+  `Docs/`, `docs/`, or `Architecture/`.
+- Keep documented versions aligned: public/release label `Beta0.4.0`, Python
+  package fallback version `0.4.0b0`.
+- Use placeholders such as `<OPENAI_API_KEY>` in examples; never use real secrets.
+
+## File Naming
+
+For future non-Python files and directories, prefer independent-word initial
+capitalization when it does not affect tooling. Python import compatibility,
+pytest discovery, plugin manifests, entry-point targets, and documented public
+paths take priority over naming style.
+
+Examples:
+
+- Keep Python package and test paths import-safe, such as `supermedicine/` and
+  `tests/test_kernel.py`.
+- Keep pytest-compatible names such as `test_*.py`.
+- Do not rename public plugin manifests or import paths only to satisfy a style
+  preference.
 
 ## Pull Request Process
 
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/my-feature`
-3. Make your changes with clear, atomic commits
-4. Run the local quality gate documented in [README.md](README.md#local-quality-gate)
-5. Review repository/upload hygiene using the README local quality gate before staging files
-6. Push and open a Pull Request against `master`
-7. PR description should explain what and why
+1. Fork the repository.
+2. Create a feature branch.
+3. Make clear, focused commits.
+4. Run the local quality gate from [README.md](README.md#local-quality-gate).
+5. Review repository hygiene before staging files.
+6. Open a pull request against `master` with a summary of what changed and why.
 
 ## Commit Convention
 
-We follow conventional commits:
+Use conventional commit prefixes where practical:
 
-```
+```text
 feat: add new feature
 fix: fix a bug
-docs: documentation changes
-test: add or update tests
 refactor: code restructuring
 style: formatting and linting
 chore: maintenance tasks
 ci: CI/CD changes
 ```
 
-## Architecture
+## Questions
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system design.
-
-## Questions?
-
-Open an issue on GitHub.
+Open a GitHub issue for questions, bugs, or proposed changes.

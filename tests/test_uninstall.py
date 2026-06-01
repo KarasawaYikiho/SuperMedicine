@@ -146,3 +146,68 @@ def test_collect_candidates_defines_project_owned_rules(tmp_path):
     assert "workspaces" in candidate_paths
     assert ".supermedicine/custom-platform-copy" in candidate_paths
     assert skipped == []
+
+
+def test_uninstall_removes_recorded_binary_shortcut_config_cache_log_temp_and_user_data_by_default(tmp_path):
+    recorded_paths = {
+        "binaries": ["bin/supermedicine.exe"],
+        "shortcuts": ["shortcuts/SuperMedicine.lnk"],
+        "config_dirs": ["config/supermedicine/settings.json"],
+        "cache_dirs": ["cache/supermedicine/cache.db"],
+        "log_dirs": ["logs/supermedicine/app.log"],
+        "temp_dirs": ["tmp/supermedicine/session.tmp"],
+        "user_data_paths": ["data/supermedicine/user.db"],
+    }
+    for values in recorded_paths.values():
+        for relative in values:
+            path = tmp_path / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("generated", encoding="utf-8")
+    record = tmp_path / ".supermedicine" / "install-record.json"
+    record.parent.mkdir(parents=True, exist_ok=True)
+    record.write_text(json.dumps(recorded_paths), encoding="utf-8")
+
+    result = uninstall(tmp_path, force=True)
+
+    assert result["status"] == "removed"
+    for values in recorded_paths.values():
+        for relative in values:
+            assert not (tmp_path / relative).exists()
+
+
+def test_uninstall_can_preserve_recorded_user_data_explicitly(tmp_path):
+    user_data = tmp_path / "data" / "supermedicine" / "user.db"
+    generated_config = tmp_path / "config" / "supermedicine" / "settings.json"
+    for path in (user_data, generated_config):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("generated", encoding="utf-8")
+    record = tmp_path / ".supermedicine" / "install-record.json"
+    record.parent.mkdir(parents=True, exist_ok=True)
+    record.write_text(
+        json.dumps({"user_data_paths": ["data/supermedicine/user.db"], "config_dirs": ["config/supermedicine/settings.json"]}),
+        encoding="utf-8",
+    )
+
+    result = uninstall(tmp_path, force=True, preserve_user_data=True)
+
+    assert result["status"] == "removed"
+    assert user_data.exists()
+    assert not generated_config.exists()
+    assert any("preserved-user-data" in item for item in result["skipped"])
+
+
+def test_uninstall_reports_residuals_and_repair_suggestions_when_delete_fails(tmp_path, monkeypatch):
+    blocked = tmp_path / ".supermedicine" / "blocked.log"
+    blocked.parent.mkdir(parents=True)
+    blocked.write_text("locked", encoding="utf-8")
+
+    def fail_delete(path):
+        raise OSError("file is locked")
+
+    monkeypatch.setattr("Uninstall._delete_path", fail_delete)
+
+    result = uninstall(tmp_path, force=True)
+
+    assert result["status"] == "removed-with-residuals"
+    assert result["residuals"]
+    assert result["repair_suggestions"]

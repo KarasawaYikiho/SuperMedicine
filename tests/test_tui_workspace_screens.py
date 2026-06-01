@@ -32,6 +32,26 @@ def test_workspace_screen_create_select_and_recent_state(tmp_path):
     assert controller.list_workspaces()[0]["id"] == "study-a"
 
 
+def test_workspace_screen_create_does_not_enter_kernel_or_llm(tmp_path, monkeypatch):
+    imported: list[str] = []
+    original_import = __import__
+
+    def guarded_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name.startswith(("core.kernel", "core.llm_client", "core.llm_providers")):
+            imported.append(name)
+            raise AssertionError(f"TUI workspace create must not import Kernel/LLM module: {name}")
+        return original_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr("builtins.__import__", guarded_import)
+
+    result = WorkspaceScreenController(tmp_path).create_workspace("direct-tui")
+
+    assert result["id"] == "direct-tui"
+    assert result["selected"] is True
+    assert (tmp_path / "workspaces" / "direct-tui" / "workspace.yaml").is_file()
+    assert imported == []
+
+
 def test_workspace_screen_empty_state_is_chinese_and_non_destructive(tmp_path):
     controller = WorkspaceScreenController(tmp_path)
 
@@ -62,6 +82,14 @@ def test_workspace_screen_hard_delete_uses_policy_and_removes_workspace(tmp_path
     assert result["message"] == "工作区已硬删除"
     assert not (tmp_path / "workspaces" / "study-a").exists()
     assert (tmp_path / ".supermedicine" / "policies" / "audit.jsonl").exists()
+
+
+def test_workspace_view_delete_does_not_auto_confirm_source():
+    delete_source = inspect.getsource(WorkspaceView._delete_workspace)
+
+    assert "confirm=workspace_id" not in delete_source
+    assert "delete:" in delete_source
+    assert "confirmed_workspace_id" in delete_source
 
 
 def test_workspace_delete_copy_describes_exact_irreversible_confirmation():

@@ -8,10 +8,11 @@ import logging
 import shutil
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import yaml
 
+from core.redaction import redact_sensitive
 from core.serialization import json_ready
 
 if TYPE_CHECKING:
@@ -21,6 +22,11 @@ logger = logging.getLogger(__name__)
 
 # 添加项目根目录到路径
 sys.path.insert(0, str(Path(__file__).parent))
+
+
+def _log_json(value: object) -> None:
+    """Log JSON output after recursively redacting secret-looking values."""
+    logger.info(json.dumps(redact_sensitive(value), ensure_ascii=False, indent=2))
 
 
 
@@ -48,7 +54,7 @@ class CLI:
 
     def status(self) -> None:
         """显示项目状态"""
-        logger.info("SuperMedicine Beta0.3.6")
+        logger.info("SuperMedicine Beta0.4.0")
         logger.info("=" * 40)
 
         # 检查配置
@@ -96,8 +102,8 @@ class CLI:
         # 确定项目根目录
         project_dir = Path.cwd()
 
-        logger.info("SuperMedicine Beta0.3.6 — 任务执行")
-        logger.info("任务: %s", task)
+        logger.info("SuperMedicine Beta0.4.0 — 任务执行")
+        logger.info("任务: %s", redact_sensitive(task))
         logger.info("=" * 50)
 
         execution_params = params
@@ -152,7 +158,7 @@ class CLI:
                 result.get("action"),
                 result.get("status"),
             )
-        logger.info(json.dumps(result, ensure_ascii=False, indent=2))
+        _log_json(result)
         return result
 
     def workspace_init(self, workspace_id: str, name: str | None = None) -> dict:
@@ -170,7 +176,7 @@ class CLI:
             )
             info = WorkspaceManager(Path.cwd()).get_workspace(workspace_id)
         result = _workspace_info_to_dict(info, name=name)
-        logger.info(json.dumps(result, ensure_ascii=False, indent=2))
+        _log_json(result)
         return result
 
     def workspace_list(self) -> list[dict]:
@@ -181,7 +187,7 @@ class CLI:
             _workspace_info_to_dict(info)
             for info in WorkspaceManager(Path.cwd()).list_workspaces()
         ]
-        logger.info(json.dumps(workspaces, ensure_ascii=False, indent=2))
+        _log_json(workspaces)
         return workspaces
 
     def workspace_show(self, workspace_id: str) -> dict:
@@ -190,7 +196,7 @@ class CLI:
 
         info = WorkspaceManager(Path.cwd()).get_workspace(workspace_id)
         result = _workspace_info_to_dict(info)
-        logger.info(json.dumps(result, ensure_ascii=False, indent=2))
+        _log_json(result)
         return result
 
     def workspace_delete(self, workspace_id: str, confirm: str) -> dict:
@@ -255,7 +261,7 @@ class CLI:
             authorization.path.unlink()
 
         result = {"status": "deleted", "id": slug, "path": str(authorization.path)}
-        logger.info(json.dumps(result, ensure_ascii=False, indent=2))
+        _log_json(result)
         return result
 
     def tool_init(self, workspace_id: str) -> dict:
@@ -263,7 +269,7 @@ class CLI:
         from core.workspace_tools import WorkspaceToolService
 
         result = WorkspaceToolService(Path.cwd()).initialize_tools(workspace_id)
-        logger.info(json.dumps(result, ensure_ascii=False, indent=2))
+        _log_json(result)
         return result
 
     def tool_list(self, workspace_id: str, language: str | None = None) -> dict:
@@ -271,7 +277,7 @@ class CLI:
         from core.workspace_tools import WorkspaceToolService
 
         result = WorkspaceToolService(Path.cwd()).list_tools(workspace_id, language=language)
-        logger.info(json.dumps(result, ensure_ascii=False, indent=2))
+        _log_json(result)
         return result
 
     def tool_add(self, workspace_id: str, language: str, tool_id: str) -> dict:
@@ -279,7 +285,7 @@ class CLI:
         from core.workspace_tools import WorkspaceToolService
 
         result = WorkspaceToolService(Path.cwd()).add_builtin_tool(workspace_id, language, tool_id)
-        logger.info(json.dumps(result, ensure_ascii=False, indent=2))
+        _log_json(result)
         return result
 
     def tool_show(self, workspace_id: str, language: str, tool_id: str) -> dict:
@@ -287,7 +293,7 @@ class CLI:
         from core.workspace_tools import WorkspaceToolService
 
         result = WorkspaceToolService(Path.cwd()).show_tool(workspace_id, language, tool_id)
-        logger.info(json.dumps(result, ensure_ascii=False, indent=2))
+        _log_json(result)
         return result
 
     def tool_run(
@@ -311,7 +317,7 @@ class CLI:
             input_path=input_path,
             output_path=output_path,
         ).to_dict()
-        logger.info(json.dumps(result, ensure_ascii=False, indent=2))
+        _log_json(result)
         return result
 
     def llm_add(
@@ -342,7 +348,7 @@ class CLI:
         )
         manager = LLMConfigManager(ConfigCenter(Path.cwd() / ".supermedicine" / "config.yaml"), restore_on_startup=False)
         result = manager.add_provider(provider, values, set_current=set_current)
-        logger.info(json.dumps(result, ensure_ascii=False, indent=2))
+        _log_json(result)
         return result
 
     def llm_list(self) -> dict:
@@ -357,7 +363,7 @@ class CLI:
             "last_provider": config.get_llm_last_provider_name(),
             "providers": manager.list_providers(redacted=True),
         }
-        logger.info(json.dumps(result, ensure_ascii=False, indent=2))
+        _log_json(result)
         return result
 
     def llm_show(self, provider: str | None = None) -> dict:
@@ -367,7 +373,7 @@ class CLI:
 
         manager = LLMConfigManager(ConfigCenter(Path.cwd() / ".supermedicine" / "config.yaml"), restore_on_startup=True)
         result = manager.get_provider(provider, redacted=True) if provider else manager.get_current_provider(redacted=True)
-        logger.info(json.dumps(result, ensure_ascii=False, indent=2))
+        _log_json(result)
         return result
 
     def llm_switch(self, provider: str) -> dict:
@@ -377,7 +383,41 @@ class CLI:
 
         manager = LLMConfigManager(ConfigCenter(Path.cwd() / ".supermedicine" / "config.yaml"), restore_on_startup=False)
         result = manager.switch_provider(provider, save=True)
-        logger.info(json.dumps(result, ensure_ascii=False, indent=2))
+        _log_json(result)
+        return result
+
+    def diagnose(self) -> dict:
+        """Print secret-safe diagnostics for config, LLM, install artifacts, and audit log."""
+        from core.config_center import ConfigCenter
+        from core.llm_manager import LLMConfigManager
+
+        project_dir = Path.cwd()
+        config = ConfigCenter(project_dir / ".supermedicine" / "config.yaml")
+        manager = LLMConfigManager(config, restore_on_startup=False)
+        audit_log = project_dir / ".supermedicine" / "policies" / "audit.jsonl"
+        config_diag: dict[str, Any] = config.diagnostics()
+        llm_diag: dict[str, Any] = manager.diagnostics()
+        result: dict[str, Any] = {
+            "ok": True,
+            "stage": "diagnose",
+            "project_dir": str(project_dir),
+            "config": config_diag,
+            "llm": llm_diag,
+            "audit": {
+                "path": str(audit_log),
+                "exists": audit_log.exists(),
+                "writable_parent": audit_log.parent.exists(),
+            },
+            "commands": {
+                "init": "set provider API key env var first, then run: supermedicine init --provider <name> --base-url <url> --model <model>",
+                "llm_list": "supermedicine llm list",
+                "llm_switch": "supermedicine llm switch <provider>",
+                "tui_dry_run": "supermedicine tui --dry-run",
+                "uninstall_dry_run": "python Uninstall.py --dry-run",
+            },
+        }
+        result["ok"] = bool(config_diag.get("exists")) and bool(llm_diag.get("ok"))
+        _log_json(result)
         return result
 
     def paper_import(
@@ -412,7 +452,7 @@ class CLI:
                 warnings.append(enrichment_result.warning)
 
         result = _paper_import_result_to_dict(import_result, warnings=warnings)
-        logger.info(json.dumps(result, ensure_ascii=False, indent=2))
+        _log_json(result)
         return result
 
     def paper_list(self, workspace_id: str) -> list[dict]:
@@ -420,7 +460,7 @@ class CLI:
         from core.paper_import.importer import PaperImporter
 
         papers = [_paper_metadata_to_dict(paper) for paper in PaperImporter(Path.cwd()).list_papers(workspace_id)]
-        logger.info(json.dumps(papers, ensure_ascii=False, indent=2))
+        _log_json(papers)
         return papers
 
     def paper_show(self, workspace_id: str, paper_id: str) -> dict:
@@ -428,7 +468,7 @@ class CLI:
         from core.paper_import.importer import PaperImporter
 
         result = _paper_metadata_to_dict(PaperImporter(Path.cwd()).get_paper(workspace_id, paper_id))
-        logger.info(json.dumps(result, ensure_ascii=False, indent=2))
+        _log_json(result)
         return result
 
     def paper_edit(self, workspace_id: str, paper_id: str, metadata: dict) -> dict:
@@ -438,7 +478,7 @@ class CLI:
         result = _paper_metadata_to_dict(
             PaperImporter(Path.cwd()).update_paper_metadata(workspace_id, paper_id, metadata)
         )
-        logger.info(json.dumps(result, ensure_ascii=False, indent=2))
+        _log_json(result)
         return result
 
     def paper_enrich(self, workspace_id: str, paper_id: str, confirm_enrich: bool) -> dict:
@@ -464,7 +504,7 @@ class CLI:
             "applied_fields": enrichment_result.applied_fields,
             "metadata": _paper_metadata_to_dict(enrichment_result.metadata),
         }
-        logger.info(json.dumps(result, ensure_ascii=False, indent=2))
+        _log_json(result)
         return result
 
     def experience_suggest(
@@ -484,7 +524,7 @@ class CLI:
             tags=tags,
         ).to_dict()
         result["workspace_id"] = workspace_id
-        logger.info(json.dumps(result, ensure_ascii=False, indent=2))
+        _log_json(result)
         return result
 
     def experience_add(
@@ -510,7 +550,7 @@ class CLI:
             tags=tags,
         )
         result = record.to_dict()
-        logger.info(json.dumps(result, ensure_ascii=False, indent=2))
+        _log_json(result)
         return result
 
     def experience_list(self, workspace_id: str, include_general: bool = False) -> list[dict]:
@@ -521,7 +561,7 @@ class CLI:
             workspace_id,
             include_general=include_general,
         )]
-        logger.info(json.dumps(records, ensure_ascii=False, indent=2))
+        _log_json(records)
         return records
 
     def experience_view(self, record_id: str, workspace_id: str, scope: str | None = None) -> dict:
@@ -535,7 +575,7 @@ class CLI:
             scope=experience_scope,
         )
         result = record.to_dict()
-        logger.info(json.dumps(result, ensure_ascii=False, indent=2))
+        _log_json(result)
         return result
 
     def experience_edit(
@@ -560,7 +600,7 @@ class CLI:
             tags=tags,
         )
         result = record.to_dict()
-        logger.info(json.dumps(result, ensure_ascii=False, indent=2))
+        _log_json(result)
         return result
 
     def experience_delete(self, record_id: str, workspace_id: str, scope: str, confirm: str) -> dict:
@@ -576,7 +616,7 @@ class CLI:
             scope=experience_scope,
         )
         result = {"status": "deleted", "id": deleted.id, "scope": deleted.scope}
-        logger.info(json.dumps(result, ensure_ascii=False, indent=2))
+        _log_json(result)
         return result
 
     def experience_export(
@@ -596,8 +636,148 @@ class CLI:
             include_general=include_general,
             path=output,
         )
-        logger.info(rendered)
+        logger.info("%s", redact_sensitive(rendered))
         return rendered
+
+    def experiment_start(self, protocol: str, session_id: str | None = None) -> dict:
+        """Start a standalone experiment guide session and persist it as JSON."""
+        from core.experiment_guide import ExperimentGuide, MEDICAL_BOUNDARY, append_experiment_log_event
+        from core.log_report import LogReportStore
+
+        session = ExperimentGuide().create_session(protocol, session_id=session_id)
+        session_file = Path.cwd() / ".supermedicine" / "experiments" / f"{session.session_id}.json"
+        _save_experiment_session(session_file, session.to_dict())
+        append_experiment_log_event(
+            LogReportStore(Path.cwd()),
+            "experiment_started",
+            session,
+            message="experiment guide session started",
+        )
+        result = _experiment_response(session, session_file=session_file, medical_boundary=MEDICAL_BOUNDARY)
+        _log_json(result)
+        return result
+
+    def experiment_show(self, session_file: str | Path) -> dict:
+        """Show a persisted experiment guide session."""
+        from core.experiment_guide import ExperimentGuide, MEDICAL_BOUNDARY
+
+        path = Path(session_file)
+        session = ExperimentGuide().restore_session(_load_experiment_session(path))
+        result = _experiment_response(session, session_file=path, medical_boundary=MEDICAL_BOUNDARY)
+        _log_json(result)
+        return result
+
+    def experiment_submit(
+        self,
+        session_file: str | Path,
+        step_id: str,
+        input_json: str,
+        *,
+        calculate: bool = False,
+    ) -> dict:
+        """Submit data for the current experiment step, optionally running WB calculation."""
+        from core.experiment_guide import CalculationResult, ExperimentGuide, MEDICAL_BOUNDARY, append_experiment_log_event
+        from core.log_report import LogReportStore
+        from plugins.tools.experiment_wb import main as wb_plugin
+
+        path = Path(session_file)
+        guide = ExperimentGuide()
+        session = guide.restore_session(_load_experiment_session(path))
+        payload = _load_input_json(input_json)
+        user_input = _dict_payload(payload.get("user_input", payload), "user_input")
+        outputs = _dict_payload(payload.get("outputs", {}), "outputs")
+        calculation_params = _dict_payload(payload.get("calculation_params", {}), "calculation_params")
+        log_store = LogReportStore(Path.cwd())
+        calculation_results: list[CalculationResult | dict[str, Any]] = []
+        plugin_request: dict[str, Any] | None = None
+        kernel_result: dict[str, Any] | None = None
+
+        if calculate:
+            requests = session.build_plugin_requests(step_id, calculation_params=calculation_params)
+            if not requests:
+                raise ValueError(f"step {step_id} has no supported WB calculation request")
+            plugin_request = requests[0]
+            kernel_result = wb_plugin.execute(plugin_request["action"], plugin_request["params"], plugin_request["metadata"])
+            if kernel_result.get("status") != "success":
+                raise ValueError(str(kernel_result.get("error") or "WB calculation failed"))
+            append_experiment_log_event(
+                log_store,
+                "plugin_result",
+                session,
+                step_id=step_id,
+                plugin_request=plugin_request,
+                kernel_result=kernel_result,
+            )
+            calculation_results.append(
+                {
+                    "request_id": str(plugin_request["request_id"]),
+                    "status": "completed",
+                    "value": kernel_result.get("output"),
+                    "metadata": {
+                        "plugin": kernel_result.get("plugin"),
+                        "action": kernel_result.get("action"),
+                        "metadata": kernel_result.get("metadata", {}),
+                    },
+                }
+            )
+
+        record = session.submit_step(
+            step_id,
+            user_input,
+            outputs=outputs,
+            calculation_results=calculation_results,
+        )
+        _save_experiment_session(path, session.to_dict())
+        append_experiment_log_event(
+            log_store,
+            "step_input_submitted",
+            session,
+            step_id=step_id,
+            user_input=user_input,
+            outputs=outputs,
+            record=record.to_dict(),
+        )
+        append_experiment_log_event(
+            log_store,
+            "experiment_completed" if session.is_completed else "step_guidance",
+            session,
+            step_id=step_id,
+            record=record.to_dict(),
+        )
+        result = _experiment_response(
+            session,
+            session_file=path,
+            record=record.to_dict(),
+            plugin_request=plugin_request,
+            kernel_result=kernel_result,
+            medical_boundary=MEDICAL_BOUNDARY,
+        )
+        _log_json(result)
+        return result
+
+    def log_write(self, message: str, session_id: str | None = None) -> dict:
+        """Write a redacted log report."""
+        from core.log_report import LogReportStore
+
+        result = LogReportStore(Path.cwd()).write(message, session_id=session_id)
+        _log_json(result)
+        return result
+
+    def log_list(self) -> list[dict]:
+        """List redacted log report summaries."""
+        from core.log_report import LogReportStore
+
+        result = LogReportStore(Path.cwd()).list()
+        _log_json(result)
+        return result
+
+    def log_show(self, file_name: str) -> dict:
+        """Show a redacted log report."""
+        from core.log_report import LogReportStore
+
+        result = LogReportStore(Path.cwd()).show(file_name)
+        _log_json(result)
+        return result
 
     def tui(self, dry_run: bool = False):
         """启动中文 TUI 工作台；不会改变 CLI 默认工作区行为。"""
@@ -684,6 +864,65 @@ def _load_params_json(raw_json: str) -> dict:
     if not isinstance(params, dict):
         raise ValueError("plugin params must be a JSON object")
     return params
+
+
+def _load_input_json(raw_json: str) -> dict:
+    """Parse experiment step input from a JSON object string."""
+    try:
+        payload = json.loads(raw_json)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"--input-json must be valid JSON: {exc.msg}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError("--input-json must be a JSON object")
+    return payload
+
+
+def _dict_payload(value: object, name: str) -> dict:
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise ValueError(f"{name} must be a JSON object")
+    return value
+
+
+def _load_experiment_session(path: Path) -> dict:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise ValueError(f"experiment session file not found: {path}") from exc
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"could not read experiment session file {path}: {exc}") from exc
+    if not isinstance(data, dict):
+        raise ValueError("experiment session file must contain a JSON object")
+    return data
+
+
+def _save_experiment_session(path: Path, data: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(json_ready(redact_sensitive(data)), ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _experiment_response(
+    session,
+    *,
+    session_file: Path,
+    medical_boundary: str,
+    record: dict | None = None,
+    plugin_request: dict | None = None,
+    kernel_result: dict | None = None,
+) -> dict:
+    next_step = session.current_step
+    return {
+        "status": session.status.value if hasattr(session.status, "value") else str(session.status),
+        "session_file": str(session_file),
+        "session": session.to_dict(),
+        "current_step": next_step.to_dict() if next_step else None,
+        "record": record,
+        "plugin_request": plugin_request,
+        "kernel_result": kernel_result,
+        "progress": session.progress,
+        "medical_boundary": medical_boundary,
+    }
 
 
 def _load_params_file(path: str) -> dict:
@@ -778,6 +1017,8 @@ def main(argv: list[str] | None = None) -> None:
     # Status 命令
     subparsers.add_parser("status", help="显示项目状态")
 
+    subparsers.add_parser("diagnose", help="输出可安全分享的配置/LLM/审计诊断信息")
+
     # Test 命令
     subparsers.add_parser("test", help="运行测试")
 
@@ -798,6 +1039,32 @@ def main(argv: list[str] | None = None) -> None:
     run_parser.add_argument("--params-json", type=str, default=None, help="JSON 对象格式的插件参数")
     run_parser.add_argument("--params-file", type=str, default=None, help="包含 JSON 对象插件参数的文件路径")
     run_parser.add_argument("--workspace", type=str, default=None, help="显式工作区 slug ID（workspaces/<id>；不会读取 TUI 最近状态）")
+
+    experiment_parser = subparsers.add_parser("experiment", help="实验指导器命令")
+    experiment_subparsers = experiment_parser.add_subparsers(dest="experiment_command")
+
+    experiment_start_parser = experiment_subparsers.add_parser("start", help="启动实验指导会话")
+    experiment_start_parser.add_argument("--protocol", required=True, choices=["wb"], help="实验协议")
+    experiment_start_parser.add_argument("--session-id", type=str, default=None, help="可选会话 ID")
+
+    experiment_show_parser = experiment_subparsers.add_parser("show", help="查看实验会话当前步骤/状态")
+    experiment_show_parser.add_argument("--session-file", required=True, type=str, help="实验会话 JSON 文件")
+
+    experiment_submit_parser = experiment_subparsers.add_parser("submit", help="提交当前步骤实验数据")
+    experiment_submit_parser.add_argument("--session-file", required=True, type=str, help="实验会话 JSON 文件")
+    experiment_submit_parser.add_argument("--step", required=True, type=str, help="当前步骤 ID")
+    experiment_submit_parser.add_argument("--input-json", required=True, type=str, help="步骤输入 JSON 对象")
+    experiment_submit_parser.add_argument("--calculate", action="store_true", help="触发支持的 WB 插件计算")
+
+    log_parser = subparsers.add_parser("log", help="日志报告命令")
+    log_subparsers = log_parser.add_subparsers(dest="log_command")
+
+    log_write_parser = log_subparsers.add_parser("write", help="写入日志报告")
+    log_write_parser.add_argument("--message", required=True, type=str, help="日志消息")
+    log_write_parser.add_argument("--session-id", type=str, default=None, help="可选关联会话 ID")
+    log_subparsers.add_parser("list", help="列出日志报告")
+    log_show_parser = log_subparsers.add_parser("show", help="查看指定日志报告")
+    log_show_parser.add_argument("--file", required=True, type=str, help="日志报告文件名")
 
     # Workspace 命令
     workspace_parser = subparsers.add_parser("workspace", help="管理 workspaces/<id> 显式 slug 工作区")
@@ -988,6 +1255,8 @@ def main(argv: list[str] | None = None) -> None:
             init_parser.error(str(exc))
     elif args.command == "status":
         cli.status()
+    elif args.command == "diagnose":
+        cli.diagnose()
     elif args.command == "test":
         cli.test()
     elif args.command == "tui":
@@ -1006,6 +1275,35 @@ def main(argv: list[str] | None = None) -> None:
             params=params,
             workspace=args.workspace,
         )
+    elif args.command == "experiment":
+        try:
+            if args.experiment_command == "start":
+                cli.experiment_start(args.protocol, session_id=args.session_id)
+            elif args.experiment_command == "show":
+                cli.experiment_show(args.session_file)
+            elif args.experiment_command == "submit":
+                cli.experiment_submit(
+                    args.session_file,
+                    args.step,
+                    args.input_json,
+                    calculate=args.calculate,
+                )
+            else:
+                experiment_parser.print_help()
+        except (KeyError, ValueError) as exc:
+            experiment_parser.error(str(exc))
+    elif args.command == "log":
+        try:
+            if args.log_command == "write":
+                cli.log_write(args.message, session_id=args.session_id)
+            elif args.log_command == "list":
+                cli.log_list()
+            elif args.log_command == "show":
+                cli.log_show(args.file)
+            else:
+                log_parser.print_help()
+        except ValueError as exc:
+            log_parser.error(str(exc))
     elif args.command == "workspace":
         if args.workspace_command == "init":
             cli.workspace_init(args.workspace, name=args.name)

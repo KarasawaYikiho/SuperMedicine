@@ -7,8 +7,10 @@ from typing import Any, cast
 from agents.checkpoint import CheckpointManager
 from core.config_center import ConfigCenter
 from core.event_bus import EventBus
+from core.llm_client import LLMClient
 from core.llm_manager import LLMConfigManager
 from core.plugin_registry import PluginRegistry
+from core.redaction import redact_sensitive
 from core.session_manager import SessionManager
 from permission.engine import PermissionEngine
 from permission.policy import DEFAULT_POLICY_RELATIVE_PATH, PermissionResult
@@ -150,13 +152,7 @@ class Kernel:
             selected_plugin, selected_action = self._select_plugin_action(task)
 
         if selected_plugin is None or selected_action is None:
-            result: dict[str, Any] = {
-                "status": "failure",
-                "task": task,
-                "error": "No executable medical/statistics plugin action matched the task.",
-                "medical_boundary": MEDICAL_BOUNDARY,
-            }
-            self._checkpoint_task(task_id=task_id, agent_id=agent_id, state="failed", task=task, plugin=selected_plugin, action=selected_action, error=result["error"], recoverable=False, not_recoverable_reason="No executable plugin/action was selected.")
+            result = self._execute_llm_chat(task, task_id=task_id, agent_id=agent_id)
             return result
 
         self._checkpoint_task(
@@ -290,19 +286,122 @@ class Kernel:
     def _llm_runtime_context(self) -> dict[str, Any]:
         """Expose secret-safe LLM runtime state to plugin/task paths."""
         provider = self._llm_manager.get_current_provider(redacted=True)
-        if not provider:
+        provider_name = str(provider.get("provider") or self._config.get_llm_runtime_provider_name() or "") if provider else ""
+        validation_error = self._llm_manager.validate_provider(provider_name, self._config.get_llm_provider_config(provider_name)) if provider_name else None
+        if not provider or validation_error is not None:
             return {
                 "configured": False,
-                "error": {
+                "error": validation_error.get("error") if validation_error is not None else {
                     "code": "missing_provider",
                     "message": LLMConfigManager.SETUP_HINT,
                 },
             }
         return {
             "configured": True,
-            "provider": provider.get("provider", self._config.get_llm_runtime_provider_name()),
+            "provider": provider.get("provider", provider_name),
             "config": provider,
         }
+
+    def _execute_llm_chat(self, task: str, *, task_id: str, agent_id: str) -> dict[str, Any]:
+        """Execute an unmatched natural-language task through the configured LLM."""
+        client_or_error = self._llm_manager.create_client()
+        if not isinstance(client_or_error, LLMClient):
+            error = client_or_error.get("error", client_or_error) if isinstance(client_or_error, dict) else str(client_or_error)
+            result: dict[str, Any] = {
+                "status": "llm_configuration_error",
+                "task": task,
+                "agent": agent_id,
+                "plugin": None,
+                "action": "llm.chat",
+                "output": None,
+                "error": error,
+                "metadata": {"medical_boundary": MEDICAL_BOUNDARY, "llm": {"configured": False, "error": error}},
+            }
+            self._checkpoint_task(task_id=task_id, agent_id=agent_id, state="failed", task=task, plugin=None, action="llm.chat", error=error, recoverable=True, not_recoverable_reason="LLM provider must be configured before chat execution can proceed.")
+            return result
+
+        try:
+            response = client_or_error.chat([{"role": "user", "content": task}])
+        except Exception as exc:
+            error = {
+                "code": "provider_chat_exception",
+                "message": str(exc.__class__.__name__),
+                "detail": str(exc),
+            }
+            safe_error = cast(dict[str, Any], redact_sensitive(error))
+            result = {
+                "status": "llm_error",
+                "task": task,
+                "agent": agent_id,
+                "plugin": None,
+                "action": "llm.chat",
+                "output": None,
+                "error": safe_error,
+                "metadata": {"medical_boundary": MEDICAL_BOUNDARY, "llm": self._llm_runtime_context()},
+            }
+            self._checkpoint_task(task_id=task_id, agent_id=agent_id, state="failed", task=task, plugin=None, action="llm.chat", error=safe_error, recoverable=True, not_recoverable_reason="Configured LLM provider raised an exception during chat execution.")
+            return result
+        if not isinstance(response, dict):
+            error = {"code": "malformed_llm_response", "message": "LLM provider returned a non-dict response"}
+            result = {
+                "status": "llm_error",
+                "task": task,
+                "agent": agent_id,
+                "plugin": None,
+                "action": "llm.chat",
+                "output": None,
+                "error": error,
+                "llm_response": {"type": type(response).__name__},
+                "metadata": {"medical_boundary": MEDICAL_BOUNDARY, "llm": self._llm_runtime_context()},
+            }
+            self._checkpoint_task(task_id=task_id, agent_id=agent_id, state="failed", task=task, plugin=None, action="llm.chat", error=error, recoverable=True, not_recoverable_reason="Configured LLM provider returned a malformed response.")
+            return result
+        if response.get("error"):
+            result = {
+                "status": "llm_error",
+                "task": task,
+                "agent": agent_id,
+                "plugin": None,
+                "action": "llm.chat",
+                "output": None,
+                "error": response["error"],
+                "llm_response": response,
+                "metadata": {"medical_boundary": MEDICAL_BOUNDARY, "llm": self._llm_runtime_context()},
+            }
+            self._checkpoint_task(task_id=task_id, agent_id=agent_id, state="failed", task=task, plugin=None, action="llm.chat", output=response, error=response["error"], recoverable=True, not_recoverable_reason="Configured LLM provider returned an error.")
+            return result
+
+        content = str(response.get("content") or "").strip()
+        if not content:
+            error = {"code": "empty_llm_response", "message": "LLM provider returned an empty response"}
+            result = {
+                "status": "llm_error",
+                "task": task,
+                "agent": agent_id,
+                "plugin": None,
+                "action": "llm.chat",
+                "output": None,
+                "error": error,
+                "llm_response": response,
+                "metadata": {"medical_boundary": MEDICAL_BOUNDARY, "llm": self._llm_runtime_context()},
+            }
+            self._checkpoint_task(task_id=task_id, agent_id=agent_id, state="failed", task=task, plugin=None, action="llm.chat", output=response, error=error, recoverable=True, not_recoverable_reason="Configured LLM provider returned no content.")
+            return result
+
+        result = {
+            "status": "success",
+            "task": task,
+            "agent": agent_id,
+            "plugin": None,
+            "action": "llm.chat",
+            "output": content,
+            "result": content,
+            "error": None,
+            "llm_response": response,
+            "metadata": {"medical_boundary": MEDICAL_BOUNDARY, "llm": self._llm_runtime_context()},
+        }
+        self._checkpoint_task(task_id=task_id, agent_id=agent_id, state="completed", task=task, plugin=None, action="llm.chat", output=result, recoverable=False)
+        return result
 
     def _select_plugin_action(self, task: str) -> tuple[str | None, str | None]:
         """基于任务文本选择当前阶段可控的真实插件路径。"""
@@ -335,4 +434,4 @@ class Kernel:
             return "medical-writing", "standard.consort"
         if "medical" in normalized or "stats" in normalized or "统计" in normalized:
             return "python-stats", "stats.descriptive"
-        return "python-stats", "stats.descriptive"
+        return None, None

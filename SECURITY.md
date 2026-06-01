@@ -1,21 +1,27 @@
 # Security Policy
 
-This policy records SuperMedicine's security, privacy, and medical-use
-boundaries. Operational setup is covered in [INSTALL.md](INSTALL.md), and the
-architecture-level permission model is described in [ARCHITECTURE.md](ARCHITECTURE.md#layer-2-permission-system-permission).
+This policy summarizes SuperMedicine security, privacy, and medical-use
+boundaries for **Beta0.4.0**. Operational setup is in [INSTALL.md](INSTALL.md),
+and architecture boundaries are in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Security Model
 
-SuperMedicine uses a **runtime permission engine plus prompt-context guidance** (P0 priority) to manage security:
+SuperMedicine uses a runtime permission engine plus advisory prompt-context
+guidance:
 
-1. **Code Layer** (`permission/policy.py`) — Hard enforcement via fnmatch-based rules with deny-override-allow logic
-2. **Prompt Context Layer** (`permission/prompt_generator.py`) — Advisory, context-aware soft constraints injected into agent context
+1. **Code layer** — `PermissionEngine.check()` performs runtime allow/deny
+   decisions with deny-overrides-allow rules, hard-limit checks where supplied,
+   and JSONL audit logging.
+2. **Prompt context layer** — prompt helpers generate safety text and rejection
+   templates for agent context. They are advisory and are not a Kernel runtime
+   veto path.
 
-Only the code-layer `PermissionEngine.check()` path performs runtime allow/deny decisions and writes audit records. The prompt context layer does **not** currently run inside `Kernel` as an additional runtime veto; it generates safety text and rejection templates for agent context.
+Runtime permission checks are the enforcement boundary.
 
 ## Permission Configuration
 
-Policies are defined in YAML files under `.supermedicine/policies/`. Each policy specifies:
+Policies are YAML files under `.supermedicine/policies/`. Each policy can define
+agent id, role, security level, allowed actions, denied actions, and hard limits:
 
 ```yaml
 - agent_id: "alpha"
@@ -25,11 +31,7 @@ Policies are defined in YAML files under `.supermedicine/policies/`. Each policy
     allowed:
       - action: "read"
         scope: "*"
-      - action: "execute"
-        scope: "*"
     denied:
-      - action: "write"
-        scope: "*.yaml"
       - action: "publish"
         scope: "*"
     hard_limits:
@@ -37,117 +39,90 @@ Policies are defined in YAML files under `.supermedicine/policies/`. Each policy
       max_tool_calls_per_minute: 30
 ```
 
-### Fields
+Configure agents with least privilege. Denied rules take precedence over allowed
+rules.
 
-| Field | Description |
-|-------|-------------|
-| `agent_id` | Unique agent identifier |
-| `role` | Agent role (analyst, reviewer, writer, orchestrator) |
-| `security_level` | Security tier (standard, elevated, admin) |
-| `allowed` | Actions the agent is permitted to perform |
-| `denied` | Explicitly forbidden actions (takes precedence over allowed) |
-| `hard_limits` | Quantitative limits (rate limiting, resource caps) |
+## Audit Logging and Redaction
 
-## Principle of Least Privilege
+Permission decisions are logged to `.supermedicine/policies/audit.jsonl` with UTC
+timestamps. Diagnostics and log/report surfaces redact known secret carriers such
+as API keys, authorization headers, bearer tokens, key-like URL query values, and
+secret-looking fields.
 
-Configure agents with the minimum permissions needed:
+Shareable outputs may still include agent ids, actions, resource paths, provider
+names, model names, BaseURLs, missing-field names, timestamps, and structured
+error categories needed for repair.
 
-- **alpha** (analyst): read-only access to data and tools
-- **beta** (reviewer): read access + write to code files only
-- **gamma** (writer): read/write access to content files
-- **delta** (orchestrator): full access (admin)
+On Windows, POSIX file mode bits are not treated as proof of owner-only ACL
+protection. Windows permission checks are platform-capability-aware.
 
-## Audit Logging
+## LLM Secret Handling
 
-All permission checks are logged to `.supermedicine/policies/audit.jsonl` in JSONL format with UTC timestamps:
+- Use environment variables, private local config, secret managers, or CI secrets
+  for real API keys.
+- Prefer `api_key_env` in `.supermedicine/config.yaml` over plaintext `api_key`.
+- Documentation, tests, manifests, and examples must use placeholders such as
+  `<OPENAI_API_KEY>`, `<ANTHROPIC_API_KEY>`, `<OPENROUTER_API_KEY>`, or
+  `<redacted>`.
+- `Install.py --api-key`, `SM_LLM_API_KEY`, and `supermedicine llm add --api-key`
+  can persist plaintext keys locally or expose them in shell history. Prefer
+  provider-specific environment variables and `--api-key-env`.
+- Do not paste unredacted local YAML, terminal history, screenshots, audit logs,
+  tracebacks, or private endpoints into public issues.
+- Optional OpenCode and Claude Code adapter files contain metadata only and must
+  not contain plaintext credentials.
 
-```json
-{"agent_id": "alpha", "action": "read", "resource": "file.txt", "result": "ALLOWED", "reason": "whitelist_match", "timestamp": "2026-05-22T00:00:00Z"}
-```
-
-Use `plugins/harness/monitor.py` to analyze audit logs for anomalies.
-
-## Workspace, Paper, and Experience Boundaries
-
-- Workspace ids are slug-only identifiers and resolve to project-local
-  `workspaces/<id>` paths. Workspace-scoped CLI commands require explicit
-  `--workspace`; CLI execution must not silently reuse TUI recent workspace
-  state.
-- Workspace deletion is a hard delete and must pass exact `--confirm <id>`
-  matching, destructive path validation, PermissionEngine authorization, and
-  audit logging. Failed confirmation, missing policy, permission denial, and
-  successful deletion are auditable events.
-- Paper import is copy-only and workspace-local. It supports common local paper
-  formats (`.pdf`, `.tex`, `.bib`, `.ris`, `.txt`, `.md`), calculates SHA-256,
-  deduplicates by SHA-256 and normalized DOI/PMID, and keeps imported metadata
-  editable without moving or uploading source files.
-- Paper metadata enrichment is never silent network behavior. It requires user
-  confirmation (`--confirm-enrich`), PermissionEngine approval, network and
-  external API hard-limit checks, and audit logging before any provider fetch.
-- Experience learning is enabled by default, but raw conversations are rejected.
-  Only user-confirmed summaries/experience records may be stored. General method
-  experiences are kept in an OS tempdir method layer and must not contain
-  workspace/project details; workspace-specific experiences remain under the
-  selected workspace and can be viewed, edited, deleted, or exported by the user.
-
-## Safety, Privacy, and Medical-Use Boundaries
-
-SuperMedicine is a research-assistance framework, not a clinical decision system.
-Plugin outputs, RAG results, paper metadata, writing checklists, citation
-formatting, and prototype statistics outputs require qualified expert review.
-Do not use generated outputs as diagnosis, treatment, regulatory, or clinical
-decision-support advice. Keep secrets in environment variables or local private
-configuration, avoid committing private endpoints or audit logs with sensitive
-paths, and treat all external network/API access as permission-gated behavior.
-
-## Environment Variables
+Relevant environment variables:
 
 | Variable | Purpose |
 |----------|---------|
 | `SM_CONFIG` | Override config file path |
-| `SM_<KEY>` | Override any config key (uppercase, `_` for `-`) |
-| `SM_LLM_PROVIDER` | Installer-time LLM provider override (any provider name; built-in defaults for `openai`, `anthropic`, `openrouter`) |
-| `SM_LLM_BASE_URL` | Installer-time custom compatible provider BaseURL |
-| `SM_LLM_API_KEY` | Installer-time generic API key injection; may be written to local config, so avoid committing it |
-| `SM_LLM_MODEL` | Installer-time default model override |
-| `OPENAI_API_KEY` | Runtime/installer key for OpenAI-compatible provider configuration |
-| `ANTHROPIC_API_KEY` | Runtime/installer key for Anthropic-compatible provider configuration |
-| `OPENROUTER_API_KEY` | Runtime/installer key for OpenRouter gateway provider configuration |
+| `SM_<KEY>` | Override config keys using uppercase and `_` for `-` |
+| `SM_LLM_PROVIDER` | Installer-time provider override |
+| `SM_LLM_BASE_URL` | Installer-time custom BaseURL |
+| `SM_LLM_API_KEY` | Installer-time generic key injection; may be written to local config |
+| `SM_LLM_MODEL` | Installer-time model override |
+| `OPENAI_API_KEY` | OpenAI-compatible provider key |
+| `ANTHROPIC_API_KEY` | Anthropic-compatible provider key |
+| `OPENROUTER_API_KEY` | OpenRouter provider key |
 
-## LLM Secret Handling
+## Workspace, Paper, Experience, Experiment, and Log Boundaries
 
-- Use environment variables or local private `.supermedicine/config.yaml` values
-  for real API keys. Do not commit real OpenAI, Anthropic, OpenRouter, gateway, or
-  platform credentials.
-- Prefer storing `api_key_env` (for example `OPENAI_API_KEY` or
-  `ANTHROPIC_API_KEY`) in `.supermedicine/config.yaml` instead of storing an
-  `api_key` value. The environment variable value should be set in a private
-  shell, profile, secret manager, or CI secret store outside the repository.
-- Documentation and tests must use non-realistic placeholders only, for example
-  `<OPENAI_API_KEY>`, `<ANTHROPIC_API_KEY>`, `<OPENROUTER_API_KEY>`, or `<redacted>`.
-- `Install.py --api-key` and `SM_LLM_API_KEY` can write the supplied key to local
-  project config. Prefer `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or
-  `OPENROUTER_API_KEY` for real keys when possible.
-- `supermedicine llm add --api-key` has the same persistence and command-history
-  risk as installer-time plaintext key injection. Prefer
-  `supermedicine llm add --api-key-env <ENV_VAR_NAME>` for real credentials.
-- `supermedicine llm list`, `supermedicine llm show`, capability reports, and
-  error messages must use redacted output. Do not paste unredacted local YAML,
-  terminal history, screenshots, audit logs, or traceback payloads into issues.
-- Switching providers persists both the current runtime provider and
-  `last_provider` for startup restore. Those fields are provider names, not
-  secrets, but custom provider names or private BaseURLs may still reveal internal
-  infrastructure; avoid committing private endpoint details.
-- LLM provider config snapshots intended for logs or capability reporting must use
-  redacted paths such as `get_llm_provider_config(redacted=True)` or provider
-  `safe_dict()` output.
-- OpenCode and Claude Code adapter manifests expose provider metadata only. They
-  must not contain plaintext credentials, and missing optional platform runtimes
-  degrade to unavailable/degraded states rather than bypassing the core security
-  model.
+- Workspace ids are slug-only identifiers that resolve to project-local
+  `workspaces/<id>` paths.
+- Workspace-scoped CLI commands require explicit `--workspace`; they do not reuse
+  TUI recent workspace state.
+- Workspace deletion requires exact confirmation, path validation,
+  PermissionEngine approval, and audit logging.
+- Paper import is copy-only and workspace-local. Source files are not moved or
+  uploaded by default.
+- Paper enrichment requires explicit confirmation, permission approval,
+  network/external API hard-limit checks, and audit logging before provider
+  access.
+- Experience learning stores only user-confirmed summaries and records, never raw
+  conversations.
+- Experiment guide and Log report surfaces write local JSON records under
+  `.supermedicine/logs/` by default and use redaction for sensitive fields.
+- The built-in `experiment-wb` actions perform deterministic arithmetic and input
+  validation only. They do not perform network requests, call external APIs, or
+  validate laboratory SOPs.
+
+## Medical-Use Boundary
+
+SuperMedicine is a research-assistance framework, not a clinical decision system.
+Plugin outputs, RAG results, paper metadata, writing checklists, citation
+formatting, and prototype statistics outputs require qualified expert review. Do
+not use generated outputs as diagnosis, treatment, regulatory, or clinical
+decision-support advice.
+
+## Optional Platform Adapter Boundary
+
+The standalone Python core is the default supported path. OpenCode and Claude
+Code add-ons are optional. Missing platform runtimes should degrade to explicit
+unavailable/degraded states rather than bypassing the core permission model.
 
 ## Reporting a Vulnerability
 
-Please report security vulnerabilities by opening a GitHub Issue with the label `security`. Do not disclose vulnerabilities publicly until they have been addressed.
-
-We aim to respond to security reports within 72 hours and provide a fix within 7 days for critical issues.
+Open a GitHub Issue with the label `security`. Do not disclose vulnerabilities
+publicly until they have been addressed. Maintainers aim to respond within 72
+hours and to fix critical issues within 7 days.

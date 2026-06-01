@@ -1,6 +1,7 @@
 """集中式 LLM 配置管理服务。"""
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from core.config_center import ConfigCenter
@@ -8,6 +9,9 @@ from core.llm_client import LLMClient, TrackedLLMClient, create_llm_client
 from core.llm_providers.config import LLMProviderConfig
 from core.redaction import redact_sensitive
 from core.token_tracker import TokenTracker
+
+
+logger = logging.getLogger(__name__)
 
 
 class LLMConfigManager:
@@ -26,7 +30,19 @@ class LLMConfigManager:
 
     def list_providers(self, *, redacted: bool = True) -> dict[str, Any]:
         """列出 provider 配置；默认脱敏。"""
+        logger.info("LLM manager list_providers: stage=config path=%s redacted=%s", self._config.config_path, redacted)
         return self._config.get_llm_providers(redacted=redacted)
+
+    def diagnostics(self) -> dict[str, Any]:
+        """Return actionable, secret-safe diagnostics for LLM configuration."""
+        diagnostic = self._config.diagnose_llm_config()
+        current = str(diagnostic.get("provider") or "")
+        if current:
+            validation_error = self.validate_provider(current)
+            if validation_error is not None:
+                diagnostic["ok"] = False
+                diagnostic["validation_error"] = validation_error["error"]
+        return redact_sensitive(diagnostic)
 
     def add_provider(
         self,
@@ -40,6 +56,7 @@ class LLMConfigManager:
         provider_name = self._normalize_provider(provider)
         if not provider_name:
             return self._error("missing_provider", "LLM provider name is required")
+        logger.info("LLM manager add_provider: stage=config provider=%s path=%s", provider_name, self._config.config_path)
 
         config_values = dict(values)
         config_values.setdefault("api_format", self._default_api_format(provider_name))
@@ -58,6 +75,7 @@ class LLMConfigManager:
         provider_name = self._normalize_provider(provider)
         if not provider_name:
             return self._error("missing_provider", "LLM provider name is required")
+        logger.info("LLM manager switch_provider: stage=config provider=%s path=%s", provider_name, self._config.config_path)
         provider_config = self._config.get_llm_provider_config(provider_name)
         if not self._provider_exists(provider_name):
             return self._error("provider_not_found", f"LLM provider not found: {provider_name}", provider=provider_name)
@@ -128,14 +146,22 @@ class LLMConfigManager:
         error_code = code_by_field.get(missing[0], "incomplete_provider_config")
         return self._error(
             error_code,
-            "LLM provider configuration is incomplete: " + ", ".join(missing) + f". {self.SETUP_HINT}",
+            "LLM provider configuration is incomplete in "
+            + str(self._config.config_path)
+            + ": provider="
+            + provider_name
+            + " missing "
+            + ", ".join(missing)
+            + ". Check provider/model/base_url/api_key. "
+            + self.SETUP_HINT,
             provider=provider_name,
-            details={"missing": missing, "config": config.safe_dict()},
+            details={"missing": missing, "config_path": str(self._config.config_path), "config": config.safe_dict()},
         )
 
     def create_client(self, provider: str | None = None) -> LLMClient | dict[str, Any]:
         """基于当前/恢复 provider 创建 LLMClient；配置异常时返回结构化错误。"""
         if provider is None:
+            logger.info("LLM manager create_client: stage=restore path=%s", self._config.config_path)
             restore_result = self.restore_startup_provider(save=False)
             if not restore_result["ok"]:
                 return restore_result
@@ -152,7 +178,15 @@ class LLMConfigManager:
         validation_error = self.validate_provider(provider_name, provider_config)
         if validation_error is not None:
             return validation_error
-        client = create_llm_client(provider_name, config=provider_config)
+        try:
+            logger.info("LLM manager create_client: stage=create provider=%s path=%s", provider_name, self._config.config_path)
+            client = create_llm_client(provider_name, config=provider_config)
+        except Exception as exc:
+            return self._error(
+                "client_creation_failed",
+                f"Failed to create LLM client for provider {provider_name}: {exc}",
+                provider=provider_name,
+            )
         tracker = TokenTracker(self._config.config_path.parent / "tokens.jsonl")
         return TrackedLLMClient(client, provider_name, tracker)
 

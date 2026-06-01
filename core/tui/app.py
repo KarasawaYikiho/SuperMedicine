@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import re
+import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from textual import events
 from rich.console import Console
 from textual.app import App, ComposeResult
 from textual.theme import Theme
@@ -20,6 +23,9 @@ from textual.widgets import Footer, Header, Input, ListItem, ListView, Static
 from core.config_center import ConfigCenter
 from core.llm_manager import LLMConfigManager
 from core.tui.i18n import LABELS, t
+
+
+logger = logging.getLogger(__name__)
 
 
 _DISPLAY_SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (
@@ -114,24 +120,54 @@ class NavItem(ListItem):
         yield Static(self._label)
 
 
+class PromptInput(Input):
+    """Prompt input that preserves app-level numeric navigation shortcuts."""
+
+    NUMERIC_NAVIGATION: dict[str, str] = {
+        "1": "chat",
+        "2": "dashboard",
+        "3": "workspace",
+        "4": "paper",
+        "5": "experience",
+        "6": "tool",
+        "7": "dialog",
+        "8": "llm",
+        "9": "experiment",
+        "0": "log",
+    }
+
+    def on_key(self, event: events.Key) -> None:
+        """Route numeric navigation before the focused input consumes digits."""
+
+        view_id = self.NUMERIC_NAVIGATION.get(event.key)
+        if view_id is None:
+            return
+        event.stop()
+        if hasattr(self.app, "action_switch_view"):
+            self.app.action_switch_view(view_id)
+
+
 class SuperMedicineTUI(App[Any]):
     """Main TUI application with persistent sidebar and swappable content."""
 
     CSS_PATH = str(_CSS_PATH)
     TITLE = t("app_title")
+    AUTO_FOCUS = "#prompt-input"
 
     BINDINGS = [
         Binding("q", "quit", t("nav_quit")),
         Binding("f", "toggle_maximize", t("nav_maximize"), show=True),
         Binding("question_mark", "show_help", t("help_title"), show=True),
-        Binding("1", "switch_view('chat')", t("nav_chat"), show=False),
-        Binding("2", "switch_view('dashboard')", t("nav_dashboard"), show=False),
-        Binding("3", "switch_view('workspace')", t("nav_workspace"), show=False),
-        Binding("4", "switch_view('paper')", t("nav_paper"), show=False),
-        Binding("5", "switch_view('experience')", t("nav_experience"), show=False),
-        Binding("6", "switch_view('tool')", t("nav_tool"), show=False),
-        Binding("7", "switch_view('dialog')", t("nav_dialog"), show=False),
-        Binding("8", "switch_view('llm')", t("nav_llm"), show=False),
+        Binding("1", "switch_view('chat')", t("nav_chat"), show=False, priority=True),
+        Binding("2", "switch_view('dashboard')", t("nav_dashboard"), show=False, priority=True),
+        Binding("3", "switch_view('workspace')", t("nav_workspace"), show=False, priority=True),
+        Binding("4", "switch_view('paper')", t("nav_paper"), show=False, priority=True),
+        Binding("5", "switch_view('experience')", t("nav_experience"), show=False, priority=True),
+        Binding("6", "switch_view('tool')", t("nav_tool"), show=False, priority=True),
+        Binding("7", "switch_view('dialog')", t("nav_dialog"), show=False, priority=True),
+        Binding("8", "switch_view('llm')", t("nav_llm"), show=False, priority=True),
+        Binding("9", "switch_view('experiment')", t("nav_experiment"), show=False, priority=True),
+        Binding("0", "switch_view('log')", t("nav_log"), show=False, priority=True),
     ]
 
     NAV_ITEMS = (
@@ -143,6 +179,8 @@ class SuperMedicineTUI(App[Any]):
         NavMetadata("6", "tool", t("nav_tool"), "🔧"),
         NavMetadata("7", "dialog", t("nav_dialog"), "📋"),
         NavMetadata("8", "llm", t("nav_llm"), "🤖"),
+        NavMetadata("9", "experiment", t("nav_experiment"), "🧪"),
+        NavMetadata("0", "log", t("nav_log"), "📝"),
     )
 
     def __init__(self, project_root: Path | str | None = None, **kwargs: Any) -> None:
@@ -170,6 +208,7 @@ class SuperMedicineTUI(App[Any]):
         self._current_view = "chat"
         self._views: dict[str, Any] = {}
         self._task_running = False
+        self._status_cache: dict[str, str] = {}
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -190,7 +229,7 @@ class SuperMedicineTUI(App[Any]):
                 yield Vertical(id="content-pane")
                 with Horizontal(id="input-bar"):
                     yield Static("> ", id="prompt-prefix")
-                    yield Input(
+                    yield PromptInput(
                         placeholder=t("input_placeholder"),
                         id="prompt-input",
                     )
@@ -206,7 +245,9 @@ class SuperMedicineTUI(App[Any]):
         from core.tui.screens.dashboard import DashboardView
         from core.tui.screens.dialog_screen import DialogView
         from core.tui.screens.experience_screen import ExperienceView
+        from core.tui.screens.experiment_screen import ExperimentGuideView
         from core.tui.screens.llm_screen import LLMView
+        from core.tui.screens.log_screen import LogReportView
         from core.tui.screens.paper_screen import PaperView
         from core.tui.screens.tool_screen import ToolView
         from core.tui.screens.workspace_screen import WorkspaceView
@@ -220,6 +261,8 @@ class SuperMedicineTUI(App[Any]):
             "tool": ToolView(self.project_root),
             "dialog": DialogView(self.project_root),
             "llm": LLMView(self.project_root),
+            "experiment": ExperimentGuideView(self.project_root),
+            "log": LogReportView(self.project_root),
         }
         # Add all views to content pane, hide all except chat
         content_pane = self.query_one("#content-pane")
@@ -321,11 +364,23 @@ class SuperMedicineTUI(App[Any]):
         status_center = self.query_one("#status-center", Static)
         status_right = self.query_one("#status-right", Static)
         status = self.status_text()
-        now = datetime.now(timezone.utc).strftime("%H:%M UTC")
+        now = self._status_clock_text()
 
-        status_left.update(f"  {status.left}  |  {status.focus}")
-        status_center.update(f"  {status.center}")
-        status_right.update(f"  🕐 {now}  |  {status.right}  ")
+        self._update_static_if_changed(status_left, "status-left", f"  {status.left}  |  {status.focus}")
+        self._update_static_if_changed(status_center, "status-center", f"  {status.center}")
+        self._update_static_if_changed(status_right, "status-right", f"  🕐 {now}  |  {status.right}  ")
+
+    def _update_static_if_changed(self, widget: Static, cache_key: str, value: str) -> None:
+        """Avoid redundant widget updates that force unnecessary repaints."""
+
+        if self._status_cache.get(cache_key) != value:
+            self._status_cache[cache_key] = value
+            widget.update(value)
+
+    def _status_clock_text(self) -> str:
+        """Return status-bar clock text isolated for stable refresh throttling."""
+
+        return datetime.now(timezone.utc).strftime("%H:%M UTC")
 
     def _workspace_count(self) -> int:
         try:
@@ -349,7 +404,7 @@ class SuperMedicineTUI(App[Any]):
             from importlib.metadata import version as pkg_version
             return pkg_version("supermedicine")
         except Exception:
-            return "0.3.6b0"
+            return "0.4.0b0"
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
         """Handle sidebar navigation item selection."""
@@ -358,8 +413,11 @@ class SuperMedicineTUI(App[Any]):
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle user input submission."""
+        event.stop()
         message = event.value.strip()
         if not message:
+            event.input.value = ""
+            self._focus_prompt_input()
             return
         # Clear input
         event.input.value = ""
@@ -369,6 +427,7 @@ class SuperMedicineTUI(App[Any]):
             chat_view.add_user_message(message)
         # Process the message
         self._process_message(message)
+        self._focus_prompt_input()
 
     def _process_message(self, message: str) -> None:
         """Process a user message through the Kernel asynchronously."""
@@ -489,6 +548,7 @@ def launch_tui(*, dry_run: bool = False, project_root: Path | str | None = None)
     if dry_run:
         llm_text = f"{t('llm_ready')}: {llm_provider}" if llm_ready else t("llm_not_ready")
         status_message = f"{status_message}；{llm_text}"
+    logger.info("TUI launch: stage=start dry_run=%s project_root=%s llm_ready=%s provider=%s", dry_run, root, llm_ready, llm_provider)
 
     status = TUIStatus(
         title=t("app_title"),
@@ -505,21 +565,24 @@ def launch_tui(*, dry_run: bool = False, project_root: Path | str | None = None)
         status_right=shell_status.right,
         focus_target="prompt-input",
     )
-    console = Console()
-    console.print(f"[bold]{status.title}[/bold]")
-    console.print(status.message)
-    console.print(t("sandbox_notice"))
-    console.print(f"{t('layout_current_view')}：{status.view_title}")
-    console.print(f"{t('layout_shortcuts')}：{status.shortcut_hint}")
-    console.print(shell_status.focus)
-    console.print(f"{status.status_left} | {status.status_center} | {status.status_right}")
     if dry_run:
+        console = Console()
+        console_encoding = getattr(console.file, "encoding", None) or getattr(sys.stdout, "encoding", None)
+        console.print(f"[bold]{_console_safe_text(status.title, console_encoding)}[/bold]")
+        console.print(_console_safe_text(status.message, console_encoding))
+        console.print(_console_safe_text(t("sandbox_notice"), console_encoding))
+        console.print(_console_safe_text(f"{t('layout_current_view')}：{status.view_title}", console_encoding))
+        console.print(_console_safe_text(f"{t('layout_shortcuts')}：{status.shortcut_hint}", console_encoding))
+        console.print(_console_safe_text(shell_status.focus, console_encoding))
+        console.print(_console_safe_text(f"{status.status_left} | {status.status_center} | {status.status_right}", console_encoding))
         return status
 
+    console = Console()
     try:
         app = SuperMedicineTUI(project_root=project_root or Path.cwd())
-        app.run()
+        app.run(mouse=False)
     except ImportError:
+        logger.error("TUI launch failed: stage=import textual_missing project_root=%s", project_root or Path.cwd())
         console.print("Textual 未安装，无法启动交互界面。")
         return TUIStatus(
             title=status.title,
@@ -527,7 +590,28 @@ def launch_tui(*, dry_run: bool = False, project_root: Path | str | None = None)
             labels=status.labels,
             interactive=False,
         )
+    logger.info("TUI launch: stage=exit project_root=%s", project_root or Path.cwd())
     return status
+
+
+def _console_safe_text(value: str, encoding: str | None = None) -> str:
+    """Return text that can be encoded by the active console.
+
+    Windows legacy consoles may use GBK or another non-UTF-8 code page that
+    cannot encode emoji used in TUI status labels.  Keep Unicode output on
+    capable terminals, but replace only unencodable characters for safe
+    non-interactive status printing.
+    """
+
+    target_encoding = encoding or "utf-8"
+    try:
+        value.encode(target_encoding)
+    except (LookupError, UnicodeEncodeError):
+        try:
+            return value.encode(target_encoding, errors="replace").decode(target_encoding, errors="replace")
+        except LookupError:
+            return value.encode("utf-8", errors="replace").decode("utf-8", errors="replace")
+    return value
 
 
 def _describe_llm_status(project_root: Path | str) -> tuple[bool, str]:
@@ -539,7 +623,8 @@ def _describe_llm_status(project_root: Path | str) -> tuple[bool, str]:
         if not provider:
             return False, ""
         return manager.validate_provider(provider) is None, provider
-    except Exception:
+    except Exception as exc:
+        logger.warning("TUI LLM status diagnostic failed: stage=config project_root=%s error=%s", project_root, exc)
         return False, ""
 
 

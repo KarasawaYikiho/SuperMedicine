@@ -7,7 +7,7 @@ from unittest.mock import patch
 import yaml
 
 from core.config_center import ConfigCenter
-from core.llm_client import create_configured_llm_client, create_llm_client
+from core.llm_client import LLMClient, TrackedLLMClient, create_configured_llm_client, create_llm_client
 from core.llm_providers.base import AnthropicClient, OpenAIClient
 from core.llm_providers.config import LLMProviderConfig
 from core.llm_providers.openrouter import OpenRouterClient
@@ -109,6 +109,25 @@ class TestLLMFactory:
 
         assert isinstance(client, AnthropicClient)
         assert client.model == "local-claude"
+
+
+class TestTrackedLLMClientDiagnostics:
+    def test_missing_usage_emits_debug_diagnostic(self, caplog):
+        class FakeClient(LLMClient):
+            def chat(self, messages, **kwargs):
+                return {"content": "ok", "model": "fake-model"}
+
+            def complete(self, prompt, **kwargs):
+                return {"content": "ok", "model": "fake-model"}
+
+        class FakeTracker:
+            def record(self, *args, **kwargs):
+                raise AssertionError("missing usage should not be recorded")
+
+        caplog.set_level("DEBUG", logger="core.llm_client")
+        TrackedLLMClient(FakeClient(), "fake", FakeTracker()).chat([{"role": "user", "content": "hi"}])
+
+        assert "LLM usage unavailable or malformed" in caplog.text
 
 
 class TestUnifiedProviderConfig:

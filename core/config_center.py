@@ -2,13 +2,44 @@
 from __future__ import annotations
 
 import os
+import logging
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 from core.redaction import redact_sensitive
-from core.llm_providers.config import sanitized_headers
+from core.llm_providers.config import LLMProviderConfig, sanitized_headers
+
+
+logger = logging.getLogger(__name__)
+
+
+DEFAULT_EXPERIMENT_GUIDE_CONFIG: dict[str, Any] = {
+    "enabled": True,
+    "allowed_plugins": ["experiment-wb"],
+    "allowed_actions": [
+        "experiment.wb.normalize_loading",
+        "experiment.wb.antibody_dilution",
+    ],
+    "allowed_protocol_sources": ["builtin"],
+    "log_dir": ".supermedicine/logs",
+    "max_log_bytes": 1024 * 1024,
+    "max_steps": 50,
+    "max_prompt_length": 8000,
+    "allow_network": False,
+    "allow_external_api": False,
+    "on_error": "record_and_stop",
+}
+
+
+DEFAULT_LOG_REPORT_CONFIG: dict[str, Any] = {
+    "log_dir": ".supermedicine/logs",
+    "max_message_length": 10000,
+    "max_records_per_session": 1000,
+    "max_file_bytes": 1024 * 1024,
+    "redact": True,
+}
 
 
 class ConfigCenter:
@@ -17,9 +48,22 @@ class ConfigCenter:
     def __init__(self, config_path: Path):
         self._config_path = config_path
         self._config: dict[str, Any] = {}
+        self._load_error: str = ""
         if config_path.exists():
-            with open(config_path, "r", encoding="utf-8") as f:
-                self._config = yaml.safe_load(f) or {}
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    loaded = yaml.safe_load(f) or {}
+                if isinstance(loaded, dict):
+                    self._config = loaded
+                else:
+                    self._load_error = f"config root must be a mapping: {config_path}"
+                    logger.error("Config load failed: stage=parse path=%s error=%s", config_path, self._load_error)
+            except yaml.YAMLError as exc:
+                self._load_error = f"invalid YAML in config file {config_path}: {exc}"
+                logger.error("Config load failed: stage=parse path=%s error=%s", config_path, redact_sensitive(str(exc)))
+            except OSError as exc:
+                self._load_error = f"cannot read config file {config_path}: {exc}"
+                logger.error("Config load failed: stage=read path=%s error=%s", config_path, redact_sensitive(str(exc)))
 
     @property
     def config_path(self) -> Path:
@@ -58,12 +102,69 @@ class ConfigCenter:
         """获取可用于日志、错误、快照和能力输出的脱敏配置。"""
         return redact_sensitive(self.all())
 
+    def diagnostics(self) -> dict[str, Any]:
+        """Return a user-shareable diagnostic snapshot for config loading."""
+        env_overrides = sorted(key for key in os.environ if key.startswith("SM_"))
+        return redact_sensitive({
+            "config_path": str(self._config_path),
+            "exists": self._config_path.exists(),
+            "load_error": self._load_error,
+            "env_override_keys": env_overrides,
+            "precedence": ["SM_* environment variables", "config file", "code defaults"],
+            "config": self.safe_all(),
+        })
+
+    def diagnose_llm_config(self) -> dict[str, Any]:
+        """Diagnose LLM provider selection and required fields without exposing secrets."""
+        providers = self.get_llm_providers(redacted=True)
+        raw_providers = self.get_llm_providers(redacted=False)
+        current = self.get_llm_runtime_provider_name()
+        missing: list[str] = []
+        if not current:
+            missing.append("provider")
+        if current and current not in raw_providers:
+            missing.append("providers." + current)
+        if current and current in raw_providers:
+            selected = raw_providers.get(current, {})
+            missing.extend(LLMProviderConfig.from_mapping(current, selected).missing_fields())
+        return {
+            "ok": not self._load_error and not missing,
+            "stage": "config.llm",
+            "config_path": str(self._config_path),
+            "load_error": redact_sensitive(self._load_error),
+            "provider": current,
+            "missing": missing,
+            "providers": providers,
+            "hints": {
+                "provider": "Set llm.provider or SM_LLM_PROVIDER / supermedicine llm switch <provider>.",
+                "base_url": "Set providers.<provider>.base_url or pass --base-url during init/add.",
+                "api_key": "Set providers.<provider>.api_key, api_key_env, or a provider API key environment variable.",
+                "model": "Set providers.<provider>.model or pass --model during init/add.",
+            },
+        }
+
     def get_llm_config(self) -> dict[str, Any]:
         """获取 LLM 配置段；缺失或类型异常时返回空配置。"""
         llm_config = self._config.get("llm", {})
         if not isinstance(llm_config, dict):
             return {}
         return llm_config
+
+    def get_experiment_guide_config(self) -> dict[str, Any]:
+        """获取实验引导配置，缺失用户配置时返回安全默认值。"""
+        return self._merged_default_section("experiment_guide", DEFAULT_EXPERIMENT_GUIDE_CONFIG)
+
+    def get_log_report_config(self) -> dict[str, Any]:
+        """获取日志报告配置，缺失用户配置时返回安全默认值。"""
+        return self._merged_default_section("log_report", DEFAULT_LOG_REPORT_CONFIG)
+
+    def _merged_default_section(self, key: str, defaults: dict[str, Any]) -> dict[str, Any]:
+        """Return a shallow, default-compatible config section merge."""
+        value = self.get(key, {})
+        result = dict(defaults)
+        if isinstance(value, dict):
+            result.update(value)
+        return result
 
     def ensure_llm_config(self) -> dict[str, Any]:
         """确保 LLM 配置段存在并返回可变引用。"""

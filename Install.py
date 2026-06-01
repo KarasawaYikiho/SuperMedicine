@@ -13,18 +13,22 @@ import argparse
 import getpass
 import logging
 import os
+import shutil
 from pathlib import Path
 from typing import Any, cast
+from urllib.parse import urlparse
 
 import yaml
 
+from core.llm_providers.config import LLMProviderConfig
+from core.redaction import redact_sensitive
 from permission.policy import ensure_default_policy
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_CONFIG: dict[str, Any] = {
     "project_name": "supermedicine",
-    "version": "Beta0.3.6",
+    "version": "Beta0.4.0",
     "llm": {
         "provider": "",
         "providers": {},
@@ -34,6 +38,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
 _PROVIDER_ENV_MAP: dict[str, str] = {
     "openai": "OPENAI_API_KEY",
     "anthropic": "ANTHROPIC_API_KEY",
+    "openrouter": "OPENROUTER_API_KEY",
 }
 
 _PROVIDER_FORMAT_HINTS: dict[str, str] = {
@@ -99,6 +104,12 @@ def _normalize_provider(provider: str | None) -> str | None:
     return normalized
 
 
+def _optional_string(value: Any) -> str | None:
+    if value is None:
+        return None
+    return str(value)
+
+
 def _provider_api_format(provider: str) -> str:
     normalized = provider.strip().lower()
     for hint, fmt in _PROVIDER_FORMAT_HINTS.items():
@@ -130,11 +141,37 @@ def _require_complete_llm_config(
         missing.append("model")
     if missing:
         raise ValueError(
-            "完整 LLM Provider 配置是首次初始化必需项；请通过 --provider/--base-url/--api-key/--model、"
-            "SM_LLM_PROVIDER/SM_LLM_BASE_URL/SM_LLM_API_KEY/SM_LLM_MODEL 环境变量或 --interactive 提供: "
+            "完整 LLM Provider 配置是首次初始化必需项；缺失字段: "
+            + ", ".join(missing)
+            + "；配置来源优先级: CLI 参数 > SM_LLM_* 环境变量/Provider API key env > --llm-config 文件。请通过 --provider/--base-url/--api-key/--model、"
+            "--llm-config、SM_LLM_PROVIDER/SM_LLM_BASE_URL/SM_LLM_API_KEY/SM_LLM_MODEL 环境变量或 --interactive 提供: "
             + ", ".join(missing)
         )
+    _validate_install_llm_config(
+        provider=normalized_provider or "",
+        base_url=base_url or "",
+        api_key=api_key or "",
+        model=model or "",
+    )
     return normalized_provider or ""
+
+
+def _validate_install_llm_config(*, provider: str, base_url: str, api_key: str, model: str) -> None:
+    config = LLMProviderConfig.from_mapping(
+        provider,
+        {
+            "provider": provider,
+            "base_url": base_url,
+            "api_key": api_key,
+            "model": model,
+        },
+    )
+    missing = config.missing_fields()
+    if missing:
+        raise ValueError("LLM Provider 配置不完整，缺少: " + ", ".join(missing))
+    parsed = urlparse(config.base_url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError(f"LLM Provider base_url 必须是有效的 http(s) URL；provider={provider} base_url={base_url}")
 
 
 def _redact(value: str | None) -> str:
@@ -154,9 +191,7 @@ def _resolve_api_key(provider: str | None, explicit: str | None) -> str | None:
     if generic:
         return generic
     if provider:
-        provider_env = PROVIDER_ENV_NAMES.get(provider)
-        if provider_env:
-            return os.environ.get(provider_env)
+        return os.environ.get(_provider_api_key_env(provider))
     return None
 
 
@@ -204,6 +239,57 @@ def _apply_llm_config(
     llm["provider"] = provider
 
 
+def _load_llm_config_file(config_path: Path) -> dict[str, str | None]:
+    if not config_path.exists():
+        raise ValueError(f"LLM 配置文件不存在: {config_path}")
+    loaded = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+    if not isinstance(loaded, dict):
+        raise ValueError("LLM 配置文件必须是 YAML mapping")
+
+    llm = loaded.get("llm") if isinstance(loaded.get("llm"), dict) else loaded
+    if not isinstance(llm, dict):
+        raise ValueError("LLM 配置文件缺少 llm 配置段")
+
+    provider = _normalize_provider(_optional_string(llm.get("provider") or loaded.get("provider")))
+    provider_config: dict[str, Any] = {}
+    providers = llm.get("providers")
+    if provider and isinstance(providers, dict):
+        raw_provider_config = providers.get(provider, {})
+        if isinstance(raw_provider_config, dict):
+            provider_config = dict(raw_provider_config)
+    elif provider is None and isinstance(providers, dict) and len(providers) == 1:
+        provider, raw_provider_config = next(iter(providers.items()))
+        provider = _normalize_provider(str(provider))
+        if isinstance(raw_provider_config, dict):
+            provider_config = dict(raw_provider_config)
+
+    merged = dict(llm)
+    merged.update(provider_config)
+    return {
+        "provider": provider,
+        "base_url": _optional_string(merged.get("base_url") or merged.get("baseURL")),
+        "api_key": _optional_string(merged.get("api_key")),
+        "model": _optional_string(merged.get("model")),
+    }
+
+
+def _snapshot_install_state(config_dir: Path) -> Path | None:
+    if not config_dir.exists():
+        return None
+    backup_dir = config_dir.parent / f".{config_dir.name}.install-backup"
+    if backup_dir.exists():
+        shutil.rmtree(backup_dir)
+    shutil.copytree(config_dir, backup_dir)
+    return backup_dir
+
+
+def _restore_install_state(config_dir: Path, backup_dir: Path | None) -> None:
+    if config_dir.exists():
+        shutil.rmtree(config_dir)
+    if backup_dir is not None and backup_dir.exists():
+        shutil.move(str(backup_dir), str(config_dir))
+
+
 def write_llm_config(
     project_dir: Path,
     *,
@@ -212,6 +298,7 @@ def write_llm_config(
     api_key: str | None = None,
     model: str | None = None,
 ) -> None:
+    logger.info("Install stage=llm-config-write project_dir=%s provider=%s", project_dir, provider or "")
     normalized_provider = _require_complete_llm_config(
         provider=provider,
         base_url=base_url,
@@ -219,6 +306,7 @@ def write_llm_config(
         model=model,
     )
     config_file = project_dir / ".supermedicine" / "config.yaml"
+    config_file.parent.mkdir(parents=True, exist_ok=True)
     config = _load_config(config_file)
     _apply_llm_config(
         config,
@@ -258,6 +346,14 @@ def init_config(
     model: str | None = None,
 ) -> None:
     """Initialize standalone SuperMedicine project configuration only."""
+    logger.info(
+        "Install stage=init-start project_dir=%s provider=%s base_url=%s model=%s api_key=%s",
+        project_dir,
+        provider or "",
+        base_url or "",
+        model or "",
+        _redact(api_key),
+    )
     normalized_provider = _require_complete_llm_config(
         provider=provider,
         base_url=base_url,
@@ -265,14 +361,22 @@ def init_config(
         model=model,
     )
     config_dir = project_dir / ".supermedicine"
-    config_dir.mkdir(parents=True, exist_ok=True)
-    config_file = config_dir / "config.yaml"
-    if not config_file.exists():
-        config_file.write_text(_default_config_text(), encoding="utf-8")
-    write_llm_config(project_dir, provider=normalized_provider, base_url=base_url, api_key=api_key, model=model)
-    (config_dir / "agents").mkdir(exist_ok=True)
-    (config_dir / "plugins").mkdir(exist_ok=True)
-    ensure_default_policy(project_dir, Path(__file__).parent)
+    backup_dir = _snapshot_install_state(config_dir)
+    try:
+        config_dir.mkdir(parents=True, exist_ok=True)
+        config_file = config_dir / "config.yaml"
+        if not config_file.exists():
+            config_file.write_text(_default_config_text(), encoding="utf-8")
+        write_llm_config(project_dir, provider=normalized_provider, base_url=base_url, api_key=api_key, model=model)
+        (config_dir / "agents").mkdir(exist_ok=True)
+        (config_dir / "plugins").mkdir(exist_ok=True)
+        ensure_default_policy(project_dir, Path(__file__).parent)
+    except Exception as exc:
+        _restore_install_state(config_dir, backup_dir)
+        logger.error("初始化失败，已回滚安装状态。stage=init error=%s", redact_sensitive(str(exc)))
+        raise
+    if backup_dir is not None and backup_dir.exists():
+        shutil.rmtree(backup_dir)
     logger.info("初始化完成。")
     logger.info("")
     logger.info("如果 'supermedicine' 命令不可用，请将以下目录添加到系统 PATH：")
@@ -292,17 +396,19 @@ def main() -> None:
     parser.add_argument("--base-url", help="LLM provider BaseURL; may also use SM_LLM_BASE_URL")
     parser.add_argument("--api-key", help="LLM provider API key; may also use SM_LLM_API_KEY or provider env var")
     parser.add_argument("--model", help="Default LLM model; may also use SM_LLM_MODEL")
+    parser.add_argument("--llm-config", type=Path, help="YAML file containing llm.provider and llm.providers.<provider> settings")
     parser.add_argument("--interactive", action="store_true", help="Prompt for LLM provider settings during initialization")
     args = parser.parse_args()
     if args.detect:
         logger.info("Detected platform: %s", detect_platform())
         return
     if args.init:
-        provider = _resolve_install_value("provider", args.provider)
-        base_url = _resolve_install_value("base_url", args.base_url)
-        model = _resolve_install_value("model", args.model)
+        imported_config = _load_llm_config_file(args.llm_config) if args.llm_config else {}
+        provider = _resolve_install_value("provider", args.provider) or cast(str | None, imported_config.get("provider"))
+        base_url = _resolve_install_value("base_url", args.base_url) or cast(str | None, imported_config.get("base_url"))
+        model = _resolve_install_value("model", args.model) or cast(str | None, imported_config.get("model"))
         normalized_provider = _normalize_provider(provider)
-        api_key = _resolve_api_key(normalized_provider, args.api_key)
+        api_key = _resolve_api_key(normalized_provider, args.api_key) or cast(str | None, imported_config.get("api_key"))
         if args.interactive:
             normalized_provider = _normalize_provider(
                 _prompt_value("LLM provider", normalized_provider or "openai")

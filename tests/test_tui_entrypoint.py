@@ -42,7 +42,7 @@ def test_tui_dry_run_returns_chinese_status(capsys):
     assert status.current_view == "chat"
     assert status.view_title == "对话"
     assert "任务空闲" in status.status_center
-    assert "1-8 切换视图" in status.shortcut_hint
+    assert "1-0 切换视图" in status.shortcut_hint
     assert "Tab/Shift+Tab" in status.shortcut_hint
     assert status.focus_target == "prompt-input"
     assert "SuperMedicine 终端工作台" in capsys.readouterr().out
@@ -53,7 +53,7 @@ def test_tui_dry_run_prints_modern_status_without_secrets(capsys):
     output = capsys.readouterr().out
 
     assert "当前视图：对话" in output
-    assert "快捷键：1-8 切换视图" in output
+    assert "快捷键：1-0 切换视图" in output
     assert "Enter 提交" in output
     assert "焦点：输入栏" in output
     assert status.status_left.startswith("📁")
@@ -153,16 +153,18 @@ def test_tui_view_title_and_status_text_are_test_friendly(tmp_path):
 
     assert app.view_title_text("workspace") == "工作区管理"
     assert app.view_title_text("llm") == "LLM 管理"
+    assert app.view_title_text("experiment") == "实验指导器"
+    assert app.view_title_text("log") == "Log 报告"
     assert app.status_text("workspace").focus == "焦点：输入栏"
     assert "当前视图：工作区管理" in app.status_text("workspace").right
-    assert "1-8 切换视图" in app.shortcut_hint_text()
+    assert "1-0 切换视图" in app.shortcut_hint_text()
     assert "Tab/Shift+Tab" in app.shortcut_hint_text()
 
 
 def test_tui_help_text_documents_actual_bindings_and_state_meanings():
     binding_keys = {binding.key for binding in SuperMedicineTUI.BINDINGS}
 
-    for key in {"1", "2", "3", "4", "5", "6", "7", "8", "q", "f", "question_mark"}:
+    for key in {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "q", "f", "question_mark"}:
         assert key in binding_keys
 
     help_text = "\n".join(
@@ -176,7 +178,7 @@ def test_tui_help_text_documents_actual_bindings_and_state_meanings():
         ]
     )
 
-    for expected in ["1-8", "Tab/Shift+Tab", "Enter", "刷新", "危险操作", "LLM", "任务", "Q", "F", "?"]:
+    for expected in ["1-0", "Tab/Shift+Tab", "Enter", "刷新", "危险操作", "LLM", "任务", "Q", "F", "?"]:
         assert expected in help_text
 
 

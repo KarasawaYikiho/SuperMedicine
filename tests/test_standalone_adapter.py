@@ -78,12 +78,28 @@ class TestStandaloneAdapter:
 
     def test_tool_call_read_write(self):
         with tempfile.TemporaryDirectory() as td:
-            adapter = StandaloneAdapter(project_dir=Path(td))
+            adapter = _adapter_with_policy(Path(td), allowed=[{"action": "tool_call", "scope": "*"}])
             fp = Path(td) / "test.txt"
             w = adapter.tool_call("write", {"filePath": str(fp), "content": "test content"})
             assert w["status"] == "ok"
             r = adapter.tool_call("read", {"filePath": str(fp)})
             assert "test content" in r["result"]
+
+    def test_write_and_edit_fail_closed_when_permission_engine_unavailable(self, tmp_path):
+        adapter = StandaloneAdapter(permission_engine=None, project_dir=tmp_path)
+        target = tmp_path / "blocked.txt"
+        target.write_text("old", encoding="utf-8")
+        policy_dir = tmp_path / ".supermedicine" / "policies"
+        policy_dir.mkdir(parents=True)
+        (policy_dir / PermissionEngine.DEFAULT_POLICY_FILENAME).write_text("invalid: [\n", encoding="utf-8")
+
+        write_result = adapter.tool_call("write", {"filePath": str(target), "content": "new"})
+        edit_result = adapter.tool_call("edit", {"filePath": str(target), "oldString": "old", "newString": "new"})
+
+        assert write_result["status"] == "denied"
+        assert write_result["error_code"] == "permission_engine_unavailable"
+        assert edit_result["status"] == "denied"
+        assert target.read_text(encoding="utf-8") == "old"
 
     def test_tool_call_glob(self):
         adapter = StandaloneAdapter()
@@ -153,6 +169,15 @@ class TestStandaloneAdapter:
 
         assert result["status"] == "denied"
         assert result["resource"] == "bash"
+
+    def test_bash_accepts_argv_without_shell_expansion(self, tmp_path):
+        marker = tmp_path / "should_not_exist.txt"
+        adapter = _adapter_with_policy(tmp_path, allowed=[{"action": "tool_call", "scope": "bash"}])
+
+        result = adapter.tool_call("bash", {"command": ["python", "-c", "print('safe')"], "workdir": str(tmp_path)})
+
+        assert result["status"] == "ok"
+        assert "safe" in result["result"]
         assert not marker.exists()
 
     @pytest.mark.adapter

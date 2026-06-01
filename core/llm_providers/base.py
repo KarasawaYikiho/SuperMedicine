@@ -2,12 +2,18 @@
 from __future__ import annotations
 
 import json
+import logging
+import socket
 import urllib.error
 import urllib.request
 from typing import Any, Iterable
 
 from core.llm_client import LLMClient
-from core.llm_providers.config import LLMProviderConfig, sanitize_error_message
+from core.llm_providers.config import LLMProviderConfig, sanitize_error_message, sanitized_headers
+from core.redaction import redact_sensitive
+
+
+logger = logging.getLogger(__name__)
 
 
 class ConfiguredLLMClient(LLMClient):
@@ -23,7 +29,16 @@ class ConfiguredLLMClient(LLMClient):
     def chat(self, messages: list[dict[str, str]], **kwargs: Any) -> dict[str, Any]:
         validation_error = self.config.validation_error()
         if validation_error:
+            logger.warning(
+                "LLM provider configuration rejected before request: provider=%s code=%s",
+                self.config.provider,
+                validation_error.get("error", {}).get("code"),
+            )
             return validation_error
+
+        if not self._valid_messages(messages):
+            logger.warning("LLM request rejected because messages are empty or malformed: provider=%s", self.config.provider)
+            return self.config.error("invalid_request", "LLM request requires at least one non-empty message with role and content")
 
         api_format = kwargs.pop("api_format", self.config.api_format).lower()
         if api_format == "anthropic":
@@ -84,8 +99,11 @@ class ConfiguredLLMClient(LLMClient):
         choices = response.get("choices") or [{}]
         choice = choices[0] if isinstance(choices, list) and choices else {}
         message = choice.get("message", {}) if isinstance(choice, dict) else {}
+        content = self._content_to_text(message.get("content", "")) if isinstance(message, dict) else ""
+        if not content:
+            return self._invalid_response("OpenAI chat response did not contain message.content", response)
         return {
-            "content": self._content_to_text(message.get("content", "")),
+            "content": content,
             "model": response.get("model", self.config.model),
             "usage": response.get("usage", {}),
         }
@@ -101,6 +119,8 @@ class ConfiguredLLMClient(LLMClient):
                     if isinstance(block, dict):
                         parts.append(str(block.get("text") or block.get("content") or ""))
             content = "".join(parts)
+        if not content:
+            return self._invalid_response("OpenAI responses response did not contain output text", response)
         return {
             "content": str(content or ""),
             "model": response.get("model", self.config.model),
@@ -131,6 +151,8 @@ class ConfiguredLLMClient(LLMClient):
         if "error" in response:
             return response
         content = self._content_to_text(response.get("content", []))
+        if not content:
+            return self._invalid_response("Anthropic response did not contain text content", response)
         return {
             "content": content,
             "model": response.get("model", self.config.model),
@@ -139,15 +161,43 @@ class ConfiguredLLMClient(LLMClient):
 
     def _post_json(self, path: str, payload: dict[str, Any], headers: dict[str, str]) -> dict[str, Any]:
         url = self.config.base_url.rstrip("/") + path
+        safe_url = redact_sensitive(url)
+        logger.info(
+            "Sending LLM request: provider=%s format=%s model=%s url=%s timeout=%s headers=%s message_count=%s",
+            self.config.provider,
+            self.config.api_format,
+            self.config.model,
+            safe_url,
+            self.config.timeout,
+            sanitized_headers(headers),
+            len(payload.get("messages") or payload.get("input") or []),
+        )
         try:
             data = json.dumps(payload).encode("utf-8")
             req = urllib.request.Request(url, data=data, headers=headers, method="POST")
             with urllib.request.urlopen(req, timeout=self.config.timeout) as resp:
-                return json.loads(resp.read().decode("utf-8"))
+                raw = resp.read().decode("utf-8")
+                parsed = json.loads(raw)
+                if not isinstance(parsed, dict):
+                    logger.error("LLM provider returned non-object JSON: provider=%s", self.config.provider)
+                    return self.config.error("invalid_response", "LLM provider returned non-object JSON response")
+                logger.info("LLM request completed: provider=%s model=%s", self.config.provider, parsed.get("model", self.config.model))
+                return parsed
         except urllib.error.HTTPError as exc:
             return self._http_error(exc)
+        except socket.timeout as exc:
+            logger.error("LLM request timed out: provider=%s url=%s timeout=%s", self.config.provider, safe_url, self.config.timeout)
+            return self.config.error("timeout", f"LLM provider request timed out after {self.config.timeout} seconds: {exc}")
+        except urllib.error.URLError as exc:
+            reason = sanitize_error_message(str(getattr(exc, "reason", exc)), [self.config.api_key])
+            logger.error("LLM network failure: provider=%s url=%s error=%s", self.config.provider, safe_url, reason)
+            return self.config.error("network_error", f"LLM provider network failure: {reason}")
+        except json.JSONDecodeError as exc:
+            logger.error("LLM provider returned invalid JSON: provider=%s url=%s error=%s", self.config.provider, safe_url, exc)
+            return self.config.error("invalid_response", f"LLM provider returned invalid JSON: {exc}")
         except Exception as exc:
             message = sanitize_error_message(str(exc), [self.config.api_key])
+            logger.error("LLM request failed: provider=%s url=%s error=%s", self.config.provider, safe_url, message)
             return self.config.error("request_error", message)
 
     def _http_error(self, exc: urllib.error.HTTPError) -> dict[str, Any]:
@@ -160,7 +210,32 @@ class ConfiguredLLMClient(LLMClient):
             details = ""
         reason = details or getattr(exc, "reason", "") or "HTTP error"
         message = sanitize_error_message(f"HTTP {exc.code}: {reason}", [self.config.api_key])
-        return self.config.error("http_error", message)
+        code = "authentication_failed" if exc.code in (401, 403) else "http_error"
+        logger.error("LLM HTTP failure: provider=%s status=%s error=%s", self.config.provider, exc.code, message)
+        return self.config.error(code, message)
+
+    def _invalid_response(self, message: str, response: dict[str, Any]) -> dict[str, Any]:
+        logger.error(
+            "LLM response parsing failed: provider=%s model=%s reason=%s keys=%s",
+            self.config.provider,
+            self.config.model,
+            message,
+            sorted(str(key) for key in response.keys()),
+        )
+        return self.config.error("invalid_response", message)
+
+    @staticmethod
+    def _valid_messages(messages: list[dict[str, str]]) -> bool:
+        if not isinstance(messages, list) or not messages:
+            return False
+        for message in messages:
+            if not isinstance(message, dict):
+                return False
+            if not str(message.get("role") or "").strip():
+                return False
+            if str(message.get("content") or "").strip():
+                return True
+        return False
 
     @staticmethod
     def _copy_options(

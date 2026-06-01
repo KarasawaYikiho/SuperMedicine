@@ -64,11 +64,15 @@ class ChatView(Vertical):
 
     def _write_block(self, label: str, icon: str, style: str, message: str, *, blank_after: bool = True) -> None:
         output = self.query_one("#chat-output", RichLog)
-        self._write_separator(output)
-        output.write(f"[{style}]{icon} {safe_display_text(label)}[/]")
-        output.write(safe_display_text(message))
+        lines = [
+            f"[dim]{safe_display_text(t('chat_separator'))}[/dim]",
+            f"[{style}]{icon} {safe_display_text(label)}[/]",
+            safe_display_text(message),
+        ]
         if blank_after:
-            output.write("")
+            lines.append("")
+        block = "\n".join(lines)
+        output.write(block)
 
     def add_user_message(self, message: str) -> None:
         """Add a user message to the chat display."""

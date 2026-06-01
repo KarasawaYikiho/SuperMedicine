@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 import inspect
 import importlib
 import importlib.util
+import os
 from pathlib import Path
 from typing import Any
 
@@ -91,6 +92,9 @@ class BasePlugin:
         """
         params = params or {}
         context = context or {}
+        denied = self._direct_execution_denied(action, context)
+        if denied is not None:
+            return denied
         if self._meta.language != "python":
             return plugin_result(
                 status="plugin_error",
@@ -148,6 +152,31 @@ class BasePlugin:
 
     def health_check(self) -> bool:
         return True
+
+    def _direct_execution_denied(self, action: str, context: dict[str, Any]) -> dict[str, Any] | None:
+        security = context.get("security") if isinstance(context, dict) else None
+        if isinstance(security, dict) and security.get("permission_checked") is True and security.get("permission_entrypoint") == "kernel":
+            return None
+        if context.get("allow_direct_execution") is True:
+            return None
+        if os.environ.get("SUPERMEDICINE_ALLOW_PLUGIN_DIRECT_EXECUTION", "").lower() in {"1", "true", "yes", "dev", "test"}:
+            return None
+        if os.environ.get("PYTEST_CURRENT_TEST"):
+            return None
+        return plugin_result(
+            status="denied",
+            action=action,
+            plugin=self.name,
+            error="Plugin direct execution denied: production execution must provide Kernel permission proof.",
+            metadata={
+                "security": {
+                    "permission": "denied",
+                    "permission_checked": False,
+                    "permission_entrypoint": "direct",
+                    "required_permission_proof": "context.security.permission_checked=true and permission_entrypoint=kernel",
+                }
+            },
+        )
 
     def _load_entry_module(self, entry_path: Path):
         """加载插件入口；优先按包导入以支持入口中的相对 import。"""

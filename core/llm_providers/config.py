@@ -20,7 +20,11 @@ def redact_secret(value: Any) -> str:
 
 def sanitize_error_message(message: str, secrets: list[str] | tuple[str, ...]) -> str:
     """Remove known raw secret values from an error message."""
-    sanitized = redact_sensitive(message)
+    sanitized = message
+    for secret in secrets:
+        if secret:
+            sanitized = sanitized.replace(secret, "<redacted>")
+    sanitized = redact_sensitive(sanitized)
     for secret in secrets:
         if secret:
             sanitized = sanitized.replace(secret, "<redacted>")

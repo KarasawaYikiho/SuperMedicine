@@ -1,77 +1,67 @@
 # SuperMedicine
 
-![Version](https://img.shields.io/badge/version-Beta0.3.6-blue)
-![CI](https://github.com/KarasawaYikiho/SuperMedicine/actions/workflows/ci.yml/badge.svg)
+![Version](https://img.shields.io/badge/version-Beta0.4.0-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-Independent Python medical research agent framework with RAG, plugin execution,
-and permission-gated orchestration. SuperMedicine runs as a standalone Python
-package by default; OpenCode, Claude Code, and similar assistant platforms are
-optional add-on adapters around the core, not core runtime requirements.
+SuperMedicine is an independent Python framework for medical research assistance.
+It combines a microkernel, permission-gated plugin execution, RAG utilities,
+medical writing/citation helpers, workspace management, paper import, experience
+learning, and a Chinese terminal UI. OpenCode and Claude Code integrations are
+optional add-ons; the Python CLI and Kernel are the default supported runtime.
 
-**Use this README for orientation and quick-start commands.** For full setup
-detail, see [INSTALL.md](INSTALL.md); for system design, see
-[ARCHITECTURE.md](ARCHITECTURE.md); for security boundaries, see
+Public/release label: **Beta0.4.0**. Python package fallback version:
+**0.4.0b0**.
+
+For detailed setup, see [INSTALL.md](INSTALL.md). For design boundaries, see
+[ARCHITECTURE.md](ARCHITECTURE.md). For security and medical-use limits, see
 [SECURITY.md](SECURITY.md).
+
+## 中文简介
+
+SuperMedicine 是一个面向医学科研辅助的独立 Python 框架，默认通过本项目的
+CLI、Kernel、插件系统和中文 TUI 运行，不依赖 OpenCode、Claude Code 或其他
+助手平台。平台适配器仅作为可选扩展。
+
+主要能力：
+
+- 工作区管理、论文导入、经验学习和工具管理。
+- RAG 检索、实验指导/日志、Python/R 统计原型接口。
+- CONSORT、STROBE、PRISMA、STARD 检查表，以及 AMA/Vancouver 引文格式化。
+- P0 权限引擎、审计日志和密钥脱敏诊断。
+- LLM Provider 管理，支持 OpenAI 格式、Anthropic 格式、OpenRouter 以及兼容网关。
+
+使用前请配置至少一个完整 LLM Provider（provider、base URL、model 和 API key
+来源）。真实密钥应放在环境变量、私有配置或密钥管理器中，不要提交到仓库。
 
 ## Feature Summary
 
-- **Modular Architecture** — Microkernel plus multi-agent orchestration with a plugin system.
-- **P0 Permission Engine** — Runtime permission constraints with prompt-context safety guidance.
-- **Plugin Ecosystem** — RAG retrieval, Harness monitoring, Python/R statistics, and medical writing standards.
-- **Interactive TUI** — Chinese terminal UI with sidebar navigation, LLM management, and keyboard shortcuts.
-- **Workspace System** — Explicit workspace management with paper import, experience learning, and tool management.
-- **Standalone Core by Default** — No OpenCode, Claude Code, or platform runtime is required.
-- **Optional Platform Add-ons** — OpenCode and Claude Code adapters support platform-specific workflows.
-- **Medical Standards** — CONSORT, STROBE, PRISMA, and STARD checklists plus AMA/Vancouver citation formatting.
-
----
-
-## Table of Contents
-
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [LLM Provider Configuration](#llm-provider-configuration)
-- [CLI Reference](#cli-reference)
-- [TUI (Terminal UI)](#tui-terminal-ui)
-- [Platform Adapters](#platform-adapters)
-- [Architecture](#architecture)
-- [Running Tests](#running-tests)
-- [Troubleshooting](#troubleshooting)
-- [Safety And Security](#safety-and-security)
-- [License](#license)
-
----
+- **Standalone Python core** — CLI, Kernel, configuration, plugin discovery, and
+  runtime execution work without platform-specific assistant runtimes.
+- **Permission-gated execution** — high-risk actions pass through
+  `PermissionEngine.check()` and are written to audit logs.
+- **LLM provider management** — built-in defaults for OpenAI, Anthropic, and
+  OpenRouter plus custom compatible providers by API format.
+- **Research workspaces** — explicit workspace ids, copy-only paper import,
+  user-confirmed experience records, and local tool templates.
+- **Chinese TUI** — Textual-based terminal interface for chat, dashboard,
+  workspace, paper, experience, tool, dialog history, LLM, experiment guide, and
+  log report screens.
+- **Medical research helpers** — RAG, harness monitoring, prototype statistics,
+  reporting checklists, and citation formatting.
 
 ## Installation
 
-### Prerequisites
+Requirements:
 
 | Requirement | Version | Notes |
 |-------------|---------|-------|
-| Python | >= 3.10 | Required (3.10, 3.11, 3.12, 3.13 tested) |
-| Git | any | For cloning the repository |
-| pip | >= 21.0 | For package installation |
-| R | >= 4.3 | Optional, for survival analysis tools |
+| Python | >= 3.10 | Required |
+| Git | any | Required for cloning |
+| pip | >= 21.0 | Required for package install |
+| R | >= 4.3 | Optional, for R survival backend |
 
-OpenCode, Claude Code, and other assistant platforms are **not** prerequisites.
-
-### Quick Install (All Platforms)
-
-```bash
-git clone https://github.com/KarasawaYikiho/SuperMedicine.git
-cd SuperMedicine
-pip install -e .       # use python3 on macOS/Linux
-supermedicine status   # or: python Cli.py status
-```
-
-For virtual environment setup, PATH configuration, and optional dependencies,
-see [INSTALL.md](INSTALL.md).
-
----
-
-## Quick Start
+Quick install:
 
 ```bash
 git clone https://github.com/KarasawaYikiho/SuperMedicine.git
@@ -80,361 +70,158 @@ pip install -e .
 export OPENAI_API_KEY=<OPENAI_API_KEY>
 python Install.py --init --provider openai --base-url https://api.openai.com/v1 --model gpt-4o-mini
 supermedicine status
-supermedicine tui
 ```
 
-See [INSTALL.md](INSTALL.md) for detailed provider configuration, virtual
-environment setup, and platform-specific instructions.
-
----
+Use `python Cli.py status` if the `supermedicine` console script is not on PATH.
+For virtual environments, development dependencies, optional R support, and
+platform-specific notes, see [INSTALL.md](INSTALL.md).
 
 ## LLM Provider Configuration
 
-SuperMedicine supports multiple LLM API formats through the standalone Python
-core. `openai` (Chat Completions) and `anthropic` (Messages) are wire protocols,
-not vendor names — any provider can use either format. OpenRouter is also
-supported as a built-in gateway provider. OpenCode and Claude Code are optional
-platform surfaces; they are not required.
+Initialization and LLM-backed tasks require a complete provider configuration:
+`provider`, `base_url`, `model`, and either `api_key` or `api_key_env`.
+SuperMedicine reports explicit setup or provider errors instead of pretending a
+missing provider succeeded.
 
-### Supported API Formats
+Supported API formats:
 
-| API Format | Protocol | Default BaseURL | Default Key Env | Default Model | Compatible Providers |
-|------------|----------|-----------------|-----------------|---------------|---------------------|
-| `openai` | OpenAI Chat Completions | `https://api.openai.com/v1` | `OPENAI_API_KEY` | `gpt-4o-mini` | OpenAI, DeepSeek, Zhipu GLM, Ollama, etc. |
-| `anthropic` | Anthropic Messages | `https://api.anthropic.com/v1` | `ANTHROPIC_API_KEY` | `claude-3-5-sonnet-latest` | Anthropic |
-| `openrouter` | OpenRouter Gateway (OpenAI format) | `https://openrouter.ai/api/v1` | `OPENROUTER_API_KEY` | `anthropic/claude-3.5-sonnet` | OpenRouter (multi-model gateway) |
+| API Format | Default Base URL | Default Key Env | Default Model |
+|------------|------------------|-----------------|---------------|
+| `openai` | `https://api.openai.com/v1` | `OPENAI_API_KEY` | `gpt-4o-mini` |
+| `anthropic` | `https://api.anthropic.com/v1` | `ANTHROPIC_API_KEY` | `claude-3-5-sonnet-latest` |
+| `openrouter` | `https://openrouter.ai/api/v1` | `OPENROUTER_API_KEY` | `anthropic/claude-3.5-sonnet` |
 
-Custom endpoints are supported with `--base-url` or `SM_LLM_BASE_URL`.
+Custom providers such as DeepSeek, 智谱 GLM, local Ollama-compatible endpoints,
+or private gateways can be configured with `--provider`, `--base-url`,
+`--api-format`, and `--model`.
 
-### Custom Providers (Any Name)
-
-SuperMedicine accepts **any provider name**. The `api_format` field determines
-which HTTP client is used, not the provider name itself. Built-in defaults exist
-for `openai`, `anthropic`, and `openrouter`; all other names default to OpenAI
-chat-completions format unless overridden with `--api-format`.
-
-| Example Provider | BaseURL | API Format | Model Example |
-|------------------|---------|------------|---------------|
-| DeepSeek | `https://api.deepseek.com/v1` | `openai` (auto) | `deepseek-chat` |
-| 智谱 GLM | `https://open.bigmodel.cn/api/paas/v4` | `openai` (auto) | `glm-4-flash` |
-| Ollama (local) | `http://localhost:11434/v1` | `openai` (auto) | `llama3` |
-| Any Anthropic-compatible | Custom URL | `anthropic` (explicit) | Custom model |
+Example:
 
 ```bash
-# DeepSeek example
-python Install.py --init --provider deepseek \
+supermedicine llm add deepseek \
+  --api-format openai \
   --base-url https://api.deepseek.com/v1 \
-  --api-key <DEEPSEEK_API_KEY> \
-  --model deepseek-chat
+  --api-key-env DEEPSEEK_API_KEY \
+  --model deepseek-chat \
+  --set-current
 
-# 智谱 GLM example
-python Install.py --init --provider zhipu \
-  --base-url https://open.bigmodel.cn/api/paas/v4 \
-  --api-key <ZHIPU_API_KEY> \
-  --model glm-4-flash
-
-# Local Ollama example (no API key required)
-python Install.py --init --provider ollama \
-  --base-url http://localhost:11434/v1 \
-  --api-key ollama \
-  --model llama3
-
-# OpenRouter example (uses OPENROUTER_API_KEY by default)
-export OPENROUTER_API_KEY=<OPENROUTER_API_KEY>
-python Install.py --init --provider openrouter
+supermedicine llm list
+supermedicine llm show deepseek
+supermedicine llm switch deepseek
 ```
 
-Provider names containing `anthropic` or `claude` auto-infer the Anthropic API
-format; all others default to OpenAI chat-completions. Override with
-`--api-format` or `api_format` in `.supermedicine/config.yaml`.
-
-### First-Run Requirement
-
-LLM-backed tasks require one complete provider (`base_url`, `api_key` or
-`api_key_env`, and `model`). See [INSTALL.md](INSTALL.md) for runtime
-validation details and programmatic client creation examples.
-
-### Configure by Editing the File
-
-Edit `.supermedicine/config.yaml` directly; see [INSTALL.md](INSTALL.md#3b-configure-by-editing-supermedicineconfigyaml) for YAML examples.
-
-### Configure with the CLI
-
-Use `supermedicine llm add/switch/list`; see [INSTALL.md](INSTALL.md#3a-add-providers-after-initialization) for CLI examples.
-
-### Configure in the TUI
-
-Launch `supermedicine tui` and open **LLM 管理**; see [INSTALL.md](INSTALL.md#3c-configure-in-the-tui) for details.
-
-### Switching and Startup Restore
-
-Use `supermedicine llm switch <provider>`; see [INSTALL.md](INSTALL.md#3a-add-providers-after-initialization) for details.
-
-### Environment Variables and Secret Safety
-
-Use `SM_LLM_*` and provider-specific env vars; see [INSTALL.md](INSTALL.md) and [SECURITY.md](SECURITY.md) for the full list.
-
----
+Prefer `--api-key-env` for real credentials. Documentation examples use
+placeholders only.
 
 ## CLI Reference
 
-All commands are available via `supermedicine <command>` or `python Cli.py <command>`.
-
-### Core Commands
+All commands can be run as `supermedicine <command>` or `python Cli.py <command>`.
 
 ```bash
 supermedicine init --provider openai --base-url https://api.openai.com/v1 --model gpt-4o-mini
-                                      # Initialize project configuration
-supermedicine status                  # Show project status (version, plugins, modules)
-supermedicine test                    # Run the test suite
-supermedicine run TASK [--workspace]  # Execute a task through the Kernel and plugins
-supermedicine run TASK --plugin NAME  # Execute via a specific plugin
-supermedicine run TASK --action NAME  # Execute a specific plugin action
-supermedicine run TASK --params-json '{"key": "value"}'  # Pass structured parameters
-supermedicine run TASK --verbose      # Detailed output
+supermedicine status
+supermedicine diagnose
+supermedicine run "summarize local context" [--workspace <slug>]
+supermedicine tui
 ```
 
-### Workspace Commands
+Workspace, paper, experience, tool, experiment, log, and LLM management commands
+use explicit flags and redacted output where appropriate:
 
 ```bash
-supermedicine workspace init --workspace <slug> [--name "Display Name"]
-supermedicine workspace list
-supermedicine workspace show --workspace <slug>
-supermedicine workspace delete --workspace <slug> --confirm <slug>
+supermedicine workspace init --workspace demo --name "Demo Workspace"
+supermedicine paper import ./paper.pdf --workspace demo --title "Paper Title"
+supermedicine experience suggest --workspace demo --summary "Keep prompts short"
+supermedicine tool init --workspace demo
+supermedicine experiment start --protocol wb --session-id wb-demo
+supermedicine log list
+supermedicine llm list
 ```
 
-Workspaces live under `workspaces/<id>` (lowercase slug, letters/digits/hyphens).
-CLI commands never infer the last TUI workspace; every workspace-scoped action
-requires `--workspace <id>`.
-
-### Paper Commands
-
-```bash
-supermedicine paper import ./paper.pdf --workspace <slug> --title "Paper Title"
-supermedicine paper import ./paper.pdf --workspace <slug> --doi "10.xxx/yyy"
-supermedicine paper import ./paper.pdf --workspace <slug> --tag "oncology" --tag "RCT"
-supermedicine paper list --workspace <slug>
-supermedicine paper show <paper-id> --workspace <slug>
-supermedicine paper edit <paper-id> --workspace <slug> --title "New Title"
-supermedicine paper enrich <paper-id> --workspace <slug> --confirm-enrich
-```
-
-Paper imports are copy-only: the source file is never moved or uploaded.
-Papers are deduplicated by SHA-256 and by normalized DOI/PMID.
-
-### Experience Commands
-
-```bash
-supermedicine experience suggest --workspace <slug> --summary "Keep prompts short"
-supermedicine experience add --workspace <slug> --scope workspace \
-  --title "Prompt Strategy" --summary "Keep prompts short" --confirm
-supermedicine experience list --workspace <slug>
-supermedicine experience list --workspace <slug> --include-general
-supermedicine experience view <record-id> --workspace <slug>
-supermedicine experience edit <record-id> --workspace <slug> --scope workspace \
-  --title "Updated Title"
-supermedicine experience delete <record-id> --workspace <slug> --scope workspace \
-  --confirm <record-id>
-supermedicine experience export --workspace <slug> --format json
-supermedicine experience export --workspace <slug> --format md --output experience.md
-```
-
-Experience learning is enabled by default. Raw conversations are **not** stored;
-only user-confirmed summaries are persisted.
-
-### Tool Commands
-
-```bash
-supermedicine tool init --workspace <slug>
-supermedicine tool add --workspace <slug> --language python --tool heatmap
-supermedicine tool add --workspace <slug> --language r --tool umap
-supermedicine tool list --workspace <slug>
-supermedicine tool list --workspace <slug> --language python
-supermedicine tool show --workspace <slug> --language python --tool heatmap
-supermedicine tool run --workspace <slug> --language python --tool heatmap --dry-run
-supermedicine tool run --workspace <slug> --language python --tool heatmap \
-  --input data.csv --output results/
-```
-
-### TUI Command
-
-```bash
-supermedicine tui              # Launch interactive TUI
-supermedicine tui --dry-run    # Show TUI status without launching
-```
-
-### LLM Commands
-
-```bash
-supermedicine llm add openai --api-format openai \
-  --base-url https://api.openai.com/v1 \
-  --api-key-env OPENAI_API_KEY \
-  --model gpt-4o-mini \
-  --set-current
-
-supermedicine llm list              # List providers; secrets are redacted
-supermedicine llm show [provider]   # Show current or named provider; redacted
-supermedicine llm switch anthropic  # Validate, switch, and persist default/last
-```
-
-For real credentials, prefer `--api-key-env` over `--api-key` so command history
-and local YAML do not receive plaintext secrets.
-
----
+Workspace-scoped CLI commands do not silently reuse the TUI's recent workspace.
+CLI commands always require explicit `--workspace`.
 
 ## TUI (Terminal UI)
 
-SuperMedicine includes a full interactive Chinese terminal UI built with
-[Textual](https://textual.textualize.io/). Launch with `supermedicine tui`.
+Launch the Chinese terminal UI with:
 
-### Interface Structure
+```bash
+supermedicine tui
+supermedicine tui --dry-run
+```
 
-The TUI is organized as a persistent left sidebar plus a swappable main content
-area and bottom status bar:
+Navigation keys:
 
-- **Sidebar** — numbered navigation entries `1` through `8` and a compact global
-  shortcut hint.
-- **Main area** — current view title, the selected management/workbench screen,
-  and a shared input bar for chat-style commands.
-- **Status bar** — workspace count and current focus on the left, plugin count,
-  LLM status, and task running state in the center, and current view/version on
-  the right.
-
-### Navigation and Shortcuts
-
-| Key | Action |
+| Key | Screen |
 |-----|--------|
-| `1` | Chat (对话) |
-| `2` | Dashboard (仪表盘) |
-| `3` | Workspace (工作区管理) |
-| `4` | Paper (论文管理) |
-| `5` | Experience (经验学习) |
-| `6` | Tool (工具管理) |
-| `7` | Dialog (对话历史) |
-| `8` | LLM (LLM 管理) |
-| `↑` / `↓` | Navigate sidebar |
-| `Tab` | Move focus forward between input, buttons, lists, and tables |
-| `Shift+Tab` | Move focus backward between focusable widgets |
-| `Enter` | Submit the input when focused on the prompt; activate the focused button/list item elsewhere |
-| `f` | Maximize/Minimize focused widget |
-| `Esc` | Exit maximize mode |
-| `?` | Show help |
-| `q` | Quit |
+| `1` | Chat / 对话 |
+| `2` | Dashboard / 仪表盘 |
+| `3` | Workspace / 工作区管理 |
+| `4` | Paper / 论文管理 |
+| `5` | Experience / 经验学习 |
+| `6` | Tool / 工具管理 |
+| `7` | Dialog / 对话历史 |
+| `8` | LLM / LLM 管理 |
+| `9` | Experiment Guide / 实验指导器 |
+| `0` | Log Report / Log 报告 |
+| `f` | Maximize/minimize the focused widget |
 
-### Screens
+Use `Tab`/`Shift+Tab` for focus movement, `Enter` to submit or activate, `?` for
+help, and `q` to quit. API-key fields are password-style, but ordinary chat input
+is not a secret-entry control.
 
-| Screen | Description |
-|--------|-------------|
-| **Chat** | Interactive conversation with the AI agent |
-| **Dashboard** | System status, workspace count, plugin count, quick actions |
-| **Workspace** | Create, select, delete workspaces; view workspace details |
-| **Paper** | Import papers, view/edit metadata, run enrichment |
-| **Experience** | Suggest, confirm, list, edit, delete, export experience records |
-| **Tool** | Initialize tools, add templates, list, run |
-| **LLM** | Add providers, switch current default, inspect redacted readiness state |
-| **Dialog** | View session dialog history (read-only) |
-
-### Status and Safety Cues
-
-- **LLM 状态** shows provider readiness without exposing API keys.
-- **任务运行状态** appears as `任务空闲` or `任务执行中` for long-running work.
-- **刷新** buttons on each screen reload lists from shared backend controllers.
-- **危险操作** require explicit confirmation before irreversible work proceeds.
-
-### TUI vs CLI
-
-- TUI recent selection is workspace/session state and does **not** alter CLI defaults.
-- CLI commands always require explicit `--workspace` — they never read TUI state.
-- TUI and CLI share the same backend controllers and data.
-- The TUI is part of the standalone Python package; platform adapters are optional.
-
----
+Status cues include workspace count and current focus on the left, plugin count,
+LLM status, and task running state in the center, and current view/version on the
+right. **LLM 状态** shows provider readiness without exposing API keys, and
+**任务运行状态** appears as `任务空闲` or `任务执行中` for long-running work.
 
 ## Platform Adapters
 
-SuperMedicine's default model is **core independent + platform add-ons**. The
-standalone Python core is the default supported path; OpenCode and Claude Code
-are optional adapters. See [INSTALL.md](INSTALL.md) for detailed setup steps.
-
-### OpenCode Add-On
-
-The OpenCode adapter (`adapters/opencode/`) provides plugin metadata, skill
-documents, agent definitions, and tool mapping for `bash`, `read`, `write`,
-`edit`, `glob`, `grep`, `skill`, `task`. See [INSTALL.md](INSTALL.md) for
-setup details.
-
-### Claude Code Add-On
-
-The Claude Code adapter (`adapters/claude_code/`) provides capability reporting,
-runtime status checking, and permission-checked `claude --print` invocation.
-See [INSTALL.md](INSTALL.md) for setup details.
-
-### Capability Matrix
+Platform adapters live under `adapters/` and are optional:
 
 | Capability | Standalone Core | OpenCode Add-on | Claude Code Add-on |
 |------------|----------------|-----------------|-------------------|
-| CLI `init`/`status`/`run` | Supported | Can wrap/adapt | Minimal adapter path |
-| PermissionEngine | Supported | Used for adapter ops | Used before tool execution |
+| CLI init/status/run | Supported | Can wrap metadata | Minimal adapter path |
+| Permission engine | Supported | Used for adapter operations | Used before tool execution |
 | Plugin discovery/execution | Supported | Metadata integration | Not native |
-| RAG/harness/medical standards | Supported | Skill docs available | Conceptual docs only |
-| Native platform tool calls | Not required | 8 tools mapped | `claude.invoke` only |
-| Native subagent runtime | Not applicable | Not without orchestrator | Not implemented |
+| Native platform tool calls | Not required | Declared tool mappings | `claude.invoke` only |
+| Native subagent runtime | Not applicable | Not launched by adapter alone | Not implemented |
 
----
+## Architecture Overview
 
-## Architecture
-
-```
-supermedicine/
-├── core/                 # Microkernel, event bus, plugin registry, workspace
-│   ├── redaction.py      # Shared sensitive-value redaction
-│   ├── time_utils.py     # Shared UTC timestamp utilities
-│   ├── tui/              # Interactive TUI (Textual)
-│   │   ├── app.py        # Main TUI application
-│   │   ├── app.tcss      # TUI stylesheet
-│   │   ├── screens/      # Dashboard, Workspace, Paper, Experience, Tool, Dialog
-│   │   ├── i18n.py       # Chinese labels
-│   │   └── dialog_history.py
-│   ├── paper_import/     # Paper import, metadata, enrichment
-│   ├── workspace.py      # Workspace identity and storage
-│   ├── experience.py     # Experience learning store
-│   └── llm_providers/    # OpenAI/Anthropic/OpenRouter provider config and HTTP clients
-├── permission/           # P0 policy, audit, engine, prompt constraints
-├── agents/               # State machine, checkpoint, orchestrator, base agent
-├── plugins/
-│   ├── rag/              # RAG retrieval + local/mock external providers
-│   ├── harness/          # Testing, monitoring, quality assessment
-│   ├── tools/            # Python stats + R survival analysis
-│   └── standards/        # Medical writing checklists + citation formatters
-├── adapters/             # Optional platform add-ons
-│   ├── opencode/         # OpenCode adapter (plugin.json, skills, agents)
-│   ├── claude_code/      # Claude Code adapter (SKILL.md, adapter.py)
-│   └── standalone/       # Standalone facade
-├── Cli.py                # CLI entry point
-├── Install.py            # Project initializer
-├── install.json          # Agent-readable installation manifest
-└── tests/                # Test suite (542+ tests)
+```text
+CLI / TUI / Optional Adapters
+        |
+        v
+Kernel: ConfigCenter + EventBus + PluginRegistry + SessionManager + PermissionEngine
+        |
+        +--> Agents and orchestration state machine
+        +--> Plugins: RAG, harness, tools, standards
+        +--> Workspace layer: papers, experience, local tool assets
 ```
 
----
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the root architecture reference.
 
-## Running Tests
+## Diagnostics and Troubleshooting
 
-```bash
-# Via CLI
-supermedicine test
+Use `supermedicine diagnose` for secret-safe status, provider readiness, audit log
+path checks, and repair suggestions.
 
-# Via pytest directly
-pytest tests/ -v
+Common fixes:
 
-# Run specific test file
-pytest tests/test_workspace.py -v
+| Issue | Fix |
+|-------|-----|
+| `No module named 'yaml'` | Install package dependencies with `pip install -e .` or install `pyyaml`. |
+| `supermedicine` command not found | Add the Python Scripts directory to PATH or use `python Cli.py`. |
+| Initialization fails with missing LLM fields | Provide provider, base URL, model, and API key source. |
+| LLM call fails | Treat it as a real provider/configuration error; run diagnostics and inspect redacted fields. |
+| TUI launch issue | Run `supermedicine tui --dry-run`, then restart the terminal if needed. |
 
-# Run with coverage
-pytest tests/ --cov=. --cov-report=term-missing
-```
+## Local Quality Gate
 
-### Local Quality Gate
+For development and release checks, use the project quality commands documented
+by the maintainers. A typical local gate includes linting, packaging smoke checks,
+and the test suite, for example:
 
 ```bash
 pip install -e ".[dev]"
@@ -443,40 +230,17 @@ python -m pip wheel . --no-deps --wheel-dir .pytest-tmp/wheel-smoke
 pytest tests/ -v
 ```
 
----
+## Safety and Medical-Use Boundaries
 
-## Troubleshooting
+- SuperMedicine is research-support software, not a clinical decision system.
+- Plugin outputs, citations, RAG results, metadata enrichment, and prototype
+  statistics require qualified human review.
+- Paper import is copy-only and does not upload source files by default.
+- Experience learning stores user-confirmed summaries, not raw conversations.
+- Real credentials belong in environment variables, private local config, secret
+  managers, or CI secrets, not committed files.
 
-| Issue | Fix |
-|-------|-----|
-| **"No module named 'yaml'"** | `pip install pyyaml` |
-| **"Permission denied" on Windows** | Run PowerShell as Administrator, or use `python -m venv .venv --without-pip` |
-| **CLI command not found** | Add Python Scripts to PATH (see [INSTALL.md](INSTALL.md#cli-command-not-found)), or use `python Cli.py` directly |
-
-For R survival backend setup, TUI launch issues, LLM provider troubleshooting,
-and additional guidance, see [INSTALL.md](INSTALL.md#troubleshooting).
-
----
-
-## Safety and Security
-
-- **Permission Engine** — All high-risk operations (bash, write, edit) are
-  permission-gated through `PermissionEngine.check()` at runtime.
-- **Adapter Sandboxing** — In-project read/write/edit compatible; out-of-root
-  denied; bash permission-gated.
-- **RAG Security** — External providers use environment variable references for
-  secrets; no hardcoded credentials.
-- **LLM Secrets** — Use environment variables or local private config for API
-  keys. Documentation examples use placeholders only; never commit real keys.
-- **Paper Import** — Copy-only; source files are never moved or uploaded.
-- **Experience Learning** — Raw conversations are not stored; only
-  user-confirmed summaries are persisted.
-- **Audit Logging** — All permission decisions are logged to
-  `.supermedicine/policies/audit.jsonl`.
-
-See [SECURITY.md](SECURITY.md) for the full security policy.
-
----
+See [SECURITY.md](SECURITY.md) for the full policy.
 
 ## License
 

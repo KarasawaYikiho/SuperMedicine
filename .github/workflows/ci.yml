@@ -5,6 +5,10 @@ on:
     branches: [master, main]
   pull_request:
     branches: [master, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   release-gate:
@@ -58,7 +62,12 @@ jobs:
 
   packaging-smoke:
     name: Source distribution smoke
+    needs: release-gate
     runs-on: ubuntu-latest
+    outputs:
+      release_label: ${{ steps.source_zip.outputs.release_label }}
+      release_title: ${{ steps.source_zip.outputs.release_title }}
+      archive_name: ${{ steps.source_zip.outputs.archive_name }}
     steps:
       - uses: actions/checkout@v4
 
@@ -79,3 +88,210 @@ jobs:
         run: |
           python -m build --sdist --outdir dist
           rm -rf dist
+
+      - name: Build release source Zip
+        id: source_zip
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import os
+          import re
+          import shutil
+          import tomllib
+          import zipfile
+
+          root = Path.cwd()
+          version = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
+          beta_match = re.fullmatch(r"(\d+\.\d+\.\d+)b\d+", version)
+          release_version = beta_match.group(1) if beta_match else version
+          release_label = f"Beta{release_version}" if beta_match else f"v{release_version}"
+          release_title = f"Beta {release_version}" if beta_match else f"v{release_version}"
+          archive_name = f"SuperMedicine-{release_label}-source.zip"
+          stage = root / ".source-zip-stage" / f"SuperMedicine-{release_label}-source"
+
+          include_files = [
+              "Cli.py",
+              "Install.py",
+              "Uninstall.py",
+              "pyproject.toml",
+              "requirements.txt",
+              "install.json",
+              "LICENSE",
+              "README.md",
+              "CHANGELOG.md",
+              "CONTRIBUTING.md",
+              "SECURITY.md",
+              "INSTALL.md",
+          ]
+          include_dirs = ["core", "permission", "agents", "plugins", "adapters"]
+          excluded_dir_names = {
+              "__pycache__",
+              ".pytest_cache",
+              ".ruff_cache",
+              ".mypy_cache",
+              ".pytest-tmp",
+              ".pytest_tmp",
+          }
+          excluded_file_names = {".env"}
+          excluded_suffixes = {".pyc", ".pyo", ".tmp", ".token"}
+
+          def should_exclude(path: Path) -> bool:
+              parts = set(path.parts)
+              if parts & excluded_dir_names:
+                  return True
+              if path.name in excluded_file_names:
+                  return True
+              if path.suffix in excluded_suffixes:
+                  return True
+              if path.name.endswith("~") or path.name.endswith(".log"):
+                  return True
+              return False
+
+          if stage.parent.exists():
+              shutil.rmtree(stage.parent)
+          stage.mkdir(parents=True)
+
+          for relative in include_files:
+              source = root / relative
+              if source.exists() and not should_exclude(Path(relative)):
+                  target = stage / relative
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copy2(source, target)
+
+          for relative_dir in include_dirs:
+              source_dir = root / relative_dir
+              if not source_dir.exists():
+                  continue
+              for source in source_dir.rglob("*"):
+                  relative = source.relative_to(root)
+                  if should_exclude(relative):
+                      continue
+                  target = stage / relative
+                  if source.is_dir():
+                      target.mkdir(parents=True, exist_ok=True)
+                  else:
+                      target.parent.mkdir(parents=True, exist_ok=True)
+                      shutil.copy2(source, target)
+
+          archive_path = root / archive_name
+          if archive_path.exists():
+              archive_path.unlink()
+          with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+              for source in sorted(stage.rglob("*")):
+                  if source.is_file():
+                      archive.write(source, source.relative_to(stage.parent).as_posix())
+
+          shutil.rmtree(stage.parent)
+          print(f"Created {archive_name}")
+          github_output = os.environ.get("GITHUB_OUTPUT")
+          if github_output:
+              with open(github_output, "a", encoding="utf-8") as output:
+                  output.write(f"release_label={release_label}\n")
+                  output.write(f"release_title={release_title}\n")
+                  output.write(f"archive_name={archive_name}\n")
+          PY
+
+      - name: Upload release source Zip artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.source_zip.outputs.release_label }}-source
+          path: ${{ steps.source_zip.outputs.archive_name }}
+          if-no-files-found: error
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: packaging-smoke
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name != 'pull_request' &&
+      (github.event_name == 'workflow_dispatch' ||
+       github.ref == 'refs/heads/master' ||
+       github.ref == 'refs/heads/main')
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ needs.packaging-smoke.outputs.release_label }}
+      RELEASE_TITLE: ${{ needs.packaging-smoke.outputs.release_title }}
+      ARCHIVE_NAME: ${{ needs.packaging-smoke.outputs.archive_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download release source Zip artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.packaging-smoke.outputs.release_label }}-source
+          path: release-artifacts
+
+      - name: Generate release body from git history
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          previous_tag=""
+          while IFS= read -r candidate; do
+            if [[ "$candidate" != "$RELEASE_TAG" ]]; then
+              previous_tag="$candidate"
+              break
+            fi
+          done < <(git tag --list 'Beta*' --sort=-v:refname)
+
+          {
+            echo "## Changes"
+            echo
+            if [[ -n "$previous_tag" ]]; then
+              echo "Changes since $previous_tag:"
+              echo
+              git log --no-merges --pretty=format:'- %s (%h)' "${previous_tag}..HEAD" || true
+            else
+              echo "No previous Beta tag was found; summarizing available history:"
+              echo
+              git log --no-merges --pretty=format:'- %s (%h)' --max-count=30 || true
+            fi
+            echo
+          } > release-body.md
+
+          if ! grep -q '^- ' release-body.md; then
+            cat > release-body.md <<'EOF'
+          ## Changes
+
+          No commit summary was available for this release.
+          EOF
+          fi
+
+      - name: Create or update tag, release, and source Zip asset
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          asset_path="release-artifacts/${ARCHIVE_NAME}"
+          if [[ ! -f "$asset_path" ]]; then
+            echo "Release asset not found: $asset_path" >&2
+            exit 1
+          fi
+
+          git fetch --tags
+          if git rev-parse -q --verify "refs/tags/${RELEASE_TAG}" >/dev/null; then
+            echo "Tag ${RELEASE_TAG} already exists; leaving it unchanged."
+          else
+            git tag "$RELEASE_TAG" "$GITHUB_SHA"
+            git push origin "refs/tags/${RELEASE_TAG}"
+          fi
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" --title "$RELEASE_TITLE" --notes-file release-body.md --target "$GITHUB_SHA"
+          else
+            gh release create "$RELEASE_TAG" --title "$RELEASE_TITLE" --notes-file release-body.md --target "$GITHUB_SHA"
+          fi
+
+          existing_asset_ids=$(gh release view "$RELEASE_TAG" --json assets --jq ".assets[] | select(.name == \"${ARCHIVE_NAME}\") | .id")
+          if [[ -n "$existing_asset_ids" ]]; then
+            while IFS= read -r asset_id; do
+              [[ -n "$asset_id" ]] && gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/assets/${asset_id}"
+            done <<< "$existing_asset_ids"
+          fi
+
+          gh release upload "$RELEASE_TAG" "$asset_path"

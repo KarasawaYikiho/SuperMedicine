@@ -5,6 +5,9 @@ from pathlib import Path
 from permission.engine import PermissionEngine
 from permission.policy import PermissionResult
 
+
+PROJECT_ROOT = Path(__file__).parent.parent
+
 class TestPermissionEngine:
     def _make_engine(self, tmp_path, policy_data):
         policy_file = tmp_path / "policy.yaml"
@@ -144,3 +147,114 @@ class TestPermissionEngineWithPolicies:
         )
 
         assert result == PermissionResult.DENIED
+
+    def test_default_policy_allows_declared_experiment_wb_local_actions(self, tmp_path):
+        audit_log = tmp_path / "audit.jsonl"
+        policy_dir = PROJECT_ROOT / "permission"
+        engine = PermissionEngine(policy_dir=policy_dir, audit_log=audit_log)
+
+        declared_actions = (
+            "experiment.wb.normalize_loading",
+            "experiment.wb.antibody_dilution",
+        )
+
+        for action in declared_actions:
+            result = engine.check(
+                "alpha",
+                "execute",
+                action,
+                context={
+                    "plugin": "experiment-wb",
+                    "action": action,
+                    "requires_network": False,
+                    "requires_external_api": False,
+                },
+            )
+            assert result == PermissionResult.ALLOWED
+
+    def test_experiment_wb_policy_does_not_default_allow_unknown_or_external_actions(self, tmp_path):
+        policy = {
+            "agent_id": "experiment_local",
+            "role": "experiment_tool",
+            "permissions": {
+                "allowed": [
+                    {"action": "execute", "scope": "experiment.wb.normalize_loading"},
+                    {"action": "execute", "scope": "experiment.wb.antibody_dilution"},
+                ],
+                "denied": [],
+                "hard_limits": {"network_access": False, "external_api": False},
+            },
+        }
+        policy_dir = tmp_path / "policies"
+        policy_dir.mkdir()
+        audit_log = tmp_path / "audit.jsonl"
+        (policy_dir / "test.yaml").write_text(yaml.dump(policy), encoding="utf-8")
+        engine = PermissionEngine(policy_dir=policy_dir, audit_log=audit_log)
+
+        unknown_result = engine.check(
+            "experiment_local",
+            "execute",
+            "experiment.wb.unknown_action",
+            context={"plugin": "experiment-wb", "action": "experiment.wb.unknown_action"},
+        )
+        network_result = engine.check(
+            "experiment_local",
+            "execute",
+            "experiment.wb.normalize_loading",
+            context={
+                "plugin": "experiment-wb",
+                "action": "experiment.wb.normalize_loading",
+                "requires_network": True,
+            },
+        )
+        external_result = engine.check(
+            "experiment_local",
+            "execute",
+            "experiment.wb.antibody_dilution",
+            context={
+                "plugin": "experiment-wb",
+                "action": "experiment.wb.antibody_dilution",
+                "requires_external_api": True,
+            },
+        )
+
+        assert unknown_result == PermissionResult.DENIED
+        assert network_result == PermissionResult.DENIED
+        assert external_result == PermissionResult.DENIED
+
+    def test_experiment_wb_denial_is_audited_with_redacted_context(self, tmp_path):
+        policy = {
+            "agent_id": "experiment_local",
+            "role": "experiment_tool",
+            "permissions": {
+                "allowed": [{"action": "execute", "scope": "experiment.wb.normalize_loading"}],
+                "denied": [],
+                "hard_limits": {"network_access": False, "external_api": False},
+            },
+        }
+        policy_dir = tmp_path / "policies"
+        policy_dir.mkdir()
+        audit_log = tmp_path / "audit.jsonl"
+        (policy_dir / "test.yaml").write_text(yaml.dump(policy), encoding="utf-8")
+        engine = PermissionEngine(policy_dir=policy_dir, audit_log=audit_log)
+
+        result = engine.check(
+            "experiment_local",
+            "execute",
+            "experiment.wb.normalize_loading",
+            context={
+                "plugin": "experiment-wb",
+                "action": "experiment.wb.normalize_loading",
+                "requires_external_api": True,
+                "api_key": "sk-permission-secret",
+            },
+        )
+
+        audit_text = audit_log.read_text(encoding="utf-8")
+        assert result == PermissionResult.DENIED
+        assert "experiment_local" in audit_text
+        assert "experiment.wb.normalize_loading" in audit_text
+        assert "DENIED" in audit_text
+        assert "hard_limit_exceeded:external_api:false" in audit_text
+        assert "api_key" not in audit_text
+        assert "sk-permission-secret" not in audit_text
