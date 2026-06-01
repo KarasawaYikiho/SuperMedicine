@@ -19,6 +19,7 @@ class BaseAdapter(ABC):
     DEFAULT_TIMEOUT_SECONDS = 30
     MAX_TIMEOUT_SECONDS = 120
     PERMISSION_GATED_TOOLS = {"bash", "write", "edit"}
+    FILESYSTEM_TOOLS = {"read", "write", "edit", "glob", "grep"}
 
     def __init__(
         self,
@@ -91,6 +92,9 @@ class BaseAdapter(ABC):
         handler = handlers.get(tool_id)
         if handler is None:
             return {"status": "error", "tool": tool_id, "result": unsupported_message}
+        sandbox_denied = self._filesystem_tool_sandbox_denied(tool_id, params)
+        if sandbox_denied is not None:
+            return sandbox_denied
         denied = self._tool_permission_denied(tool_id, params)
         if denied is not None:
             return denied
@@ -102,6 +106,17 @@ class BaseAdapter(ABC):
             return {"status": "ok", "tool": tool_id, "result": result}
         except Exception as e:
             return {"status": "error", "tool": tool_id, "result": str(e)}
+
+    def _filesystem_tool_sandbox_denied(self, tool_id: str, params: dict[str, Any]) -> dict[str, Any] | None:
+        if tool_id not in self.FILESYSTEM_TOOLS:
+            return None
+        path_param = "filePath" if tool_id in {"read", "write", "edit"} else "path"
+        must_exist = tool_id in {"glob", "grep"}
+        resolved = self._resolve_sandbox_path(params.get(path_param, ""), resource_label=tool_id, must_exist=must_exist)
+        if isinstance(resolved, dict):
+            return resolved
+        params[path_param] = str(resolved)
+        return None
 
     def _tool_permission_denied(self, tool_id: str, params: dict[str, Any]) -> dict[str, Any] | None:
         if tool_id not in self.PERMISSION_GATED_TOOLS:

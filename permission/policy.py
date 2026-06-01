@@ -1,6 +1,7 @@
 """权限声明解析与检查"""
 from __future__ import annotations
 import fnmatch
+import os
 from importlib import resources
 import shutil
 from dataclasses import dataclass, field
@@ -57,7 +58,42 @@ class PermissionRule:
     scope: str
 
     def matches(self, action: str, scope: str) -> bool:
-        return fnmatch.fnmatch(action, self.action) and fnmatch.fnmatch(scope, self.scope)
+        return fnmatch.fnmatch(action, self.action) and self._scope_matches(scope)
+
+    def _scope_matches(self, scope: str) -> bool:
+        if fnmatch.fnmatch(scope, self.scope):
+            return True
+        if not self._looks_like_path(self.scope) or not self._looks_like_path(scope):
+            return False
+
+        rule_path = self._normalize_path_scope(self.scope)
+        requested_path = self._normalize_path_scope(scope)
+        if rule_path is None or requested_path is None:
+            return False
+        if self._has_wildcard(self.scope):
+            return fnmatch.fnmatch(requested_path, rule_path)
+        return requested_path == rule_path
+
+    @staticmethod
+    def _has_wildcard(value: str) -> bool:
+        return any(char in value for char in "*?[")
+
+    @classmethod
+    def _looks_like_path(cls, value: str) -> bool:
+        if value in {"", "*"}:
+            return False
+        if cls._has_wildcard(value):
+            return any(separator in value for separator in ("/", "\\"))
+        return any(separator in value for separator in ("/", "\\")) or Path(value).is_absolute()
+
+    @staticmethod
+    def _normalize_path_scope(value: str) -> str | None:
+        try:
+            path = Path(value)
+        except (TypeError, ValueError):
+            return None
+        normalized = os.path.normpath(str(path.expanduser().resolve(strict=False)))
+        return os.path.normcase(normalized)
 
 
 @dataclass

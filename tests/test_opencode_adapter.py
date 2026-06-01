@@ -190,6 +190,72 @@ class TestToolCall:
         assert result["status"] == "ok"
         assert target.read_text(encoding="utf-8") == "allowed"
 
+    def test_tool_call_read_write_allows_same_file_when_policy_scope_uses_unresolved_path(self, tmp_path):
+        """Same-file policy scopes must survive adapter path resolution.
+
+        The adapter checks permissions against BaseAdapter._tool_permission_resource(),
+        which resolves filePath before calling PermissionEngine.check(), while the
+        policy scope may come from the caller's original path string.  On CI roots
+        that expose tmp paths through alternate representations (for example
+        symlinked/private temp roots or case-normalized paths), exact string
+        matching can deny the same file before write/read executes.
+        """
+        project_dir = tmp_path / "project"
+        project_dir.mkdir()
+        policy_scope = project_dir / "nested" / ".." / "nested" / "same-file.txt"
+        adapter = _adapter_with_policy(
+            project_dir,
+            allowed=[{"action": "tool_call", "scope": str(policy_scope)}],
+        )
+
+        write_result = adapter.tool_call("write", {
+            "filePath": str(policy_scope),
+            "content": "same file through unresolved policy scope",
+        })
+
+        assert write_result["status"] == "ok"
+        read_result = adapter.tool_call("read", {"filePath": str(policy_scope)})
+        assert read_result["status"] == "ok"
+        assert "same file through unresolved policy scope" in read_result["result"]
+
+    def test_tool_call_read_write_allows_resolved_policy_scope_with_raw_params(self, tmp_path):
+        project_dir = tmp_path / "project"
+        project_dir.mkdir()
+        raw_file_path = project_dir / "nested" / ".." / "nested" / "same-file-reversed.txt"
+        resolved_policy_scope = raw_file_path.resolve(strict=False)
+        adapter = _adapter_with_policy(
+            project_dir,
+            allowed=[{"action": "tool_call", "scope": str(resolved_policy_scope)}],
+        )
+
+        write_result = adapter.tool_call("write", {
+            "filePath": str(raw_file_path),
+            "content": "same file through resolved policy scope",
+        })
+
+        assert write_result["status"] == "ok"
+        read_result = adapter.tool_call("read", {"filePath": str(raw_file_path)})
+        assert read_result["status"] == "ok"
+        assert "same file through resolved policy scope" in read_result["result"]
+
+    def test_tool_call_read_write_does_not_allow_different_normalized_file(self, tmp_path):
+        project_dir = tmp_path / "project"
+        project_dir.mkdir()
+        allowed_file = project_dir / "nested" / "allowed.txt"
+        different_file = project_dir / "nested" / "allowed.txt.bak"
+        adapter = _adapter_with_policy(
+            project_dir,
+            allowed=[{"action": "tool_call", "scope": str(allowed_file.resolve(strict=False))}],
+        )
+
+        write_result = adapter.tool_call("write", {
+            "filePath": str(different_file),
+            "content": "must not be written",
+        })
+
+        assert write_result["status"] == "denied"
+        assert not different_file.exists()
+
     def test_tool_call_glob(self, adapter):
         """验证 Glob 工具调用"""
         result = adapter.tool_call("glob", {
