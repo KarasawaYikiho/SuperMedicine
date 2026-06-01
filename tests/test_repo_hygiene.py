@@ -222,7 +222,6 @@ def test_release_label_and_package_version_stay_in_sync():
     assert package_version is not None
     assert package_version.group(1) == "0.4.0b0"
     assert "Beta0.4.0" in readme
-    assert "Beta0.4.0" in readme
     assert "## [Beta0.4.0]" in changelog
     assert "metadata uses fallback version `0.4.0b0`" in changelog
 
