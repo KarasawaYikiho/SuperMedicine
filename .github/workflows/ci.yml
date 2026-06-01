@@ -268,8 +268,13 @@ jobs:
           set -euo pipefail
 
           asset_path="release-artifacts/${ARCHIVE_NAME}"
+          echo "Release tag: ${RELEASE_TAG}"
+          echo "Release title: ${RELEASE_TITLE}"
+          echo "Archive name: ${ARCHIVE_NAME}"
+          echo "Asset path: ${asset_path}"
+
           if [[ ! -f "$asset_path" ]]; then
-            echo "Release asset not found: $asset_path" >&2
+            echo "ERROR: Release asset file does not exist: ${asset_path}" >&2
             exit 1
           fi
 
@@ -287,11 +292,26 @@ jobs:
             gh release create "$RELEASE_TAG" --title "$RELEASE_TITLE" --notes-file release-body.md --target "$GITHUB_SHA"
           fi
 
-          existing_asset_ids=$(gh release view "$RELEASE_TAG" --json assets --jq ".assets[] | select(.name == \"${ARCHIVE_NAME}\") | .id")
+          upload_asset_name="${ARCHIVE_NAME// /.}"
+          echo "Checking for existing release assets named '${ARCHIVE_NAME}' or '${upload_asset_name}'..."
+          existing_asset_ids=$(gh release view "$RELEASE_TAG" --json assets --jq ".assets[] | select(.name == \"${ARCHIVE_NAME}\" or .name == \"${upload_asset_name}\") | .id")
           if [[ -n "$existing_asset_ids" ]]; then
             while IFS= read -r asset_id; do
-              [[ -n "$asset_id" ]] && gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/assets/${asset_id}"
+              if [[ -n "$asset_id" ]]; then
+                echo "Deleting existing release asset id: ${asset_id}"
+                if ! gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/assets/${asset_id}"; then
+                  echo "ERROR: Failed to delete existing release asset id ${asset_id} for ${RELEASE_TAG}." >&2
+                  exit 1
+                fi
+              fi
             done <<< "$existing_asset_ids"
+          else
+            echo "No existing release assets found for '${ARCHIVE_NAME}' or '${upload_asset_name}'."
           fi
 
-          gh release upload "$RELEASE_TAG" "$asset_path"
+          echo "Uploading release asset '${asset_path}' to ${RELEASE_TAG}..."
+          if ! gh release upload "$RELEASE_TAG" "$asset_path" --clobber; then
+            echo "ERROR: Failed to upload release asset '${asset_path}' to ${RELEASE_TAG}." >&2
+            exit 1
+          fi
+          echo "Release asset upload completed: ${asset_path}"
