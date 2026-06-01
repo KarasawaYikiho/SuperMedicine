@@ -89,7 +89,7 @@ jobs:
           python -m build --sdist --outdir dist
           rm -rf dist
 
-      - name: Build release source Zip
+      - name: Build release Zip
         id: source_zip
         shell: bash
         run: |
@@ -107,8 +107,8 @@ jobs:
           release_version = beta_match.group(1) if beta_match else version
           release_label = f"Beta{release_version}" if beta_match else f"v{release_version}"
           release_title = f"Beta {release_version}" if beta_match else f"v{release_version}"
-          archive_name = f"SuperMedicine-{release_label}-source.zip"
-          stage = root / ".source-zip-stage" / f"SuperMedicine-{release_label}-source"
+          archive_name = f"SuperMedicine {release_label}.zip"
+          stage = root / ".release-zip-stage" / f"SuperMedicine {release_label}"
 
           include_files = [
               "Cli.py",
@@ -192,10 +192,10 @@ jobs:
                   output.write(f"archive_name={archive_name}\n")
           PY
 
-      - name: Upload release source Zip artifact
+      - name: Upload release Zip artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.source_zip.outputs.release_label }}-source
+          name: ${{ steps.source_zip.outputs.release_label }}
           path: ${{ steps.source_zip.outputs.archive_name }}
           if-no-files-found: error
 
@@ -220,10 +220,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Download release source Zip artifact
+      - name: Download release Zip artifact
         uses: actions/download-artifact@v4
         with:
-          name: ${{ needs.packaging-smoke.outputs.release_label }}-source
+          name: ${{ needs.packaging-smoke.outputs.release_label }}
           path: release-artifacts
 
       - name: Generate release body from git history
@@ -262,7 +262,7 @@ jobs:
           EOF
           fi
 
-      - name: Create or update tag, release, and source Zip asset
+      - name: Create or update tag, release, and Zip asset
         shell: bash
         run: |
           set -euo pipefail

@@ -227,6 +227,30 @@ def test_release_label_and_package_version_stay_in_sync():
     assert "metadata uses fallback version `0.4.0b0`" in changelog
 
 
+def test_release_zip_archive_name_uses_display_format_without_source_suffix():
+    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    package_version = _read_pyproject()["project"]["version"]
+    beta_match = re.fullmatch(r"(\d+\.\d+\.\d+)b\d+", package_version)
+    assert beta_match is not None
+
+    expected_archive_name = f"SuperMedicine Beta{beta_match.group(1)}.zip"
+    archive_body = expected_archive_name.removesuffix(".zip")
+
+    assert expected_archive_name == "SuperMedicine Beta0.4.0.zip"
+    assert "source" not in archive_body.lower()
+    assert "_" not in archive_body
+    assert 'archive_name = f"SuperMedicine {release_label}.zip"' in workflow
+    assert 'stage = root / ".release-zip-stage" / f"SuperMedicine {release_label}"' in workflow
+    assert "SuperMedicine-{release_label}-source" not in workflow
+    assert ".source-zip-stage" not in workflow
+    assert "${{ steps.source_zip.outputs.release_label }}-source" not in workflow
+    assert "${{ needs.packaging-smoke.outputs.release_label }}-source" not in workflow
+    assert "output.write(f\"archive_name={archive_name}\\n\")" in workflow
+    assert "ARCHIVE_NAME: ${{ needs.packaging-smoke.outputs.archive_name }}" in workflow
+    assert 'asset_path="release-artifacts/${ARCHIVE_NAME}"' in workflow
+    assert 'gh release upload "$RELEASE_TAG" "$asset_path"' in workflow
+
+
 def test_opencode_plugin_declared_entry_skills_and_agents_exist():
     plugin_dir = REPO_ROOT / "adapters" / "opencode"
     plugin = json.loads((plugin_dir / "plugin.json").read_text(encoding="utf-8"))
