@@ -250,6 +250,28 @@ def test_release_zip_archive_name_uses_display_format_without_source_suffix():
     assert 'gh release upload "$RELEASE_TAG" "$asset_path"' in workflow
 
 
+def test_release_asset_cleanup_does_not_delete_graphql_node_ids_with_rest_endpoint():
+    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+
+    extracts_release_asset_node_ids = re.search(
+        r"gh\s+release\s+view\b(?:(?!\n\s*(?:if|else|fi|while|done)\b).)*"
+        r"--json\s+assets\b(?:(?!\n\s*(?:if|else|fi|while|done)\b).)*"
+        r"--jq\s+[\"'][^\"']*\.id\b",
+        workflow,
+        re.DOTALL,
+    )
+    deletes_release_asset_with_rest_endpoint = re.search(
+        r"gh\s+api\s+--method\s+DELETE\s+repos/[^\s\"']+/releases/assets/\$\{?asset_id\}?\b",
+        workflow,
+    )
+
+    assert not (extracts_release_asset_node_ids and deletes_release_asset_with_rest_endpoint), (
+        "Release asset cleanup must not pass GraphQL asset node IDs from "
+        "`gh release view --json assets --jq ... .id` to the REST release asset delete endpoint."
+    )
+    assert "gh release delete-asset" in workflow
+
+
 def test_opencode_plugin_declared_entry_skills_and_agents_exist():
     plugin_dir = REPO_ROOT / "adapters" / "opencode"
     plugin = json.loads((plugin_dir / "plugin.json").read_text(encoding="utf-8"))

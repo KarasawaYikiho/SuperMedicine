@@ -294,17 +294,17 @@ jobs:
 
           upload_asset_name="${ARCHIVE_NAME// /.}"
           echo "Checking for existing release assets named '${ARCHIVE_NAME}' or '${upload_asset_name}'..."
-          existing_asset_ids=$(gh release view "$RELEASE_TAG" --json assets --jq ".assets[] | select(.name == \"${ARCHIVE_NAME}\" or .name == \"${upload_asset_name}\") | .id")
-          if [[ -n "$existing_asset_ids" ]]; then
-            while IFS= read -r asset_id; do
-              if [[ -n "$asset_id" ]]; then
-                echo "Deleting existing release asset id: ${asset_id}"
-                if ! gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/assets/${asset_id}"; then
-                  echo "ERROR: Failed to delete existing release asset id ${asset_id} for ${RELEASE_TAG}." >&2
+          existing_asset_names=$(gh release view "$RELEASE_TAG" --json assets --jq ".assets[] | select(.name == \"${ARCHIVE_NAME}\" or .name == \"${upload_asset_name}\") | .name")
+          if [[ -n "$existing_asset_names" ]]; then
+            while IFS= read -r asset_name; do
+              if [[ -n "$asset_name" ]]; then
+                echo "Deleting existing release asset by name: ${asset_name}"
+                if ! gh release delete-asset "$RELEASE_TAG" "$asset_name" --yes; then
+                  echo "ERROR: Failed to delete existing release asset '${asset_name}' for ${RELEASE_TAG}." >&2
                   exit 1
                 fi
               fi
-            done <<< "$existing_asset_ids"
+            done <<< "$existing_asset_names"
           else
             echo "No existing release assets found for '${ARCHIVE_NAME}' or '${upload_asset_name}'."
           fi
