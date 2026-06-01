@@ -62,9 +62,10 @@ permission = ["default_policy.yaml"]
 core = ["tui/app.tcss"]
 plugins = ["**/plugin.yaml", "**/*.yaml"]
 adapters = ["opencode/plugin.json", "opencode/skills/*.md", "opencode/agents/*.md", "claude_code/SKILL.md"]
+installer = ["resources/*.json", "resources/*.md", "resources/*.txt"]
 
 [tool.setuptools.packages.find]
-include = ["core*", "permission*", "agents*", "plugins*", "adapters*"]
+include = ["core*", "permission*", "agents*", "plugins*", "adapters*", "installer*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

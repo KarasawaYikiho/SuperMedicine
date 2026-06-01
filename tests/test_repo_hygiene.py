@@ -45,14 +45,15 @@ def _read_pyproject() -> dict:
                 dev_match.group(1),
             )
     # Extract core package-data entries
-    in_core_data = False
+    current_package_data_key = None
     for line in text.splitlines():
-        if re.match(r'^core\s*=\s*\[', line):
-            in_core_data = True
+        package_data_match = re.match(r'^(core|installer)\s*=\s*\[', line)
+        if package_data_match:
+            current_package_data_key = package_data_match.group(1)
             entries = re.findall(r'"([^"]+)"', line)
-            result["tool"]["setuptools"]["package-data"]["core"] = entries
-        elif in_core_data and line.strip().startswith("]"):
-            in_core_data = False
+            result["tool"]["setuptools"]["package-data"][current_package_data_key] = entries
+        elif current_package_data_key and line.strip().startswith("]"):
+            current_package_data_key = None
     return result
 
 
@@ -118,7 +119,11 @@ def test_tracked_files_do_not_include_forbidden_or_generated_artifacts():
             forbidden_matches.append(tracked_path)
         if name.endswith(".pyc"):
             forbidden_matches.append(tracked_path)
+        if name.lower().endswith(".exe"):
+            forbidden_matches.append(tracked_path)
         if any(part in {"__pycache__", ".pytest_cache", ".pytest-tmp", ".ruff_cache", "build", "dist"} for part in parts):
+            forbidden_matches.append(tracked_path)
+        if any(part in {".release-zip-stage", "release-artifacts"} for part in parts):
             forbidden_matches.append(tracked_path)
         if any(part.endswith(".egg-info") for part in parts):
             forbidden_matches.append(tracked_path)
@@ -147,8 +152,18 @@ def test_gitignore_excludes_runtime_and_external_platform_config_artifacts():
         ".pytest_cache/",
         ".pytest-tmp/",
         ".ruff_cache/",
+        ".mypy_cache/",
+        "build/",
+        "dist/",
+        ".release-zip-stage/",
+        "release-artifacts/",
+        "*.exe",
+        "*.py[cod]",
+        ".supermedicine/install-record.json",
         ".supermedicine/policies/audit.jsonl",
         ".supermedicine/checkpoints/",
+        ".supermedicine/cache/",
+        ".supermedicine/tmp/",
         ".claude/",
         ".opencode/",
         "superpowers/",
@@ -499,6 +514,23 @@ def test_package_data_includes_tui_css():
     assert "tui/app.tcss" in core_data, (
         f"core package-data must include 'tui/app.tcss', got {core_data!r}"
     )
+
+
+def test_packaging_declares_installer_resource_strategy_without_tracked_exe():
+    pyproject = _read_pyproject()
+    package_data = pyproject.get("tool", {}).get("setuptools", {}).get("package-data", {})
+    installer_data = package_data.get("installer", [])
+    manifest = json.loads((REPO_ROOT / "install.json").read_text(encoding="utf-8"))
+    resource_policy = manifest["packaging_resources"]
+
+    assert "resources/*.json" in installer_data
+    assert "resources/*.md" in installer_data
+    assert "resources/*.txt" in installer_data
+    assert resource_policy["installer_package"] == "installer"
+    assert "Install.py --release-exe" in resource_policy["exe_resource_strategy"]
+    assert "not committed" in resource_policy["exe_resource_strategy"]
+    assert "*.exe" in resource_policy["generated_artifacts_excluded"]
+    assert not any(path.lower().endswith(".exe") for path in _tracked_files())
 
 
 def test_install_manifest_uses_editable_install():

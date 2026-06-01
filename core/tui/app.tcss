@@ -3,22 +3,23 @@
    by Textual from the Theme registered in the app module.
 */
 
-/* SuperMedicine TUI Stylesheet */
-
 Screen {
     layout: vertical;
     background: $background;
+    color: $foreground;
 }
 
 Header {
     background: $primary;
     color: $foreground;
     text-style: bold;
+    height: 1;
 }
 
 Footer {
     background: $surface;
     color: $text-muted;
+    border-top: tall $primary 35%;
 }
 
 #app-body {
@@ -33,14 +34,14 @@ Footer {
     min-width: 20;
     height: 100%;
     background: $surface;
-    border-right: heavy $primary;
+    border-right: tall $primary 60%;
 }
 
 #sidebar-title {
-    height: 3;
+    height: 2;
     padding: 0 1;
     text-style: bold;
-    color: $primary;
+    color: $accent;
     content-align: center middle;
 }
 
@@ -49,6 +50,15 @@ Footer {
     padding: 0 1;
     color: $text-muted;
     content-align: center middle;
+    border-bottom: tall $primary 25%;
+}
+
+.shell-title {
+    background: $primary 8%;
+}
+
+.shell-subtitle {
+    text-style: italic;
 }
 
 #nav-list {
@@ -59,23 +69,30 @@ Footer {
 #nav-list > NavItem {
     padding: 0 1;
     height: 2;
+    color: $foreground;
 }
 
 #nav-list > NavItem:hover {
-    background: $primary 20%;
+    background: $primary 18%;
 }
 
 #nav-list > NavItem.-active {
-    background: $primary 40%;
+    background: $primary 35%;
     text-style: bold;
     border-left: heavy $accent;
+    color: $foreground;
 }
 
 #sidebar-shortcuts {
-    height: 3;
+    height: 4;
     padding: 0 1;
     color: $text-muted;
-    border-top: tall $primary 40%;
+    border-top: tall $primary 35%;
+    background: $primary 8%;
+}
+
+.shortcut-hint {
+    color: $text-muted;
 }
 
 /* Main Area */
@@ -86,14 +103,18 @@ Footer {
 }
 
 #view-title {
-    height: 3;
+    height: 2;
     width: 100%;
     padding: 0 2;
-    background: $primary 25%;
+    background: $surface;
     color: $foreground;
     text-style: bold;
     content-align: left middle;
-    border-bottom: tall $primary 50%;
+    border-bottom: tall $primary 35%;
+}
+
+.view-heading {
+    color: $accent;
 }
 
 #content-pane {
@@ -101,6 +122,7 @@ Footer {
     width: 100%;
     overflow-y: auto;
     padding: 1 1;
+    background: $background;
 }
 
 /* Input Bar */
@@ -109,7 +131,7 @@ Footer {
     height: auto;
     width: 100%;
     background: $surface;
-    border-top: heavy $primary;
+    border-top: tall $primary 60%;
     padding: 0 1;
 }
 
@@ -118,25 +140,26 @@ Footer {
     height: auto;
     content-align: center middle;
     text-style: bold;
-    color: $primary;
+    color: $accent;
 }
 
 #prompt-input {
     width: 1fr;
     height: auto;
-    border: wide $primary 40%;
+    border: round $primary 35%;
+    background: $background;
 }
 
 #prompt-input:focus {
-    border: wide $accent;
+    border: round $accent;
 }
 
 /* Status Bar */
 #status-bar {
     height: 1;
     width: 100%;
-    background: $primary 15%;
-    border-top: tall $primary 50%;
+    background: $surface;
+    border-top: tall $primary 35%;
     color: $text-muted;
 }
 
@@ -163,6 +186,10 @@ Footer {
     padding: 0 1;
     border: round $primary 30%;
     background: $surface;
+}
+
+#chat-output:focus {
+    border: round $accent;
 }
 
 /* Dashboard */
@@ -230,6 +257,7 @@ Select {
     padding: 0 1;
     color: $text-muted;
     border-left: tall $primary 40%;
+    background: $surface;
 }
 
 .status-info {
@@ -324,4 +352,6 @@ Select {
 /* Maximized View */
 .-maximized {
     height: 1fr;
+    border: heavy $accent;
+    background: $background;
 }

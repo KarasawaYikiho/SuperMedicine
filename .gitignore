@@ -5,9 +5,12 @@ __pycache__/
 # Packaging/build artifacts
 dist/
 build/
+.release-zip-stage/
+release-artifacts/
 *.egg-info/
 .eggs/
 *.egg
+*.exe
 
 # Test/lint/type-check/coverage artifacts
 .pytest_cache/
@@ -20,6 +23,7 @@ coverage.xml
 htmlcov/
 
 # SuperMedicine runtime artifacts
+.supermedicine/install-record.json
 .supermedicine/policies/audit.jsonl
 .supermedicine/checkpoints/
 .supermedicine/experiments/
@@ -27,6 +31,8 @@ htmlcov/
 .supermedicine/rag/
 .supermedicine/sessions/
 .supermedicine/tokens.jsonl
+.supermedicine/cache/
+.supermedicine/tmp/
 
 # External assistant platform local config/artifacts
 .claude/

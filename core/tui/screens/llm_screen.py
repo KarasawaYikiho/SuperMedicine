@@ -82,6 +82,7 @@ class LLMView(Vertical):
         yield Static(t("llm_title"), classes="section-title")
         yield Static("", id="llm-current")
         yield Static(t("llm_secret_hidden"), id="llm-secret-hint")
+        yield Static(t("llm_action_hint"), id="llm-action-hint", classes="hint")
         yield DataTable(id="llm-table", cursor_type="row")
         with Horizontal(classes="form-row"):
             yield Select([], prompt=t("llm_missing_selection"), id="llm-provider-select")
@@ -168,7 +169,9 @@ class LLMView(Vertical):
         self.query_one("#llm-api-key-input", Input).value = ""
         if result.get("ok"):
             self._set_status(f"{t('llm_provider_added')}: {provider.lower()}")
+            self.app.notify(f"{t('llm_provider_added')}: {provider.lower()}")
             self.refresh_llm_state()
+            self._set_status(f"{t('llm_provider_added')}: {provider.lower()}")
         else:
             self._set_status(self._safe_error_message(result))
 
@@ -181,7 +184,9 @@ class LLMView(Vertical):
         result = self.controller.switch_provider(provider)
         if result.get("ok"):
             self._set_status(f"{t('llm_provider_switched')}: {provider}")
+            self.app.notify(f"{t('llm_provider_switched')}: {provider}")
             self.refresh_llm_state()
+            self._set_status(f"{t('llm_provider_switched')}: {provider}")
         else:
             self._set_status(self._safe_error_message(result))
 

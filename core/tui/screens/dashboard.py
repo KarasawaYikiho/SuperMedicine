@@ -172,6 +172,7 @@ class DashboardView(Vertical):
         yield Static(t("sandbox_notice"), id="dashboard-summary")
         yield DataTable(id="dashboard-table", cursor_type="row", classes="dashboard-stat")
         yield Static("", id="dashboard-advice")
+        yield Static(t("status_shortcuts_hint"), id="dashboard-shortcuts", classes="hint")
 
     def on_mount(self) -> None:
         self._load_data()

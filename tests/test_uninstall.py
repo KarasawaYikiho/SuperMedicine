@@ -175,6 +175,15 @@ def test_uninstall_removes_recorded_binary_shortcut_config_cache_log_temp_and_us
             assert not (tmp_path / relative).exists()
 
 
+def test_uninstall_manifest_ownership_keys_cover_recorded_exe_and_shortcut_artifacts():
+    manifest = json.loads((__import__("pathlib").Path(__file__).resolve().parents[1] / "install.json").read_text(encoding="utf-8"))
+    recorded_keys = set(manifest["uninstall"]["recorded_artifact_keys"])
+
+    assert {"binaries", "binary_paths", "shortcuts", "shortcut_paths"}.issubset(recorded_keys)
+    assert "binaries" in manifest["packaging_resources"]["source_tree_exe_policy"]
+    assert "shortcut_paths" in manifest["packaging_resources"]["source_tree_exe_policy"]
+
+
 def test_uninstall_can_preserve_recorded_user_data_explicitly(tmp_path):
     user_data = tmp_path / "data" / "supermedicine" / "user.db"
     generated_config = tmp_path / "config" / "supermedicine" / "settings.json"

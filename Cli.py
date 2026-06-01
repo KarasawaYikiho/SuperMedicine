@@ -45,12 +45,27 @@ class CLI:
         base_url: str | None = None,
         api_key: str | None = None,
         model: str | None = None,
+        release_exe: Path | None = None,
+        desktop_dir: Path | None = None,
+        exe_target_name: str | None = None,
+        exe_overwrite: bool = False,
+        exe_dry_run: bool = False,
     ) -> None:
         """初始化项目"""
         from Install import init_config
+        from installer.exe_release import release_exe_to_desktop
 
         init_config(project_dir, provider=provider, base_url=base_url, api_key=api_key, model=model)
         logger.info("项目已初始化: %s", project_dir / ".supermedicine")
+        if release_exe is not None:
+            result = release_exe_to_desktop(
+                exe_path=release_exe,
+                desktop_dir=desktop_dir,
+                target_filename=exe_target_name,
+                overwrite=exe_overwrite,
+                dry_run=exe_dry_run,
+            )
+            logger.info("桌面 Exe 释放结果: status=%s target=%s", result["status"], result["target_path"])
 
     def status(self) -> None:
         """显示项目状态"""
@@ -1007,12 +1022,17 @@ def main(argv: list[str] | None = None) -> None:
     subparsers = parser.add_subparsers(dest="command")
 
     # Init 命令
-    init_parser = subparsers.add_parser("init", help="初始化项目")
+    init_parser = subparsers.add_parser("init", help="初始化项目；可选释放桌面 Exe")
     init_parser.add_argument("--dir", type=str, default=".", help="项目目录")
     init_parser.add_argument("--provider", type=str, default=None, help="LLM provider（openai、anthropic 或自定义 OpenAI-compatible provider）")
     init_parser.add_argument("--base-url", type=str, default=None, help="LLM provider BaseURL；也可使用 SM_LLM_BASE_URL")
     init_parser.add_argument("--api-key", type=str, default=None, help="LLM provider API key；也可使用 SM_LLM_API_KEY 或 provider 专用环境变量")
     init_parser.add_argument("--model", type=str, default=None, help="默认 LLM model；也可使用 SM_LLM_MODEL")
+    init_parser.add_argument("--release-exe", type=Path, default=None, help="初始化后将指定 Exe 释放到桌面；未提供时不会复制 Exe")
+    init_parser.add_argument("--desktop-dir", type=Path, default=None, help="桌面目录覆盖；测试/CI 应使用临时目录或 --exe-dry-run 避免真实桌面写入")
+    init_parser.add_argument("--exe-target-name", type=str, default=None, help="桌面 Exe 文件名；默认使用源文件名，自动规范为 .exe")
+    init_parser.add_argument("--exe-overwrite", action="store_true", help="覆盖已存在的桌面 Exe；默认目标存在时跳过")
+    init_parser.add_argument("--exe-dry-run", action="store_true", help="仅报告桌面 Exe 释放动作，不复制文件")
 
     # Status 命令
     subparsers.add_parser("status", help="显示项目状态")
@@ -1026,7 +1046,7 @@ def main(argv: list[str] | None = None) -> None:
     tui_parser = subparsers.add_parser(
         "tui",
         help="启动中文 TUI 工作台",
-        description="启动中文 TUI 工作台",
+        description="启动中文 TUI 工作台；数字键 1-0 切换模块，Tab/Shift+Tab 移动焦点，Enter 提交或激活，? 帮助，F 最大化，Q 退出。",
     )
     tui_parser.add_argument("--dry-run", action="store_true", help="输出中文 TUI 就绪状态，不启动交互界面")
 
@@ -1250,8 +1270,19 @@ def main(argv: list[str] | None = None) -> None:
         normalized_provider = _normalize_provider(provider)
         api_key = _resolve_api_key(normalized_provider, args.api_key)
         try:
-            cli.init(Path(args.dir), provider=normalized_provider, base_url=base_url, api_key=api_key, model=model)
-        except ValueError as exc:
+            cli.init(
+                Path(args.dir),
+                provider=normalized_provider,
+                base_url=base_url,
+                api_key=api_key,
+                model=model,
+                release_exe=args.release_exe,
+                desktop_dir=args.desktop_dir,
+                exe_target_name=args.exe_target_name,
+                exe_overwrite=args.exe_overwrite,
+                exe_dry_run=args.exe_dry_run,
+            )
+        except (ValueError, FileNotFoundError, OSError) as exc:
             init_parser.error(str(exc))
     elif args.command == "status":
         cli.status()

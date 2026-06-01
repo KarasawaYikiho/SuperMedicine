@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SuperMedicine standalone installer.
+"""SuperMedicine standalone/unified installer.
 
 The default ``--init`` path is intentionally core-only: it creates the
 ``.supermedicine`` project configuration and canonical permission policy
@@ -22,6 +22,7 @@ import yaml
 
 from core.llm_providers.config import LLMProviderConfig
 from core.redaction import redact_sensitive
+from installer.exe_release import release_exe_to_desktop
 from permission.policy import ensure_default_policy
 
 logger = logging.getLogger(__name__)
@@ -384,11 +385,58 @@ def init_config(
     logger.info("  Linux/macOS: ~/.local/bin")
     logger.info("或者使用 'python Cli.py' 代替 'supermedicine' 命令。")
 
-def main() -> None:
+
+def _log_exe_release_result(result: dict[str, Any]) -> None:
+    """Log user-facing Exe release status with deterministic wording."""
+
+    status = result.get("status", "unknown")
+    target = result.get("target_path", "")
+    reason = result.get("reason", "")
+    if status == "copied":
+        logger.info("桌面 Exe 释放完成: target=%s reason=%s", target, reason)
+    elif status == "skipped":
+        logger.info("桌面 Exe 释放跳过: target=%s reason=%s", target, reason)
+    elif status == "dry-run":
+        logger.info("桌面 Exe 释放 dry-run: target=%s reason=%s", target, reason)
+    else:
+        logger.info("桌面 Exe 释放结果: status=%s target=%s reason=%s", status, target, reason)
+
+
+def _release_exe_from_args(args: argparse.Namespace) -> dict[str, Any]:
+    """Release the requested Exe and convert copy failures into CLI errors."""
+
+    try:
+        result = release_exe_to_desktop(
+            exe_path=args.release_exe,
+            desktop_dir=args.desktop_dir,
+            target_filename=args.exe_target_name,
+            overwrite=args.exe_overwrite,
+            dry_run=args.exe_dry_run,
+        )
+    except Exception as exc:
+        logger.error("桌面 Exe 释放失败: %s", redact_sensitive(str(exc)))
+        raise SystemExit(f"error: 桌面 Exe 释放失败: {redact_sensitive(str(exc))}") from exc
+    _log_exe_release_result(result)
+    return result
+
+def main(argv: list[str] | None = None) -> None:
     logging.basicConfig(level=logging.INFO, format='%(message)s')
-    parser = argparse.ArgumentParser(description="SuperMedicine standalone installer")
+    parser = argparse.ArgumentParser(
+        description="SuperMedicine standalone/unified installer",
+        epilog=(
+            "统一安装示例: python Install.py --unified-install --release-exe dist/SuperMedicine.exe "
+            "--provider openai --base-url https://api.openai.com/v1 --model gpt-4o-mini. "
+            "--init 默认不复制 Exe；只有显式 --release-exe 才释放桌面 Exe。"
+            "测试/CI 请配合 --desktop-dir <tmp> 或 --exe-dry-run，避免写入真实桌面。"
+        ),
+    )
     parser.add_argument("--detect", action="store_true", help="Optionally detect OpenCode/Claude Code add-on presence")
-    parser.add_argument("--init", action="store_true", help="Initialize core SuperMedicine config only")
+    parser.add_argument("--init", action="store_true", help="Initialize core SuperMedicine config only; does not release Exe unless --release-exe is also provided")
+    parser.add_argument(
+        "--unified-install",
+        action="store_true",
+        help="Run initialization plus desktop Exe release; requires --release-exe and keeps --init semantics explicit",
+    )
     parser.add_argument(
         "--provider",
         help="LLM provider to configure (e.g. openai, anthropic, deepseek, or any custom OpenAI-compatible provider)",
@@ -398,11 +446,19 @@ def main() -> None:
     parser.add_argument("--model", help="Default LLM model; may also use SM_LLM_MODEL")
     parser.add_argument("--llm-config", type=Path, help="YAML file containing llm.provider and llm.providers.<provider> settings")
     parser.add_argument("--interactive", action="store_true", help="Prompt for LLM provider settings during initialization")
-    args = parser.parse_args()
+    parser.add_argument("--release-exe", type=Path, help="Release this Exe to the desktop after installer work completes; can be used alone, with --init, or with --unified-install")
+    parser.add_argument("--desktop-dir", type=Path, help="Desktop directory override for Exe release; use in tests/CI to avoid the real user Desktop")
+    parser.add_argument("--exe-target-name", help="Desktop filename for released Exe; defaults to the source filename and is normalized to .exe")
+    parser.add_argument("--exe-overwrite", action="store_true", help="Overwrite an existing desktop Exe target; default behavior skips existing target")
+    parser.add_argument("--exe-dry-run", action="store_true", help="Report Exe release action without copying")
+    args = parser.parse_args(argv)
+    run_init = args.init or args.unified_install
+    if args.unified_install and not args.release_exe:
+        parser.error("--unified-install requires --release-exe <path-to-SuperMedicine.exe>")
     if args.detect:
         logger.info("Detected platform: %s", detect_platform())
         return
-    if args.init:
+    if run_init:
         imported_config = _load_llm_config_file(args.llm_config) if args.llm_config else {}
         provider = _resolve_install_value("provider", args.provider) or cast(str | None, imported_config.get("provider"))
         base_url = _resolve_install_value("base_url", args.base_url) or cast(str | None, imported_config.get("base_url"))
@@ -425,6 +481,12 @@ def main() -> None:
             api_key=api_key,
             model=model,
         )
+        logger.info("安装初始化结果: .supermedicine=%s", Path.cwd() / ".supermedicine")
+        if args.release_exe:
+            _release_exe_from_args(args)
+        return
+    if args.release_exe:
+        _release_exe_from_args(args)
         return
     parser.print_help()
 

@@ -98,3 +98,20 @@ def test_paper_view_sets_deterministic_non_empty_reload_status():
 
     assert "paper_list" in loader
     assert "len(papers)" in loader
+
+
+def test_paper_view_empty_success_error_copy_and_secret_redaction_are_explicit():
+    compose_source = inspect.getsource(PaperView.compose)
+    loader_source = inspect.getsource(PaperView._load_papers)
+    import_source = inspect.getsource(PaperView._import_paper)
+    error_source = inspect.getsource(PaperView._set_error)
+    status_source = inspect.getsource(PaperView._set_status)
+
+    assert "paper_select_workspace" in compose_source
+    assert "paper_no_papers" in loader_source
+    assert "paper_list" in loader_source
+    assert "paper_imported" in import_source
+    assert "redact_sensitive" in error_source
+    assert "redact_sensitive" in status_source
+    assert t("paper_no_papers") == "暂无论文，请先导入"
+    assert t("paper_select_workspace") == "请先选择工作区"

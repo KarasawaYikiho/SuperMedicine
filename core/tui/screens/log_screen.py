@@ -25,6 +25,7 @@ class LogReportView(Vertical):
     def compose(self) -> ComposeResult:
         yield Static(t("log_title"), classes="section-title")
         yield Static(t("log_redaction_hint"), id="log-redaction-hint")
+        yield Static(t("log_action_hint"), id="log-action-hint", classes="hint")
         yield Input(placeholder=t("log_session_id"), id="log-session-id-input")
         yield TextArea.code_editor("", language="markdown", id="log-message-input")
         with Horizontal(classes="form-row"):
@@ -48,9 +49,9 @@ class LogReportView(Vertical):
         elif event.button.id == "log-show":
             self._show_selected_log()
         elif event.button.id == "log-refresh":
-            self.refresh_logs()
+            self.refresh_logs(refreshed=True)
 
-    def refresh_logs(self) -> None:
+    def refresh_logs(self, *, refreshed: bool = False) -> str:
         table = self.query_one("#log-table", DataTable)
         table.clear(columns=True)
         table.add_columns("文件", "报告 ID", "会话", "时间", "摘要")
@@ -64,9 +65,13 @@ class LogReportView(Vertical):
                     str(report.get("created_at") or ""),
                     str(report.get("message") or "")[:80],
                 )
-            self._set_status(f"{t('log_list')}: {len(reports)}" if reports else t("log_no_reports"))
+            label = t("log_refreshed") if refreshed else t("log_list")
+            status_text = f"{label}: {len(reports)}" if reports else (f"{t('log_refreshed')}：{t('log_no_reports')}" if refreshed else t("log_no_reports"))
+            self._set_status(status_text)
+            return status_text
         except Exception as exc:
             self._set_error(exc)
+            return f"{t('error')}: {t('safe_error_hint')}"
 
     def _write_log(self) -> None:
         message = self.query_one("#log-message-input", TextArea).text.strip()
@@ -75,9 +80,10 @@ class LogReportView(Vertical):
             return
         session_id = self.query_one("#log-session-id-input", Input).value.strip() or None
         try:
-            result = self.store.write(message, session_id=session_id)
-            self._set_status(f"{t('log_saved')}: {result.get('file')}")
-            self.refresh_logs()
+            self.store.write(message, session_id=session_id)
+            self.app.notify(t("log_saved"))
+            list_status = self.refresh_logs()
+            self._set_status(f"{t('log_saved')}；{list_status}")
         except Exception as exc:
             self._set_error(exc)
 
@@ -108,7 +114,9 @@ class LogReportView(Vertical):
         apply_status_style(status, safe_message)
 
     def _set_error(self, error: Exception) -> None:
-        self._set_status(f"{t('error')}: {redact_sensitive(str(error)) or t('safe_error_hint')}")
+        message = f"{t('error')}: {redact_sensitive(str(error)) or t('safe_error_hint')}"
+        self._set_status(message)
+        self.app.notify(message, severity="error")
 
 
 LogScreen = LogReportView

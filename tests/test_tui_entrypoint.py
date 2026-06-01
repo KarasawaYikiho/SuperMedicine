@@ -20,6 +20,20 @@ def test_tui_help_is_registered(monkeypatch, capsys):
     assert "启动中文 TUI 工作台" in capsys.readouterr().out
 
 
+def test_cli_init_help_documents_optional_desktop_exe_release(monkeypatch, capsys):
+    monkeypatch.setattr("sys.argv", ["supermedicine", "init", "--help"])
+
+    with pytest.raises(SystemExit) as excinfo:
+        main()
+
+    assert excinfo.value.code == 0
+    output = capsys.readouterr().out
+    assert "--release-exe" in output
+    assert "--desktop-dir" in output
+    assert "--exe-dry-run" in output
+    assert "避免真实桌面写入" in output
+
+
 def test_chinese_labels_available():
     assert t("app_title") == "SuperMedicine 终端工作台"
     assert LABELS["permission_required"] == "需要权限确认"
@@ -46,6 +60,65 @@ def test_tui_dry_run_returns_chinese_status(capsys):
     assert "Tab/Shift+Tab" in status.shortcut_hint
     assert status.focus_target == "prompt-input"
     assert "SuperMedicine 终端工作台" in capsys.readouterr().out
+
+
+def test_tui_startup_metadata_covers_all_primary_views_and_shortcuts():
+    nav_items = SuperMedicineTUI.nav_items()
+    binding_by_key = {binding.key: binding for binding in SuperMedicineTUI.BINDINGS}
+
+    assert [item.key for item in nav_items] == ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]
+    assert [item.view_id for item in nav_items] == [
+        "chat",
+        "dashboard",
+        "workspace",
+        "paper",
+        "experience",
+        "tool",
+        "dialog",
+        "llm",
+        "experiment",
+        "log",
+    ]
+    assert [item.label for item in nav_items] == [
+        "对话",
+        "仪表盘",
+        "工作区管理",
+        "论文管理",
+        "经验学习",
+        "工具管理",
+        "对话历史",
+        "LLM 管理",
+        "实验指导器",
+        "Log 报告",
+    ]
+    assert all(item.icon for item in nav_items)
+    assert {item.key for item in nav_items} <= set(binding_by_key)
+    assert all("switch_view" in binding_by_key[item.key].action for item in nav_items)
+    assert "1-0 切换视图" in SuperMedicineTUI.shortcut_hint_text()
+    assert "Enter 提交" in SuperMedicineTUI.shortcut_hint_text()
+    assert "? 帮助" in SuperMedicineTUI.shortcut_hint_text()
+
+
+def test_tui_theme_layout_and_status_text_are_testable_without_terminal(tmp_path):
+    app = SuperMedicineTUI(project_root=tmp_path)
+
+    assert app.CSS_PATH.endswith("app.tcss")
+    assert app.theme == "supermedicine"
+    assert app.AUTO_FOCUS == "#prompt-input"
+    assert "#sidebar" in Path(app.CSS_PATH).read_text(encoding="utf-8")
+
+    idle_status = app.status_text("chat")
+    assert idle_status.left.startswith("📁 0 工作区")
+    assert "🔌 0 插件" in idle_status.center
+    assert "LLM 未就绪" in idle_status.center
+    assert "任务空闲" in idle_status.center
+    assert "当前视图：对话" in idle_status.right
+    assert idle_status.focus == "焦点：输入栏"
+
+    app._task_running = True
+    running_status = app.status_text("llm")
+    assert "任务执行中" in running_status.center
+    assert "当前视图：LLM 管理" in running_status.right
 
 
 def test_tui_dry_run_prints_modern_status_without_secrets(capsys):

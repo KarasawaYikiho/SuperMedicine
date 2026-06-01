@@ -1,0 +1,269 @@
+from __future__ import annotations
+
+import importlib
+import json
+import logging
+from pathlib import Path
+
+import pytest
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _llm_args() -> list[str]:
+    return [
+        "--provider",
+        "openai",
+        "--base-url",
+        "https://openai.local.test/v1",
+        "--api-key",
+        "sk-test-installer-exe-release",
+        "--model",
+        "gpt-test",
+    ]
+
+
+def test_exe_desktop_release_uses_supplied_desktop_directory_and_dry_run(tmp_path, caplog):
+    """Regression skeleton for future unified installer / Exe desktop release.
+
+    The contract is intentionally test-friendly: callers must be able to inject a
+    temporary desktop directory and dry-run the release without touching the real
+    user desktop or requiring an interactive terminal.
+    """
+
+    module = importlib.import_module("installer.exe_release")
+
+    desktop_dir = tmp_path / "Desktop"
+    desktop_dir.mkdir()
+    build_dir = tmp_path / "dist"
+    build_dir.mkdir()
+    exe_path = build_dir / "SuperMedicine.exe"
+    exe_path.write_bytes(b"fake exe bytes")
+    caplog.set_level(logging.INFO, logger="installer.exe_release")
+
+    result = module.release_exe_to_desktop(
+        exe_path=exe_path,
+        desktop_dir=desktop_dir,
+        dry_run=True,
+    )
+
+    assert not (desktop_dir / "SuperMedicine.exe").exists()
+    assert result["dry_run"] is True
+    assert result["desktop_dir"] == desktop_dir
+    assert result["target_path"] == desktop_dir / "SuperMedicine.exe"
+    assert result["status"] == "dry-run"
+    assert "Exe release dry-run" in caplog.text
+    assert str(desktop_dir / "SuperMedicine.exe") in caplog.text
+
+
+def test_exe_desktop_release_copies_to_supplied_desktop_directory(tmp_path, caplog):
+    module = importlib.import_module("installer.exe_release")
+    caplog.set_level(logging.INFO, logger="installer.exe_release")
+    desktop_dir = tmp_path / "Desktop"
+    source = tmp_path / "dist" / "SuperMedicine.exe"
+    source.parent.mkdir()
+    source.write_bytes(b"fake exe bytes")
+
+    result = module.release_exe_to_desktop(exe_path=source, desktop_dir=desktop_dir)
+
+    target = desktop_dir / "SuperMedicine.exe"
+    assert result["status"] == "copied"
+    assert result["reason"] == "created"
+    assert result["target_path"] == target
+    assert target.read_bytes() == b"fake exe bytes"
+    assert "Exe release completed" in caplog.text
+    assert str(target) in caplog.text
+
+
+def test_exe_desktop_release_missing_source_has_deterministic_error(tmp_path):
+    module = importlib.import_module("installer.exe_release")
+
+    with pytest.raises(FileNotFoundError, match="Exe source does not exist"):
+        module.release_exe_to_desktop(
+            exe_path=tmp_path / "dist" / "Missing.exe",
+            desktop_dir=tmp_path / "Desktop",
+        )
+
+
+def test_exe_desktop_release_skips_existing_target_by_default(tmp_path, caplog):
+    module = importlib.import_module("installer.exe_release")
+    caplog.set_level(logging.INFO, logger="installer.exe_release")
+    desktop_dir = tmp_path / "Desktop"
+    desktop_dir.mkdir()
+    source = tmp_path / "SuperMedicine.exe"
+    source.write_bytes(b"new bytes")
+    target = desktop_dir / "SuperMedicine.exe"
+    target.write_bytes(b"existing bytes")
+
+    result = module.release_exe_to_desktop(exe_path=source, desktop_dir=desktop_dir)
+
+    assert result["status"] == "skipped"
+    assert result["reason"] == "target-exists"
+    assert target.read_bytes() == b"existing bytes"
+    assert "Exe release skipped" in caplog.text
+    assert str(target) in caplog.text
+
+
+def test_exe_desktop_release_overwrites_existing_target_when_requested(tmp_path, caplog):
+    module = importlib.import_module("installer.exe_release")
+    caplog.set_level(logging.INFO, logger="installer.exe_release")
+    desktop_dir = tmp_path / "Desktop"
+    desktop_dir.mkdir()
+    source = tmp_path / "SuperMedicine.exe"
+    source.write_bytes(b"new bytes")
+    target = desktop_dir / "SuperMedicine.exe"
+    target.write_bytes(b"existing bytes")
+
+    result = module.release_exe_to_desktop(exe_path=source, desktop_dir=desktop_dir, overwrite=True)
+
+    assert result["status"] == "copied"
+    assert result["reason"] == "overwritten"
+    assert target.read_bytes() == b"new bytes"
+    assert "Exe release completed" in caplog.text
+    assert str(target) in caplog.text
+
+
+def test_exe_desktop_release_logs_copy_errors(tmp_path, caplog, monkeypatch):
+    module = importlib.import_module("installer.exe_release")
+    caplog.set_level(logging.ERROR, logger="installer.exe_release")
+    desktop_dir = tmp_path / "Desktop"
+    source = tmp_path / "SuperMedicine.exe"
+    source.write_bytes(b"fake exe bytes")
+
+    def fail_copy2(source_path, target_path):
+        raise OSError("copy failed for test")
+
+    monkeypatch.setattr(module.shutil, "copy2", fail_copy2)
+
+    with pytest.raises(OSError, match="copy failed for test"):
+        module.release_exe_to_desktop(exe_path=source, desktop_dir=desktop_dir)
+
+    assert "Exe release failed" in caplog.text
+    assert "copy failed for test" in caplog.text
+    assert str(desktop_dir / "SuperMedicine.exe") in caplog.text
+
+
+@pytest.mark.parametrize("bad_name", ["../SuperMedicine.exe", "subdir/SuperMedicine.exe", "bad:name.exe", "CON.exe"])
+def test_exe_desktop_release_rejects_unsafe_target_filename(tmp_path, bad_name):
+    module = importlib.import_module("installer.exe_release")
+    source = tmp_path / "SuperMedicine.exe"
+    source.write_bytes(b"fake exe bytes")
+
+    with pytest.raises(module.ExeReleaseError):
+        module.release_exe_to_desktop(
+            exe_path=source,
+            desktop_dir=tmp_path / "Desktop",
+            target_filename=bad_name,
+        )
+
+
+def test_exe_desktop_release_normalizes_target_filename_suffix(tmp_path):
+    module = importlib.import_module("installer.exe_release")
+    source = tmp_path / "BuildName.exe"
+    source.write_bytes(b"fake exe bytes")
+
+    result = module.release_exe_to_desktop(
+        exe_path=source,
+        desktop_dir=tmp_path / "Desktop",
+        target_filename="SuperMedicine",
+        dry_run=True,
+    )
+
+    assert result["target_filename"] == "SuperMedicine.exe"
+    assert result["target_path"] == tmp_path / "Desktop" / "SuperMedicine.exe"
+
+
+def test_install_help_documents_unified_install_and_desktop_release(capsys):
+    install = importlib.import_module("Install")
+
+    with pytest.raises(SystemExit) as excinfo:
+        install.main(["--help"])
+
+    assert excinfo.value.code == 0
+    output = capsys.readouterr().out
+    assert "--unified-install" in output
+    assert "--release-exe" in output
+    assert "--desktop-dir" in output
+    assert "--exe-dry-run" in output
+    assert "统一安装" in output
+
+
+def test_unified_install_dry_run_initializes_project_without_real_desktop_write(tmp_path, monkeypatch, caplog):
+    install = importlib.import_module("Install")
+    source = tmp_path / "dist" / "SuperMedicine.exe"
+    source.parent.mkdir()
+    source.write_bytes(b"fake exe bytes")
+    desktop_dir = tmp_path / "fake-desktop"
+    real_home = tmp_path / "real-home"
+    real_home.mkdir()
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(install.Path, "home", lambda: real_home)
+    caplog.set_level(logging.INFO)
+
+    install.main(
+        [
+            "--unified-install",
+            "--release-exe",
+            str(source),
+            "--desktop-dir",
+            str(desktop_dir),
+            "--exe-dry-run",
+            *_llm_args(),
+        ]
+    )
+
+    assert (tmp_path / ".supermedicine" / "config.yaml").exists()
+    assert not (desktop_dir / "SuperMedicine.exe").exists()
+    assert not (real_home / "Desktop" / "SuperMedicine.exe").exists()
+    assert "安装初始化结果" in caplog.text
+    assert "桌面 Exe 释放 dry-run" in caplog.text
+    assert str(desktop_dir / "SuperMedicine.exe") in caplog.text
+
+
+def test_init_with_release_exe_copies_to_injected_desktop_directory(tmp_path, monkeypatch, caplog):
+    install = importlib.import_module("Install")
+    source = tmp_path / "SuperMedicine.exe"
+    source.write_bytes(b"fake exe bytes")
+    desktop_dir = tmp_path / "Desktop"
+    monkeypatch.chdir(tmp_path)
+    caplog.set_level(logging.INFO)
+
+    install.main(
+        [
+            "--init",
+            "--release-exe",
+            str(source),
+            "--desktop-dir",
+            str(desktop_dir),
+            *_llm_args(),
+        ]
+    )
+
+    target = desktop_dir / "SuperMedicine.exe"
+    assert (tmp_path / ".supermedicine" / "config.yaml").exists()
+    assert target.read_bytes() == b"fake exe bytes"
+    assert "桌面 Exe 释放完成" in caplog.text
+    assert str(target) in caplog.text
+
+
+def test_unified_install_requires_release_exe(capsys):
+    install = importlib.import_module("Install")
+
+    with pytest.raises(SystemExit) as excinfo:
+        install.main(["--unified-install", *_llm_args()])
+
+    assert excinfo.value.code == 2
+    assert "--unified-install requires --release-exe" in capsys.readouterr().err
+
+
+def test_install_manifest_documents_exe_as_external_release_artifact():
+    manifest = json.loads((REPO_ROOT / "install.json").read_text(encoding="utf-8"))
+    resource_policy = manifest["packaging_resources"]
+
+    assert resource_policy["installer_package"] == "installer"
+    assert "installer/resources/*.json" in resource_policy["non_code_resource_globs"]
+    assert "Real SuperMedicine.exe binaries" in resource_policy["exe_resource_strategy"]
+    assert "not committed" in resource_policy["exe_resource_strategy"]
+    assert "must not use a .exe suffix" in resource_policy["exe_resource_strategy"]
+    assert "*.exe" in resource_policy["generated_artifacts_excluded"]

@@ -23,6 +23,7 @@ class PaperView(Vertical):
 
     def compose(self) -> ComposeResult:
         yield Static(t("paper_title"), classes="section-title")
+        yield Static(t("paper_action_hint"), id="paper-action-hint", classes="hint")
         yield Select(
             [],
             prompt=t("paper_select_workspace"),
@@ -64,6 +65,8 @@ class PaperView(Vertical):
             workspaces = controller.list_workspaces()
             options = [(ws["label"], ws["id"]) for ws in workspaces]
             select_widget.set_options(options)
+            if not options:
+                self._set_status(t("workspace_no_workspaces"))
         except Exception as e:
             self._set_error(e)
 
@@ -74,20 +77,20 @@ class PaperView(Vertical):
             return None
         return str(value)
 
-    def _load_papers(self) -> None:
+    def _load_papers(self, *, refreshed: bool = False) -> None:
         workspace_id = self._get_selected_workspace()
         table = self.query_one("#paper-table", DataTable)
         table.clear(columns=True)
         table.add_columns("ID", t("paper_title_label"), t("paper_authors"), t("paper_format"), t("paper_imported_at"))
         if not workspace_id:
-            self._set_status(t("paper_select_workspace"))
+            self._set_status(f"{t('paper_refreshed')}：{t('paper_select_workspace')}" if refreshed else t("paper_select_workspace"))
             return
 
         controller = self._get_paper_controller()
         try:
             papers = controller.list_papers(workspace_id)
             if not papers:
-                self._set_status(t("paper_no_papers"))
+                self._set_status(f"{t('paper_refreshed')}：{t('paper_no_papers')}" if refreshed else t("paper_no_papers"))
                 return
             for paper in papers:
                 authors = ", ".join(paper.get("authors", []))
@@ -99,7 +102,7 @@ class PaperView(Vertical):
                     paper.get("imported_at", ""),
                     key=paper.get("id", ""),
                 )
-            self._set_status(f"{t('paper_list')}: {len(papers)}")
+            self._set_status(f"{t('paper_refreshed')}: {len(papers)}" if refreshed else f"{t('paper_list')}: {len(papers)}")
         except Exception as e:
             self._set_error(e)
 
@@ -110,7 +113,9 @@ class PaperView(Vertical):
         apply_status_style(status, safe_message)
 
     def _set_error(self, error: Exception) -> None:
-        self._set_status(f"{t('error')}: {redact_sensitive(str(error)) or t('safe_error_hint')}")
+        message = f"{t('error')}: {redact_sensitive(str(error)) or t('safe_error_hint')}"
+        self._set_status(message)
+        self.app.notify(message, severity="error")
 
     def on_select_changed(self, event: Select.Changed) -> None:
         if event.select.id == "paper-workspace-select":
@@ -122,7 +127,7 @@ class PaperView(Vertical):
         elif event.button.id == "paper-enrich":
             self._enrich_paper()
         elif event.button.id == "paper-refresh":
-            self._load_papers()
+            self._load_papers(refreshed=True)
 
     def _import_paper(self) -> None:
         workspace_id = self._get_selected_workspace()
@@ -158,7 +163,9 @@ class PaperView(Vertical):
         try:
             result = controller.import_paper(workspace_id, source_path, metadata=metadata)
             self._set_status(result.get("message", t("paper_imported")))
+            self.app.notify(result.get("message", t("paper_imported")))
             self._load_papers()
+            self._set_status(result.get("message", t("paper_imported")))
         except Exception as e:
             self._set_error(e)
 
@@ -182,7 +189,9 @@ class PaperView(Vertical):
         try:
             result = controller.enrich_metadata(workspace_id, row_key, confirm=True)
             self._set_status(result.get("message", ""))
+            self.app.notify(result.get("message", t("paper_enrich")))
             self._load_papers()
+            self._set_status(result.get("message", ""))
         except Exception as e:
             self._set_error(e)
 

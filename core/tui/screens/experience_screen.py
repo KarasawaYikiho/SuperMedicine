@@ -23,6 +23,7 @@ class ExperienceView(Vertical):
 
     def compose(self) -> ComposeResult:
         yield Static(t("experience_title"), classes="section-title")
+        yield Static(t("experience_action_hint"), id="exp-action-hint", classes="hint")
         yield Select(
             [],
             prompt=t("paper_select_workspace"),
@@ -70,6 +71,8 @@ class ExperienceView(Vertical):
             workspaces = controller.list_workspaces()
             options = [(ws["label"], ws["id"]) for ws in workspaces]
             select_widget.set_options(options)
+            if not options:
+                self._set_status(t("workspace_no_workspaces"))
         except Exception as e:
             self._set_error(e)
 
@@ -80,7 +83,7 @@ class ExperienceView(Vertical):
             return None
         return str(value)
 
-    def _load_experiences(self) -> None:
+    def _load_experiences(self, *, refreshed: bool = False) -> None:
         workspace_id = self._get_selected_workspace()
         table = self.query_one("#exp-table", DataTable)
         table.clear(columns=True)
@@ -92,14 +95,14 @@ class ExperienceView(Vertical):
             t("experience_tags_label"),
         )
         if not workspace_id:
-            self._set_status(t("paper_select_workspace"))
+            self._set_status(f"{t('experience_refreshed')}：{t('paper_select_workspace')}" if refreshed else t("paper_select_workspace"))
             return
 
         controller = self._get_experience_controller()
         try:
             records = controller.list_experiences(workspace_id, include_general=True)
             if not records:
-                self._set_status(t("experience_no_records"))
+                self._set_status(f"{t('experience_refreshed')}：{t('experience_no_records')}" if refreshed else t("experience_no_records"))
                 return
             for record in records:
                 tags = ", ".join(record.get("tags", []))
@@ -111,7 +114,7 @@ class ExperienceView(Vertical):
                     tags,
                     key=record.get("id", ""),
                 )
-            self._set_status(f"{t('experience_list')}: {len(records)}")
+            self._set_status(f"{t('experience_refreshed')}: {len(records)}" if refreshed else f"{t('experience_list')}: {len(records)}")
         except Exception as e:
             self._set_error(e)
 
@@ -122,7 +125,9 @@ class ExperienceView(Vertical):
         apply_status_style(status, safe_message)
 
     def _set_error(self, error: Exception) -> None:
-        self._set_status(f"{t('error')}: {redact_sensitive(str(error)) or t('safe_error_hint')}")
+        message = f"{t('error')}: {redact_sensitive(str(error)) or t('safe_error_hint')}"
+        self._set_status(message)
+        self.app.notify(message, severity="error")
 
     def on_select_changed(self, event: Select.Changed) -> None:
         if event.select.id == "exp-workspace-select":
@@ -138,7 +143,7 @@ class ExperienceView(Vertical):
         elif event.button.id == "exp-export":
             self._export_experiences()
         elif event.button.id == "exp-refresh":
-            self._load_experiences()
+            self._load_experiences(refreshed=True)
 
     def _suggest_classification(self) -> None:
         workspace_id = self._get_selected_workspace()
@@ -171,6 +176,7 @@ class ExperienceView(Vertical):
                 tags=tags,
             )
             self._set_status(result.get("message", t("experience_suggested")))
+            self.app.notify(result.get("message", t("experience_suggested")))
         except Exception as e:
             self._set_error(e)
 
@@ -209,7 +215,9 @@ class ExperienceView(Vertical):
                 confirm=True,
             )
             self._set_status(result.get("message", t("experience_confirmed")))
+            self.app.notify(result.get("message", t("experience_confirmed")))
             self._load_experiences()
+            self._set_status(result.get("message", t("experience_confirmed")))
         except Exception as e:
             self._set_error(e)
 
@@ -240,7 +248,9 @@ class ExperienceView(Vertical):
                 confirm=record_id,
             )
             self._set_status(result.get("message", t("experience_deleted")))
+            self.app.notify(result.get("message", t("experience_deleted")))
             self._load_experiences()
+            self._set_status(result.get("message", t("experience_deleted")))
         except Exception as e:
             self._set_error(e)
 
@@ -254,6 +264,7 @@ class ExperienceView(Vertical):
         try:
             result = controller.export_experiences(workspace_id=workspace_id, format="json", include_general=True)
             self._set_status(result.get("message", ""))
+            self.app.notify(result.get("message", t("experience_export")))
         except Exception as e:
             self._set_error(e)
 

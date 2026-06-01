@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
-from textual.widgets import Input, Static, TextArea
+from textual.widgets import Button, DataTable, Input, Static, TextArea
 
 from core.tui.app import SuperMedicineTUI
 from core.tui.i18n import t
@@ -99,5 +99,26 @@ def test_experiment_screen_reports_missing_required_input(tmp_path):
             assert t("error") in status
             assert t("experiment_missing_required") in status
             assert "目标蛋白" in status
+
+    asyncio.run(scenario())
+
+
+def test_experiment_screen_initial_empty_copy_and_safe_layout_are_visible(tmp_path):
+    async def scenario() -> None:
+        app = SuperMedicineTUI(project_root=tmp_path)
+        async with app.run_test(size=(140, 45)) as pilot:
+            await pilot.press("9")
+            await pilot.pause()
+
+            assert t("experiment_protocol") in _static_text(app.query_one("#experiment-session", Static))
+            assert t("experiment_current_step") in _static_text(app.query_one("#experiment-step", Static))
+            assert t("experiment_step_instructions") in _static_text(app.query_one("#experiment-instructions", Static))
+            assert app.query_one("#experiment-input-table", DataTable).row_count > 0
+            assert t("experiment_boundary") in _static_text(app.query_one("#experiment-boundary", Static))
+            assert app.query_one("#experiment-data-input", TextArea).text == ""
+            assert app.query_one("#experiment-output-input", Input).value == ""
+            assert t("experiment_calculate_step") in str(app.query_one("#experiment-calculate", Button).label)
+            assert t("experiment_submit_step") in str(app.query_one("#experiment-submit", Button).label)
+            assert t("experiment_save_log") in str(app.query_one("#experiment-save-log", Button).label)
 
     asyncio.run(scenario())

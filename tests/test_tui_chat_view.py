@@ -59,6 +59,22 @@ def test_chat_status_message_uses_status_prefix_and_escaping():
     assert "&lt;unsafe&gt;" in rendered
 
 
+def test_chat_empty_success_and_error_copy_stays_localized_and_secret_safe():
+    view = CapturingChatView()
+    secret = "sk-chat-empty-secret"
+
+    view.add_system_message(t("chat_help"))
+    view.add_assistant_message(t("chat_no_output"))
+    view.add_error_message(f"{t('error')}: api_key={secret}")
+    rendered = "\n".join(view.output.lines)
+
+    assert t("chat_help") in rendered
+    assert t("chat_no_output") in rendered
+    assert t("chat_error_action") in rendered
+    assert secret not in rendered
+    assert "[已隐藏]" in rendered
+
+
 def test_kernel_result_format_handles_success_error_empty_and_non_dict_outputs():
     assert SuperMedicineTUI._format_kernel_result({"status": "success", "output": {"b": 2, "a": [1]}}) == {
         "kind": "assistant",

@@ -24,6 +24,7 @@ class ToolView(Vertical):
 
     def compose(self) -> ComposeResult:
         yield Static(t("tool_title"), classes="section-title")
+        yield Static(t("tool_action_hint"), id="tool-action-hint", classes="hint")
         yield Select(
             [],
             prompt=t("paper_select_workspace"),
@@ -62,6 +63,8 @@ class ToolView(Vertical):
             workspaces = controller.list_workspaces()
             options = [(ws["label"], ws["id"]) for ws in workspaces]
             select_widget.set_options(options)
+            if not options:
+                self._set_status(t("workspace_no_workspaces"))
         except Exception as e:
             self._set_error(e)
 
@@ -86,18 +89,18 @@ class ToolView(Vertical):
             pass
         return None
 
-    def _load_tools(self) -> None:
+    def _load_tools(self, *, refreshed: bool = False) -> None:
         workspace_path = self._get_workspace_path()
         table = self.query_one("#tool-table", DataTable)
         table.clear(columns=True)
         table.add_columns(t("tool_language"), "ID", t("dashboard_status"))
         if not workspace_path:
-            self._set_status(t("paper_select_workspace"))
+            self._set_status(f"{t('tool_refreshed')}：{t('paper_select_workspace')}" if refreshed else t("paper_select_workspace"))
             return
 
         tools_dir = workspace_path / "tools"
         if not tools_dir.is_dir():
-            self._set_status(t("tool_no_tools"))
+            self._set_status(f"{t('tool_refreshed')}：{t('tool_no_tools')}" if refreshed else t("tool_no_tools"))
             return
 
         tool_count = 0
@@ -117,9 +120,9 @@ class ToolView(Vertical):
                             tool_count += 1
 
         if tool_count == 0:
-            self._set_status(t("tool_no_tools"))
+            self._set_status(f"{t('tool_refreshed')}：{t('tool_no_tools')}" if refreshed else t("tool_no_tools"))
         else:
-            self._set_status(f"{t('tool_list')}: {tool_count}")
+            self._set_status(f"{t('tool_refreshed')}: {tool_count}" if refreshed else f"{t('tool_list')}: {tool_count}")
 
     def _set_status(self, message: str) -> None:
         status = self.query_one("#tool-status", Static)
@@ -128,7 +131,9 @@ class ToolView(Vertical):
         apply_status_style(status, safe_message)
 
     def _set_error(self, error: Exception) -> None:
-        self._set_status(f"{t('error')}: {redact_sensitive(str(error)) or t('safe_error_hint')}")
+        message = f"{t('error')}: {redact_sensitive(str(error)) or t('safe_error_hint')}"
+        self._set_status(message)
+        self.app.notify(message, severity="error")
 
     def on_select_changed(self, event: Select.Changed) -> None:
         if event.select.id == "tool-workspace-select":
@@ -142,7 +147,7 @@ class ToolView(Vertical):
         elif event.button.id == "tool-run":
             self._run_tool()
         elif event.button.id == "tool-refresh":
-            self._load_tools()
+            self._load_tools(refreshed=True)
 
     def _init_tools(self) -> None:
         workspace_path = self._get_workspace_path()
@@ -155,7 +160,9 @@ class ToolView(Vertical):
         (tools_dir / "python").mkdir(exist_ok=True)
         (tools_dir / "r").mkdir(exist_ok=True)
         self._set_status(t("tool_initialized"))
+        self.app.notify(t("tool_initialized"))
         self._load_tools()
+        self._set_status(t("tool_initialized"))
 
     def _add_tool(self) -> None:
         workspace_path = self._get_workspace_path()
@@ -185,7 +192,9 @@ class ToolView(Vertical):
             json.dumps(tool_meta, ensure_ascii=False, indent=2), encoding="utf-8"
         )
         self._set_status(t("tool_added"))
+        self.app.notify(t("tool_added"))
         self._load_tools()
+        self._set_status(t("tool_added"))
 
     def _run_tool(self) -> None:
         table = self.query_one("#tool-table", DataTable)

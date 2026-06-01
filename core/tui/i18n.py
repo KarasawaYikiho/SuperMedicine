@@ -37,6 +37,8 @@ LABELS: dict[str, str] = {
     "layout_shortcuts": "快捷键",
     "layout_current_view": "当前视图",
     "layout_focus": "焦点",
+    "layout_mode": "布局",
+    "layout_status_bar": "状态栏",
     "layout_sidebar_title": "SuperMedicine",
     "layout_sidebar_subtitle": "智能医学工作台",
 
@@ -84,6 +86,7 @@ LABELS: dict[str, str] = {
     "workspace_delete_requires_confirm": "危险操作：删除工作区前，请在输入框输入完全一致的工作区 ID。此操作会硬删除工作区且不可恢复。",
     "workspace_no_workspaces": "暂无工作区，请先创建",
     "workspace_manual_create_hint": "手动创建：在“工作区 ID”输入框输入小写 slug，按 Enter 或点击“创建工作区”。快捷键 Ctrl+N 聚焦输入框；可用鼠标点击输入框、按钮或列表。",
+    "workspace_action_hint": "操作提示：创建/选择工作区不会调用 Kernel 或 LLM；删除必须手动输入 delete:<工作区ID> 并经过权限策略确认。",
     "workspace_create_placeholder": "工作区 ID（小写字母、数字、连字符；例如 study-a）",
     "workspace_created": "工作区已创建",
     "workspace_selected": "已选择工作区",
@@ -111,6 +114,7 @@ LABELS: dict[str, str] = {
     "paper_enrich": "在线补全",
     "paper_enrich_confirm": "在线补全将发起网络请求。请在 DOI 输入框输入选中论文 ID 后再点击在线补全。",
     "paper_refreshed": "论文列表已刷新",
+    "paper_action_hint": "操作提示：先选择工作区，再填写文件路径导入；在线补全会发起网络请求，必须在 DOI 输入框输入选中论文 ID。",
 
     # Experience
     "experience_title": "经验学习",
@@ -131,6 +135,7 @@ LABELS: dict[str, str] = {
     "experience_confirm_delete": "输入经验 ID 确认删除",
     "experience_delete_requires_confirm": "危险操作：删除经验前，请在经验标题输入框输入完全一致的经验 ID。此操作不可恢复。",
     "experience_refreshed": "经验列表已刷新",
+    "experience_action_hint": "操作提示：建议分类不会写入经验库；确认写入需填写标题和摘要；删除需在标题输入框输入完全一致的经验 ID。",
 
     # Tool
     "tool_title": "工具管理",
@@ -147,6 +152,7 @@ LABELS: dict[str, str] = {
     "tool_added": "工具已添加",
     "tool_run": "运行工具",
     "tool_refreshed": "工具列表已刷新",
+    "tool_action_hint": "操作提示：先选择工作区，可初始化工具目录、添加工具元数据或查看工具路径；运行真实工具仍需权限与沙箱边界。",
 
     # Dialog
     "dialog_title": "对话历史",
@@ -155,6 +161,7 @@ LABELS: dict[str, str] = {
     "dialog_summary": "摘要",
     "dialog_time": "时间",
     "dialog_refreshed": "对话历史已刷新",
+    "dialog_action_hint": "操作提示：选择工作区后可查看审计友好的对话事件摘要；敏感内容会在展示前隐藏。",
 
     # LLM
     "llm_title": "LLM 管理",
@@ -181,6 +188,7 @@ LABELS: dict[str, str] = {
     "llm_secret_hidden": "密钥已隐藏，不会显示在状态栏或通知中",
     "llm_refreshed": "LLM Provider 列表已刷新",
     "safe_error_hint": "操作失败，敏感信息已隐藏。请检查输入、配置与权限后重试。",
+    "llm_action_hint": "操作提示：API Key 输入框会隐藏内容，保存后状态栏和通知不会显示密钥；切换 Provider 前请确认配置完整。",
 
     # Common
     "confirm": "确认",
@@ -207,6 +215,11 @@ LABELS: dict[str, str] = {
     "status_task_idle": "任务空闲",
     "status_task_running": "任务执行中",
     "status_focus_input": "输入栏",
+    "status_layout_normal": "标准",
+    "status_layout_maximized": "最大化",
+    "status_maximized": "已最大化当前焦点组件，按 Esc 或 F 还原。",
+    "status_restored": "已还原标准布局。",
+    "status_maximize_unavailable": "当前焦点组件不支持最大化，请先聚焦列表、表格或内容区。",
     "status_shortcuts_hint": "1-0 切换视图 · Tab/Shift+Tab 移动焦点 · Enter 提交 · ? 帮助 · F 最大化 · Q 退出",
     "thinking": "正在思考...",
     "chat_separator": "────────────────────────────────────────",
@@ -222,6 +235,7 @@ LABELS: dict[str, str] = {
     "chat_result_status": "执行状态",
     "chat_result_output": "输出",
     "chat_help": "在下方输入框输入消息，按 Enter 提交当前输入。输入 /help 查看命令。",
+    "chat_empty_hint": "暂无用户消息。可直接输入问题，或先进入工作区/LLM 管理完成上下文配置。",
     "help_title": "快捷键帮助",
     "help_navigation": "导航：1-0 数字键直接切换视图；↑↓ 在侧边栏选择；Tab/Shift+Tab 在输入框、按钮和列表间移动焦点。",
     "help_submission": "提交：焦点在输入栏时按 Enter 提交消息；焦点在按钮/列表时按 Enter 激活当前项。",
@@ -252,6 +266,7 @@ LABELS: dict[str, str] = {
     "experiment_missing_required": "缺少必填输入",
     "experiment_parse_error": "输入格式无法解析，请使用 JSON 或 key=value",
     "experiment_boundary": "仅供科研记录与实验辅助，不构成临床或生产建议；使用前需专家复核。",
+    "experiment_action_hint": "操作提示：按步骤填写 JSON 或 key=value 输入；计算会通过权限引擎和插件沙箱；保存日志前会自动脱敏。",
 
     # Log reports
     "log_title": "Log 报告",
@@ -265,6 +280,8 @@ LABELS: dict[str, str] = {
     "log_no_reports": "暂无 Log 报告",
     "log_empty_message": "请输入日志内容",
     "log_redaction_hint": "敏感信息会在保存前自动脱敏。",
+    "log_refreshed": "Log 报告列表已刷新",
+    "log_action_hint": "操作提示：输入日志内容后保存，可刷新列表并查看选中报告；报告详情展示时继续脱敏。",
 }
 
 

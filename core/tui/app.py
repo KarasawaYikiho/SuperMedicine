@@ -106,6 +106,7 @@ class ShellStatusText:
     center: str
     right: str
     focus: str
+    layout: str
 
 
 class NavItem(ListItem):
@@ -302,8 +303,8 @@ class SuperMedicineTUI(App[Any]):
         yield Header()
         with Horizontal(id="app-body"):
             with Vertical(id="sidebar"):
-                yield Static(t("layout_sidebar_title"), id="sidebar-title")
-                yield Static(t("layout_sidebar_subtitle"), id="sidebar-subtitle")
+                yield Static(t("layout_sidebar_title"), id="sidebar-title", classes="shell-title")
+                yield Static(t("layout_sidebar_subtitle"), id="sidebar-subtitle", classes="shell-subtitle")
                 yield ListView(
                     *(
                         NavItem(f"{item.key} {item.icon} {item.label}", item.view_id)
@@ -311,9 +312,9 @@ class SuperMedicineTUI(App[Any]):
                     ),
                     id="nav-list",
                 )
-                yield Static(f"{t('layout_shortcuts')}\n{self.shortcut_hint_text()}", id="sidebar-shortcuts")
+                yield Static(f"{t('layout_shortcuts')}\n{self.shortcut_hint_text()}", id="sidebar-shortcuts", classes="shortcut-hint")
             with Vertical(id="main-area"):
-                yield Static(t("nav_chat"), id="view-title")
+                yield Static(t("nav_chat"), id="view-title", classes="view-heading")
                 yield Vertical(id="content-pane")
                 with Horizontal(id="input-bar"):
                     yield Static("> ", id="prompt-prefix")
@@ -410,11 +411,20 @@ class SuperMedicineTUI(App[Any]):
 
         current_view = view_id or self._current_view
         task_state = t("status_task_running") if self._task_running else t("status_task_idle")
+        layout_state = self._layout_status_label()
         left = f"📁 {self._workspace_count()} {t('status_workspaces')}"
         center = f"🔌 {self._plugin_count()} {t('status_plugins')}  |  {self._llm_status_label()}  |  {task_state}"
-        right = f"{t('layout_current_view')}：{self.view_title_text(current_view)}  |  SuperMedicine {self._package_version()}"
+        right = f"{t('layout_current_view')}：{self.view_title_text(current_view)}  |  {t('layout_mode')}：{layout_state}  |  SuperMedicine {self._package_version()}"
         focus = f"{t('layout_focus')}：{t('status_focus_input')}"
-        return ShellStatusText(left=left, center=center, right=right, focus=focus)
+        return ShellStatusText(left=left, center=center, right=right, focus=focus, layout=layout_state)
+
+    def _layout_status_label(self) -> str:
+        """Return maximize state text safely for mounted and dry-run contexts."""
+
+        try:
+            return t("status_layout_maximized") if self.screen.maximized is not None else t("status_layout_normal")
+        except Exception:
+            return t("status_layout_normal")
 
     def _focus_prompt_input(self) -> None:
         """Move focus back to the prompt input after navigation."""
@@ -441,10 +451,16 @@ class SuperMedicineTUI(App[Any]):
         """Toggle maximize on the focused widget."""
         if self.screen.maximized is not None:
             self.screen.minimize()
+            self.notify(t("status_restored"), title=t("layout_mode"), severity="information", timeout=3)
+            self._update_status_bar()
         else:
             focused = self.screen.focused
             if focused is not None and getattr(focused, "allow_maximize", False):
                 self.screen.maximize(focused)
+                self.notify(t("status_maximized"), title=t("layout_mode"), severity="information", timeout=3)
+                self._update_status_bar()
+            else:
+                self.notify(t("status_maximize_unavailable"), title=t("layout_mode"), severity="warning", timeout=4)
 
     def action_show_help(self) -> None:
         """Show help information."""
@@ -457,7 +473,7 @@ class SuperMedicineTUI(App[Any]):
     def _update_view_title(self, view_id: str) -> None:
         """Update the view title bar."""
         title_widget = self.query_one("#view-title", Static)
-        title_widget.update(f"{self.view_title_text(view_id)}  ·  {self.shortcut_hint_text()}")
+        title_widget.update(f"{t('layout_current_view')}：{self.view_title_text(view_id)}  ·  {self.shortcut_hint_text()}")
 
     def _update_status_bar(self) -> None:
         """Update the bottom status bar with context info."""
@@ -672,10 +688,10 @@ def launch_tui(*, dry_run: bool = False, project_root: Path | str | None = None)
         console.print(f"[bold]{_console_safe_text(status.title, console_encoding)}[/bold]")
         console.print(_console_safe_text(status.message, console_encoding))
         console.print(_console_safe_text(t("sandbox_notice"), console_encoding))
-        console.print(_console_safe_text(f"{t('layout_current_view')}：{status.view_title}", console_encoding))
+        console.print(_console_safe_text(f"{t('layout_current_view')}：{status.view_title}（{t('layout_mode')}：{shell_status.layout}）", console_encoding))
         console.print(_console_safe_text(f"{t('layout_shortcuts')}：{status.shortcut_hint}", console_encoding))
         console.print(_console_safe_text(shell_status.focus, console_encoding))
-        console.print(_console_safe_text(f"{status.status_left} | {status.status_center} | {status.status_right}", console_encoding))
+        console.print(_console_safe_text(f"{t('layout_status_bar')}：{status.status_left} | {status.status_center} | {status.status_right}", console_encoding))
         return status
 
     console = Console()

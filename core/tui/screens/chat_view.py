@@ -58,6 +58,7 @@ class ChatView(Vertical):
         self.add_system_message(t("welcome"))
         self.add_system_message(t("sandbox_notice"))
         self.add_system_message(t("chat_help"))
+        self.add_status_message(t("chat_empty_hint"))
 
     def _write_separator(self, output: RichLog) -> None:
         output.write(f"[dim]{safe_display_text(t('chat_separator'))}[/dim]")
@@ -101,3 +102,4 @@ class ChatView(Vertical):
         output = self.query_one("#chat-output", RichLog)
         output.clear()
         self._message_count = 0
+        self.add_status_message(t("chat_empty_hint"))

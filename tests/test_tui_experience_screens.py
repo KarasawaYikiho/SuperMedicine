@@ -96,3 +96,20 @@ def test_experience_view_sets_deterministic_non_empty_reload_status():
 
     assert "experience_list" in loader
     assert "len(records)" in loader
+
+
+def test_experience_view_empty_success_error_copy_and_secret_redaction_are_explicit():
+    compose_source = inspect.getsource(ExperienceView.compose)
+    loader_source = inspect.getsource(ExperienceView._load_experiences)
+    confirm_source = inspect.getsource(ExperienceView._confirm_experience)
+    error_source = inspect.getsource(ExperienceView._set_error)
+    status_source = inspect.getsource(ExperienceView._set_status)
+
+    assert "experience_no_records" in loader_source
+    assert "experience_list" in loader_source
+    assert "experience_confirmed" in confirm_source
+    assert "experience_delete_requires_confirm" in compose_source + inspect.getsource(ExperienceView._delete_experience)
+    assert "redact_sensitive" in error_source
+    assert "redact_sensitive" in status_source
+    assert t("experience_no_records") == "暂无经验记录"
+    assert "完全一致" in t("experience_delete_requires_confirm")

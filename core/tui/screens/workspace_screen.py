@@ -24,6 +24,7 @@ class WorkspaceView(Vertical):
     def compose(self) -> ComposeResult:
         yield Static(t("workspace_title"), classes="section-title")
         yield Static(t("workspace_manual_create_hint"), id="workspace-create-hint", classes="hint")
+        yield Static(t("workspace_action_hint"), id="workspace-action-hint", classes="hint")
         yield DataTable(id="workspace-table", cursor_type="row")
         with Horizontal(classes="form-row"):
             yield Input(
@@ -58,7 +59,7 @@ class WorkspaceView(Vertical):
 
         return WorkspaceScreenController(project_root=self._project_root)
 
-    def _load_workspaces(self, *, preserve_status: bool = False) -> None:
+    def _load_workspaces(self, *, preserve_status: bool = False, refreshed: bool = False) -> None:
         table = self.query_one("#workspace-table", DataTable)
         selected_key = self._selected_workspace_id()
         table.clear(columns=True)
@@ -68,7 +69,7 @@ class WorkspaceView(Vertical):
         try:
             workspaces = controller.list_workspaces()
             if not workspaces:
-                self._set_status(t("workspace_no_workspaces"))
+                self._set_status(f"{t('workspace_refreshed')}：{t('workspace_no_workspaces')}" if refreshed else t("workspace_no_workspaces"))
                 return
             for ws in workspaces:
                 metadata = ws.get("metadata", {})
@@ -77,7 +78,7 @@ class WorkspaceView(Vertical):
             if selected_key is not None:
                 self._select_table_row(selected_key)
             if not preserve_status:
-                self._set_status(f"{t('workspace_list')}: {len(workspaces)}")
+                self._set_status(f"{t('workspace_refreshed')}: {len(workspaces)}" if refreshed else f"{t('workspace_list')}: {len(workspaces)}")
         except Exception as e:
             self._set_error(e)
 
@@ -103,7 +104,7 @@ class WorkspaceView(Vertical):
         elif event.button.id == "workspace-delete":
             self._delete_workspace(workspace_id)
         elif event.button.id == "workspace-refresh":
-            self._load_workspaces()
+            self._load_workspaces(refreshed=True)
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         if event.data_table.id != "workspace-table":
@@ -182,6 +183,7 @@ class WorkspaceView(Vertical):
             self._set_status(result.get("message", t("workspace_deleted")))
             self.app.notify(result.get("message", t("workspace_deleted")))
             self._load_workspaces()
+            self._set_status(result.get("message", t("workspace_deleted")))
         except Exception as e:
             self._set_error(e)
 

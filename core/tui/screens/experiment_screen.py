@@ -39,6 +39,7 @@ class ExperimentGuideView(Vertical):
     def compose(self) -> ComposeResult:
         yield Static(t("experiment_title"), classes="section-title")
         yield Static(t("experiment_boundary"), id="experiment-boundary")
+        yield Static(t("experiment_action_hint"), id="experiment-action-hint", classes="hint")
         yield Static("", id="experiment-session")
         yield Static("", id="experiment-step")
         yield Static("", id="experiment-instructions")
@@ -278,7 +279,9 @@ class ExperimentGuideView(Vertical):
         apply_status_style(status, safe_message)
 
     def _set_error(self, error: Exception) -> None:
-        self._set_status(f"{t('error')}: {redact_sensitive(str(error)) or t('safe_error_hint')}")
+        message = f"{t('error')}: {redact_sensitive(str(error)) or t('safe_error_hint')}"
+        self._set_status(message)
+        self.app.notify(message, severity="error")
 
 
 ExperimentScreen = ExperimentGuideView

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import inspect
+
 import yaml
 
 from core.config_center import ConfigCenter
 from core.tui.i18n import t
-from core.tui.screens.llm_screen import LLMScreenController
+from core.tui.screens.llm_screen import LLMView, LLMScreenController
 
 
 def test_tui_controller_adds_switches_and_redacts_provider(tmp_path):
@@ -146,3 +148,19 @@ def test_tui_controller_readiness_message_redacts_api_key(tmp_path):
     assert secret not in str(result)
     assert secret not in str(switch_result)
     assert secret not in str(readiness)
+
+
+def test_llm_view_declares_secret_safe_inputs_empty_state_and_error_redaction():
+    compose_source = inspect.getsource(LLMView.compose)
+    refresh_source = inspect.getsource(LLMView.refresh_llm_state)
+    add_source = inspect.getsource(LLMView._add_provider_from_form)
+    error_source = inspect.getsource(LLMView._safe_error_message)
+
+    assert 'id="llm-api-key-input"' in compose_source
+    assert "password=True" in compose_source
+    assert "llm_secret_hidden" in compose_source
+    assert "llm_no_providers" in refresh_source
+    assert "llm_provider_added" in add_source
+    assert "redact_sensitive" in error_source
+    assert t("llm_secret_hidden") == "密钥已隐藏，不会显示在状态栏或通知中"
+    assert t("llm_no_providers") == "暂无 LLM Provider"
