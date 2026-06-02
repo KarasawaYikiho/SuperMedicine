@@ -81,6 +81,14 @@ python Install.py --unified-install --release-exe dist/SuperMedicine.exe \
   --model gpt-4o-mini
 ```
 
+The release package must be kept as a complete extracted directory. Run
+`Install.py` from the extracted root that also contains `installer/__init__.py`
+and `installer/exe_release.py`. Do not copy only `Install.py` out of the archive.
+If you see `ModuleNotFoundError: No module named 'installer'` at a path like
+`C:\Users\D2O\Downloads\SuperMedicine.Beta0.4.1\SuperMedicine Beta0.4.1\Install.py`,
+the archive is likely incomplete or from an older broken release; re-download the
+fixed Beta0.4.1 package or run from a complete source/release directory.
+
 `python Install.py --init` keeps its existing core initialization behavior and
 does not copy a desktop executable unless `--release-exe` is explicitly supplied.
 For automation, CI, or dry runs, use a temporary desktop directory or dry-run mode

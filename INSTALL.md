@@ -72,6 +72,14 @@ python Install.py --init --provider openai --base-url https://api.openai.com/v1 
 This creates local `.supermedicine/` configuration. It does not require or create
 OpenCode or Claude Code configuration.
 
+If you launch `Install.py` from a release archive, keep the extracted directory
+intact. The fixed Beta0.4.1 release layout places `Install.py` next to the
+`installer/` package, including `installer/__init__.py` and
+`installer/exe_release.py`, under the extracted root. Copying only `Install.py`
+out of the archive can trigger `ModuleNotFoundError: No module named 'installer'`.
+In that case, re-download the fixed complete package or run the installer from a
+complete source/release directory.
+
 Alternative initialization examples:
 
 ```bash
@@ -226,6 +234,16 @@ Install project dependencies:
 ```bash
 pip install -e .
 ```
+
+### `ModuleNotFoundError: No module named 'installer'`
+
+This usually means `Install.py` was copied out of the release archive instead of
+being run from the full extracted directory. The Beta0.4.1 release must keep the
+complete layout with `Install.py` and the `installer/` package together at the
+extracted root, including `installer/__init__.py` and `installer/exe_release.py`.
+Re-download the fixed complete package or run from a complete source/release
+directory. Do not try to repair this by manually copying single files out of the
+archive.
 
 ### Permission denied on Windows
 

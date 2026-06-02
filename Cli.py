@@ -29,6 +29,21 @@ def _log_json(value: object) -> None:
     logger.info(json.dumps(redact_sensitive(value), ensure_ascii=False, indent=2))
 
 
+def _load_release_exe_to_desktop():
+    """Lazily load optional Exe release support only when explicitly requested."""
+
+    try:
+        from installer.exe_release import release_exe_to_desktop
+    except ModuleNotFoundError as exc:
+        missing_module = exc.name or "installer.exe_release"
+        raise ValueError(
+            "桌面 Exe 释放功能不可用: release package is incomplete "
+            f"(missing Python module: {missing_module}). "
+            "请重新下载完整发布包，或从包含 installer/ 目录的完整源码/发布目录运行。"
+        ) from None
+    return release_exe_to_desktop
+
+
 
 class CLI:
     """SuperMedicine CLI"""
@@ -53,11 +68,11 @@ class CLI:
     ) -> None:
         """初始化项目"""
         from Install import init_config
-        from installer.exe_release import release_exe_to_desktop
 
         init_config(project_dir, provider=provider, base_url=base_url, api_key=api_key, model=model)
         logger.info("项目已初始化: %s", project_dir / ".supermedicine")
         if release_exe is not None:
+            release_exe_to_desktop = _load_release_exe_to_desktop()
             result = release_exe_to_desktop(
                 exe_path=release_exe,
                 desktop_dir=desktop_dir,

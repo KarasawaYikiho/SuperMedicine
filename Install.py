@@ -22,7 +22,6 @@ import yaml
 
 from core.llm_providers.config import LLMProviderConfig
 from core.redaction import redact_sensitive
-from installer.exe_release import release_exe_to_desktop
 from permission.policy import ensure_default_policy
 
 logger = logging.getLogger(__name__)
@@ -402,10 +401,26 @@ def _log_exe_release_result(result: dict[str, Any]) -> None:
         logger.info("桌面 Exe 释放结果: status=%s target=%s reason=%s", status, target, reason)
 
 
+def _load_release_exe_to_desktop() -> Any:
+    """Lazily load Exe release support only when explicitly requested."""
+
+    try:
+        from installer.exe_release import release_exe_to_desktop
+    except ModuleNotFoundError as exc:
+        missing_module = exc.name or "installer.exe_release"
+        raise SystemExit(
+            "error: 桌面 Exe 释放功能不可用: release package is incomplete "
+            f"(missing Python module: {missing_module}). "
+            "请重新下载完整发布包，或从包含 installer/ 目录的完整源码/发布目录运行。"
+        ) from None
+    return release_exe_to_desktop
+
+
 def _release_exe_from_args(args: argparse.Namespace) -> dict[str, Any]:
     """Release the requested Exe and convert copy failures into CLI errors."""
 
     try:
+        release_exe_to_desktop = _load_release_exe_to_desktop()
         result = release_exe_to_desktop(
             exe_path=args.release_exe,
             desktop_dir=args.desktop_dir,
@@ -413,6 +428,8 @@ def _release_exe_from_args(args: argparse.Namespace) -> dict[str, Any]:
             overwrite=args.exe_overwrite,
             dry_run=args.exe_dry_run,
         )
+    except SystemExit:
+        raise
     except Exception as exc:
         logger.error("桌面 Exe 释放失败: %s", redact_sensitive(str(exc)))
         raise SystemExit(f"error: 桌面 Exe 释放失败: {redact_sensitive(str(exc))}") from exc
