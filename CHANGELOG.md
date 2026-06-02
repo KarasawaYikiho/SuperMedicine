@@ -5,15 +5,15 @@ All notable changes to SuperMedicine are documented here. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html) for package metadata.
 
 Public release labels and Python package versions may differ when the public label
-is not PEP 440-compatible. Current public/release label: **Beta0.4.0**. Current
-Python package fallback version: **0.4.0b0**.
+is not PEP 440-compatible. Current public/release label: **Beta0.4.1**. Current
+Python package fallback version: **0.4.1b0**.
 
-## [Beta0.4.0] - 2026-05-31
+## [Beta0.4.1] - 2026-05-31
 
 ### Changed
 
-- Updated public/release display label to `Beta0.4.0`.
-- Python package metadata uses fallback version `0.4.0b0`.
+- Updated public/release display label to `Beta0.4.1`.
+- Python package metadata uses fallback version `0.4.1b0`.
 - Reworked root user-facing Markdown for release upload scope, including a
   Chinese README section and removal of stale links to excluded engineering docs.
 

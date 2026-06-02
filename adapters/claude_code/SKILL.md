@@ -27,20 +27,20 @@ local so this optional skill remains self-contained.
 
 `install.json` registers this optional Claude Code surface as:
 
-- platform key: `claude-code`
+- Platform key: `claude-code`
 - entry file: `adapters/claude_code/SKILL.md`
-- adapter module: `adapters/claude_code/adapter.py`
-- optional add-on: yes
-- core runtime required: no
-- user-facing Agent/surface: exactly one, `SuperMedicine`
-- internal role contexts: `alpha`, `beta`, `gamma`, and `delta` as
+- Adapter module: `adapters/claude_code/adapter.py`
+- Optional add-on: yes
+- Core runtime required: no
+- User-facing Agent/surface: exactly one, `SuperMedicine`
+- Internal role contexts: `alpha`, `beta`, `gamma`, and `delta` as
   non-user-facing workflow context only
 - AI provider formats: OpenAI-compatible and Anthropic-compatible
-- provider configuration source: installer/runtime/project configuration only,
+- Provider configuration source: installer/runtime/project configuration only,
   including `Install.py --provider openai|anthropic --base-url <url>
   --api-key <placeholder-or-secret> --model <model>`, `SM_LLM_*` variables,
   `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`, and `.supermedicine/config.yaml`
-- secret handling: API keys must be redacted from logs, manifests, adapter
+- Secret handling: API keys must be redacted from logs, manifests, adapter
   responses, and documentation; this skill document intentionally contains no
   real plaintext API key examples
 

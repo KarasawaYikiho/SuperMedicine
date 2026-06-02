@@ -69,7 +69,7 @@ class CLI:
 
     def status(self) -> None:
         """显示项目状态"""
-        logger.info("SuperMedicine Beta0.4.0")
+        logger.info("SuperMedicine Beta0.4.1")
         logger.info("=" * 40)
 
         # 检查配置
@@ -117,7 +117,7 @@ class CLI:
         # 确定项目根目录
         project_dir = Path.cwd()
 
-        logger.info("SuperMedicine Beta0.4.0 — 任务执行")
+        logger.info("SuperMedicine Beta0.4.1 — 任务执行")
         logger.info("任务: %s", redact_sensitive(task))
         logger.info("=" * 50)
 

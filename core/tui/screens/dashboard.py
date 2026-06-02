@@ -146,7 +146,7 @@ def _package_version() -> str:
     try:
         return pkg_version("supermedicine")
     except Exception:
-        return "0.4.0b0"
+        return "0.4.1b0"
 
 
 def _action_hint(context: dict[str, Any]) -> str:

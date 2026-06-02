@@ -2,7 +2,7 @@
 
 This guide covers installation, initialization, provider configuration, optional
 R support, platform adapter notes, troubleshooting, and uninstall behavior for
-SuperMedicine **Beta0.4.0**. The Python package fallback version is **0.4.0b0**.
+SuperMedicine **Beta0.4.1**. The Python package fallback version is **0.4.1b0**.
 
 For a shorter overview, start with [README.md](README.md). For design and
 security boundaries, see [ARCHITECTURE.md](ARCHITECTURE.md) and
@@ -13,7 +13,7 @@ security boundaries, see [ARCHITECTURE.md](ARCHITECTURE.md) and
 | Requirement | Version | Notes |
 |-------------|---------|-------|
 | Python | >= 3.10 | Required |
-| Git | any | Required for cloning |
+| Git | Any | Required for cloning |
 | pip | >= 21.0 | Required for installation |
 | R | >= 4.3 | Optional, for R survival backend |
 
@@ -210,8 +210,8 @@ Adapters are optional add-ons around the standalone Python framework.
 | Area | Core install required? | Status |
 |------|------------------------|--------|
 | Standalone Python CLI/Kernel | Yes | Default supported path |
-| OpenCode add-on | No | Metadata, skills, agents, and tool mapping; no native external subagent runtime bridge by itself |
-| Claude Code add-on | No | Minimal capabilities/runtime/local CLI invocation adapter; no native Claude Code skill or subagent support |
+| OpenCode Add-on | No | Metadata, skills, agents, and tool mapping; no native external subagent runtime bridge by itself |
+| Claude Code Add-on | No | Minimal capabilities/runtime/local CLI invocation adapter; no native Claude Code skill or subagent support |
 
 OpenCode add-on content lives under `adapters/opencode/`. Claude Code add-on
 content lives under `adapters/claude_code/`. These files contain metadata and

@@ -1,7 +1,7 @@
 # Contributing to SuperMedicine
 
 Thank you for contributing to SuperMedicine. This guide summarizes the local
-development workflow for the **Beta0.4.0** codebase. User installation details
+development workflow for the **Beta0.4.1** codebase. User installation details
 are in [INSTALL.md](INSTALL.md), and the local quality gate is in
 [README.md](README.md#local-quality-gate).
 
@@ -39,13 +39,9 @@ ruff check --fix .
 ## Testing Expectations
 
 All functional changes should include appropriate tests and pass the existing
-suite before a pull request is submitted:
-
-```bash
-pytest tests/ -v
-pytest tests/test_kernel.py -v
-pytest tests/ --cov=. --cov-report=term
-```
+suite before a pull request is submitted. Use the local quality gate documented
+in [README.md](README.md#local-quality-gate) for the maintained test command;
+targeted test or coverage variants may also be useful while developing.
 
 Use `tmp_path` for temporary filesystem tests, keep tests deterministic, and avoid
 live external provider calls unless a test is explicitly designed and gated for
@@ -57,8 +53,8 @@ that purpose.
   upload.
 - Do not add final-upload dependencies on excluded engineering folders such as
   `Docs/`, `docs/`, or `Architecture/`.
-- Keep documented versions aligned: public/release label `Beta0.4.0`, Python
-  package fallback version `0.4.0b0`.
+- Keep documented versions aligned: public/release label `Beta0.4.1`, Python
+  package fallback version `0.4.1b0`.
 - Use placeholders such as `<OPENAI_API_KEY>` in examples; never use real secrets.
 
 ## File Naming

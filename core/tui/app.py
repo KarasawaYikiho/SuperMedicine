@@ -521,7 +521,7 @@ class SuperMedicineTUI(App[Any]):
             from importlib.metadata import version as pkg_version
             return pkg_version("supermedicine")
         except Exception:
-            return "0.4.0b0"
+            return "0.4.1b0"
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
         """Handle sidebar navigation item selection."""

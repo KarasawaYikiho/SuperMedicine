@@ -1,6 +1,6 @@
 # SuperMedicine
 
-![Version](https://img.shields.io/badge/version-Beta0.4.0-blue)
+![Version](https://img.shields.io/badge/version-Beta0.4.1-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -10,8 +10,8 @@ medical writing/citation helpers, workspace management, paper import, experience
 learning, and a Chinese terminal UI. OpenCode and Claude Code integrations are
 optional add-ons; the Python CLI and Kernel are the default supported runtime.
 
-Public/release label: **Beta0.4.0**. Python package fallback version:
-**0.4.0b0**.
+Public/release label: **Beta0.4.1**. Python package fallback version:
+**0.4.1b0**.
 
 For detailed setup, see [INSTALL.md](INSTALL.md). For design boundaries, see
 [ARCHITECTURE.md](ARCHITECTURE.md). For security and medical-use limits, see
@@ -57,7 +57,7 @@ Requirements:
 | Requirement | Version | Notes |
 |-------------|---------|-------|
 | Python | >= 3.10 | Required |
-| Git | any | Required for cloning |
+| Git | Any | Required for cloning |
 | pip | >= 21.0 | Required for package install |
 | R | >= 4.3 | Optional, for R survival backend |
 
@@ -72,7 +72,7 @@ python Install.py --init --provider openai --base-url https://api.openai.com/v1 
 supermedicine status
 ```
 
-Unified installer / desktop Exe release:
+Unified Installer / Desktop Exe Release:
 
 ```bash
 python Install.py --unified-install --release-exe dist/SuperMedicine.exe \
@@ -262,7 +262,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the root architecture reference.
 Use `supermedicine diagnose` for secret-safe status, provider readiness, audit log
 path checks, and repair suggestions.
 
-Common fixes:
+Common Fixes:
 
 | Issue | Fix |
 |-------|-----|

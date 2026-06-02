@@ -233,12 +233,12 @@ def test_release_label_and_package_version_stay_in_sync():
 
     package_version = re.search(r'^version\s*=\s*["\']([^"\']+)["\']\s*$', pyproject, re.MULTILINE)
 
-    assert install_manifest["version"] == "Beta0.4.0"
+    assert install_manifest["version"] == "Beta0.4.1"
     assert package_version is not None
-    assert package_version.group(1) == "0.4.0b0"
-    assert "Beta0.4.0" in readme
-    assert "## [Beta0.4.0]" in changelog
-    assert "metadata uses fallback version `0.4.0b0`" in changelog
+    assert package_version.group(1) == "0.4.1b0"
+    assert "Beta0.4.1" in readme
+    assert "## [Beta0.4.1]" in changelog
+    assert "metadata uses fallback version `0.4.1b0`" in changelog
 
 
 def test_release_zip_archive_name_uses_display_format_without_source_suffix():
@@ -250,7 +250,7 @@ def test_release_zip_archive_name_uses_display_format_without_source_suffix():
     expected_archive_name = f"SuperMedicine Beta{beta_match.group(1)}.zip"
     archive_body = expected_archive_name.removesuffix(".zip")
 
-    assert expected_archive_name == "SuperMedicine Beta0.4.0.zip"
+    assert expected_archive_name == "SuperMedicine Beta0.4.1.zip"
     assert "source" not in archive_body.lower()
     assert "_" not in archive_body
     assert 'archive_name = f"SuperMedicine {release_label}.zip"' in workflow

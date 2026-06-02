@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_CONFIG: dict[str, Any] = {
     "project_name": "supermedicine",
-    "version": "Beta0.4.0",
+    "version": "Beta0.4.1",
     "llm": {
         "provider": "",
         "providers": {},
