@@ -40,7 +40,7 @@ Kernel
 - **WorkspaceManager** anchors workspaces under `workspaces/<id>`, rejects path
   traversal and non-slug ids, and supports workspace-local papers, notes,
   outputs, checkpoints, sessions, and RAG assets.
-- **TUI backend controllers** share the same core paths as the CLI. TUI recent
+- **TUI Backend Controllers** share the same core paths as the CLI. TUI recent
   selection is not an implicit CLI default.
 
 ## Layer 2: Permission System (`permission/`)
@@ -51,10 +51,10 @@ The permission system has a runtime enforcement path and an advisory prompt path
 Action request
     |
     +--> Runtime code layer: PermissionEngine -> PermissionPolicy -> AuditLogger
-    |      deny-overrides-allow, hard limits, enforced decision
+    |      Deny-Overrides-Allow, hard limits, enforced decision
     |
     +--> Prompt context layer: safety text and rejection templates
-           advisory only, not a Kernel runtime veto
+           Advisory only, not a Kernel runtime veto
 ```
 
 Key files:
@@ -95,7 +95,7 @@ permission model where applicable.
 ```text
 plugins/
   base_plugin.py
-  rag/                 RAG provider interface, local TF-IDF, mock external semantics
+  rag/                 RAG Provider Interface, local TF-IDF, mock external semantics
   harness/             audit monitoring and quality assessment
   tools/               prototype Python statistics and R survival interfaces
   standards/           medical writing checklists and citation formatting
@@ -149,7 +149,7 @@ explicit and persisted through `llm.provider` and `llm.last_provider`.
   conversations.
 - The Chinese TUI exposes chat, dashboard, workspace, paper, experience, tool,
   dialog history, LLM, experiment guide, and log report screens.
-- Experiment guide and Log report paths store local JSON records and use redacted
+- Experiment Guide and Log Report paths store local JSON records and use redacted
   event/log output.
 
 ## Layer 7: Optional Platform Adapters (`adapters/`)
@@ -189,7 +189,7 @@ Before release, exclude generated `build/`, `dist/`, `*.egg-info`, `__pycache__`
 
 ## Quality Gate
 
-The root quality gate reference is [README.md](README.md#local-quality-gate).
+The root Quality Gate reference is [README.md](README.md#local-quality-gate).
 Static type checking is not a required gate unless the project intentionally adds
 a dedicated mypy or pyright configuration.
 

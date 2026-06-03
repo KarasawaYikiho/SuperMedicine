@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "supermedicine"
 version = "0.4.1b0"
-description = "Modular medical research Agent with RAG and Harness"
+description = "Modular Medical Research Agent with RAG and Harness"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [

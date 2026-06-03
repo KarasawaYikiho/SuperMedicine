@@ -36,18 +36,18 @@ CLI、Kernel、插件系统和中文 TUI 运行，不依赖 OpenCode、Claude Co
 
 ## Feature Summary
 
-- **Standalone Python core** — CLI, Kernel, configuration, plugin discovery, and
+- **Standalone Python Core** — CLI, Kernel, configuration, plugin discovery, and
   runtime execution work without platform-specific assistant runtimes.
-- **Permission-gated execution** — high-risk actions pass through
+- **Permission-Gated Execution** — high-risk actions pass through
   `PermissionEngine.check()` and are written to audit logs.
-- **LLM provider management** — built-in defaults for OpenAI, Anthropic, and
+- **LLM Provider Management** — built-in defaults for OpenAI, Anthropic, and
   OpenRouter plus custom compatible providers by API format.
-- **Research workspaces** — explicit workspace ids, copy-only paper import,
+- **Research Workspaces** — explicit workspace ids, copy-only paper import,
   user-confirmed experience records, and local tool templates.
 - **Chinese TUI** — Textual-based terminal interface for chat, dashboard,
   workspace, paper, experience, tool, dialog history, LLM, experiment guide, and
   log report screens.
-- **Medical research helpers** — RAG, harness monitoring, prototype statistics,
+- **Medical Research Helpers** — RAG, harness monitoring, prototype statistics,
   reporting checklists, and citation formatting.
 
 ## Installation
@@ -224,12 +224,12 @@ TUI 读取当前项目目录下的 `.supermedicine`、`workspaces/`、`plugins/`
 | 实验指导器 | 按步骤记录 WB 实验辅助信息并可计算试剂用量 | 仅供科研记录与实验辅助，保存日志前会脱敏。 |
 | Log 报告 | 保存、列出和查看脱敏日志报告 | 敏感信息会在保存和展示前自动脱敏。 |
 
-Status cues include workspace count and current focus on the left, plugin count,
+Status Cues include workspace count and current focus on the left, plugin count,
 LLM status, and task running state in the center, and current view/version on the
 right. **LLM 状态** shows provider readiness without exposing API keys, and
 **任务运行状态** appears as `任务空闲` or `任务执行中` for long-running work.
 
-安装后的桌面 Exe 释放行为：
+安装后的 Desktop Exe 释放行为：
 
 - `python Install.py --init` 和 `supermedicine init` 默认只初始化核心配置，不会复制桌面 Exe。
 - 只有显式传入 `--release-exe <path-to-SuperMedicine.exe>` 时才会释放桌面 Exe。
@@ -286,8 +286,8 @@ Common Fixes:
 
 ## Local Quality Gate
 
-For development and release checks, use the project quality commands documented
-by the maintainers. A typical local gate includes linting, packaging smoke checks,
+For development and release checks, use the project Quality commands documented
+by the maintainers. A typical Local Gate includes linting, packaging smoke checks,
 and the test suite, for example:
 
 ```bash

@@ -9,10 +9,10 @@ and architecture boundaries are in [ARCHITECTURE.md](ARCHITECTURE.md).
 SuperMedicine uses a runtime permission engine plus advisory prompt-context
 guidance:
 
-1. **Code layer** — `PermissionEngine.check()` performs runtime allow/deny
+1. **Code Layer** — `PermissionEngine.check()` performs runtime allow/deny
    decisions with deny-overrides-allow rules, hard-limit checks where supplied,
    and JSONL audit logging.
-2. **Prompt context layer** — prompt helpers generate safety text and rejection
+2. **Prompt Context Layer** — prompt helpers generate safety text and rejection
    templates for agent context. They are advisory and are not a Kernel runtime
    veto path.
 

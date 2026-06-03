@@ -168,7 +168,7 @@ export OPENAI_API_KEY=<OPENAI_API_KEY>
 ### TUI Configuration
 
 Run `supermedicine tui`, open **LLM 管理**, enter provider name, BaseURL, model,
-API key, and optional API format, then add or switch the provider. Key fields are
+API Key, and optional API format, then add or switch the provider. Key fields are
 password-style and cleared after submission.
 
 ## Optional R Support
@@ -198,7 +198,7 @@ plugin discovery status, and test-module count. Diagnostic output redacts API
 keys, authorization headers, key-like URL tokens, and secret-looking fields while
 preserving information needed for repair.
 
-For development environments, run the local quality gate described in
+For development environments, run the Local Quality Gate described in
 [README.md](README.md#local-quality-gate).
 
 ## Global CLI Access
@@ -215,7 +215,7 @@ You can always use `python Cli.py` as a direct substitute.
 
 Adapters are optional add-ons around the standalone Python framework.
 
-| Area | Core install required? | Status |
+| Area | Core Install Required? | Status |
 |------|------------------------|--------|
 | Standalone Python CLI/Kernel | Yes | Default supported path |
 | OpenCode Add-on | No | Metadata, skills, agents, and tool mapping; no native external subagent runtime bridge by itself |
