@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -26,6 +27,12 @@ CRITICAL_IMPORTS = (
 )
 
 
+def _cp1252_stdio_env() -> dict[str, str]:
+    env = os.environ.copy()
+    env["PYTHONIOENCODING"] = "cp1252"
+    return env
+
+
 def _copy_release_tree(tmp_path: Path) -> Path:
     """Build a representative extracted release directory in a temp workspace."""
 
@@ -43,11 +50,18 @@ def _copy_release_tree(tmp_path: Path) -> Path:
     return release_dir
 
 
-def _run_release_python(release_dir: Path, *args: str) -> subprocess.CompletedProcess[str]:
+def _run_release_python(
+    release_dir: Path,
+    *args: str,
+    env: dict[str, str] | None = None,
+    encoding: str | None = None,
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, *args],
         cwd=release_dir,
+        env=env,
         text=True,
+        encoding=encoding,
         capture_output=True,
         check=False,
     )
@@ -72,10 +86,18 @@ def test_extracted_release_directory_installer_entrypoint_smoke(tmp_path):
         f"{', '.join(CRITICAL_IMPORTS)}\n{import_output}"
     )
 
-    help_result = _run_release_python(release_dir, "Install.py", "--help")
+    help_result = _run_release_python(
+        release_dir,
+        "Install.py",
+        "--help",
+        env=_cp1252_stdio_env(),
+        encoding="cp1252",
+    )
     help_output = help_result.stdout + help_result.stderr
     assert help_result.returncode == 0, help_output
+    assert "usage:" in help_output.lower()
     assert "--release-exe" in help_output
+    assert "UnicodeEncodeError" not in help_output
 
     fake_exe = release_dir / "SuperMedicine.exe"
     fake_exe.write_bytes(b"fake exe bytes for release smoke dry-run")

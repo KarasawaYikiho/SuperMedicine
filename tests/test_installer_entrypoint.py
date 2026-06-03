@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import textwrap
@@ -7,6 +8,12 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _cp1252_stdio_env() -> dict[str, str]:
+    env = os.environ.copy()
+    env["PYTHONIOENCODING"] = "cp1252"
+    return env
 
 
 def _write_minimal_import_stubs(workspace: Path) -> None:
@@ -72,7 +79,9 @@ def _run_isolated_install(workspace: Path, *args: str) -> subprocess.CompletedPr
     return subprocess.run(
         [sys.executable, "Install.py", *args],
         cwd=workspace,
+        env=_cp1252_stdio_env(),
         text=True,
+        encoding="cp1252",
         capture_output=True,
         check=False,
     )
@@ -82,14 +91,16 @@ def _run_isolated_cli(workspace: Path, *args: str) -> subprocess.CompletedProces
     return subprocess.run(
         [sys.executable, "Cli.py", *args],
         cwd=workspace,
+        env=_cp1252_stdio_env(),
         text=True,
+        encoding="cp1252",
         capture_output=True,
         check=False,
     )
 
 
 def test_install_help_works_when_optional_installer_package_is_absent(tmp_path):
-    """Regression: release Zip layouts missing installer/ must not break --help."""
+    """Regression: isolated --help must survive strict Windows cp1252 stdio."""
 
     _copy_install_entrypoint_without_installer_package(tmp_path)
 
@@ -98,8 +109,10 @@ def test_install_help_works_when_optional_installer_package_is_absent(tmp_path):
     output = result.stdout + result.stderr
     assert result.returncode == 0
     assert "--release-exe" in output
+    assert "usage:" in output.lower()
     assert "ModuleNotFoundError" not in output
     assert "No module named 'installer'" not in output
+    assert "UnicodeEncodeError" not in output
 
 
 def test_init_entry_path_does_not_require_optional_exe_release_module(tmp_path):
@@ -145,7 +158,7 @@ def test_release_exe_missing_optional_module_reports_actionable_error(tmp_path):
 
 
 def test_cli_help_works_when_optional_installer_package_is_absent(tmp_path):
-    """Regression: ordinary CLI/help paths must not import optional installer modules."""
+    """Regression: isolated CLI help must survive strict Windows cp1252 stdio."""
 
     _copy_cli_entrypoint_without_installer_package(tmp_path)
 
@@ -154,8 +167,10 @@ def test_cli_help_works_when_optional_installer_package_is_absent(tmp_path):
     output = result.stdout + result.stderr
     assert result.returncode == 0
     assert "--release-exe" in output
+    assert "usage:" in output.lower()
     assert "ModuleNotFoundError" not in output
     assert "No module named 'installer'" not in output
+    assert "UnicodeEncodeError" not in output
 
 
 def test_cli_init_without_release_exe_does_not_require_optional_installer_package(tmp_path):

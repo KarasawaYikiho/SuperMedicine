@@ -20,6 +20,19 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
+def _configure_stdio_errors() -> None:
+    """Keep argparse/help output writable on narrow Windows stdio encodings."""
+
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(errors="backslashreplace")
+        except (AttributeError, TypeError, ValueError):
+            continue
+
 # 添加项目根目录到路径
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -1043,6 +1056,7 @@ def _llm_provider_values(
 
 
 def main(argv: list[str] | None = None) -> None:
+    _configure_stdio_errors()
     logging.basicConfig(level=logging.INFO, format='%(message)s')
     parser = argparse.ArgumentParser(
         prog="supermedicine",

@@ -27,6 +27,19 @@ from permission.policy import ensure_default_policy
 
 logger = logging.getLogger(__name__)
 
+
+def _configure_stdio_errors() -> None:
+    """Keep argparse/help output writable on narrow Windows stdio encodings."""
+
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(errors="backslashreplace")
+        except (AttributeError, TypeError, ValueError):
+            continue
+
 DEFAULT_CONFIG: dict[str, Any] = {
     "project_name": "supermedicine",
     "version": "Beta0.4.1",
@@ -452,6 +465,7 @@ def _release_exe_from_args(args: argparse.Namespace) -> dict[str, Any]:
     return result
 
 def main(argv: list[str] | None = None) -> None:
+    _configure_stdio_errors()
     logging.basicConfig(level=logging.INFO, format='%(message)s')
     parser = argparse.ArgumentParser(
         description="SuperMedicine standalone/unified installer",
