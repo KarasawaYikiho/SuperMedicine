@@ -32,6 +32,20 @@ def _log_json(value: object) -> None:
 def _load_release_exe_to_desktop():
     """Lazily load optional Exe release support only when explicitly requested."""
 
+    entrypoint_dir = Path(__file__).resolve().parent
+    installer_dir = entrypoint_dir / "installer"
+    release_module = installer_dir / "exe_release.py"
+    if not installer_dir.is_dir() or not release_module.is_file():
+        raise ValueError(
+            "桌面 Exe 释放功能不可用: --release-exe requires a complete release package "
+            "with installer/exe_release.py. "
+            "请重新下载完整发布包，或从包含 installer/ 目录的完整源码/发布目录运行。"
+        ) from None
+
+    entrypoint_path = str(entrypoint_dir)
+    if entrypoint_path not in sys.path:
+        sys.path.insert(0, entrypoint_path)
+
     try:
         from installer.exe_release import release_exe_to_desktop
     except ModuleNotFoundError as exc:
