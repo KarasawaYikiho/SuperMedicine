@@ -169,7 +169,14 @@ jobs:
                       target.parent.mkdir(parents=True, exist_ok=True)
                       shutil.copy2(source, target)
           PY
-          python -m PyInstaller --onefile --name SuperMedicineInstaller --distpath dist --workpath .pyinstaller-installer-build --specpath .pyinstaller-installer-spec --hidden-import installer.exe_release --add-data ".installer-payload-stage/release_payload;release_payload" install.py
+          payload_source="$(python - <<'PY'
+          from pathlib import Path
+
+          print((Path.cwd() / ".installer-payload-stage" / "release_payload").resolve().as_posix())
+          PY
+          )"
+          test -d "$payload_source"
+          python -m PyInstaller --onefile --name SuperMedicineInstaller --distpath dist --workpath .pyinstaller-installer-build --specpath .pyinstaller-installer-spec --hidden-import installer.exe_release --add-data "${payload_source};release_payload" install.py
           test -f dist/SuperMedicineInstaller.exe
           python Install.py --extract-release-to "$RUNNER_TEMP/InstallerDryRun" --release-payload-root .installer-payload-stage/release_payload --exe-dry-run
           ./dist/SuperMedicineInstaller.exe --help

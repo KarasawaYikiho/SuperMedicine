@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import re
 import shutil
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -33,6 +34,7 @@ INSTALLER_EXE_RELEASE_PATHS = (
 )
 INSTALLER_EXE_NAME = "SuperMedicineInstaller.exe"
 CANONICAL_LOWERCASE_INSTALL = "install.py"
+PYINSTALLER_STANDALONE_SPEC_PATH = ".pyinstaller-installer-spec"
 RUNTIME_DEPENDENCY_INSTALL_RE = re.compile(
     r"^\s*python\s+-m\s+pip\s+install\b[^\n]*(?:"
     r"-e\s+['\"]?\.(?:\[[^\]\n]+\])?['\"]?|"
@@ -42,6 +44,41 @@ RUNTIME_DEPENDENCY_INSTALL_RE = re.compile(
     r")",
     re.MULTILINE,
 )
+
+
+def _extract_bash_pyinstaller_command(workflow: str, exe_name: str) -> list[str]:
+    for line in workflow.splitlines():
+        command = line.strip()
+        if command.startswith("python -m PyInstaller") and f"--name {exe_name}" in command:
+            return shlex.split(command, posix=True)
+    raise AssertionError(f"Could not find PyInstaller command for --name {exe_name} in CI workflow")
+
+
+def _token_value(tokens: list[str], option: str) -> str | None:
+    try:
+        option_index = tokens.index(option)
+    except ValueError:
+        return None
+    try:
+        return tokens[option_index + 1]
+    except IndexError as exc:
+        raise AssertionError(f"CI PyInstaller command has {option} without a following value") from exc
+
+
+def _looks_absolute_or_resolved_for_ci_shell(source: str) -> bool:
+    return (
+        source.startswith(("/", "$", "${"))
+        or re.match(r"^[A-Za-z]:[\\/]", source) is not None
+        or "resolve" in source.lower()
+        or "realpath" in source.lower()
+        or "pwd" in source.lower()
+    )
+
+
+def _relative_source_is_staged_under_specpath(source: str, specpath: str) -> bool:
+    normalized_source = source.replace("\\", "/").lstrip("./")
+    normalized_specpath = specpath.replace("\\", "/").lstrip("./")
+    return normalized_source == normalized_specpath or normalized_source.startswith(f"{normalized_specpath}/")
 PACKAGING_TOOLING_WITH_RUNTIME_INSTALL_RE = re.compile(
     r"^\s*python\s+-m\s+pip\s+install\b"
     r"(?=[^\n]*\bbuild\b)"
@@ -272,6 +309,38 @@ def test_ci_release_artifacts_include_standalone_installer_exe_and_shared_payloa
     assert '["git", "show", ":install.py"]' in workflow
     assert "archive.writestr(lowercase_entry" in workflow
     assert "git archive HEAD" not in workflow
+
+
+def test_ci_standalone_installer_pyinstaller_payload_path_matches_specpath_contract():
+    """Regression: --specpath must not make PyInstaller look for a missing release_payload."""
+
+    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    command_tokens = _extract_bash_pyinstaller_command(workflow, INSTALLER_EXE_NAME.removesuffix(".exe"))
+    specpath = _token_value(command_tokens, "--specpath")
+    add_data = _token_value(command_tokens, "--add-data")
+
+    assert specpath == PYINSTALLER_STANDALONE_SPEC_PATH, (
+        "This regression test models the logged standalone-installer failure where CI used "
+        f"--specpath {PYINSTALLER_STANDALONE_SPEC_PATH}. If the spec path changes, update the "
+        "payload-path contract assertion to keep PyInstaller data-source resolution explicit."
+    )
+    assert add_data is not None and ";release_payload" in add_data
+
+    add_data_source, add_data_dest = add_data.split(";", 1)
+    assert add_data_dest == "release_payload"
+    assert "payload = root / \".installer-payload-stage\" / \"release_payload\"" in workflow
+    assert (
+        _looks_absolute_or_resolved_for_ci_shell(add_data_source)
+        or _relative_source_is_staged_under_specpath(add_data_source, specpath)
+    ), (
+        "CI currently stages release_payload at repo-root .installer-payload-stage/release_payload "
+        "but invokes PyInstaller with --specpath .pyinstaller-installer-spec and a relative "
+        f"--add-data source {add_data_source!r}. PyInstaller resolves that relative source under "
+        ".pyinstaller-installer-spec, yielding the logged missing path "
+        ".pyinstaller-installer-spec/.installer-payload-stage/release_payload. Use an absolute/resolved "
+        "payload source, or stage the payload below the specpath-resolved location, so "
+        "SuperMedicineInstaller.exe can bundle release_payload without running PyInstaller in this test."
+    )
 
 
 def test_ci_packaging_smoke_installs_runtime_dependencies_before_installer_entrypoints():
