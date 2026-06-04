@@ -94,7 +94,7 @@ class CLI:
         exe_dry_run: bool = False,
     ) -> None:
         """初始化项目"""
-        from Install import init_config
+        from installer.entrypoint import init_config
 
         init_config(project_dir, provider=provider, base_url=base_url, api_key=api_key, model=model)
         logger.info("项目已初始化: %s", project_dir / ".supermedicine")
@@ -1305,7 +1305,7 @@ def main(argv: list[str] | None = None) -> None:
     cli = CLI()
 
     if args.command == "init":
-        from Install import _normalize_provider, _resolve_api_key, _resolve_install_value
+        from installer.entrypoint import _normalize_provider, _resolve_api_key, _resolve_install_value
 
         provider = _resolve_install_value("provider", args.provider)
         base_url = _resolve_install_value("base_url", args.base_url)

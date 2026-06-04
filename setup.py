@@ -21,19 +21,36 @@ except Exception:  # pragma: no cover - wheel is a build dependency in pyproject
 LOWERCASE_INSTALL_NAME = "install.py"
 UPPERCASE_INSTALL_NAME = "Install.py"
 LOWERCASE_INSTALL_BYTES = b'''#!/usr/bin/env python3
-"""Lowercase compatibility entrypoint for the SuperMedicine installer.
-
-This wrapper keeps the user-facing ``python install.py`` command available on
-case-sensitive platforms while preserving the existing ``python Install.py``
-entrypoint for older scripts and release automation.
-"""
+"""Lowercase compatibility entrypoint for the SuperMedicine installer."""
 from __future__ import annotations
 
-from Install import main
+from installer.entrypoint import main
 
 
 if __name__ == "__main__":
     main()
+'''
+UPPERCASE_INSTALL_BYTES = b'''#!/usr/bin/env python3
+"""Compatibility wrapper for the stable lowercase installer entrypoint."""
+from __future__ import annotations
+
+from installer import entrypoint as _entrypoint
+
+globals().update(
+    {
+        name: getattr(_entrypoint, name)
+        for name in dir(_entrypoint)
+        if not (name.startswith("__") and name.endswith("__"))
+    }
+)
+
+__all__ = [name for name in globals() if not (name.startswith("__") and name.endswith("__"))]
+
+if __name__ == "__main__":
+    try:
+        _entrypoint.main()
+    except ValueError as exc:
+        raise SystemExit(f"error: {exc}") from exc
 '''
 
 
@@ -42,7 +59,7 @@ def _repo_root() -> Path:
 
 
 def _lowercase_install_bytes() -> bytes:
-    """Return exact lowercase wrapper bytes without relying on the worktree."""
+    """Return exact lowercase wrapper bytes without relying on case-only files."""
 
     try:
         result = subprocess.run(
@@ -53,13 +70,13 @@ def _lowercase_install_bytes() -> bytes:
         )
     except (OSError, ValueError):
         return LOWERCASE_INSTALL_BYTES
-    if result.returncode == 0 and b"from Install import main" in result.stdout:
+    if result.returncode == 0 and b"from installer.entrypoint import main" in result.stdout:
         return result.stdout.replace(b"\r\n", b"\n")
     return LOWERCASE_INSTALL_BYTES
 
 
 def _uppercase_install_bytes() -> bytes:
-    """Return exact uppercase installer implementation bytes."""
+    """Return exact uppercase wrapper bytes without relying on case-only files."""
 
     try:
         result = subprocess.run(
@@ -70,13 +87,9 @@ def _uppercase_install_bytes() -> bytes:
         )
     except (OSError, ValueError):
         result = None
-    if result is not None and result.returncode == 0 and b"def main(" in result.stdout:
+    if result is not None and result.returncode == 0 and b"installer.entrypoint" in result.stdout:
         return result.stdout.replace(b"\r\n", b"\n")
-
-    source = _repo_root() / UPPERCASE_INSTALL_NAME
-    if source.exists():
-        return source.read_bytes().replace(b"\r\n", b"\n")
-    raise FileNotFoundError(f"Cannot locate {UPPERCASE_INSTALL_NAME} for distribution packaging")
+    return UPPERCASE_INSTALL_BYTES
 
 
 def _install_payloads() -> dict[str, bytes]:
@@ -86,10 +99,11 @@ def _install_payloads() -> dict[str, bytes]:
     }
 
 
-def _write_lowercase_install(target_dir: str | Path) -> None:
-    target = Path(target_dir) / LOWERCASE_INSTALL_NAME
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_bytes(_lowercase_install_bytes())
+def _write_case_distinct_installs(target_dir: str | Path) -> None:
+    root = Path(target_dir)
+    root.mkdir(parents=True, exist_ok=True)
+    for name, payload in _install_payloads().items():
+        (root / name).write_bytes(payload)
 
 
 def _supports_case_distinct_names(directory: str | Path) -> bool:
@@ -111,12 +125,12 @@ def _supports_case_distinct_names(directory: str | Path) -> bool:
 
 
 class build_py(_build_py):
-    """Ensure wheels get exact lowercase install.py on Windows worktrees."""
+    """Ensure build dirs get exact installer wrappers when case-distinct names work."""
 
     def run(self) -> None:
         super().run()
         if _supports_case_distinct_names(self.build_lib):
-            _write_lowercase_install(self.build_lib)
+            _write_case_distinct_installs(self.build_lib)
 
 
 def _ensure_zip_members(archive_path: Path, payloads: dict[str, bytes]) -> None:

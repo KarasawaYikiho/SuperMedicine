@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import importlib
 import json
 import re
@@ -101,6 +102,43 @@ def _setuptools_py_modules(pyproject: str) -> set[str]:
         return set()
 
     return set(re.findall(r'["\']([^"\']+)["\']', modules_match.group(1)))
+
+
+def _tracked_python_files() -> list[Path]:
+    return [REPO_ROOT / path for path in _tracked_files() if path.endswith(".py")]
+
+
+def test_python_sources_do_not_import_legacy_uppercase_install_module_outside_compatibility_tests():
+    """Regression baseline: mypy must not depend on resolving top-level ``Install``.
+
+    Windows and case-only sibling checkouts cannot consistently expose the
+    uppercase top-level module to mypy while also supporting the documented
+    lowercase ``install.py`` entrypoint.  Runtime entrypoints and tests should
+    import the stable lowercase installer surface instead of ``from Install`` or
+    ``import Install``.
+    """
+
+    allowed_legacy_compatibility_imports: set[tuple[str, int]] = set()
+    offenders: list[str] = []
+    for path in _tracked_python_files():
+        relative_path = path.relative_to(REPO_ROOT).as_posix()
+        tree = ast.parse(path.read_text(encoding="utf-8-sig"), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module == "Install":
+                if (relative_path, node.lineno) not in allowed_legacy_compatibility_imports:
+                    offenders.append(f"{relative_path}:{node.lineno}: legacy uppercase Install import-from")
+            elif isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name == "Install":
+                        if (relative_path, node.lineno) not in allowed_legacy_compatibility_imports:
+                            offenders.append(f"{relative_path}:{node.lineno}: legacy uppercase Install direct import")
+
+    assert offenders == [], (
+        "Do not import the legacy uppercase top-level Install module; use the "
+        "lowercase installer entrypoint/module so mypy and case-only sibling "
+        "checkouts are stable. Only narrowly scoped runtime compatibility tests "
+        f"may be allowlisted here. Offenders: {offenders}"
+    )
 
 
 def test_tracked_files_do_not_include_forbidden_or_generated_artifacts():
@@ -505,8 +543,11 @@ def test_distribution_build_forces_exact_lowercase_install_entry():
     pyproject = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
     setup_py = (REPO_ROOT / "setup.py").read_text(encoding="utf-8")
 
-    assert "install" in _setuptools_py_modules(pyproject)
-    assert "Install" in _setuptools_py_modules(pyproject)
+    py_modules = _setuptools_py_modules(pyproject)
+    assert "Cli" in py_modules
+    assert "Uninstall" in py_modules
+    assert "install" not in py_modules
+    assert "Install" not in py_modules
     assert '["git", "show", ":install.py"]' in setup_py
     assert '["git", "show", ":Install.py"]' in setup_py
     assert "LOWERCASE_INSTALL_NAME = \"install.py\"" in setup_py

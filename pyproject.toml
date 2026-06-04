@@ -55,7 +55,7 @@ platform-adapters = []
 supermedicine = "Cli:main"
 
 [tool.setuptools]
-py-modules = ["Cli", "Install", "install", "Uninstall"]
+py-modules = ["Cli", "Uninstall"]
 
 [tool.setuptools.package-data]
 permission = ["default_policy.yaml"]

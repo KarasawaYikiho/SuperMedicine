@@ -9,7 +9,7 @@ import yaml
 import pytest
 
 from Cli import CLI, _resolve_run_params
-from Install import init_config, main as install_main, write_llm_config
+from installer.entrypoint import DEFAULT_CONFIG, init_config, main as install_main, write_llm_config
 from core.kernel import Kernel
 from agents.orchestrator import Orchestrator
 from agents.base_agent import BaseAgent
@@ -176,8 +176,6 @@ class TestIntegration:
         assert secret not in str(context)
 
     def test_install_init_default_template_keeps_api_values_empty(self):
-        from Install import DEFAULT_CONFIG
-
         assert DEFAULT_CONFIG["llm"]["provider"] == ""
         assert DEFAULT_CONFIG["llm"]["providers"] == {}
 

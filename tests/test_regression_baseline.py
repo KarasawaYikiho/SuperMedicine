@@ -8,7 +8,7 @@ import pytest
 import yaml
 from textual import events
 
-from Install import init_config
+from installer.entrypoint import init_config
 from Uninstall import uninstall
 from core.config_center import ConfigCenter
 from core.llm_client import create_configured_llm_client

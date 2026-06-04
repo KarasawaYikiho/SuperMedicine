@@ -354,7 +354,7 @@ def test_cli_release_exe_missing_optional_module_reports_actionable_error(tmp_pa
 def test_install_defaults_to_interactive_question_answer_when_args_are_absent(tmp_path, monkeypatch):
     """Regression baseline: bare installer should be usable as an interactive flow."""
 
-    import Install
+    from installer import entrypoint as Install
 
     prompts: list[str] = []
 
