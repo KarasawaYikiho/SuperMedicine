@@ -40,6 +40,31 @@ def _cp1252_stdio_env() -> dict[str, str]:
     return env
 
 
+# Step-2 CI investigation note:
+# ``Install.py`` delegates to ``installer.entrypoint.main()``, which calls
+# ``_configure_stdio_errors()`` and reconfigures stdout/stderr with
+# ``errors="backslashreplace"``.  When release-smoke subprocesses run with
+# ``PYTHONIOENCODING=cp1252`` and parent decoding also uses cp1252, user-facing
+# Chinese log text may be emitted as escaped ``\u....`` sequences instead of
+# literal readable Chinese.  The dry-run assertion near the payload extraction
+# smoke must therefore accept either the readable signal
+# ``程序文件释放 dry-run`` or its escaped representation; otherwise the failure
+# is an assertion/encoding mismatch, not a release-copy behavior failure.
+# Related production/release files for any later fix decision are
+# ``Install.py``/``install.py``, ``installer/entrypoint.py``,
+# ``installer/exe_release.py``, ``.github/workflows/ci.yml``, ``setup.py``, and
+# ``pyproject.toml``.
+PAYLOAD_DRY_RUN_SIGNAL = "程序文件释放 dry-run"
+PAYLOAD_DRY_RUN_ESCAPED_SIGNAL = PAYLOAD_DRY_RUN_SIGNAL.encode(
+    "cp1252",
+    errors="backslashreplace",
+).decode("cp1252")
+PAYLOAD_DRY_RUN_SIGNALS = (
+    PAYLOAD_DRY_RUN_SIGNAL,
+    PAYLOAD_DRY_RUN_ESCAPED_SIGNAL,
+)
+
+
 def _has_exact_child_name(directory: Path, filename: str) -> bool:
     return filename in {child.name for child in directory.iterdir()}
 
@@ -179,7 +204,7 @@ def test_extracted_release_directory_installer_entrypoint_smoke(tmp_path):
     )
     payload_output = payload_dry_run_result.stdout + payload_dry_run_result.stderr
     assert payload_dry_run_result.returncode == 0, payload_output
-    assert "程序文件释放 dry-run" in payload_output
+    assert any(signal in payload_output for signal in PAYLOAD_DRY_RUN_SIGNALS), payload_output
     assert not (tmp_path / "Installed").exists()
 
 
@@ -187,6 +212,15 @@ def test_ci_release_artifacts_include_installer_usable_exe_or_dist_path():
     """Regression baseline: published CI artifacts must contain an Exe path Install.py can release."""
 
     workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+
+    # Step-2 CI investigation note:
+    # These workflow assertions map the release-smoke failures to the concrete
+    # CI artifact contract: ``.github/workflows/ci.yml`` must publish an app Exe
+    # path usable by ``Install.py --release-exe`` and must stage the standalone
+    # installer payload with both case-only wrappers.  If these fail, inspect the
+    # workflow packaging scripts together with ``installer/exe_release.py``'s
+    # payload requirements and the wrapper preservation logic in ``setup.py`` /
+    # package metadata in ``pyproject.toml`` before changing production code.
 
     assert any(path in workflow for path in INSTALLER_EXE_RELEASE_PATHS), (
         "CI/release workflow must publish either dist/SuperMedicine.exe or "

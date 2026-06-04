@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import json
 import logging
+import shutil
 from pathlib import Path
 
 import pytest
@@ -199,12 +200,14 @@ def _make_release_payload(root: Path) -> Path:
     (payload / "permission").mkdir()
     (payload / "installer").mkdir()
     (payload / "dist").mkdir()
-    (payload / "Install.py").write_text("print('installer')\n", encoding="utf-8")
+    shutil.copy2(REPO_ROOT / "Install.py", payload / "Install.py")
     if _supports_case_distinct_names(payload):
-        (payload / "install.py").write_text("from Install import main\n", encoding="utf-8")
+        shutil.copy2(REPO_ROOT / "install.py", payload / "install.py")
     (payload / "core" / "__init__.py").write_text("", encoding="utf-8")
     (payload / "permission" / "__init__.py").write_text("", encoding="utf-8")
-    (payload / "installer" / "exe_release.py").write_text("# helper\n", encoding="utf-8")
+    shutil.copy2(REPO_ROOT / "installer" / "__init__.py", payload / "installer" / "__init__.py")
+    shutil.copy2(REPO_ROOT / "installer" / "entrypoint.py", payload / "installer" / "entrypoint.py")
+    shutil.copy2(REPO_ROOT / "installer" / "exe_release.py", payload / "installer" / "exe_release.py")
     (payload / "dist" / "SuperMedicine.exe").write_bytes(b"app exe")
     (payload / "README.md").write_text("docs\n", encoding="utf-8")
     return payload
@@ -222,6 +225,9 @@ def test_release_payload_to_directory_copies_unified_layout(tmp_path, caplog):
     assert result["reason"] == "created"
     assert (target_dir / "install.py").exists()
     assert (target_dir / "Install.py").exists()
+    assert (target_dir / "Install.py").read_text(encoding="utf-8") == (payload / "Install.py").read_text(encoding="utf-8")
+    assert (target_dir / "installer" / "__init__.py").exists()
+    assert (target_dir / "installer" / "entrypoint.py").exists()
     assert (target_dir / "installer" / "exe_release.py").exists()
     assert (target_dir / "dist" / "SuperMedicine.exe").read_bytes() == b"app exe"
     assert "Release payload extraction completed" in caplog.text
@@ -252,7 +258,7 @@ def test_release_payload_to_directory_rejects_incomplete_layout(tmp_path):
 
 
 def test_install_help_documents_unified_install_and_desktop_release(capsys):
-    install = importlib.import_module("Install")
+    install = importlib.import_module("installer.entrypoint")
 
     with pytest.raises(SystemExit) as excinfo:
         install.main(["--help"])
@@ -268,7 +274,7 @@ def test_install_help_documents_unified_install_and_desktop_release(capsys):
 
 
 def test_unified_install_dry_run_initializes_project_without_real_desktop_write(tmp_path, monkeypatch, caplog):
-    install = importlib.import_module("Install")
+    install = importlib.import_module("installer.entrypoint")
     source = tmp_path / "dist" / "SuperMedicine.exe"
     source.parent.mkdir()
     source.write_bytes(b"fake exe bytes")
@@ -300,7 +306,7 @@ def test_unified_install_dry_run_initializes_project_without_real_desktop_write(
 
 
 def test_init_with_release_exe_copies_to_injected_desktop_directory(tmp_path, monkeypatch, caplog):
-    install = importlib.import_module("Install")
+    install = importlib.import_module("installer.entrypoint")
     source = tmp_path / "SuperMedicine.exe"
     source.write_bytes(b"fake exe bytes")
     desktop_dir = tmp_path / "Desktop"
@@ -326,7 +332,7 @@ def test_init_with_release_exe_copies_to_injected_desktop_directory(tmp_path, mo
 
 
 def test_unified_install_requires_release_exe(capsys):
-    install = importlib.import_module("Install")
+    install = importlib.import_module("installer.entrypoint")
 
     with pytest.raises(SystemExit) as excinfo:
         install.main(["--unified-install", *_llm_args()])
