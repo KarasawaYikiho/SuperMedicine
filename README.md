@@ -67,35 +67,69 @@ Quick install:
 git clone https://github.com/KarasawaYikiho/SuperMedicine.git
 cd SuperMedicine
 pip install -e .
-export OPENAI_API_KEY=<OPENAI_API_KEY>
-python Install.py --init --provider openai --base-url https://api.openai.com/v1 --model gpt-4o-mini
+python install.py
 supermedicine status
 ```
 
-Unified Installer / Desktop Exe Release:
+`python install.py` opens a concise four-step installer wizard. The legacy
+`python Install.py` command remains compatible for older scripts. Ordinary users
+should run the command with no flags and answer the questions on screen:
+
+1. **安装/项目路径** — where `.supermedicine` and local project state are written;
+   press Enter to use the current directory.
+2. **初始化 .supermedicine 配置** — usually choose the default **yes**, then enter
+   Provider, Base URL, Model, and API key. Provider defaults to `openai`; Base URL
+   must be an `http(s)` URL; API key input is hidden in a real terminal.
+3. **可选快捷入口** — shortcut/PATH prompts only record or display guidance. The
+   Desktop Exe copy is optional and asks for an existing `SuperMedicine.exe` path
+   only if you choose yes.
+4. **确认安装** — review the summary, start installation, or return to edit answers.
+
+Windows release artifacts also include **SuperMedicineInstaller.exe**. Double-click
+it or run it from a terminal with no flags for the same console wizard. In the Exe
+build, the first step defaults to releasing the full bundled program payload into
+the target directory you choose. The extracted payload includes the main app Exe at
+`dist/SuperMedicine.exe`, `install.py`, `Install.py`, configuration/documentation
+templates, Python packages, and required resources. Keep the release archive/layout
+intact; do not copy only `Install.py` or `install.py` elsewhere.
+
+After installation, verify with:
 
 ```bash
-python Install.py --unified-install --release-exe dist/SuperMedicine.exe \
-  --provider openai \
-  --base-url https://api.openai.com/v1 \
-  --model gpt-4o-mini
+python Cli.py status
+supermedicine diagnose
 ```
 
-The release package must be kept as a complete extracted directory. Run
-`Install.py` from the extracted root that also contains `installer/__init__.py`
-and `installer/exe_release.py`. Do not copy only `Install.py` out of the archive.
+The release package must be kept as a complete extracted directory. CI publishes
+the installer-usable application executable at `dist/SuperMedicine.exe` inside
+the archive and the standalone installer at `SuperMedicineInstaller.exe`. The
+Windows packaging smoke installs PyInstaller in CI, builds both executables, runs
+`SuperMedicineInstaller.exe --help`, and dry-runs payload extraction. Local
+verification may rely on that CI/package smoke when PyInstaller is not installed.
+The installer also supports local `Dist/SuperMedicine.exe` and a root-level
+`SuperMedicine.exe` for compatibility. Run `Install.py` from the extracted root
+that also contains `installer/__init__.py`, `installer/exe_release.py`, and the
+executable/resources. Do not copy only `Install.py` out of the archive.
 If you see `ModuleNotFoundError: No module named 'installer'` at a path like
 `C:\Users\D2O\Downloads\SuperMedicine.Beta0.4.1\SuperMedicine Beta0.4.1\Install.py`,
 the archive is likely incomplete or from an older broken release; re-download the
 fixed Beta0.4.1 package or run from a complete source/release directory.
+If `SuperMedicine.exe` is missing, the installer reports the requested file,
+every searched path, and instructs you to regenerate the CI/local package.
 
-`python Install.py --init` keeps its existing core initialization behavior and
-does not copy a desktop executable unless `--release-exe` is explicitly supplied.
-For automation, CI, or dry runs, use a temporary desktop directory or dry-run mode
-so the real user Desktop is not modified:
+### Advanced automation / CI flags
+
+The following flags are for scripted installs, packaging smoke checks, and CI. They
+are not required for normal interactive use. `python install.py --init` keeps its
+existing core initialization behavior and does not copy a desktop executable unless
+`--release-exe` is explicitly supplied. Use `python install.py --init
+--interactive` only when you specifically want the LLM-only prompt in init mode.
+For automation, CI, or dry runs, provide the LLM settings explicitly and use a
+temporary desktop directory or dry-run mode so the real user Desktop is not
+modified:
 
 ```bash
-python Install.py --unified-install --release-exe dist/SuperMedicine.exe \
+python install.py --unified-install --release-exe dist/SuperMedicine.exe \
   --desktop-dir .pytest-tmp/Desktop \
   --exe-dry-run \
   --provider openai \
@@ -123,8 +157,10 @@ Supported API formats:
 | `openrouter` | `https://openrouter.ai/api/v1` | `OPENROUTER_API_KEY` | `anthropic/claude-3.5-sonnet` |
 
 Custom providers such as DeepSeek, 智谱 GLM, local Ollama-compatible endpoints,
-or private gateways can be configured with `--provider`, `--base-url`,
-`--api-format`, and `--model`.
+or private gateways can be configured in the `python install.py` wizard by entering
+their provider name, Base URL, and model when prompted. The installer infers
+OpenAI-compatible request format for custom providers; use `supermedicine llm add
+--api-format ...` later if you need to override the format explicitly.
 
 Example:
 
@@ -149,8 +185,6 @@ placeholders only.
 All commands can be run as `supermedicine <command>` or `python Cli.py <command>`.
 
 ```bash
-supermedicine init --provider openai --base-url https://api.openai.com/v1 --model gpt-4o-mini
-supermedicine init --release-exe dist/SuperMedicine.exe --desktop-dir .pytest-tmp/Desktop --exe-dry-run --provider openai --base-url https://api.openai.com/v1 --model gpt-4o-mini
 supermedicine status
 supermedicine diagnose
 supermedicine run "summarize local context" [--workspace <slug>]
@@ -231,12 +265,20 @@ right. **LLM 状态** shows provider readiness without exposing API keys, and
 
 安装后的 Desktop Exe 释放行为：
 
-- `python Install.py --init` 和 `supermedicine init` 默认只初始化核心配置，不会复制桌面 Exe。
+- `python install.py --init` 和 `supermedicine init` 默认只初始化核心配置，不会复制桌面 Exe。
 - 只有显式传入 `--release-exe <path-to-SuperMedicine.exe>` 时才会释放桌面 Exe。
-- `python Install.py --unified-install --release-exe <path>` 会先初始化 `.supermedicine`，再执行桌面 Exe 释放；缺少 `--release-exe` 会报错。
+- `python install.py --unified-install --release-exe <path>` 会先初始化 `.supermedicine`，再执行桌面 Exe 释放；缺少 `--release-exe` 会报错。
 - 默认目标位置是用户 Desktop，目标文件名默认使用源 Exe 文件名；可用 `--desktop-dir` 指定目录，用 `--exe-target-name` 指定目标文件名（会规范为 `.exe`）。
 - 如果目标文件已存在，默认跳过；使用 `--exe-overwrite` 才会覆盖；使用 `--exe-dry-run` 只报告动作不复制文件。
 - 测试、CI 或文档演示应使用 `--desktop-dir <tmp>` 或 `--exe-dry-run`，避免修改真实桌面。
+
+安装 Exe 程序文件释放行为：
+
+- CI 产物包含独立 `SuperMedicineInstaller.exe`，用于把完整发布 payload 释放到用户选择目录。
+- 安装 Exe 与 `python install.py --extract-release-to <dir>` 共用 `installer/exe_release.py` 的发布布局解析/释放逻辑。
+- 释放后的目录应包含 `dist/SuperMedicine.exe`、`install.py`、`Install.py`、`installer/`、`core/`、`permission/`、配置/文档模板和必要资源。
+- `Install.py` 的交互式流程继续负责 `.supermedicine` 初始化、LLM 配置和可选桌面 Exe 复制；如果需要在一次自动化调用中完成释放和配置，可把 `--extract-release-to <dir>` 与 `--init --project-dir <dir>` 组合使用。
+- 自动化或 smoke 检查必须指向 staged release payload，而不是缺少生成产物的源码根目录；该 payload 需包含 `dist/SuperMedicine.exe`。例如：`python install.py --extract-release-to .pytest-tmp/Installed --release-payload-root .installer-payload-stage/release_payload --exe-dry-run`。
 
 ## Platform Adapters
 
@@ -277,12 +319,13 @@ Common Fixes:
 | `No module named 'yaml'` | Install package dependencies with `pip install -e .` or install `pyyaml`. |
 | `supermedicine` command not found | Add the Python Scripts directory to PATH or use `python Cli.py`. |
 | Initialization fails with missing LLM fields | Provide provider, base URL, model, and API key source. |
+| `python install.py` 问答不知道怎么填 | 路径可直接回车；初始化配置通常选 yes；Provider 可用 `openai` 或你的网关名称；Base URL 必须以 `http://` 或 `https://` 开头；Model 填服务商模型名；API key 粘贴后可能不显示，这是正常隐藏输入。 |
 | LLM call fails | Treat it as a real provider/configuration error; run diagnostics and inspect redacted fields. |
 | TUI launch issue | Run `supermedicine tui --dry-run`, then restart the terminal if needed. |
 | TUI 操作无响应 | 确认焦点位置，先用 `Tab`/`Shift+Tab` 移动焦点；管理页按钮和列表需要 `Enter` 激活。 |
 | 论文在线补全失败 | 检查是否选择工作区、输入论文 ID 并显式确认；该操作可能受网络/API/权限策略限制。 |
 | 桌面 Exe 未出现 | 确认已提供 `--release-exe`，源 Exe 存在，目标未因已存在而跳过；必要时加 `--exe-overwrite` 或先用 `--exe-dry-run` 查看目标路径。 |
-| Exe 释放失败 | 检查 `--desktop-dir` 是否可写、`--exe-target-name` 是否为安全文件名，以及杀毒/权限策略是否阻止复制。 |
+| Exe 释放失败 | 检查发布包是否包含 `dist/SuperMedicine.exe`（或本地 `Dist/SuperMedicine.exe`/根目录 `SuperMedicine.exe`）、`--desktop-dir` 是否可写、`--exe-target-name` 是否为安全文件名，以及杀毒/权限策略是否阻止复制。 |
 
 ## Local Quality Gate
 

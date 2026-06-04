@@ -49,7 +49,7 @@ class WorkspaceScreenController:
     def list_workspaces(self) -> list[dict[str, Any]]:
         """List workspaces with Chinese labels for display."""
 
-        return [self._workspace_payload(info, selected=False) for info in self.workspace_manager.list_workspaces()]
+        return TUIState(self.root).workspace_payloads()
 
     def create_workspace(self, workspace_id: str) -> dict[str, Any]:
         """Create a workspace through the shared WorkspaceManager service."""
@@ -59,6 +59,7 @@ class WorkspaceScreenController:
         except InvalidWorkspaceId as exc:
             raise ValueError("工作区 ID 只能使用小写字母、数字和连字符，且不能以连字符开头或结尾") from exc
 
+        state = TUIState(self.root)
         manager = self.workspace_manager
         try:
             manager.get_workspace(slug)
@@ -67,16 +68,14 @@ class WorkspaceScreenController:
         else:
             raise ValueError(f"工作区已存在：{slug}")
 
-        info = manager.initialize_workspace(slug)
-        TUIState(self.root).save_recent_workspace(info.id, info.id)
+        info = state.create_workspace(slug)
+        state.save_recent_workspace(info.id, info.id)
         return self._workspace_payload(info, selected=True, message="已创建并选择工作区")
 
     def select_workspace(self, workspace_id: str, *, state_workspace_id: str | None = None) -> dict[str, Any]:
         """Select an existing workspace and persist recent TUI state in workspace sessions."""
 
-        info = self.workspace_manager.get_workspace(workspace_id)
-        state_source = state_workspace_id or info.id
-        TUIState(self.root).save_recent_workspace(state_source, info.id)
+        info = TUIState(self.root).select_workspace(workspace_id, state_workspace_id=state_workspace_id)
         return self._workspace_payload(info, selected=True, message="已选择工作区")
 
     def recent_workspace(self, workspace_id: str) -> str | None:

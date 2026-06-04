@@ -171,6 +171,38 @@ def test_workspace_view_manual_create_is_visible_and_usable_in_running_tui(tmp_p
     asyncio.run(scenario())
 
 
+def test_workspace_manual_create_is_visible_to_already_mounted_dialog_page(tmp_path):
+    """Regression baseline: pages mounted before manual create must observe the shared workspace list."""
+
+    import asyncio
+
+    async def scenario() -> None:
+        app = SuperMedicineTUI(project_root=tmp_path)
+        async with app.run_test(size=(140, 45)) as pilot:
+            await pilot.press("3")
+            await pilot.pause()
+
+            workspace_view = app._views["workspace"]
+            workspace_view._create_workspace("manual-cross-page")
+            await pilot.pause()
+
+            await pilot.press("7")
+            await pilot.pause()
+
+            dialog_view = app._views["dialog"]
+            select_widget = dialog_view.query_one("#dialog-workspace-select")
+            option_values = [str(option[1]) for option in select_widget._options]
+
+            assert "manual-cross-page" in option_values
+
+            dialog_view._load_dialog_history(refreshed=True)
+            await pilot.pause()
+            status = dialog_view.query_one("#dialog-status", Static)
+            assert "暂无工作区" not in str(status.renderable)
+
+    asyncio.run(scenario())
+
+
 def test_workspace_view_prevents_global_prompt_from_stealing_workspace_focus():
     app_switch_source = inspect.getsource(SuperMedicineTUI.action_switch_view)
     app_focus_source = inspect.getsource(SuperMedicineTUI._focus_current_view_default)

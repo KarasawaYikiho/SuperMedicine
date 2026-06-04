@@ -174,6 +174,83 @@ def test_exe_desktop_release_normalizes_target_filename_suffix(tmp_path):
     assert result["target_path"] == tmp_path / "Desktop" / "SuperMedicine.exe"
 
 
+def _has_exact_child_name(directory: Path, filename: str) -> bool:
+    return filename in {child.name for child in directory.iterdir()}
+
+
+def _supports_case_distinct_names(directory: Path) -> bool:
+    upper = directory / "CaseProbe.tmp"
+    lower = directory / "caseprobe.tmp"
+    try:
+        upper.write_text("upper", encoding="utf-8")
+        lower.write_text("lower", encoding="utf-8")
+        return _has_exact_child_name(directory, upper.name) and _has_exact_child_name(directory, lower.name)
+    finally:
+        for path in (upper, lower):
+            try:
+                path.unlink()
+            except FileNotFoundError:
+                pass
+
+
+def _make_release_payload(root: Path) -> Path:
+    payload = root / "release_payload"
+    (payload / "core").mkdir(parents=True)
+    (payload / "permission").mkdir()
+    (payload / "installer").mkdir()
+    (payload / "dist").mkdir()
+    (payload / "Install.py").write_text("print('installer')\n", encoding="utf-8")
+    if _supports_case_distinct_names(payload):
+        (payload / "install.py").write_text("from Install import main\n", encoding="utf-8")
+    (payload / "core" / "__init__.py").write_text("", encoding="utf-8")
+    (payload / "permission" / "__init__.py").write_text("", encoding="utf-8")
+    (payload / "installer" / "exe_release.py").write_text("# helper\n", encoding="utf-8")
+    (payload / "dist" / "SuperMedicine.exe").write_bytes(b"app exe")
+    (payload / "README.md").write_text("docs\n", encoding="utf-8")
+    return payload
+
+
+def test_release_payload_to_directory_copies_unified_layout(tmp_path, caplog):
+    module = importlib.import_module("installer.exe_release")
+    caplog.set_level(logging.INFO, logger="installer.exe_release")
+    payload = _make_release_payload(tmp_path)
+    target_dir = tmp_path / "Installed"
+
+    result = module.release_payload_to_directory(source_root=payload, target_dir=target_dir)
+
+    assert result["status"] == "copied"
+    assert result["reason"] == "created"
+    assert (target_dir / "install.py").exists()
+    assert (target_dir / "Install.py").exists()
+    assert (target_dir / "installer" / "exe_release.py").exists()
+    assert (target_dir / "dist" / "SuperMedicine.exe").read_bytes() == b"app exe"
+    assert "Release payload extraction completed" in caplog.text
+
+
+def test_release_payload_to_directory_dry_run_does_not_create_target(tmp_path):
+    module = importlib.import_module("installer.exe_release")
+    payload = _make_release_payload(tmp_path)
+
+    result = module.release_payload_to_directory(
+        source_root=payload,
+        target_dir=tmp_path / "Installed",
+        dry_run=True,
+    )
+
+    assert result["status"] == "dry-run"
+    assert result["file_count"] >= 5
+    assert not (tmp_path / "Installed").exists()
+
+
+def test_release_payload_to_directory_rejects_incomplete_layout(tmp_path):
+    module = importlib.import_module("installer.exe_release")
+    payload = tmp_path / "release_payload"
+    payload.mkdir()
+
+    with pytest.raises(FileNotFoundError, match="Release payload is incomplete"):
+        module.release_payload_to_directory(source_root=payload, target_dir=tmp_path / "Installed")
+
+
 def test_install_help_documents_unified_install_and_desktop_release(capsys):
     install = importlib.import_module("Install")
 
@@ -186,6 +263,7 @@ def test_install_help_documents_unified_install_and_desktop_release(capsys):
     assert "--release-exe" in output
     assert "--desktop-dir" in output
     assert "--exe-dry-run" in output
+    assert "--extract-release-to" in output
     assert "统一安装" in output
 
 

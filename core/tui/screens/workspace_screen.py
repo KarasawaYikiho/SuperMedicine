@@ -130,6 +130,11 @@ class WorkspaceView(Vertical):
             input_widget = self.query_one("#workspace-id-input", Input)
             input_widget.value = str(created_id)
             input_widget.focus()
+            refresh_workspace_views = getattr(self.app, "refresh_workspace_views", None)
+            if callable(refresh_workspace_views):
+                refresh_workspace_views(selected_workspace_id=str(created_id))
+                self._select_table_row(str(created_id))
+                input_widget.focus()
         except Exception as e:
             self._set_error(e)
 

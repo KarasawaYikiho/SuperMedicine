@@ -6,6 +6,7 @@ import yaml
 
 from core.config_center import ConfigCenter
 from core.tui.i18n import t
+from core.tui.app import SuperMedicineTUI
 from core.tui.screens.llm_screen import LLMView, LLMScreenController
 
 
@@ -164,3 +165,23 @@ def test_llm_view_declares_secret_safe_inputs_empty_state_and_error_redaction():
     assert "redact_sensitive" in error_source
     assert t("llm_secret_hidden") == "密钥已隐藏，不会显示在状态栏或通知中"
     assert t("llm_no_providers") == "暂无 LLM Provider"
+
+
+def test_background_llm_transport_diagnostics_are_not_formatted_as_chat_content():
+    """Regression baseline: backend LLM telemetry must not leak into TUI chat output."""
+
+    formatted = SuperMedicineTUI._format_kernel_result(
+        {
+            "status": "success",
+            "output": {
+                "stage": "LLM Request Sending",
+                "command": "LLM Request Sending: POST https://llm.local.test/v1/chat/completions",
+                "assistant": "final user-facing answer",
+            },
+        }
+    )
+
+    assert formatted["kind"] == "assistant"
+    assert "final user-facing answer" in formatted["message"]
+    assert "LLM Request Sending" not in formatted["message"]
+    assert "POST https://llm.local.test" not in formatted["message"]

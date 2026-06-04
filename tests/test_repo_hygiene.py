@@ -499,6 +499,26 @@ def test_shebang_lines_are_portable():
         )
 
 
+def test_distribution_build_forces_exact_lowercase_install_entry():
+    """Packaging must not rely on Windows materializing install.py and Install.py."""
+
+    pyproject = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    setup_py = (REPO_ROOT / "setup.py").read_text(encoding="utf-8")
+
+    assert "install" in _setuptools_py_modules(pyproject)
+    assert "Install" in _setuptools_py_modules(pyproject)
+    assert '["git", "show", ":install.py"]' in setup_py
+    assert '["git", "show", ":Install.py"]' in setup_py
+    assert "LOWERCASE_INSTALL_NAME = \"install.py\"" in setup_py
+    assert "UPPERCASE_INSTALL_NAME = \"Install.py\"" in setup_py
+    assert "class build_py" in setup_py
+    assert "class sdist" in setup_py
+    assert "class bdist_wheel" in setup_py
+    assert "Path(self.dist_dir).glob(\"*.whl\")" in setup_py
+    assert "get_outputs()" not in setup_py
+    assert "archive.writestr(name, data)" in setup_py
+
+
 def test_install_manifest_declares_safe_uninstall_entry():
     manifest = json.loads((REPO_ROOT / "install.json").read_text(encoding="utf-8"))
     uninstall = manifest["uninstall"]

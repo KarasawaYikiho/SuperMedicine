@@ -49,6 +49,89 @@ def _redact_display_secrets(value: str) -> str:
     return text
 
 
+_KERNEL_OUTPUT_ASSISTANT_KEYS = ("assistant", "answer", "response", "content", "message", "text")
+_KERNEL_OUTPUT_INTERNAL_KEYS = {
+    "backend_command",
+    "debug",
+    "debug_event",
+    "diagnostic",
+    "diagnostics",
+    "event",
+    "event_type",
+    "internal",
+    "internal_event",
+    "llm_debug",
+    "request",
+    "request_id",
+    "stage",
+    "telemetry",
+    "transport",
+}
+_KERNEL_OUTPUT_INTERNAL_COMMAND_KEYS = {"backend_command", "command"}
+_KERNEL_OUTPUT_INTERNAL_MARKERS = (
+    "LLM Request Sending",
+    "backend command",
+    "debug event",
+)
+
+
+def _looks_like_internal_kernel_text(value: Any) -> bool:
+    """Return whether text is backend telemetry rather than chat content."""
+
+    if not isinstance(value, str):
+        return False
+    lowered = value.lower()
+    return any(marker.lower() in lowered for marker in _KERNEL_OUTPUT_INTERNAL_MARKERS)
+
+
+def _strip_internal_kernel_output(value: Any) -> tuple[Any, list[Any]]:
+    """Remove backend-only telemetry from a Kernel output payload for chat display."""
+
+    removed: list[Any] = []
+    if isinstance(value, dict):
+        visible: dict[Any, Any] = {}
+        for key, item in value.items():
+            key_text = str(key)
+            key_normalized = key_text.lower()
+            if (
+                key_normalized in _KERNEL_OUTPUT_INTERNAL_KEYS
+                or (key_normalized in _KERNEL_OUTPUT_INTERNAL_COMMAND_KEYS and _looks_like_internal_kernel_text(item))
+                or _looks_like_internal_kernel_text(item)
+            ):
+                removed.append({key_text: item})
+                continue
+            cleaned, child_removed = _strip_internal_kernel_output(item)
+            removed.extend(child_removed)
+            if cleaned is not None and cleaned != {} and cleaned != []:
+                visible[key] = cleaned
+        return visible, removed
+    if isinstance(value, list):
+        visible_list: list[Any] = []
+        for item in value:
+            if _looks_like_internal_kernel_text(item):
+                removed.append(item)
+                continue
+            cleaned, child_removed = _strip_internal_kernel_output(item)
+            removed.extend(child_removed)
+            if cleaned is not None and cleaned != {} and cleaned != []:
+                visible_list.append(cleaned)
+        return visible_list, removed
+    if isinstance(value, tuple):
+        visible_items: list[Any] = []
+        for item in value:
+            if _looks_like_internal_kernel_text(item):
+                removed.append(item)
+                continue
+            cleaned, child_removed = _strip_internal_kernel_output(item)
+            removed.extend(child_removed)
+            if cleaned is not None and cleaned != {} and cleaned != []:
+                visible_items.append(cleaned)
+        return tuple(visible_items), removed
+    if _looks_like_internal_kernel_text(value):
+        return None, [value]
+    return value, removed
+
+
 _CSS_PATH = Path(__file__).parent / "app.tcss"
 
 STATUS_STYLE_CLASSES = ("status-info", "status-success", "status-warning", "status-error")
@@ -368,6 +451,7 @@ class SuperMedicineTUI(App[Any]):
     def action_switch_view(self, view_id: str) -> None:
         """Switch the visible content view."""
         if view_id == self._current_view:
+            self._refresh_visible_workspace_state(view_id)
             self._focus_current_view_default()
             self._update_status_bar()
             return
@@ -377,6 +461,7 @@ class SuperMedicineTUI(App[Any]):
         if view_id in self._views:
             self._views[view_id].display = True
             self._current_view = view_id
+            self._refresh_visible_workspace_state(view_id)
             self._update_view_title(view_id)
             self._update_status_bar()
             # Update sidebar selection
@@ -386,6 +471,48 @@ class SuperMedicineTUI(App[Any]):
                     nav_list.index = i
                     break
             self._focus_current_view_default()
+
+    def refresh_workspace_views(self, *, selected_workspace_id: str | None = None) -> None:
+        """Refresh mounted views that expose workspace-dependent selectors."""
+
+        for name, view in self._views.items():
+            load_workspaces = getattr(view, "_load_workspaces", None)
+            if callable(load_workspaces):
+                try:
+                    if name == "workspace":
+                        load_workspaces(preserve_status=True)
+                    else:
+                        load_workspaces()
+                except TypeError:
+                    try:
+                        load_workspaces(preserve_status=True)
+                    except Exception:
+                        continue
+                except Exception:
+                    continue
+            select_workspace = getattr(view, "_select_workspace_if_available", None)
+            if selected_workspace_id is not None and callable(select_workspace):
+                try:
+                    select_workspace(selected_workspace_id)
+                except Exception:
+                    continue
+
+    def _refresh_visible_workspace_state(self, view_id: str) -> None:
+        """Reload workspace selectors whenever a mounted page becomes visible."""
+
+        view = self._views.get(view_id)
+        load_workspaces = getattr(view, "_load_workspaces", None)
+        if not callable(load_workspaces):
+            return
+        try:
+            load_workspaces()
+        except TypeError:
+            try:
+                load_workspaces(preserve_status=True)
+            except Exception:
+                pass
+        except Exception:
+            pass
 
     @classmethod
     def nav_items(cls) -> tuple[NavMetadata, ...]:
@@ -606,6 +733,18 @@ class SuperMedicineTUI(App[Any]):
         return _redact_display_secrets(str(output))
 
     @classmethod
+    def _visible_kernel_output(cls, output: Any) -> tuple[Any, list[Any]]:
+        """Return chat-visible output plus any backend telemetry stripped from it."""
+
+        if isinstance(output, dict):
+            for key in _KERNEL_OUTPUT_ASSISTANT_KEYS:
+                if key in output and output.get(key) not in (None, ""):
+                    assistant_value, assistant_removed = _strip_internal_kernel_output(output.get(key))
+                    _, payload_removed = _strip_internal_kernel_output(output)
+                    return assistant_value, payload_removed + assistant_removed
+        return _strip_internal_kernel_output(output)
+
+    @classmethod
     def _format_kernel_result(cls, result: Any) -> dict[str, str]:
         """Format Kernel result dict/list/string/empty values for ChatView."""
 
@@ -615,7 +754,15 @@ class SuperMedicineTUI(App[Any]):
 
         status = str(result.get("status") or "unknown")
         error = result.get("error") or result.get("reason")
-        output = cls._format_kernel_output(result.get("output", result.get("result", "")))
+        output_payload = result.get("output", result.get("result", ""))
+        output_payload, stripped_internal = cls._visible_kernel_output(output_payload)
+        if stripped_internal:
+            logger.debug(
+                "TUI kernel backend telemetry routed away from chat: status=%s telemetry=%s",
+                status,
+                _redact_display_secrets(str(stripped_internal)),
+            )
+        output = cls._format_kernel_output(output_payload)
         header = f"{t('chat_result_status')}: {status}"
 
         if error:

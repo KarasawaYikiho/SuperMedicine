@@ -10,12 +10,28 @@ Python package fallback version: **0.4.1b0**.
 
 ## [Beta0.4.1] - 2026-05-31
 
+### Added
+
+- Added end-to-end or near end-to-end regression coverage for TUI internal LLM
+  diagnostic redaction, cross-page workspace visibility after creation,
+  interactive `python Install.py` setup, and CI release artifacts that include a
+  releasable application Exe plus standalone installer Exe.
+
 ### Changed
 
 - Updated public/release display label to `Beta0.4.1`.
 - Python package metadata uses fallback version `0.4.1b0`.
 - Reworked root user-facing Markdown for release upload scope, including a
   Chinese README section and removal of stale links to excluded engineering docs.
+
+### Fixed
+
+- Clarified installer/release documentation so ordinary users, scripted installs,
+  and CI artifact consumers follow the same `Install.py`, `dist/SuperMedicine.exe`,
+  and `SuperMedicineInstaller.exe` layout contract.
+- Updated installation docs to make no-flag `python install.py` / no-flag
+  `SuperMedicineInstaller.exe` the ordinary user path, with scripted `--` flags
+  documented only as advanced automation/CI usage.
 
 ## [Beta0.3.6] - 2026-05-29
 

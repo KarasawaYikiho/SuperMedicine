@@ -27,6 +27,9 @@ from permission.policy import ensure_default_policy
 
 logger = logging.getLogger(__name__)
 
+INSTALLER_TITLE = "SuperMedicine 安装向导"
+INSTALLER_RULE = "=" * 52
+
 
 def _configure_stdio_errors() -> None:
     """Keep argparse/help output writable on narrow Windows stdio encodings."""
@@ -67,6 +70,21 @@ INSTALL_ENV_NAMES = {
     "base_url": "SM_LLM_BASE_URL",
     "api_key": "SM_LLM_API_KEY",
     "model": "SM_LLM_MODEL",
+}
+
+_PROVIDER_DEFAULTS: dict[str, dict[str, str]] = {
+    "openai": {
+        "base_url": "https://api.openai.com/v1",
+        "model": "gpt-4o-mini",
+    },
+    "anthropic": {
+        "base_url": "https://api.anthropic.com/v1",
+        "model": "claude-3-5-sonnet-latest",
+    },
+    "openrouter": {
+        "base_url": "https://openrouter.ai/api/v1",
+        "model": "anthropic/claude-3.5-sonnet",
+    },
 }
 
 
@@ -155,10 +173,10 @@ def _require_complete_llm_config(
         missing.append("model")
     if missing:
         raise ValueError(
-            "完整 LLM Provider 配置是首次初始化必需项；缺失字段: "
+            "初始化需要完整 LLM Provider 配置；缺失: "
             + ", ".join(missing)
-            + "；配置来源优先级: CLI 参数 > SM_LLM_* 环境变量/Provider API key env > --llm-config 文件。请通过 --provider/--base-url/--api-key/--model、"
-            "--llm-config、SM_LLM_PROVIDER/SM_LLM_BASE_URL/SM_LLM_API_KEY/SM_LLM_MODEL 环境变量或 --interactive 提供: "
+            + "。请使用 --interactive，或提供 --provider/--base-url/--api-key/--model、--llm-config、SM_LLM_* 环境变量。"
+            " 配置优先级: CLI 参数 > 环境变量 > --llm-config。待补充字段: "
             + ", ".join(missing)
         )
     _validate_install_llm_config(
@@ -212,12 +230,202 @@ def _resolve_api_key(provider: str | None, explicit: str | None) -> str | None:
 def _prompt_value(prompt: str, default: str | None = None, *, secret: bool = False) -> str | None:
     suffix = f" [{default}]" if default and not secret else ""
     if secret:
-        value = getpass.getpass(f"{prompt}: ").strip()
+        if sys.stdin.isatty():
+            value = getpass.getpass(f"{prompt}: ").strip()
+        else:
+            value = input(f"{prompt}: ").strip()
     else:
         value = input(f"{prompt}{suffix}: ").strip()
     if value:
         return value
     return default
+
+
+def _prompt_required_value(prompt: str, default: str | None = None, *, secret: bool = False) -> str:
+    while True:
+        value = _prompt_value(prompt, default, secret=secret)
+        if value and value.strip():
+            return value.strip()
+        logger.info("提示: %s 不能为空。", prompt)
+
+
+def _prompt_base_url(default: str | None = None) -> str:
+    while True:
+        value = _prompt_required_value("Base URL", default)
+        parsed = urlparse(value)
+        if parsed.scheme in {"http", "https"} and parsed.netloc:
+            return value
+        logger.info("提示: Base URL 需为 http(s) 地址，例如 https://api.openai.com/v1。")
+
+
+def _prompt_yes_no(prompt: str, default: bool = False) -> bool:
+    default_text = "Y/n" if default else "y/N"
+    while True:
+        value = input(f"{prompt} [{default_text}]: ").strip().lower()
+        if not value:
+            return default
+        if value in {"y", "yes", "1", "true", "是", "好"}:
+            return True
+        if value in {"n", "no", "0", "false", "否", "不"}:
+            return False
+        logger.info("提示: 请输入 y 或 n。")
+
+
+def _prompt_path(prompt: str, default: Path) -> Path:
+    value = _prompt_value(prompt, str(default))
+    return Path(value or str(default)).expanduser().resolve()
+
+
+def _provider_defaults(provider: str | None) -> dict[str, str]:
+    if provider is None:
+        return {}
+    return _PROVIDER_DEFAULTS.get(provider, {})
+
+
+def _collect_interactive_llm_config(
+    *,
+    provider: str | None = None,
+    base_url: str | None = None,
+    api_key: str | None = None,
+    model: str | None = None,
+) -> dict[str, str | None]:
+    normalized_provider = _normalize_provider(
+        _prompt_required_value("Provider", _normalize_provider(provider) or "openai")
+    )
+    if normalized_provider is None:
+        raise ValueError("provider is required")
+    defaults = _provider_defaults(normalized_provider)
+    base_url = _prompt_base_url(base_url or defaults.get("base_url"))
+    model = _prompt_required_value("Model", model or defaults.get("model"))
+    api_key = _prompt_required_value("API key", api_key, secret=True)
+    return {
+        "provider": normalized_provider,
+        "base_url": base_url,
+        "api_key": api_key,
+        "model": model,
+    }
+
+
+def _log_interactive_summary(
+    *,
+    install_path: Path,
+    init_config_enabled: bool,
+    provider: str | None,
+    base_url: str | None,
+    model: str | None,
+    create_shortcut: bool,
+    add_to_path: bool,
+    release_exe: Path | None,
+    extract_release: bool,
+) -> None:
+    logger.info("")
+    logger.info("%s", INSTALLER_RULE)
+    logger.info("安装摘要")
+    logger.info("%s", INSTALLER_RULE)
+    logger.info("目标目录      %s", install_path)
+    logger.info("初始化配置    %s", "是" if init_config_enabled else "否")
+    if init_config_enabled:
+        logger.info("Provider      %s", provider or "")
+        logger.info("Base URL      %s", base_url or "")
+        logger.info("Model         %s", model or "")
+        logger.info("API key       %s", _redact("provided"))
+    logger.info("释放程序文件  %s", "是" if extract_release else "否")
+    logger.info("桌面 Exe      %s", release_exe if release_exe else "跳过")
+    logger.info("快捷方式      %s", "记录选择" if create_shortcut else "跳过")
+    logger.info("PATH          %s", "显示手动配置提示" if add_to_path else "跳过")
+    logger.info("%s", INSTALLER_RULE)
+
+
+def _run_interactive_installer(args: argparse.Namespace) -> None:
+    logger.info("%s", INSTALLER_RULE)
+    logger.info("%s", INSTALLER_TITLE)
+    logger.info("%s", INSTALLER_RULE)
+    logger.info("回车使用默认值；API key 不会显示在屏幕上。")
+    logger.info("准备: 建议先执行 pip install -e .；命令不可用时可用 python Cli.py。")
+
+    while True:
+        logger.info("")
+        logger.info("[1/4] 选择安装位置")
+        install_path = _prompt_path("安装/项目路径", Path.cwd())
+        extract_release = _prompt_yes_no("释放完整程序文件到该目录", bool(getattr(sys, "frozen", False)))
+
+        logger.info("")
+        logger.info("[2/4] 初始化项目配置")
+        init_config_enabled = _prompt_yes_no("初始化 .supermedicine 配置", True)
+        llm_config: dict[str, str | None] = {"provider": None, "base_url": None, "api_key": None, "model": None}
+        if init_config_enabled:
+            imported_config = _load_llm_config_file(args.llm_config) if args.llm_config else {}
+            provider = _resolve_install_value("provider", args.provider) or cast(str | None, imported_config.get("provider"))
+            base_url = _resolve_install_value("base_url", args.base_url) or cast(str | None, imported_config.get("base_url"))
+            model = _resolve_install_value("model", args.model) or cast(str | None, imported_config.get("model"))
+            normalized_provider = _normalize_provider(provider)
+            api_key = _resolve_api_key(normalized_provider, args.api_key) or cast(str | None, imported_config.get("api_key"))
+            llm_config = _collect_interactive_llm_config(
+                provider=normalized_provider,
+                base_url=base_url,
+                api_key=api_key,
+                model=model,
+            )
+
+        logger.info("")
+        logger.info("[3/4] 可选快捷入口")
+        create_shortcut = _prompt_yes_no("记录创建快捷方式意向", False)
+        add_to_path = _prompt_yes_no("显示 PATH 手动配置提示", False)
+
+        release_exe: Path | None = None
+        if _prompt_yes_no("复制 SuperMedicine.exe 到桌面", bool(args.release_exe)):
+            default_exe = args.release_exe or Path("dist") / "SuperMedicine.exe"
+            release_exe = _prompt_path("Exe 路径", default_exe)
+
+        logger.info("")
+        logger.info("[4/4] 确认安装")
+        _log_interactive_summary(
+            install_path=install_path,
+            init_config_enabled=init_config_enabled,
+            provider=llm_config.get("provider"),
+            base_url=llm_config.get("base_url"),
+            model=llm_config.get("model"),
+            create_shortcut=create_shortcut,
+            add_to_path=add_to_path,
+            release_exe=release_exe,
+            extract_release=extract_release,
+        )
+        if not _prompt_yes_no("开始安装", True):
+            if _prompt_yes_no("返回重新填写", True):
+                continue
+            logger.info("安装已取消。")
+            return
+
+        try:
+            logger.info("")
+            logger.info("正在安装...")
+            if init_config_enabled:
+                init_config(
+                    install_path,
+                    provider=llm_config.get("provider"),
+                    base_url=llm_config.get("base_url"),
+                    api_key=llm_config.get("api_key"),
+                    model=llm_config.get("model"),
+                )
+                logger.info("配置完成: %s", install_path / ".supermedicine")
+            if extract_release:
+                args.extract_release_to = install_path
+                _extract_release_from_args(args)
+            if release_exe:
+                args.release_exe = release_exe
+                if extract_release:
+                    _align_release_exe_with_extracted_payload(args)
+                _release_exe_from_args(args)
+            if add_to_path:
+                logger.info("PATH 提示: 可将 Python Scripts 目录加入系统 PATH，或使用 python Cli.py。")
+            if create_shortcut:
+                logger.info("快捷方式提示: 当前版本请手动创建指向 supermedicine 或 python Cli.py 的快捷方式。")
+            logger.info("安装完成。可运行 python Cli.py status 检查状态。")
+            return
+        except (ValueError, OSError, SystemExit) as exc:
+            logger.error("安装失败: %s", redact_sensitive(str(exc)))
+            if not _prompt_yes_no("重试安装向导", True):
+                raise
 
 
 def _apply_llm_config(
@@ -387,11 +595,11 @@ def init_config(
         ensure_default_policy(project_dir, Path(__file__).parent)
     except Exception as exc:
         _restore_install_state(config_dir, backup_dir)
-        logger.error("初始化失败，已回滚安装状态。stage=init error=%s", redact_sensitive(str(exc)))
+        logger.error("初始化失败，已回滚更改: %s", redact_sensitive(str(exc)))
         raise
     if backup_dir is not None and backup_dir.exists():
         shutil.rmtree(backup_dir)
-    logger.info("初始化完成。")
+    logger.info("初始化完成: %s", config_dir)
     logger.info("")
     logger.info("如果 'supermedicine' 命令不可用，请将以下目录添加到系统 PATH：")
     logger.info("  Windows:  %APPDATA%\\Python\\Python<版本>\\Scripts")
@@ -413,6 +621,23 @@ def _log_exe_release_result(result: dict[str, Any]) -> None:
         logger.info("桌面 Exe 释放 dry-run: target=%s reason=%s", target, reason)
     else:
         logger.info("桌面 Exe 释放结果: status=%s target=%s reason=%s", status, target, reason)
+
+
+def _log_payload_release_result(result: dict[str, Any]) -> None:
+    """Log user-facing full release extraction status with deterministic wording."""
+
+    status = result.get("status", "unknown")
+    target = result.get("target_dir", "")
+    reason = result.get("reason", "")
+    files = result.get("file_count", "")
+    if status == "copied":
+        logger.info("安装 Exe 程序文件释放完成: target=%s files=%s reason=%s", target, files, reason)
+    elif status == "skipped":
+        logger.info("安装 Exe 程序文件释放跳过: target=%s reason=%s", target, reason)
+    elif status == "dry-run":
+        logger.info("安装 Exe 程序文件释放 dry-run: target=%s files=%s reason=%s", target, files, reason)
+    else:
+        logger.info("安装 Exe 程序文件释放结果: status=%s target=%s files=%s reason=%s", status, target, files, reason)
 
 
 def _load_release_exe_to_desktop() -> Any:
@@ -444,6 +669,39 @@ def _load_release_exe_to_desktop() -> Any:
     return release_exe_to_desktop
 
 
+def _load_release_payload_to_directory() -> Any:
+    """Lazily load shared release payload extraction support."""
+
+    entrypoint_dir = Path(__file__).resolve().parent
+    bundled = getattr(sys, "_MEIPASS", None)
+    bundled_payload = Path(bundled) / "release_payload" if bundled else None
+    release_module = entrypoint_dir / "installer" / "exe_release.py"
+    if not bundled and not release_module.is_file():
+        raise SystemExit(
+            "error: 安装 Exe 释放功能不可用: requires installer/exe_release.py or a bundled release payload. "
+            "请重新下载完整发布包，或运行 CI 生成的 SuperMedicineInstaller.exe。"
+        ) from None
+
+    import_roots = [entrypoint_dir]
+    if bundled_payload is not None:
+        import_roots.insert(0, bundled_payload)
+    for import_root in import_roots:
+        import_root_path = str(import_root)
+        if import_root_path not in sys.path:
+            sys.path.insert(0, import_root_path)
+
+    try:
+        from installer.exe_release import release_payload_to_directory
+    except ModuleNotFoundError as exc:
+        missing_module = exc.name or "installer.exe_release"
+        raise SystemExit(
+            "error: 安装 Exe 释放功能不可用: release package is incomplete "
+            f"(missing Python module: {missing_module}). "
+            "请重新下载完整发布包，或运行 CI 生成的 SuperMedicineInstaller.exe。"
+        ) from None
+    return release_payload_to_directory
+
+
 def _release_exe_from_args(args: argparse.Namespace) -> dict[str, Any]:
     """Release the requested Exe and convert copy failures into CLI errors."""
 
@@ -464,46 +722,129 @@ def _release_exe_from_args(args: argparse.Namespace) -> dict[str, Any]:
     _log_exe_release_result(result)
     return result
 
+
+def _extract_release_from_args(args: argparse.Namespace) -> dict[str, Any]:
+    """Extract bundled/unified release payload and convert failures into CLI errors."""
+
+    try:
+        release_payload_to_directory = _load_release_payload_to_directory()
+        result = release_payload_to_directory(
+            target_dir=args.extract_release_to,
+            source_root=args.release_payload_root,
+            overwrite=args.extract_overwrite,
+            dry_run=args.exe_dry_run,
+        )
+    except SystemExit:
+        raise
+    except Exception as exc:
+        logger.error("安装 Exe 程序文件释放失败: %s", redact_sensitive(str(exc)))
+        raise SystemExit(f"error: 安装 Exe 程序文件释放失败: {redact_sensitive(str(exc))}") from exc
+    _log_payload_release_result(result)
+    return result
+
+
+def _resolve_project_dir(args: argparse.Namespace) -> Path:
+    """Return where installer configuration should be written."""
+
+    project_dir = getattr(args, "project_dir", None)
+    if project_dir:
+        return Path(project_dir).expanduser().resolve()
+    extract_release_to = getattr(args, "extract_release_to", None)
+    if extract_release_to:
+        return Path(extract_release_to).expanduser().resolve()
+    return Path.cwd()
+
+
+def _align_release_exe_with_extracted_payload(args: argparse.Namespace) -> None:
+    """Prefer the freshly extracted application Exe for combined installs."""
+
+    if not getattr(args, "release_exe", None) or not getattr(args, "extract_release_to", None):
+        return
+    release_exe = Path(args.release_exe)
+    if release_exe.is_absolute() or release_exe.exists():
+        return
+    extracted_candidate = Path(args.extract_release_to).expanduser() / release_exe
+    if extracted_candidate.exists():
+        args.release_exe = extracted_candidate
+
+
 def main(argv: list[str] | None = None) -> None:
     _configure_stdio_errors()
     logging.basicConfig(level=logging.INFO, format='%(message)s')
     parser = argparse.ArgumentParser(
-        description="SuperMedicine standalone/unified installer",
+        description="SuperMedicine 安装器：初始化配置、释放程序文件、复制桌面 Exe。",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
-            "统一安装示例: python Install.py --unified-install --release-exe dist/SuperMedicine.exe "
-            "--provider openai --base-url https://api.openai.com/v1 --model gpt-4o-mini. "
-            "--init 默认不复制 Exe；只有显式 --release-exe 才释放桌面 Exe。"
-            "测试/CI 请配合 --desktop-dir <tmp> 或 --exe-dry-run，避免写入真实桌面。"
+            "常用示例:\n"
+            "  python install.py\n"
+            "  python install.py --init --interactive\n"
+            "  统一安装示例:\n"
+            "  python install.py --unified-install --release-exe dist/SuperMedicine.exe --provider openai --base-url https://api.openai.com/v1 --model gpt-4o-mini\n"
+            "  SuperMedicineInstaller.exe --extract-release-to C:\\SuperMedicine --init --project-dir C:\\SuperMedicine ...\n\n"
+            "说明:\n"
+            "  --init 默认只初始化配置；只有显式 --release-exe 才复制桌面 Exe。\n"
+            "  --release-exe 默认查找 dist/SuperMedicine.exe，并兼容 Dist/SuperMedicine.exe 或根目录 SuperMedicine.exe。\n"
+            "  测试/CI 请使用 --desktop-dir <tmp> 或 --exe-dry-run，避免写入真实桌面。"
         ),
     )
-    parser.add_argument("--detect", action="store_true", help="Optionally detect OpenCode/Claude Code add-on presence")
-    parser.add_argument("--init", action="store_true", help="Initialize core SuperMedicine config only; does not release Exe unless --release-exe is also provided")
+    parser.add_argument("--detect", action="store_true", help="检测可选 OpenCode/Claude Code 适配器")
+    parser.add_argument("--init", action="store_true", help="初始化 .supermedicine 配置；脚本模式需提供完整 LLM 配置")
     parser.add_argument(
         "--unified-install",
         action="store_true",
-        help="Run initialization plus desktop Exe release; requires --release-exe and keeps --init semantics explicit",
+        help="初始化配置并复制桌面 Exe；必须同时提供 --release-exe",
     )
     parser.add_argument(
         "--provider",
-        help="LLM provider to configure (e.g. openai, anthropic, deepseek, or any custom OpenAI-compatible provider)",
+        help="LLM provider 名称，如 openai、anthropic、deepseek 或自定义兼容网关",
     )
-    parser.add_argument("--base-url", help="LLM provider BaseURL; may also use SM_LLM_BASE_URL")
-    parser.add_argument("--api-key", help="LLM provider API key; may also use SM_LLM_API_KEY or provider env var")
-    parser.add_argument("--model", help="Default LLM model; may also use SM_LLM_MODEL")
-    parser.add_argument("--llm-config", type=Path, help="YAML file containing llm.provider and llm.providers.<provider> settings")
-    parser.add_argument("--interactive", action="store_true", help="Prompt for LLM provider settings during initialization")
-    parser.add_argument("--release-exe", type=Path, help="Release this Exe to the desktop after installer work completes; can be used alone, with --init, or with --unified-install")
-    parser.add_argument("--desktop-dir", type=Path, help="Desktop directory override for Exe release; use in tests/CI to avoid the real user Desktop")
-    parser.add_argument("--exe-target-name", help="Desktop filename for released Exe; defaults to the source filename and is normalized to .exe")
-    parser.add_argument("--exe-overwrite", action="store_true", help="Overwrite an existing desktop Exe target; default behavior skips existing target")
-    parser.add_argument("--exe-dry-run", action="store_true", help="Report Exe release action without copying")
+    parser.add_argument("--base-url", help="LLM Base URL；也可用 SM_LLM_BASE_URL")
+    parser.add_argument("--api-key", help="LLM API key；也可用 SM_LLM_API_KEY 或 provider 专用环境变量")
+    parser.add_argument("--model", help="默认 LLM model；也可用 SM_LLM_MODEL")
+    parser.add_argument("--llm-config", type=Path, help="读取包含 llm.provider / llm.providers 的 YAML 配置")
+    parser.add_argument("--interactive", action="store_true", help="在初始化时交互填写 LLM 配置")
+    parser.add_argument(
+        "--project-dir",
+        type=Path,
+        help=".supermedicine 初始化目录；默认使用 --extract-release-to 或当前目录",
+    )
+    parser.add_argument(
+        "--release-exe",
+        type=Path,
+        nargs="?",
+        const=Path("dist") / "SuperMedicine.exe",
+        help="复制指定 Exe 到桌面；不带值时默认 dist/SuperMedicine.exe，并兼容 Dist/ 或根目录 Exe",
+    )
+    parser.add_argument("--desktop-dir", type=Path, help="指定桌面目录；测试/CI 用于避免真实桌面")
+    parser.add_argument("--exe-target-name", help="桌面 Exe 文件名；默认使用源文件名并规范为 .exe")
+    parser.add_argument("--exe-overwrite", action="store_true", help="覆盖已存在的桌面 Exe；默认跳过")
+    parser.add_argument("--exe-dry-run", action="store_true", help="仅显示将执行的 Exe 释放动作，不复制文件")
+    parser.add_argument(
+        "--extract-release-to",
+        type=Path,
+        help="释放完整发布 payload 到目录；供独立安装 Exe 使用",
+    )
+    parser.add_argument(
+        "--release-payload-root",
+        type=Path,
+        help="指定发布 payload 来源；默认使用 PyInstaller 内置 payload 或当前发布根目录",
+    )
+    parser.add_argument("--extract-overwrite", action="store_true", help="释放 payload 时覆盖已有文件")
     args = parser.parse_args(argv)
+    if not (argv if argv is not None else sys.argv[1:]):
+        _run_interactive_installer(args)
+        return
     run_init = args.init or args.unified_install
     if args.unified_install and not args.release_exe:
         parser.error("--unified-install requires --release-exe <path-to-SuperMedicine.exe>")
     if args.detect:
         logger.info("Detected platform: %s", detect_platform())
         return
+    if args.extract_release_to:
+        _extract_release_from_args(args)
+        _align_release_exe_with_extracted_payload(args)
+        if not run_init and not args.release_exe:
+            return
     if run_init:
         imported_config = _load_llm_config_file(args.llm_config) if args.llm_config else {}
         provider = _resolve_install_value("provider", args.provider) or cast(str | None, imported_config.get("provider"))
@@ -512,22 +853,24 @@ def main(argv: list[str] | None = None) -> None:
         normalized_provider = _normalize_provider(provider)
         api_key = _resolve_api_key(normalized_provider, args.api_key) or cast(str | None, imported_config.get("api_key"))
         if args.interactive:
-            normalized_provider = _normalize_provider(
-                _prompt_value("LLM provider", normalized_provider or "openai")
+            prompted_config = _collect_interactive_llm_config(
+                provider=normalized_provider,
+                base_url=base_url,
+                api_key=api_key,
+                model=model,
             )
-            if normalized_provider is None:
-                raise ValueError("provider is required")
-            base_url = _prompt_value("BaseURL", base_url)
-            model = _prompt_value("Default model", model)
-            api_key = _prompt_value("API key", api_key, secret=True)
+            normalized_provider = cast(str | None, prompted_config.get("provider"))
+            base_url = cast(str | None, prompted_config.get("base_url"))
+            model = cast(str | None, prompted_config.get("model"))
+            api_key = cast(str | None, prompted_config.get("api_key"))
         init_config(
-            Path.cwd(),
+            _resolve_project_dir(args),
             provider=normalized_provider,
             base_url=base_url,
             api_key=api_key,
             model=model,
         )
-        logger.info("安装初始化结果: .supermedicine=%s", Path.cwd() / ".supermedicine")
+        logger.info("安装初始化结果: .supermedicine=%s", _resolve_project_dir(args) / ".supermedicine")
         if args.release_exe:
             _release_exe_from_args(args)
         return

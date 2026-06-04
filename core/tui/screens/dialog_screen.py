@@ -106,6 +106,7 @@ class DialogView(Vertical):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "dialog-refresh":
+            self._load_workspaces()
             self._load_dialog_history(refreshed=True)
 
 

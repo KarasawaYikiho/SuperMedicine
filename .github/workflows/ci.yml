@@ -63,7 +63,7 @@ jobs:
   packaging-smoke:
     name: Source distribution smoke
     needs: release-gate
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     outputs:
       release_label: ${{ steps.source_zip.outputs.release_label }}
       release_title: ${{ steps.source_zip.outputs.release_title }}
@@ -81,13 +81,99 @@ jobs:
         run: |
           python -m pip install --upgrade pip setuptools wheel
           python -m pip cache purge || true
-          python -m pip install build
+          python -m pip install build pyinstaller
 
       - name: Build sdist for validation only
         shell: bash
         run: |
           python -m build --sdist --outdir dist
           rm -rf dist
+
+      - name: Build release application Exe artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m PyInstaller --onefile --name SuperMedicine --distpath dist --workpath .pyinstaller-build --specpath .pyinstaller-spec Cli.py
+          test -f dist/SuperMedicine.exe
+          python Install.py --release-exe dist/SuperMedicine.exe --desktop-dir "$RUNNER_TEMP/Desktop" --exe-dry-run
+
+      - name: Build standalone installer Exe artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .installer-payload-stage
+          python - <<'PY'
+          from pathlib import Path
+          import shutil
+
+          root = Path.cwd()
+          payload = root / ".installer-payload-stage" / "release_payload"
+          include_files = [
+              "Cli.py",
+              "install.py",
+              "Install.py",
+              "Uninstall.py",
+              "pyproject.toml",
+              "requirements.txt",
+              "install.json",
+              "LICENSE",
+              "README.md",
+              "CHANGELOG.md",
+              "CONTRIBUTING.md",
+              "SECURITY.md",
+              "INSTALL.md",
+          ]
+          include_dirs = ["core", "permission", "agents", "plugins", "adapters", "installer"]
+          excluded_dir_names = {"__pycache__", ".pytest_cache", ".ruff_cache", ".mypy_cache", ".pytest-tmp", ".pytest_tmp"}
+          excluded_file_names = {".env"}
+          excluded_suffixes = {".pyc", ".pyo", ".tmp", ".token"}
+
+          def should_exclude(path: Path) -> bool:
+              if set(path.parts) & excluded_dir_names:
+                  return True
+              if path.name in excluded_file_names:
+                  return True
+              if path.suffix in excluded_suffixes:
+                  return True
+              if path.name.endswith("~") or path.name.endswith(".log"):
+                  return True
+              return False
+
+          payload.mkdir(parents=True)
+          for relative in include_files:
+              source = root / relative
+              if source.exists() and not should_exclude(Path(relative)):
+                  target = payload / relative
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copy2(source, target)
+
+          release_exe = root / "dist" / "SuperMedicine.exe"
+          if not release_exe.is_file():
+              raise SystemExit("Missing CI release executable: dist/SuperMedicine.exe")
+          exe_target = payload / "dist" / "SuperMedicine.exe"
+          exe_target.parent.mkdir(parents=True, exist_ok=True)
+          shutil.copy2(release_exe, exe_target)
+
+          for relative_dir in include_dirs:
+              source_dir = root / relative_dir
+              if not source_dir.exists():
+                  continue
+              for source in source_dir.rglob("*"):
+                  relative = source.relative_to(root)
+                  if should_exclude(relative):
+                      continue
+                  target = payload / relative
+                  if source.is_dir():
+                      target.mkdir(parents=True, exist_ok=True)
+                  else:
+                      target.parent.mkdir(parents=True, exist_ok=True)
+                      shutil.copy2(source, target)
+          PY
+          python -m PyInstaller --onefile --name SuperMedicineInstaller --distpath dist --workpath .pyinstaller-installer-build --specpath .pyinstaller-installer-spec --hidden-import installer.exe_release --add-data ".installer-payload-stage/release_payload;release_payload" install.py
+          test -f dist/SuperMedicineInstaller.exe
+          python Install.py --extract-release-to "$RUNNER_TEMP/InstallerDryRun" --release-payload-root .installer-payload-stage/release_payload --exe-dry-run
+          ./dist/SuperMedicineInstaller.exe --help
+          ./dist/SuperMedicineInstaller.exe --extract-release-to "$RUNNER_TEMP/InstallerExeDryRun" --exe-dry-run
 
       - name: Build release Zip
         id: source_zip
@@ -98,6 +184,7 @@ jobs:
           import os
           import re
           import shutil
+          import subprocess
           import tomllib
           import zipfile
 
@@ -112,6 +199,7 @@ jobs:
 
           include_files = [
               "Cli.py",
+              "install.py",
               "Install.py",
               "Uninstall.py",
               "pyproject.toml",
@@ -159,6 +247,18 @@ jobs:
                   target.parent.mkdir(parents=True, exist_ok=True)
                   shutil.copy2(source, target)
 
+          release_exe = root / "dist" / "SuperMedicine.exe"
+          if not release_exe.is_file():
+              raise SystemExit("Missing CI release executable: dist/SuperMedicine.exe. Re-run the Build release application Exe artifact step.")
+          exe_target = stage / "dist" / "SuperMedicine.exe"
+          exe_target.parent.mkdir(parents=True, exist_ok=True)
+          shutil.copy2(release_exe, exe_target)
+
+          installer_exe = root / "dist" / "SuperMedicineInstaller.exe"
+          if not installer_exe.is_file():
+              raise SystemExit("Missing CI installer executable: dist/SuperMedicineInstaller.exe. Re-run the Build standalone installer Exe artifact step.")
+          shutil.copy2(installer_exe, stage / "SuperMedicineInstaller.exe")
+
           for relative_dir in include_dirs:
               source_dir = root / relative_dir
               if not source_dir.exists():
@@ -181,6 +281,14 @@ jobs:
               for source in sorted(stage.rglob("*")):
                   if source.is_file():
                       archive.write(source, source.relative_to(stage.parent).as_posix())
+              # Windows runners cannot always materialize case-only sibling files
+              # in the staging directory, but release archives must keep the
+              # canonical lowercase entry alongside the legacy uppercase entry
+              # for case-sensitive extraction targets.
+              lowercase_entry = f"SuperMedicine {release_label}/install.py"
+              if lowercase_entry not in archive.namelist():
+                  lowercase_source = subprocess.check_output(["git", "show", ":install.py"], cwd=root, text=True)
+                  archive.writestr(lowercase_entry, lowercase_source)
 
           shutil.rmtree(stage.parent)
           print(f"Created {archive_name}")
