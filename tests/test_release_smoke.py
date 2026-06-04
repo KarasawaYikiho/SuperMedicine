@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -32,6 +33,27 @@ INSTALLER_EXE_RELEASE_PATHS = (
 )
 INSTALLER_EXE_NAME = "SuperMedicineInstaller.exe"
 CANONICAL_LOWERCASE_INSTALL = "install.py"
+RUNTIME_DEPENDENCY_INSTALL_RE = re.compile(
+    r"^\s*python\s+-m\s+pip\s+install\b[^\n]*(?:"
+    r"-e\s+['\"]?\.(?:\[[^\]\n]+\])?['\"]?|"
+    r"['\"]?\.(?:\[[^\]\n]+\])?['\"]?|"
+    r"-r\s+requirements\.txt\b|"
+    r"\bPyYAML\b|\bpyyaml\b"
+    r")",
+    re.MULTILINE,
+)
+PACKAGING_TOOLING_WITH_RUNTIME_INSTALL_RE = re.compile(
+    r"^\s*python\s+-m\s+pip\s+install\b"
+    r"(?=[^\n]*\bbuild\b)"
+    r"(?=[^\n]*\bpyinstaller\b)"
+    r"[^\n]*(?:"
+    r"-e\s+['\"]?\.(?:\[[^\]\n]+\])?['\"]?|"
+    r"['\"]?\.(?:\[[^\]\n]+\])?['\"]?|"
+    r"-r\s+requirements\.txt\b|"
+    r"\bPyYAML\b|\bpyyaml\b"
+    r")",
+    re.IGNORECASE | re.MULTILINE,
+)
 
 
 def _cp1252_stdio_env() -> dict[str, str]:
@@ -241,12 +263,38 @@ def test_ci_release_artifacts_include_standalone_installer_exe_and_shared_payloa
     assert "release_payload" in workflow
     assert "--extract-release-to" in workflow
     assert "dist/SuperMedicine.exe" in workflow
-    assert "python -m pip install build pyinstaller" in workflow
+    assert PACKAGING_TOOLING_WITH_RUNTIME_INSTALL_RE.search(workflow), (
+        "CI packaging smoke must install build tooling (build, pyinstaller) together with "
+        "runtime/project dependencies before installer entrypoint smoke commands."
+    )
     assert "./dist/SuperMedicineInstaller.exe --help" in workflow
     assert "./dist/SuperMedicineInstaller.exe --extract-release-to" in workflow
     assert '["git", "show", ":install.py"]' in workflow
     assert "archive.writestr(lowercase_entry" in workflow
     assert "git archive HEAD" not in workflow
+
+
+def test_ci_packaging_smoke_installs_runtime_dependencies_before_installer_entrypoints():
+    """Packaging smoke must install runtime deps, including PyYAML, before installer entrypoints."""
+
+    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    packaging_job = workflow[workflow.index("  packaging-smoke:") :]
+    installer_smoke_markers = (
+        "python Install.py --release-exe",
+        "python Install.py --extract-release-to",
+        "./dist/SuperMedicineInstaller.exe --help",
+        "./dist/SuperMedicineInstaller.exe --extract-release-to",
+    )
+    first_installer_smoke_index = min(packaging_job.index(marker) for marker in installer_smoke_markers)
+    before_installer_smokes = packaging_job[:first_installer_smoke_index]
+
+    assert RUNTIME_DEPENDENCY_INSTALL_RE.search(before_installer_smokes), (
+        "The packaging-smoke job invokes Install.py/SuperMedicineInstaller.exe entrypoints that import "
+        "runtime modules such as yaml from PyYAML. Install the project/runtime dependencies "
+        "(for example `python -m pip install -e .`, `python -m pip install -r requirements.txt`, "
+        "or an explicit PyYAML install) before those smoke commands; tool-only installs like "
+        "`python -m pip install build pyinstaller` are not sufficient."
+    )
 
 
 def test_release_docs_describe_ci_artifact_layout_and_install_py_roles():
