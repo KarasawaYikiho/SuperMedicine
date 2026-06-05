@@ -23,7 +23,9 @@ def test_paper_screen_import_is_copy_only_and_lists_metadata(tmp_path):
     source.write_bytes(b"paper bytes")
     controller = PaperScreenController(tmp_path)
 
-    imported = controller.import_paper("study-a", source, metadata={"title": "研究论文", "tags": ["肿瘤"]})
+    imported = controller.import_paper(
+        "study-a", source, metadata={"title": "研究论文", "tags": ["肿瘤"]}
+    )
 
     assert source.exists()
     assert imported["message"] == "论文已复制导入工作区"
@@ -48,7 +50,9 @@ def test_paper_screen_edit_metadata(tmp_path):
     controller = PaperScreenController(tmp_path)
     paper_id = controller.import_paper("study-a", source)["metadata"]["id"]
 
-    updated = controller.edit_metadata("study-a", paper_id, {"title": "更新标题", "notes": "中文备注"})
+    updated = controller.edit_metadata(
+        "study-a", paper_id, {"title": "更新标题", "notes": "中文备注"}
+    )
 
     assert updated["message"] == "论文元数据已更新"
     assert controller.show_paper("study-a", paper_id)["title"] == "更新标题"

@@ -52,7 +52,9 @@ def test_workspace_screen_create_does_not_enter_kernel_or_llm(tmp_path, monkeypa
     def guarded_import(name, globals=None, locals=None, fromlist=(), level=0):
         if name.startswith(("core.kernel", "core.llm_client", "core.llm_providers")):
             imported.append(name)
-            raise AssertionError(f"TUI workspace create must not import Kernel/LLM module: {name}")
+            raise AssertionError(
+                f"TUI workspace create must not import Kernel/LLM module: {name}"
+            )
         return original_import(name, globals, locals, fromlist, level)
 
     monkeypatch.setattr("builtins.__import__", guarded_import)

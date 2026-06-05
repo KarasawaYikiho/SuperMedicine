@@ -17,15 +17,27 @@ def _pubmed_engine_for(agent_id: str, allowed: bool) -> PermissionEngine:
     policy_dir = Path(tempfile.mkdtemp()) / "policies"
     policy_dir.mkdir()
     permissions = {
-        "allowed": [{"action": "rag.external.query", "scope": "https://eutils.ncbi.nlm.nih.gov/*"}] if allowed else [],
+        "allowed": [
+            {
+                "action": "rag.external.query",
+                "scope": "https://eutils.ncbi.nlm.nih.gov/*",
+            }
+        ]
+        if allowed
+        else [],
         "denied": [] if allowed else [{"action": "rag.external.query", "scope": "*"}],
         "hard_limits": {"network_access": True, "external_api": True},
     }
-    (policy_dir / PermissionEngine.DEFAULT_POLICY_FILENAME).write_text(yaml.dump({
-        "agent_id": agent_id,
-        "role": "rag-test",
-        "permissions": permissions,
-    }), encoding="utf-8")
+    (policy_dir / PermissionEngine.DEFAULT_POLICY_FILENAME).write_text(
+        yaml.dump(
+            {
+                "agent_id": agent_id,
+                "role": "rag-test",
+                "permissions": permissions,
+            }
+        ),
+        encoding="utf-8",
+    )
     return PermissionEngine(policy_dir, policy_dir / "audit.jsonl")
 
 
@@ -58,7 +70,13 @@ class TestLocalRAGProvider:
     def test_context_key_rejects_path_traversal(self, tmp_path):
         provider = LocalRAGProvider(tmp_path)
 
-        for key in ("../escape", "..\\escape", "/tmp/escape", "C:\\escape", "nested/key"):
+        for key in (
+            "../escape",
+            "..\\escape",
+            "/tmp/escape",
+            "C:\\escape",
+            "nested/key",
+        ):
             try:
                 provider.store_context(key, {"blocked": True})
                 assert False, f"unsafe key should be rejected: {key}"
@@ -86,8 +104,10 @@ class TestPubmedRAGProvider:
 
     def test_query_empty_result_on_failure(self):
         """API 失败时返回空结果"""
-        provider = PubmedRAGProvider(permission_engine=_pubmed_engine_for("alpha", True), agent_id="alpha")
-        with patch.object(provider, '_search', side_effect=Exception("network error")):
+        provider = PubmedRAGProvider(
+            permission_engine=_pubmed_engine_for("alpha", True), agent_id="alpha"
+        )
+        with patch.object(provider, "_search", side_effect=Exception("network error")):
             result = provider.query("test query")
             assert result["results"] == []
             assert result["relevance_scores"] == []
@@ -97,7 +117,9 @@ class TestPubmedRAGProvider:
 
     def test_query_with_mock_results(self):
         """模拟 API 返回结果"""
-        provider = PubmedRAGProvider(permission_engine=_pubmed_engine_for("alpha", True), agent_id="alpha")
+        provider = PubmedRAGProvider(
+            permission_engine=_pubmed_engine_for("alpha", True), agent_id="alpha"
+        )
 
         # Mock _search 返回一些 PMIDs
         mock_ids = ["12345", "67890"]
@@ -124,8 +146,8 @@ class TestPubmedRAGProvider:
             },
         ]
 
-        with patch.object(provider, '_search', return_value=mock_ids):
-            with patch.object(provider, '_fetch', return_value=mock_articles):
+        with patch.object(provider, "_search", return_value=mock_ids):
+            with patch.object(provider, "_fetch", return_value=mock_articles):
                 result = provider.query("test query")
 
         assert len(result["results"]) == 2
@@ -148,8 +170,10 @@ class TestPubmedRAGProvider:
 
     def test_empty_search(self):
         """空搜索结果"""
-        provider = PubmedRAGProvider(permission_engine=_pubmed_engine_for("alpha", True), agent_id="alpha")
-        with patch.object(provider, '_search', return_value=[]):
+        provider = PubmedRAGProvider(
+            permission_engine=_pubmed_engine_for("alpha", True), agent_id="alpha"
+        )
+        with patch.object(provider, "_search", return_value=[]):
             result = provider.query("no results query")
             assert result["results"] == []
             assert result["source_metadata"] == []
@@ -158,15 +182,25 @@ class TestPubmedRAGProvider:
         """PubMed external HTTP access is policy-gated when an engine is supplied."""
         policies = tmp_path / "policies"
         policies.mkdir()
-        (policies / PermissionEngine.DEFAULT_POLICY_FILENAME).write_text(yaml.dump({
-            "agent_id": "alpha",
-            "role": "restricted",
-            "permissions": {"allowed": [], "denied": [{"action": "rag.external.query", "scope": "*"}]},
-        }), encoding="utf-8")
+        (policies / PermissionEngine.DEFAULT_POLICY_FILENAME).write_text(
+            yaml.dump(
+                {
+                    "agent_id": "alpha",
+                    "role": "restricted",
+                    "permissions": {
+                        "allowed": [],
+                        "denied": [{"action": "rag.external.query", "scope": "*"}],
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
         engine = PermissionEngine(policies, tmp_path / "audit.jsonl")
         provider = PubmedRAGProvider(permission_engine=engine, agent_id="alpha")
 
-        with patch.object(provider, '_search', side_effect=AssertionError("HTTP path should not run")):
+        with patch.object(
+            provider, "_search", side_effect=AssertionError("HTTP path should not run")
+        ):
             result = provider.query("blocked")
 
         assert result["status"] == "denied"
@@ -176,16 +210,22 @@ class TestPubmedRAGProvider:
     def test_pubmed_external_query_requires_permission_engine_before_http(self):
         provider = PubmedRAGProvider()
 
-        with patch.object(provider, '_search', side_effect=AssertionError("HTTP path should not run")):
+        with patch.object(
+            provider, "_search", side_effect=AssertionError("HTTP path should not run")
+        ):
             result = provider.query("blocked")
 
         assert result["status"] == "denied"
         assert result["errors"][0]["code"] == "permission_engine_required"
 
     def test_pubmed_external_query_requires_agent_identity_before_http(self):
-        provider = PubmedRAGProvider(permission_engine=_pubmed_engine_for("alpha", True))
+        provider = PubmedRAGProvider(
+            permission_engine=_pubmed_engine_for("alpha", True)
+        )
 
-        with patch.object(provider, '_search', side_effect=AssertionError("HTTP path should not run")):
+        with patch.object(
+            provider, "_search", side_effect=AssertionError("HTTP path should not run")
+        ):
             result = provider.query("blocked")
 
         assert result["status"] == "denied"
@@ -233,11 +273,15 @@ class TestMockExternalVectorStoreProvider:
         assert result["items"][0]["id"] == "doc-1"
         assert result["items"][0]["title"] == "Hypertension review"
         assert result["items"][0]["score"] > 0
-        assert result["items"][0]["snippet"] == "hypertension diabetes cardiovascular risk"
+        assert (
+            result["items"][0]["snippet"] == "hypertension diabetes cardiovascular risk"
+        )
         assert result["results"] == ["hypertension diabetes cardiovascular risk"]
 
     def test_missing_config_is_structured_error(self):
-        provider = MockExternalVectorStoreProvider(RAGProviderConfig(provider_type="external_vector"))
+        provider = MockExternalVectorStoreProvider(
+            RAGProviderConfig(provider_type="external_vector")
+        )
 
         result = provider.query("anything")
 
@@ -260,7 +304,9 @@ class TestMockExternalVectorStoreProvider:
 
     def test_timeout_and_empty_results_are_observable(self):
         timeout_provider = MockExternalVectorStoreProvider(
-            RAGProviderConfig(endpoint="mock://vector-store", index_name="idx", timeout_seconds=0),
+            RAGProviderConfig(
+                endpoint="mock://vector-store", index_name="idx", timeout_seconds=0
+            ),
             records=[{"id": "doc-1", "text": "content"}],
         )
         timeout_result = timeout_provider.query("content")
@@ -277,7 +323,9 @@ class TestMockExternalVectorStoreProvider:
 
     def test_resource_error_for_excessive_timeout(self):
         provider = MockExternalVectorStoreProvider(
-            RAGProviderConfig(endpoint="mock://vector-store", index_name="idx", timeout_seconds=121)
+            RAGProviderConfig(
+                endpoint="mock://vector-store", index_name="idx", timeout_seconds=121
+            )
         )
 
         result = provider.query("content")
@@ -298,9 +346,18 @@ class TestMockExternalVectorStoreProvider:
                 endpoint="mock://vector-store",
                 index_name="idx",
                 api_key_env="SM_RAG_API_KEY",
-                metadata={sensitive_key: raw_value, "nested": {token_key: nested_value}},
+                metadata={
+                    sensitive_key: raw_value,
+                    "nested": {token_key: nested_value},
+                },
             ),
-            records=[{"id": "doc-1", "text": f"{sensitive_key}={record_value} content", "metadata": {password_key: raw_value}}],
+            records=[
+                {
+                    "id": "doc-1",
+                    "text": f"{sensitive_key}={record_value} content",
+                    "metadata": {password_key: raw_value},
+                }
+            ],
         )
 
         result = provider.query("content")
@@ -313,7 +370,13 @@ class TestMockExternalVectorStoreProvider:
         assert "[REDACTED]" in serialized
 
     def test_skill_doc_does_not_instantiate_abstract_provider(self):
-        doc_path = __import__("pathlib").Path(__file__).parent.parent / "adapters" / "opencode" / "skills" / "rag-query.md"
+        doc_path = (
+            __import__("pathlib").Path(__file__).parent.parent
+            / "adapters"
+            / "opencode"
+            / "skills"
+            / "rag-query.md"
+        )
         content = doc_path.read_text(encoding="utf-8")
 
         assert "RAGProvider()" not in content

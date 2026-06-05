@@ -4,6 +4,7 @@ Interface boundary: deterministic test fixture path only. This simplified
 gradient path is not a production-grade, clinical-grade, or regulatory survival
 analysis engine.
 """
+
 from __future__ import annotations
 
 import math
@@ -15,6 +16,7 @@ from plugins.tools._common import normal_cdf
 @dataclass
 class CoxResult:
     """Cox 模型结果"""
+
     coefficients: list[float]
     hazard_ratios: list[float]
     standard_errors: list[float]
@@ -74,10 +76,7 @@ def cox_ph(
         for idx in sorted_indices:
             if events[idx] == 1:
                 # 计算风险集
-                risk_set = [
-                    i for i in sorted_indices
-                    if times[i] >= times[idx]
-                ]
+                risk_set = [i for i in sorted_indices if times[i] >= times[idx]]
 
                 # 计算 Exp(Beta * X)
                 exp_bx = [_exp_dot(beta, covariates, i) for i in risk_set]
@@ -98,7 +97,9 @@ def cox_ph(
                 for k in range(n_covs):
                     gradient[k] += covariates[k][idx] - weighted_x[k]
                     for m in range(n_covs):
-                        hessian[k][m] += weighted_xx[k][m] - weighted_x[k] * weighted_x[m]
+                        hessian[k][m] += (
+                            weighted_xx[k][m] - weighted_x[k] * weighted_x[m]
+                        )
 
         # Newton-Raphson 更新
         # 简化：使用梯度下降
@@ -116,7 +117,7 @@ def cox_ph(
         if hessian[k][k] > 0:
             se[k] = 1.0 / math.sqrt(hessian[k][k])
         else:
-            se[k] = float('inf')
+            se[k] = float("inf")
 
     # 计算风险比、置信区间、p 值
     hazard_ratios = [math.exp(b) for b in beta]
@@ -158,4 +159,3 @@ def _exp_dot(beta: list[float], covariates: list[list[float]], idx: int) -> floa
     """计算 Exp(Beta . X)"""
     dot = sum(b * covariates[k][idx] for k, b in enumerate(beta))
     return math.exp(dot)
-

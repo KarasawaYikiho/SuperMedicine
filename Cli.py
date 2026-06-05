@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """SuperMedicine CLI 入口"""
+
 from __future__ import annotations
 
 import argparse
@@ -32,6 +33,7 @@ def _configure_stdio_errors() -> None:
             reconfigure(errors="backslashreplace")
         except (AttributeError, TypeError, ValueError):
             continue
+
 
 # 添加项目根目录到路径
 sys.path.insert(0, str(Path(__file__).parent))
@@ -71,7 +73,6 @@ def _load_release_exe_to_desktop():
     return release_exe_to_desktop
 
 
-
 class CLI:
     """SuperMedicine CLI"""
 
@@ -96,7 +97,13 @@ class CLI:
         """初始化项目"""
         from installer.entrypoint import init_config
 
-        init_config(project_dir, provider=provider, base_url=base_url, api_key=api_key, model=model)
+        init_config(
+            project_dir,
+            provider=provider,
+            base_url=base_url,
+            api_key=api_key,
+            model=model,
+        )
         logger.info("项目已初始化: %s", project_dir / ".supermedicine")
         if release_exe is not None:
             release_exe_to_desktop = _load_release_exe_to_desktop()
@@ -107,7 +114,11 @@ class CLI:
                 overwrite=exe_overwrite,
                 dry_run=exe_dry_run,
             )
-            logger.info("桌面 Exe 释放结果: status=%s target=%s", result["status"], result["target_path"])
+            logger.info(
+                "桌面 Exe 释放结果: status=%s target=%s",
+                result["status"],
+                result["target_path"],
+            )
 
     def status(self) -> None:
         """显示项目状态"""
@@ -136,6 +147,7 @@ class CLI:
     def test(self) -> None:
         """运行测试"""
         import subprocess
+
         result = subprocess.run(
             [sys.executable, "-m", "pytest", "tests/", "-v"],
             cwd=Path(__file__).parent,
@@ -205,7 +217,9 @@ class CLI:
             for p in plugins:
                 logger.info("     - %s (%s)", p.name, p.type)
 
-        result = kernel.execute_task(task, plugin_name=plugin, action=action, params=execution_params)
+        result = kernel.execute_task(
+            task, plugin_name=plugin, action=action, params=execution_params
+        )
         if verbose:
             logger.info(
                 "[STATE] agent=%s task=%s plugin=%s action=%s status=%s",
@@ -333,7 +347,9 @@ class CLI:
         """List workspace-local tools grouped by language."""
         from core.workspace_tools import WorkspaceToolService
 
-        result = WorkspaceToolService(Path.cwd()).list_tools(workspace_id, language=language)
+        result = WorkspaceToolService(Path.cwd()).list_tools(
+            workspace_id, language=language
+        )
         _log_json(result)
         return result
 
@@ -341,7 +357,9 @@ class CLI:
         """Scaffold a built-in workspace-local tool."""
         from core.workspace_tools import WorkspaceToolService
 
-        result = WorkspaceToolService(Path.cwd()).add_builtin_tool(workspace_id, language, tool_id)
+        result = WorkspaceToolService(Path.cwd()).add_builtin_tool(
+            workspace_id, language, tool_id
+        )
         _log_json(result)
         return result
 
@@ -349,7 +367,9 @@ class CLI:
         """Show one workspace-local tool manifest."""
         from core.workspace_tools import WorkspaceToolService
 
-        result = WorkspaceToolService(Path.cwd()).show_tool(workspace_id, language, tool_id)
+        result = WorkspaceToolService(Path.cwd()).show_tool(
+            workspace_id, language, tool_id
+        )
         _log_json(result)
         return result
 
@@ -366,14 +386,18 @@ class CLI:
         """Prepare a guarded workspace-local tool invocation without unsafe execution."""
         from core.workspace_tools import WorkspaceToolService
 
-        result = WorkspaceToolService(Path.cwd()).prepare_invocation(
-            workspace_id,
-            language,
-            tool_id,
-            dry_run=dry_run,
-            input_path=input_path,
-            output_path=output_path,
-        ).to_dict()
+        result = (
+            WorkspaceToolService(Path.cwd())
+            .prepare_invocation(
+                workspace_id,
+                language,
+                tool_id,
+                dry_run=dry_run,
+                input_path=input_path,
+                output_path=output_path,
+            )
+            .to_dict()
+        )
         _log_json(result)
         return result
 
@@ -403,7 +427,10 @@ class CLI:
             timeout=timeout,
             headers=headers,
         )
-        manager = LLMConfigManager(ConfigCenter(Path.cwd() / ".supermedicine" / "config.yaml"), restore_on_startup=False)
+        manager = LLMConfigManager(
+            ConfigCenter(Path.cwd() / ".supermedicine" / "config.yaml"),
+            restore_on_startup=False,
+        )
         result = manager.add_provider(provider, values, set_current=set_current)
         _log_json(result)
         return result
@@ -413,7 +440,10 @@ class CLI:
         from core.config_center import ConfigCenter
         from core.llm_manager import LLMConfigManager
 
-        manager = LLMConfigManager(ConfigCenter(Path.cwd() / ".supermedicine" / "config.yaml"), restore_on_startup=False)
+        manager = LLMConfigManager(
+            ConfigCenter(Path.cwd() / ".supermedicine" / "config.yaml"),
+            restore_on_startup=False,
+        )
         config = manager._config
         result = {
             "current_provider": config.get_llm_current_provider_name(),
@@ -428,8 +458,15 @@ class CLI:
         from core.config_center import ConfigCenter
         from core.llm_manager import LLMConfigManager
 
-        manager = LLMConfigManager(ConfigCenter(Path.cwd() / ".supermedicine" / "config.yaml"), restore_on_startup=True)
-        result = manager.get_provider(provider, redacted=True) if provider else manager.get_current_provider(redacted=True)
+        manager = LLMConfigManager(
+            ConfigCenter(Path.cwd() / ".supermedicine" / "config.yaml"),
+            restore_on_startup=True,
+        )
+        result = (
+            manager.get_provider(provider, redacted=True)
+            if provider
+            else manager.get_current_provider(redacted=True)
+        )
         _log_json(result)
         return result
 
@@ -438,7 +475,10 @@ class CLI:
         from core.config_center import ConfigCenter
         from core.llm_manager import LLMConfigManager
 
-        manager = LLMConfigManager(ConfigCenter(Path.cwd() / ".supermedicine" / "config.yaml"), restore_on_startup=False)
+        manager = LLMConfigManager(
+            ConfigCenter(Path.cwd() / ".supermedicine" / "config.yaml"),
+            restore_on_startup=False,
+        )
         result = manager.switch_provider(provider, save=True)
         _log_json(result)
         return result
@@ -499,10 +539,14 @@ class CLI:
         if enrich:
             audit_log = project_dir / ".supermedicine" / "policies" / "audit.jsonl"
             enricher = PaperEnricher(
-                PermissionEngine(project_dir / ".supermedicine" / "policies", audit_log),
+                PermissionEngine(
+                    project_dir / ".supermedicine" / "policies", audit_log
+                ),
                 AuditLogger(audit_log),
             )
-            enrichment_result = enricher.enrich(import_result.metadata, confirmed=confirm_enrich)
+            enrichment_result = enricher.enrich(
+                import_result.metadata, confirmed=confirm_enrich
+            )
             if enrichment_result.status == "enriched":
                 importer.save_paper_metadata(workspace_id, enrichment_result.metadata)
             if enrichment_result.warning:
@@ -516,7 +560,10 @@ class CLI:
         """List papers from an explicitly selected workspace."""
         from core.paper_import.importer import PaperImporter
 
-        papers = [_paper_metadata_to_dict(paper) for paper in PaperImporter(Path.cwd()).list_papers(workspace_id)]
+        papers = [
+            _paper_metadata_to_dict(paper)
+            for paper in PaperImporter(Path.cwd()).list_papers(workspace_id)
+        ]
         _log_json(papers)
         return papers
 
@@ -524,7 +571,9 @@ class CLI:
         """Show one imported paper from an explicitly selected workspace."""
         from core.paper_import.importer import PaperImporter
 
-        result = _paper_metadata_to_dict(PaperImporter(Path.cwd()).get_paper(workspace_id, paper_id))
+        result = _paper_metadata_to_dict(
+            PaperImporter(Path.cwd()).get_paper(workspace_id, paper_id)
+        )
         _log_json(result)
         return result
 
@@ -533,12 +582,16 @@ class CLI:
         from core.paper_import.importer import PaperImporter
 
         result = _paper_metadata_to_dict(
-            PaperImporter(Path.cwd()).update_paper_metadata(workspace_id, paper_id, metadata)
+            PaperImporter(Path.cwd()).update_paper_metadata(
+                workspace_id, paper_id, metadata
+            )
         )
         _log_json(result)
         return result
 
-    def paper_enrich(self, workspace_id: str, paper_id: str, confirm_enrich: bool) -> dict:
+    def paper_enrich(
+        self, workspace_id: str, paper_id: str, confirm_enrich: bool
+    ) -> dict:
         """Enrich one imported paper after explicit confirmation and permission approval."""
         from core.paper_import.enrichment import PaperEnricher
         from core.paper_import.importer import PaperImporter
@@ -574,12 +627,16 @@ class CLI:
         """Suggest an experience classification without persisting anything."""
         from core.experience import ExperienceStore
 
-        result = ExperienceStore(Path.cwd()).suggest_classification(
-            workspace_id=workspace_id,
-            title=title,
-            summary=summary,
-            tags=tags,
-        ).to_dict()
+        result = (
+            ExperienceStore(Path.cwd())
+            .suggest_classification(
+                workspace_id=workspace_id,
+                title=title,
+                summary=summary,
+                tags=tags,
+            )
+            .to_dict()
+        )
         result["workspace_id"] = workspace_id
         _log_json(result)
         return result
@@ -610,18 +667,25 @@ class CLI:
         _log_json(result)
         return result
 
-    def experience_list(self, workspace_id: str, include_general: bool = False) -> list[dict]:
+    def experience_list(
+        self, workspace_id: str, include_general: bool = False
+    ) -> list[dict]:
         """List experiences visible from an explicit workspace context."""
         from core.experience import ExperienceStore
 
-        records = [record.to_dict() for record in ExperienceStore(Path.cwd()).list_experiences(
-            workspace_id,
-            include_general=include_general,
-        )]
+        records = [
+            record.to_dict()
+            for record in ExperienceStore(Path.cwd()).list_experiences(
+                workspace_id,
+                include_general=include_general,
+            )
+        ]
         _log_json(records)
         return records
 
-    def experience_view(self, record_id: str, workspace_id: str, scope: str | None = None) -> dict:
+    def experience_view(
+        self, record_id: str, workspace_id: str, scope: str | None = None
+    ) -> dict:
         """View one visible experience by id."""
         from core.experience import ExperienceStore
 
@@ -660,7 +724,9 @@ class CLI:
         _log_json(result)
         return result
 
-    def experience_delete(self, record_id: str, workspace_id: str, scope: str, confirm: str) -> dict:
+    def experience_delete(
+        self, record_id: str, workspace_id: str, scope: str, confirm: str
+    ) -> dict:
         """Delete one experience after exact id confirmation."""
         from core.experience import ExperienceStore
 
@@ -698,11 +764,17 @@ class CLI:
 
     def experiment_start(self, protocol: str, session_id: str | None = None) -> dict:
         """Start a standalone experiment guide session and persist it as JSON."""
-        from core.experiment_guide import ExperimentGuide, MEDICAL_BOUNDARY, append_experiment_log_event
+        from core.experiment_guide import (
+            ExperimentGuide,
+            MEDICAL_BOUNDARY,
+            append_experiment_log_event,
+        )
         from core.log_report import LogReportStore
 
         session = ExperimentGuide().create_session(protocol, session_id=session_id)
-        session_file = Path.cwd() / ".supermedicine" / "experiments" / f"{session.session_id}.json"
+        session_file = (
+            Path.cwd() / ".supermedicine" / "experiments" / f"{session.session_id}.json"
+        )
         _save_experiment_session(session_file, session.to_dict())
         append_experiment_log_event(
             LogReportStore(Path.cwd()),
@@ -710,7 +782,9 @@ class CLI:
             session,
             message="experiment guide session started",
         )
-        result = _experiment_response(session, session_file=session_file, medical_boundary=MEDICAL_BOUNDARY)
+        result = _experiment_response(
+            session, session_file=session_file, medical_boundary=MEDICAL_BOUNDARY
+        )
         _log_json(result)
         return result
 
@@ -720,7 +794,9 @@ class CLI:
 
         path = Path(session_file)
         session = ExperimentGuide().restore_session(_load_experiment_session(path))
-        result = _experiment_response(session, session_file=path, medical_boundary=MEDICAL_BOUNDARY)
+        result = _experiment_response(
+            session, session_file=path, medical_boundary=MEDICAL_BOUNDARY
+        )
         _log_json(result)
         return result
 
@@ -733,7 +809,12 @@ class CLI:
         calculate: bool = False,
     ) -> dict:
         """Submit data for the current experiment step, optionally running WB calculation."""
-        from core.experiment_guide import CalculationResult, ExperimentGuide, MEDICAL_BOUNDARY, append_experiment_log_event
+        from core.experiment_guide import (
+            CalculationResult,
+            ExperimentGuide,
+            MEDICAL_BOUNDARY,
+            append_experiment_log_event,
+        )
         from core.log_report import LogReportStore
         from plugins.tools.experiment_wb import main as wb_plugin
 
@@ -743,20 +824,32 @@ class CLI:
         payload = _load_input_json(input_json)
         user_input = _dict_payload(payload.get("user_input", payload), "user_input")
         outputs = _dict_payload(payload.get("outputs", {}), "outputs")
-        calculation_params = _dict_payload(payload.get("calculation_params", {}), "calculation_params")
+        calculation_params = _dict_payload(
+            payload.get("calculation_params", {}), "calculation_params"
+        )
         log_store = LogReportStore(Path.cwd())
         calculation_results: list[CalculationResult | dict[str, Any]] = []
         plugin_request: dict[str, Any] | None = None
         kernel_result: dict[str, Any] | None = None
 
         if calculate:
-            requests = session.build_plugin_requests(step_id, calculation_params=calculation_params)
+            requests = session.build_plugin_requests(
+                step_id, calculation_params=calculation_params
+            )
             if not requests:
-                raise ValueError(f"step {step_id} has no supported WB calculation request")
+                raise ValueError(
+                    f"step {step_id} has no supported WB calculation request"
+                )
             plugin_request = requests[0]
-            kernel_result = wb_plugin.execute(plugin_request["action"], plugin_request["params"], plugin_request["metadata"])
+            kernel_result = wb_plugin.execute(
+                plugin_request["action"],
+                plugin_request["params"],
+                plugin_request["metadata"],
+            )
             if kernel_result.get("status") != "success":
-                raise ValueError(str(kernel_result.get("error") or "WB calculation failed"))
+                raise ValueError(
+                    str(kernel_result.get("error") or "WB calculation failed")
+                )
             append_experiment_log_event(
                 log_store,
                 "plugin_result",
@@ -849,7 +942,10 @@ def _workspace_info_to_dict(info, name: str | None = None) -> dict:
     metadata_path = info.path / "workspace.yaml"
     if metadata_path.is_file():
         raw_metadata = yaml.safe_load(metadata_path.read_text(encoding="utf-8")) or {}
-        if isinstance(raw_metadata, dict) and raw_metadata.get("display_name") is not None:
+        if (
+            isinstance(raw_metadata, dict)
+            and raw_metadata.get("display_name") is not None
+        ):
             metadata["display_name"] = str(raw_metadata["display_name"])
     data = {
         "id": info.id,
@@ -889,10 +985,14 @@ def _paper_metadata_to_dict(metadata) -> dict:
     return json_ready(metadata)
 
 
-def _paper_import_result_to_dict(import_result, warnings: list[str] | None = None) -> dict:
+def _paper_import_result_to_dict(
+    import_result, warnings: list[str] | None = None
+) -> dict:
     return {
         "metadata": _paper_metadata_to_dict(import_result.metadata),
-        "source_path": str(import_result.source_path) if import_result.source_path else None,
+        "source_path": str(import_result.source_path)
+        if import_result.source_path
+        else None,
         "warnings": warnings if warnings is not None else list(import_result.warnings),
         "duplicate": import_result.duplicate,
         "duplicate_reason": import_result.duplicate_reason,
@@ -948,7 +1048,9 @@ def _load_experiment_session(path: Path) -> dict:
     except FileNotFoundError as exc:
         raise ValueError(f"experiment session file not found: {path}") from exc
     except (OSError, json.JSONDecodeError) as exc:
-        raise ValueError(f"could not read experiment session file {path}: {exc}") from exc
+        raise ValueError(
+            f"could not read experiment session file {path}: {exc}"
+        ) from exc
     if not isinstance(data, dict):
         raise ValueError("experiment session file must contain a JSON object")
     return data
@@ -956,7 +1058,10 @@ def _load_experiment_session(path: Path) -> dict:
 
 def _save_experiment_session(path: Path, data: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(json_ready(redact_sensitive(data)), ensure_ascii=False, indent=2), encoding="utf-8")
+    path.write_text(
+        json.dumps(json_ready(redact_sensitive(data)), ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
 
 
 def _experiment_response(
@@ -970,7 +1075,9 @@ def _experiment_response(
 ) -> dict:
     next_step = session.current_step
     return {
-        "status": session.status.value if hasattr(session.status, "value") else str(session.status),
+        "status": session.status.value
+        if hasattr(session.status, "value")
+        else str(session.status),
         "session_file": str(session_file),
         "session": session.to_dict(),
         "current_step": next_step.to_dict() if next_step else None,
@@ -995,7 +1102,9 @@ def _load_params_file(path: str) -> dict:
         raise ValueError(f"--params-file {params_path}: {exc}") from exc
 
 
-def _resolve_run_params(params_json: str | None, params_file: str | None) -> dict | None:
+def _resolve_run_params(
+    params_json: str | None, params_file: str | None
+) -> dict | None:
     """Resolve optional structured params for the run command."""
     if params_json and params_file:
         raise ValueError("--params-json and --params-file cannot be used together")
@@ -1006,7 +1115,9 @@ def _resolve_run_params(params_json: str | None, params_file: str | None) -> dic
     return None
 
 
-def _parse_llm_headers(header_items: list[str] | None, headers_json: str | None) -> dict[str, str]:
+def _parse_llm_headers(
+    header_items: list[str] | None, headers_json: str | None
+) -> dict[str, str]:
     """Resolve LLM headers from repeated key=value args and optional JSON object."""
     headers: dict[str, str] = {}
     if headers_json:
@@ -1057,7 +1168,6 @@ def _llm_provider_values(
 
 def main(argv: list[str] | None = None) -> None:
     _configure_stdio_errors()
-    logging.basicConfig(level=logging.INFO, format='%(message)s')
     parser = argparse.ArgumentParser(
         prog="supermedicine",
         description="SuperMedicine - 模块化医学科研 Agent 框架",
@@ -1067,15 +1177,53 @@ def main(argv: list[str] | None = None) -> None:
     # Init 命令
     init_parser = subparsers.add_parser("init", help="初始化项目；可选释放桌面 Exe")
     init_parser.add_argument("--dir", type=str, default=".", help="项目目录")
-    init_parser.add_argument("--provider", type=str, default=None, help="LLM provider（openai、anthropic 或自定义 OpenAI-compatible provider）")
-    init_parser.add_argument("--base-url", type=str, default=None, help="LLM provider BaseURL；也可使用 SM_LLM_BASE_URL")
-    init_parser.add_argument("--api-key", type=str, default=None, help="LLM provider API key；也可使用 SM_LLM_API_KEY 或 provider 专用环境变量")
-    init_parser.add_argument("--model", type=str, default=None, help="默认 LLM model；也可使用 SM_LLM_MODEL")
-    init_parser.add_argument("--release-exe", type=Path, default=None, help="初始化后将指定 Exe 释放到桌面；未提供时不会复制 Exe")
-    init_parser.add_argument("--desktop-dir", type=Path, default=None, help="桌面目录覆盖；测试/CI 应使用临时目录或 --exe-dry-run 避免真实桌面写入")
-    init_parser.add_argument("--exe-target-name", type=str, default=None, help="桌面 Exe 文件名；默认使用源文件名，自动规范为 .exe")
-    init_parser.add_argument("--exe-overwrite", action="store_true", help="覆盖已存在的桌面 Exe；默认目标存在时跳过")
-    init_parser.add_argument("--exe-dry-run", action="store_true", help="仅报告桌面 Exe 释放动作，不复制文件")
+    init_parser.add_argument(
+        "--provider",
+        type=str,
+        default=None,
+        help="LLM provider（openai、anthropic 或自定义 OpenAI-compatible provider）",
+    )
+    init_parser.add_argument(
+        "--base-url",
+        type=str,
+        default=None,
+        help="LLM provider BaseURL；也可使用 SM_LLM_BASE_URL",
+    )
+    init_parser.add_argument(
+        "--api-key",
+        type=str,
+        default=None,
+        help="LLM provider API key；也可使用 SM_LLM_API_KEY 或 provider 专用环境变量",
+    )
+    init_parser.add_argument(
+        "--model", type=str, default=None, help="默认 LLM model；也可使用 SM_LLM_MODEL"
+    )
+    init_parser.add_argument(
+        "--release-exe",
+        type=Path,
+        default=None,
+        help="初始化后将指定 Exe 释放到桌面；未提供时不会复制 Exe",
+    )
+    init_parser.add_argument(
+        "--desktop-dir",
+        type=Path,
+        default=None,
+        help="桌面目录覆盖；测试/CI 应使用临时目录或 --exe-dry-run 避免真实桌面写入",
+    )
+    init_parser.add_argument(
+        "--exe-target-name",
+        type=str,
+        default=None,
+        help="桌面 Exe 文件名；默认使用源文件名，自动规范为 .exe",
+    )
+    init_parser.add_argument(
+        "--exe-overwrite",
+        action="store_true",
+        help="覆盖已存在的桌面 Exe；默认目标存在时跳过",
+    )
+    init_parser.add_argument(
+        "--exe-dry-run", action="store_true", help="仅报告桌面 Exe 释放动作，不复制文件"
+    )
 
     # Status 命令
     subparsers.add_parser("status", help="显示项目状态")
@@ -1091,7 +1239,9 @@ def main(argv: list[str] | None = None) -> None:
         help="启动中文 TUI 工作台",
         description="启动中文 TUI 工作台；数字键 1-0 切换模块，Tab/Shift+Tab 移动焦点，Enter 提交或激活，? 帮助，F 最大化，Q 退出。",
     )
-    tui_parser.add_argument("--dry-run", action="store_true", help="输出中文 TUI 就绪状态，不启动交互界面")
+    tui_parser.add_argument(
+        "--dry-run", action="store_true", help="输出中文 TUI 就绪状态，不启动交互界面"
+    )
 
     # Run 命令
     run_parser = subparsers.add_parser("run", help="执行任务")
@@ -1099,48 +1249,89 @@ def main(argv: list[str] | None = None) -> None:
     run_parser.add_argument("--verbose", action="store_true", help="详细输出")
     run_parser.add_argument("--plugin", type=str, default=None, help="指定插件名称")
     run_parser.add_argument("--action", type=str, default=None, help="指定插件动作")
-    run_parser.add_argument("--params-json", type=str, default=None, help="JSON 对象格式的插件参数")
-    run_parser.add_argument("--params-file", type=str, default=None, help="包含 JSON 对象插件参数的文件路径")
-    run_parser.add_argument("--workspace", type=str, default=None, help="显式工作区 slug ID（workspaces/<id>；不会读取 TUI 最近状态）")
+    run_parser.add_argument(
+        "--params-json", type=str, default=None, help="JSON 对象格式的插件参数"
+    )
+    run_parser.add_argument(
+        "--params-file", type=str, default=None, help="包含 JSON 对象插件参数的文件路径"
+    )
+    run_parser.add_argument(
+        "--workspace",
+        type=str,
+        default=None,
+        help="显式工作区 slug ID（workspaces/<id>；不会读取 TUI 最近状态）",
+    )
 
     experiment_parser = subparsers.add_parser("experiment", help="实验指导器命令")
     experiment_subparsers = experiment_parser.add_subparsers(dest="experiment_command")
 
-    experiment_start_parser = experiment_subparsers.add_parser("start", help="启动实验指导会话")
-    experiment_start_parser.add_argument("--protocol", required=True, choices=["wb"], help="实验协议")
-    experiment_start_parser.add_argument("--session-id", type=str, default=None, help="可选会话 ID")
+    experiment_start_parser = experiment_subparsers.add_parser(
+        "start", help="启动实验指导会话"
+    )
+    experiment_start_parser.add_argument(
+        "--protocol", required=True, choices=["wb"], help="实验协议"
+    )
+    experiment_start_parser.add_argument(
+        "--session-id", type=str, default=None, help="可选会话 ID"
+    )
 
-    experiment_show_parser = experiment_subparsers.add_parser("show", help="查看实验会话当前步骤/状态")
-    experiment_show_parser.add_argument("--session-file", required=True, type=str, help="实验会话 JSON 文件")
+    experiment_show_parser = experiment_subparsers.add_parser(
+        "show", help="查看实验会话当前步骤/状态"
+    )
+    experiment_show_parser.add_argument(
+        "--session-file", required=True, type=str, help="实验会话 JSON 文件"
+    )
 
-    experiment_submit_parser = experiment_subparsers.add_parser("submit", help="提交当前步骤实验数据")
-    experiment_submit_parser.add_argument("--session-file", required=True, type=str, help="实验会话 JSON 文件")
-    experiment_submit_parser.add_argument("--step", required=True, type=str, help="当前步骤 ID")
-    experiment_submit_parser.add_argument("--input-json", required=True, type=str, help="步骤输入 JSON 对象")
-    experiment_submit_parser.add_argument("--calculate", action="store_true", help="触发支持的 WB 插件计算")
+    experiment_submit_parser = experiment_subparsers.add_parser(
+        "submit", help="提交当前步骤实验数据"
+    )
+    experiment_submit_parser.add_argument(
+        "--session-file", required=True, type=str, help="实验会话 JSON 文件"
+    )
+    experiment_submit_parser.add_argument(
+        "--step", required=True, type=str, help="当前步骤 ID"
+    )
+    experiment_submit_parser.add_argument(
+        "--input-json", required=True, type=str, help="步骤输入 JSON 对象"
+    )
+    experiment_submit_parser.add_argument(
+        "--calculate", action="store_true", help="触发支持的 WB 插件计算"
+    )
 
     log_parser = subparsers.add_parser("log", help="日志报告命令")
     log_subparsers = log_parser.add_subparsers(dest="log_command")
 
     log_write_parser = log_subparsers.add_parser("write", help="写入日志报告")
     log_write_parser.add_argument("--message", required=True, type=str, help="日志消息")
-    log_write_parser.add_argument("--session-id", type=str, default=None, help="可选关联会话 ID")
+    log_write_parser.add_argument(
+        "--session-id", type=str, default=None, help="可选关联会话 ID"
+    )
     log_subparsers.add_parser("list", help="列出日志报告")
     log_show_parser = log_subparsers.add_parser("show", help="查看指定日志报告")
-    log_show_parser.add_argument("--file", required=True, type=str, help="日志报告文件名")
+    log_show_parser.add_argument(
+        "--file", required=True, type=str, help="日志报告文件名"
+    )
 
     # Workspace 命令
-    workspace_parser = subparsers.add_parser("workspace", help="管理 workspaces/<id> 显式 slug 工作区")
+    workspace_parser = subparsers.add_parser(
+        "workspace", help="管理 workspaces/<id> 显式 slug 工作区"
+    )
     workspace_subparsers = workspace_parser.add_subparsers(dest="workspace_command")
 
     workspace_init_parser = workspace_subparsers.add_parser("init", help="初始化工作区")
-    workspace_init_parser.add_argument("--workspace", required=True, type=str, help="工作区 ID")
-    workspace_init_parser.add_argument("--name", type=str, default=None, help="显示名称")
+    workspace_init_parser.add_argument(
+        "--workspace", required=True, type=str, help="工作区 ID"
+    )
+    workspace_init_parser.add_argument(
+        "--name", type=str, default=None, help="显示名称"
+    )
 
     workspace_subparsers.add_parser("list", help="列出工作区")
 
     workspace_show_parser = workspace_subparsers.add_parser("show", help="显示工作区")
-    workspace_show_parser.add_argument("--workspace", required=True, type=str, help="工作区 ID")
+    workspace_show_parser.add_argument(
+        "--workspace", required=True, type=str, help="工作区 ID"
+    )
 
     workspace_delete_parser = workspace_subparsers.add_parser(
         "delete",
@@ -1148,60 +1339,125 @@ def main(argv: list[str] | None = None) -> None:
         description="硬删除指定工作区；执行前会进行权限检查并写入审计记录。",
         epilog="必须提供 --confirm，且其值必须与 --workspace 完全一致。",
     )
-    workspace_delete_parser.add_argument("--workspace", required=True, type=str, help="工作区 ID")
-    workspace_delete_parser.add_argument("--confirm", required=True, type=str, help="必须与工作区 ID 完全一致")
+    workspace_delete_parser.add_argument(
+        "--workspace", required=True, type=str, help="工作区 ID"
+    )
+    workspace_delete_parser.add_argument(
+        "--confirm", required=True, type=str, help="必须与工作区 ID 完全一致"
+    )
 
     # Tool 命令（全部要求显式 --workspace；不会读取 TUI 最近状态）
     tool_parser = subparsers.add_parser("tool", help="管理工作区内 Python/R 模块化工具")
     tool_subparsers = tool_parser.add_subparsers(dest="tool_command")
 
     tool_init_parser = tool_subparsers.add_parser("init", help="初始化工作区工具目录")
-    tool_init_parser.add_argument("--workspace", required=True, type=str, help="工作区 ID")
+    tool_init_parser.add_argument(
+        "--workspace", required=True, type=str, help="工作区 ID"
+    )
 
     tool_list_parser = tool_subparsers.add_parser("list", help="列出工作区工具")
-    tool_list_parser.add_argument("--workspace", required=True, type=str, help="工作区 ID")
-    tool_list_parser.add_argument("--language", choices=["python", "r"], default=None, help="可选语言过滤")
+    tool_list_parser.add_argument(
+        "--workspace", required=True, type=str, help="工作区 ID"
+    )
+    tool_list_parser.add_argument(
+        "--language", choices=["python", "r"], default=None, help="可选语言过滤"
+    )
 
     tool_add_parser = tool_subparsers.add_parser("add", help="添加内置工具模板")
-    tool_add_parser.add_argument("--workspace", required=True, type=str, help="工作区 ID")
-    tool_add_parser.add_argument("--language", required=True, choices=["python", "r"], help="工具语言")
-    tool_add_parser.add_argument("--tool", required=True, choices=["heatmap", "umap"], help="内置工具 ID")
+    tool_add_parser.add_argument(
+        "--workspace", required=True, type=str, help="工作区 ID"
+    )
+    tool_add_parser.add_argument(
+        "--language", required=True, choices=["python", "r"], help="工具语言"
+    )
+    tool_add_parser.add_argument(
+        "--tool", required=True, choices=["heatmap", "umap"], help="内置工具 ID"
+    )
 
     tool_show_parser = tool_subparsers.add_parser("show", help="显示工具清单")
-    tool_show_parser.add_argument("--workspace", required=True, type=str, help="工作区 ID")
-    tool_show_parser.add_argument("--language", required=True, choices=["python", "r"], help="工具语言")
+    tool_show_parser.add_argument(
+        "--workspace", required=True, type=str, help="工作区 ID"
+    )
+    tool_show_parser.add_argument(
+        "--language", required=True, choices=["python", "r"], help="工具语言"
+    )
     tool_show_parser.add_argument("--tool", required=True, type=str, help="工具 ID")
 
-    tool_run_parser = tool_subparsers.add_parser("run", help="准备工具运行命令（安全基础默认不执行脚本）")
-    tool_run_parser.add_argument("--workspace", required=True, type=str, help="工作区 ID")
-    tool_run_parser.add_argument("--language", required=True, choices=["python", "r"], help="工具语言")
+    tool_run_parser = tool_subparsers.add_parser(
+        "run", help="准备工具运行命令（安全基础默认不执行脚本）"
+    )
+    tool_run_parser.add_argument(
+        "--workspace", required=True, type=str, help="工作区 ID"
+    )
+    tool_run_parser.add_argument(
+        "--language", required=True, choices=["python", "r"], help="工具语言"
+    )
     tool_run_parser.add_argument("--tool", required=True, type=str, help="工具 ID")
-    tool_run_parser.add_argument("--dry-run", action="store_true", help="只输出准备好的命令")
-    tool_run_parser.add_argument("--input", type=str, default=None, help="工作区内输入路径")
-    tool_run_parser.add_argument("--output", type=str, default=None, help="工作区内输出路径")
+    tool_run_parser.add_argument(
+        "--dry-run", action="store_true", help="只输出准备好的命令"
+    )
+    tool_run_parser.add_argument(
+        "--input", type=str, default=None, help="工作区内输入路径"
+    )
+    tool_run_parser.add_argument(
+        "--output", type=str, default=None, help="工作区内输出路径"
+    )
 
     # LLM 命令
     llm_parser = subparsers.add_parser("llm", help="管理 LLM API provider")
     llm_subparsers = llm_parser.add_subparsers(dest="llm_command")
 
-    llm_add_parser = llm_subparsers.add_parser("add", help="添加或更新 LLM API provider")
+    llm_add_parser = llm_subparsers.add_parser(
+        "add", help="添加或更新 LLM API provider"
+    )
     llm_add_parser.add_argument("provider", type=str, help="Provider 名称")
-    llm_add_parser.add_argument("--api-format", type=str, default=None, help="API 格式，如 openai 或 anthropic")
-    llm_add_parser.add_argument("--base-url", type=str, default=None, help="Provider Base URL")
-    llm_add_parser.add_argument("--api-key", type=str, default=None, help="API key；输出默认脱敏。推荐改用 --api-key-env")
-    llm_add_parser.add_argument("--api-key-env", type=str, default=None, help="读取 API key 的环境变量名；可避免命令行明文 key")
+    llm_add_parser.add_argument(
+        "--api-format", type=str, default=None, help="API 格式，如 openai 或 anthropic"
+    )
+    llm_add_parser.add_argument(
+        "--base-url", type=str, default=None, help="Provider Base URL"
+    )
+    llm_add_parser.add_argument(
+        "--api-key",
+        type=str,
+        default=None,
+        help="API key；输出默认脱敏。推荐改用 --api-key-env",
+    )
+    llm_add_parser.add_argument(
+        "--api-key-env",
+        type=str,
+        default=None,
+        help="读取 API key 的环境变量名；可避免命令行明文 key",
+    )
     llm_add_parser.add_argument("--model", type=str, default=None, help="默认模型")
-    llm_add_parser.add_argument("--timeout", type=float, default=None, help="请求超时秒数")
-    llm_add_parser.add_argument("--header", action="append", default=None, help="额外请求头 KEY=VALUE；可重复")
-    llm_add_parser.add_argument("--headers-json", type=str, default=None, help="额外请求头 JSON 对象")
-    llm_add_parser.add_argument("--set-current", action="store_true", help="添加后立即切换为当前默认 provider")
+    llm_add_parser.add_argument(
+        "--timeout", type=float, default=None, help="请求超时秒数"
+    )
+    llm_add_parser.add_argument(
+        "--header", action="append", default=None, help="额外请求头 KEY=VALUE；可重复"
+    )
+    llm_add_parser.add_argument(
+        "--headers-json", type=str, default=None, help="额外请求头 JSON 对象"
+    )
+    llm_add_parser.add_argument(
+        "--set-current", action="store_true", help="添加后立即切换为当前默认 provider"
+    )
 
     llm_subparsers.add_parser("list", help="列出 LLM provider（默认脱敏）")
 
-    llm_show_parser = llm_subparsers.add_parser("show", help="显示当前或指定 LLM provider（默认脱敏）")
-    llm_show_parser.add_argument("provider", nargs="?", default=None, help="可选 Provider 名称；缺省显示当前默认 provider")
+    llm_show_parser = llm_subparsers.add_parser(
+        "show", help="显示当前或指定 LLM provider（默认脱敏）"
+    )
+    llm_show_parser.add_argument(
+        "provider",
+        nargs="?",
+        default=None,
+        help="可选 Provider 名称；缺省显示当前默认 provider",
+    )
 
-    llm_switch_parser = llm_subparsers.add_parser("switch", help="切换当前默认 LLM provider 并持久化")
+    llm_switch_parser = llm_subparsers.add_parser(
+        "switch", help="切换当前默认 LLM provider 并持久化"
+    )
     llm_switch_parser.add_argument("provider", type=str, help="Provider 名称")
 
     # Paper 命令（全部要求显式 --workspace；不会读取 TUI 最近状态）
@@ -1215,30 +1471,48 @@ def main(argv: list[str] | None = None) -> None:
         epilog="默认不联网；如需在线/外部元数据补全，请同时使用 --enrich 与 --confirm-enrich。",
     )
     paper_import_parser.add_argument("path", type=str, help="本地论文文件路径")
-    paper_import_parser.add_argument("--workspace", required=True, type=str, help="工作区 ID")
+    paper_import_parser.add_argument(
+        "--workspace", required=True, type=str, help="工作区 ID"
+    )
     paper_import_parser.add_argument("--title", type=str, default=None, help="论文标题")
     paper_import_parser.add_argument("--doi", type=str, default=None, help="DOI")
     paper_import_parser.add_argument("--pmid", type=str, default=None, help="PMID")
     paper_import_parser.add_argument("--notes", type=str, default=None, help="备注")
-    paper_import_parser.add_argument("--tag", action="append", default=None, help="标签，可重复")
-    paper_import_parser.add_argument("--enrich", action="store_true", help="请求在线/外部元数据补全（默认不联网）")
-    paper_import_parser.add_argument("--confirm-enrich", action="store_true", help="显式确认允许发起补全授权检查、网络/API 限制检查与审计")
+    paper_import_parser.add_argument(
+        "--tag", action="append", default=None, help="标签，可重复"
+    )
+    paper_import_parser.add_argument(
+        "--enrich", action="store_true", help="请求在线/外部元数据补全（默认不联网）"
+    )
+    paper_import_parser.add_argument(
+        "--confirm-enrich",
+        action="store_true",
+        help="显式确认允许发起补全授权检查、网络/API 限制检查与审计",
+    )
 
     paper_list_parser = paper_subparsers.add_parser("list", help="列出工作区论文")
-    paper_list_parser.add_argument("--workspace", required=True, type=str, help="工作区 ID")
+    paper_list_parser.add_argument(
+        "--workspace", required=True, type=str, help="工作区 ID"
+    )
 
     paper_show_parser = paper_subparsers.add_parser("show", help="显示论文元数据")
     paper_show_parser.add_argument("paper_id", type=str, help="论文 ID")
-    paper_show_parser.add_argument("--workspace", required=True, type=str, help="工作区 ID")
+    paper_show_parser.add_argument(
+        "--workspace", required=True, type=str, help="工作区 ID"
+    )
 
     paper_edit_parser = paper_subparsers.add_parser("edit", help="编辑论文元数据")
     paper_edit_parser.add_argument("paper_id", type=str, help="论文 ID")
-    paper_edit_parser.add_argument("--workspace", required=True, type=str, help="工作区 ID")
+    paper_edit_parser.add_argument(
+        "--workspace", required=True, type=str, help="工作区 ID"
+    )
     paper_edit_parser.add_argument("--title", type=str, default=None, help="论文标题")
     paper_edit_parser.add_argument("--doi", type=str, default=None, help="DOI")
     paper_edit_parser.add_argument("--pmid", type=str, default=None, help="PMID")
     paper_edit_parser.add_argument("--notes", type=str, default=None, help="备注")
-    paper_edit_parser.add_argument("--tag", action="append", default=None, help="标签，可重复")
+    paper_edit_parser.add_argument(
+        "--tag", action="append", default=None, help="标签，可重复"
+    )
 
     paper_enrich_parser = paper_subparsers.add_parser(
         "enrich",
@@ -1247,8 +1521,15 @@ def main(argv: list[str] | None = None) -> None:
         epilog="必须提供 --confirm-enrich 显式确认允许外部元数据补全。",
     )
     paper_enrich_parser.add_argument("paper_id", type=str, help="论文 ID")
-    paper_enrich_parser.add_argument("--workspace", required=True, type=str, help="工作区 ID")
-    paper_enrich_parser.add_argument("--confirm-enrich", action="store_true", required=True, help="显式确认允许发起补全授权检查、网络/API 限制检查与审计")
+    paper_enrich_parser.add_argument(
+        "--workspace", required=True, type=str, help="工作区 ID"
+    )
+    paper_enrich_parser.add_argument(
+        "--confirm-enrich",
+        action="store_true",
+        required=True,
+        help="显式确认允许发起补全授权检查、网络/API 限制检查与审计",
+    )
 
     # Experience 命令（全部要求显式 --workspace；建议不会持久化）
     experience_parser = subparsers.add_parser(
@@ -1258,54 +1539,123 @@ def main(argv: list[str] | None = None) -> None:
     )
     experience_subparsers = experience_parser.add_subparsers(dest="experience_command")
 
-    experience_suggest_parser = experience_subparsers.add_parser("suggest", help="建议分类但不写入")
-    experience_suggest_parser.add_argument("--workspace", required=True, type=str, help="工作区 ID")
-    experience_suggest_parser.add_argument("--title", type=str, default=None, help="经验标题")
-    experience_suggest_parser.add_argument("--summary", required=True, type=str, help="经验摘要")
-    experience_suggest_parser.add_argument("--tag", action="append", default=None, help="标签，可重复")
+    experience_suggest_parser = experience_subparsers.add_parser(
+        "suggest", help="建议分类但不写入"
+    )
+    experience_suggest_parser.add_argument(
+        "--workspace", required=True, type=str, help="工作区 ID"
+    )
+    experience_suggest_parser.add_argument(
+        "--title", type=str, default=None, help="经验标题"
+    )
+    experience_suggest_parser.add_argument(
+        "--summary", required=True, type=str, help="经验摘要"
+    )
+    experience_suggest_parser.add_argument(
+        "--tag", action="append", default=None, help="标签，可重复"
+    )
 
-    experience_add_parser = experience_subparsers.add_parser("add", help="确认并新增经验")
-    experience_add_parser.add_argument("--workspace", required=True, type=str, help="工作区 ID")
-    experience_add_parser.add_argument("--scope", required=True, choices=["general", "workspace"], help="确认后的存储范围")
-    experience_add_parser.add_argument("--title", required=True, type=str, help="经验标题")
-    experience_add_parser.add_argument("--summary", required=True, type=str, help="经验摘要")
-    experience_add_parser.add_argument("--tag", action="append", default=None, help="标签，可重复")
-    experience_add_parser.add_argument("--confirm", action="store_true", required=True, help="显式确认写入")
+    experience_add_parser = experience_subparsers.add_parser(
+        "add", help="确认并新增经验"
+    )
+    experience_add_parser.add_argument(
+        "--workspace", required=True, type=str, help="工作区 ID"
+    )
+    experience_add_parser.add_argument(
+        "--scope",
+        required=True,
+        choices=["general", "workspace"],
+        help="确认后的存储范围",
+    )
+    experience_add_parser.add_argument(
+        "--title", required=True, type=str, help="经验标题"
+    )
+    experience_add_parser.add_argument(
+        "--summary", required=True, type=str, help="经验摘要"
+    )
+    experience_add_parser.add_argument(
+        "--tag", action="append", default=None, help="标签，可重复"
+    )
+    experience_add_parser.add_argument(
+        "--confirm", action="store_true", required=True, help="显式确认写入"
+    )
 
     experience_list_parser = experience_subparsers.add_parser("list", help="列出经验")
-    experience_list_parser.add_argument("--workspace", required=True, type=str, help="工作区 ID")
-    experience_list_parser.add_argument("--include-general", action="store_true", help="包含通用方法层")
+    experience_list_parser.add_argument(
+        "--workspace", required=True, type=str, help="工作区 ID"
+    )
+    experience_list_parser.add_argument(
+        "--include-general", action="store_true", help="包含通用方法层"
+    )
 
     experience_view_parser = experience_subparsers.add_parser("view", help="查看经验")
     experience_view_parser.add_argument("record_id", type=str, help="经验 ID")
-    experience_view_parser.add_argument("--workspace", required=True, type=str, help="工作区 ID")
-    experience_view_parser.add_argument("--scope", choices=["general", "workspace"], default=None, help="范围过滤")
+    experience_view_parser.add_argument(
+        "--workspace", required=True, type=str, help="工作区 ID"
+    )
+    experience_view_parser.add_argument(
+        "--scope", choices=["general", "workspace"], default=None, help="范围过滤"
+    )
 
     experience_edit_parser = experience_subparsers.add_parser("edit", help="编辑经验")
     experience_edit_parser.add_argument("record_id", type=str, help="经验 ID")
-    experience_edit_parser.add_argument("--workspace", required=True, type=str, help="工作区 ID")
-    experience_edit_parser.add_argument("--scope", required=True, choices=["general", "workspace"], help="经验范围")
-    experience_edit_parser.add_argument("--title", type=str, default=None, help="经验标题")
-    experience_edit_parser.add_argument("--summary", type=str, default=None, help="经验摘要")
-    experience_edit_parser.add_argument("--tag", action="append", default=None, help="标签，可重复；提供后替换原标签")
+    experience_edit_parser.add_argument(
+        "--workspace", required=True, type=str, help="工作区 ID"
+    )
+    experience_edit_parser.add_argument(
+        "--scope", required=True, choices=["general", "workspace"], help="经验范围"
+    )
+    experience_edit_parser.add_argument(
+        "--title", type=str, default=None, help="经验标题"
+    )
+    experience_edit_parser.add_argument(
+        "--summary", type=str, default=None, help="经验摘要"
+    )
+    experience_edit_parser.add_argument(
+        "--tag", action="append", default=None, help="标签，可重复；提供后替换原标签"
+    )
 
-    experience_delete_parser = experience_subparsers.add_parser("delete", help="删除经验")
+    experience_delete_parser = experience_subparsers.add_parser(
+        "delete", help="删除经验"
+    )
     experience_delete_parser.add_argument("record_id", type=str, help="经验 ID")
-    experience_delete_parser.add_argument("--workspace", required=True, type=str, help="工作区 ID")
-    experience_delete_parser.add_argument("--scope", required=True, choices=["general", "workspace"], help="经验范围")
-    experience_delete_parser.add_argument("--confirm", required=True, type=str, help="必须与经验 ID 完全一致")
+    experience_delete_parser.add_argument(
+        "--workspace", required=True, type=str, help="工作区 ID"
+    )
+    experience_delete_parser.add_argument(
+        "--scope", required=True, choices=["general", "workspace"], help="经验范围"
+    )
+    experience_delete_parser.add_argument(
+        "--confirm", required=True, type=str, help="必须与经验 ID 完全一致"
+    )
 
-    experience_export_parser = experience_subparsers.add_parser("export", help="导出经验")
-    experience_export_parser.add_argument("--workspace", required=True, type=str, help="工作区 ID")
-    experience_export_parser.add_argument("--format", required=True, choices=["json", "md"], help="导出格式")
-    experience_export_parser.add_argument("--include-general", action="store_true", help="包含通用方法层")
-    experience_export_parser.add_argument("--output", type=str, default=None, help="可选 UTF-8 输出文件")
+    experience_export_parser = experience_subparsers.add_parser(
+        "export", help="导出经验"
+    )
+    experience_export_parser.add_argument(
+        "--workspace", required=True, type=str, help="工作区 ID"
+    )
+    experience_export_parser.add_argument(
+        "--format", required=True, choices=["json", "md"], help="导出格式"
+    )
+    experience_export_parser.add_argument(
+        "--include-general", action="store_true", help="包含通用方法层"
+    )
+    experience_export_parser.add_argument(
+        "--output", type=str, default=None, help="可选 UTF-8 输出文件"
+    )
 
     args = parser.parse_args(argv)
+    if args.command != "tui":
+        logging.basicConfig(level=logging.INFO, format="%(message)s")
     cli = CLI()
 
     if args.command == "init":
-        from installer.entrypoint import _normalize_provider, _resolve_api_key, _resolve_install_value
+        from installer.entrypoint import (
+            _normalize_provider,
+            _resolve_api_key,
+            _resolve_install_value,
+        )
 
         provider = _resolve_install_value("provider", args.provider)
         base_url = _resolve_install_value("base_url", args.base_url)
@@ -1336,7 +1686,7 @@ def main(argv: list[str] | None = None) -> None:
     elif args.command == "tui":
         cli.tui(dry_run=args.dry_run)
     elif args.command == "run":
-        verbose = getattr(args, 'verbose', False)
+        verbose = getattr(args, "verbose", False)
         try:
             params = _resolve_run_params(args.params_json, args.params_file)
         except ValueError as exc:
@@ -1459,7 +1809,9 @@ def main(argv: list[str] | None = None) -> None:
     elif args.command == "experience":
         try:
             if args.experience_command == "suggest":
-                cli.experience_suggest(args.workspace, args.summary, title=args.title, tags=args.tag)
+                cli.experience_suggest(
+                    args.workspace, args.summary, title=args.title, tags=args.tag
+                )
             elif args.experience_command == "add":
                 cli.experience_add(
                     args.workspace,
@@ -1470,7 +1822,9 @@ def main(argv: list[str] | None = None) -> None:
                     confirm=args.confirm,
                 )
             elif args.experience_command == "list":
-                cli.experience_list(args.workspace, include_general=args.include_general)
+                cli.experience_list(
+                    args.workspace, include_general=args.include_general
+                )
             elif args.experience_command == "view":
                 cli.experience_view(args.record_id, args.workspace, scope=args.scope)
             elif args.experience_command == "edit":
@@ -1483,7 +1837,9 @@ def main(argv: list[str] | None = None) -> None:
                     tags=args.tag,
                 )
             elif args.experience_command == "delete":
-                cli.experience_delete(args.record_id, args.workspace, args.scope, args.confirm)
+                cli.experience_delete(
+                    args.record_id, args.workspace, args.scope, args.confirm
+                )
             elif args.experience_command == "export":
                 cli.experience_export(
                     args.workspace,

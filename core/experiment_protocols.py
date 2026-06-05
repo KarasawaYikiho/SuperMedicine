@@ -5,6 +5,7 @@ calculation requests are represented as generic descriptors so later plugins can
 perform reagent math or external assistance without hard-coding that logic into
 the core state machine.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -105,7 +106,9 @@ class ExperimentStep:
                 CalculationRequest.from_dict(item)
                 for item in data.get("calculation_requests", [])
             ),
-            expected_outputs=tuple(str(item) for item in data.get("expected_outputs", [])),
+            expected_outputs=tuple(
+                str(item) for item in data.get("expected_outputs", [])
+            ),
         )
 
 

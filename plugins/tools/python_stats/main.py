@@ -5,13 +5,19 @@ basic statistics actions. The implementations are intentionally lightweight and
 must not be described as production-grade, clinical-grade, or regulatory-grade
 statistics.
 """
+
 from __future__ import annotations
 
 import math
 from typing import Any
 
 from plugins.base_plugin import plugin_result
-from plugins.tools._common import as_float_groups, as_float_list, normal_cdf, param_or_default
+from plugins.tools._common import (
+    as_float_groups,
+    as_float_list,
+    normal_cdf,
+    param_or_default,
+)
 
 
 MEDICAL_BOUNDARY = (
@@ -43,7 +49,11 @@ ACTION_CONTRACTS: dict[str, dict[str, Any]] = {
         "prototype": True,
     },
     "stats.regression": {
-        "required_params": {"x": "list[number]", "y": "list[number]", "same_length": True},
+        "required_params": {
+            "x": "list[number]",
+            "y": "list[number]",
+            "same_length": True,
+        },
         "output_fields": ["slope", "intercept", "r_squared", "n"],
         "prototype": True,
     },
@@ -205,22 +215,38 @@ def execute(
             "actions": ACTION_CONTRACTS,
             "default_params_are_smoke_test_fixtures": True,
         },
-        "audit": {"interface_only": True, "prototype_path": True, "context_keys": sorted((context or {}).keys())},
+        "audit": {
+            "interface_only": True,
+            "prototype_path": True,
+            "context_keys": sorted((context or {}).keys()),
+        },
     }
     try:
         if action == "stats.descriptive":
             data = param_or_default(params, "data", DEFAULT_PARAMS[action]["data"])
             result: dict[str, Any] = descriptive(as_float_list(data, "data"))
         elif action == "stats.ttest":
-            group1 = param_or_default(params, "group1", DEFAULT_PARAMS[action]["group1"])
-            group2 = param_or_default(params, "group2", DEFAULT_PARAMS[action]["group2"])
-            result = ttest(as_float_list(group1, "group1"), as_float_list(group2, "group2"))
+            group1 = param_or_default(
+                params, "group1", DEFAULT_PARAMS[action]["group1"]
+            )
+            group2 = param_or_default(
+                params, "group2", DEFAULT_PARAMS[action]["group2"]
+            )
+            result = ttest(
+                as_float_list(group1, "group1"), as_float_list(group2, "group2")
+            )
         elif action == "stats.anova":
-            groups = param_or_default(params, "groups", DEFAULT_PARAMS[action]["groups"])
+            groups = param_or_default(
+                params, "groups", DEFAULT_PARAMS[action]["groups"]
+            )
             result = anova(*as_float_groups(groups, "groups"))
         elif action == "stats.regression":
-            x = as_float_list(param_or_default(params, "x", DEFAULT_PARAMS[action]["x"]), "x")
-            y = as_float_list(param_or_default(params, "y", DEFAULT_PARAMS[action]["y"]), "y")
+            x = as_float_list(
+                param_or_default(params, "x", DEFAULT_PARAMS[action]["x"]), "x"
+            )
+            y = as_float_list(
+                param_or_default(params, "y", DEFAULT_PARAMS[action]["y"]), "y"
+            )
             if len(x) != len(y):
                 raise ValueError("x and y must have the same length")
             result = regression(x, y)
@@ -255,5 +281,7 @@ def _f_cdf(f: float, d1: int, d2: int) -> float:
     if f <= 0:
         return 0
     # 近似公式
-    z = ((f ** (1/3)) * (1 - 2 / (9 * d2)) - (1 - 2 / (9 * d1))) / math.sqrt(2 / (9 * d1) + (f ** (2/3)) * 2 / (9 * d2))
+    z = ((f ** (1 / 3)) * (1 - 2 / (9 * d2)) - (1 - 2 / (9 * d1))) / math.sqrt(
+        2 / (9 * d1) + (f ** (2 / 3)) * 2 / (9 * d2)
+    )
     return normal_cdf(z)

@@ -14,7 +14,9 @@ def test_experience_screen_suggest_requires_later_confirmation(tmp_path):
     WorkspaceManager(tmp_path).initialize_workspace("study-a")
     controller = ExperienceScreenController(tmp_path)
 
-    suggestion = controller.suggest_classification("study-a", title="方法", summary="总结事件")
+    suggestion = controller.suggest_classification(
+        "study-a", title="方法", summary="总结事件"
+    )
 
     assert suggestion["label"] == "经验分类建议"
     assert suggestion["confirmed"] is False
@@ -58,7 +60,9 @@ def test_experience_screen_confirm_then_list_edit_export(tmp_path):
         tags=["tui"],
         confirm=True,
     )
-    edited = controller.edit_experience(record["id"], workspace_id="study-a", scope="workspace", title="新经验")
+    edited = controller.edit_experience(
+        record["id"], workspace_id="study-a", scope="workspace", title="新经验"
+    )
     exported = controller.export_experiences(workspace_id="study-a", format="md")
 
     assert record["message"] == "经验已确认写入"
@@ -79,9 +83,13 @@ def test_experience_screen_delete_requires_exact_confirmation(tmp_path):
     )
 
     with pytest.raises(ValueError, match="经验 ID"):
-        controller.delete_experience(record["id"], workspace_id="study-a", scope="workspace", confirm="wrong")
+        controller.delete_experience(
+            record["id"], workspace_id="study-a", scope="workspace", confirm="wrong"
+        )
 
-    deleted = controller.delete_experience(record["id"], workspace_id="study-a", scope="workspace", confirm=record["id"])
+    deleted = controller.delete_experience(
+        record["id"], workspace_id="study-a", scope="workspace", confirm=record["id"]
+    )
     assert deleted["status"] == "deleted"
     assert controller.list_experiences("study-a") == []
 
@@ -108,7 +116,9 @@ def test_experience_view_empty_success_error_copy_and_secret_redaction_are_expli
     assert "experience_no_records" in loader_source
     assert "experience_list" in loader_source
     assert "experience_confirmed" in confirm_source
-    assert "experience_delete_requires_confirm" in compose_source + inspect.getsource(ExperienceView._delete_experience)
+    assert "experience_delete_requires_confirm" in compose_source + inspect.getsource(
+        ExperienceView._delete_experience
+    )
     assert "redact_sensitive" in error_source
     assert "redact_sensitive" in status_source
     assert t("experience_no_records") == "暂无经验记录"

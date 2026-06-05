@@ -1,4 +1,5 @@
 """检查点验证器测试"""
+
 from __future__ import annotations
 
 import json
@@ -51,7 +52,9 @@ class TestCheckpointVerifier:
         assert result["final_state_success"] is False
         assert 3 in result["missing_steps"]
 
-    def test_verify_structural_complete_distinct_from_final_state_success(self, tmp_path):
+    def test_verify_structural_complete_distinct_from_final_state_success(
+        self, tmp_path
+    ):
         """Sequential checkpoints can be structurally complete before final completion."""
         task_dir = tmp_path / "task-running"
         for step in range(1, 3):
@@ -75,7 +78,9 @@ class TestCheckpointVerifier:
         bad_step = task_dir / "step-2"
         good_step.mkdir(parents=True)
         bad_step.mkdir(parents=True)
-        (good_step / "status.json").write_text(json.dumps({"state": "completed"}), encoding="utf-8")
+        (good_step / "status.json").write_text(
+            json.dumps({"state": "completed"}), encoding="utf-8"
+        )
         (bad_step / "status.json").write_text("{not-json", encoding="utf-8")
 
         verifier = CheckpointVerifier(tmp_path)
@@ -91,7 +96,9 @@ class TestCheckpointVerifier:
         task_dir = tmp_path / "task-a"
         step_dir = task_dir / "step-1"
         step_dir.mkdir(parents=True)
-        (step_dir / "status.json").write_text(json.dumps({"state": "completed"}), encoding="utf-8")
+        (step_dir / "status.json").write_text(
+            json.dumps({"state": "completed"}), encoding="utf-8"
+        )
 
         verifier = CheckpointVerifier(tmp_path)
         results = verifier.verify_all()

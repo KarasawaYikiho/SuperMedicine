@@ -41,7 +41,11 @@ class LLMScreenController:
         return {
             "ok": False,
             "provider": provider,
-            "message": str(redact_sensitive(validation.get("error", {}).get("message") or t("llm_not_ready"))),
+            "message": str(
+                redact_sensitive(
+                    validation.get("error", {}).get("message") or t("llm_not_ready")
+                )
+            ),
         }
 
     def add_provider(
@@ -85,14 +89,20 @@ class LLMView(Vertical):
         yield Static(t("llm_action_hint"), id="llm-action-hint", classes="hint")
         yield DataTable(id="llm-table", cursor_type="row")
         with Horizontal(classes="form-row"):
-            yield Select([], prompt=t("llm_missing_selection"), id="llm-provider-select")
-            yield Button(t("llm_switch_provider"), id="llm-switch", classes="btn btn-primary")
+            yield Select(
+                [], prompt=t("llm_missing_selection"), id="llm-provider-select"
+            )
+            yield Button(
+                t("llm_switch_provider"), id="llm-switch", classes="btn btn-primary"
+            )
             yield Button(t("refresh"), id="llm-refresh", classes="btn btn-secondary")
         with Vertical(id="llm-form"):
             yield Input(placeholder=t("llm_provider_name"), id="llm-provider-input")
             yield Input(placeholder=t("llm_base_url"), id="llm-base-url-input")
             yield Input(placeholder=t("llm_model"), id="llm-model-input")
-            yield Input(placeholder=t("llm_api_key"), password=True, id="llm-api-key-input")
+            yield Input(
+                placeholder=t("llm_api_key"), password=True, id="llm-api-key-input"
+            )
             yield Input(placeholder=t("llm_api_format_hint"), id="llm-api-format-input")
             yield Button(t("llm_add_provider"), id="llm-add", classes="btn btn-primary")
         yield Static("", id="llm-status")
@@ -111,7 +121,9 @@ class LLMView(Vertical):
         select = self.query_one("#llm-provider-select", Select)
         current_widget = self.query_one("#llm-current", Static)
         table.clear(columns=True)
-        table.add_columns(t("llm_provider"), t("llm_base_url"), t("llm_model"), t("dashboard_status"))
+        table.add_columns(
+            t("llm_provider"), t("llm_base_url"), t("llm_model"), t("dashboard_status")
+        )
 
         providers = self.controller.list_providers()
         readiness = self.controller.readiness()
@@ -123,7 +135,11 @@ class LLMView(Vertical):
             if not isinstance(config, dict):
                 config = {}
             options.append((provider_name, provider_name))
-            status = t("llm_ready") if self.controller.manager.validate_provider(provider_name) is None else t("llm_not_ready")
+            status = (
+                t("llm_ready")
+                if self.controller.manager.validate_provider(provider_name) is None
+                else t("llm_not_ready")
+            )
             table.add_row(
                 provider_name,
                 str(config.get("base_url") or ""),
@@ -192,7 +208,11 @@ class LLMView(Vertical):
 
     def _safe_error_message(self, result: dict[str, Any]) -> str:
         error = result.get("error", {}) if isinstance(result, dict) else {}
-        message = str(error.get("message") or t("error")) if isinstance(error, dict) else t("error")
+        message = (
+            str(error.get("message") or t("error"))
+            if isinstance(error, dict)
+            else t("error")
+        )
         return f"{t('error')}: {redact_sensitive(message) or t('safe_error_hint')}"
 
     def _set_status(self, message: str) -> None:

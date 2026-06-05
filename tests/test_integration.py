@@ -1,4 +1,5 @@
 """集成测试 — 端到端科研流程"""
+
 from __future__ import annotations
 
 import json
@@ -9,7 +10,12 @@ import yaml
 import pytest
 
 from Cli import CLI, _resolve_run_params
-from installer.entrypoint import DEFAULT_CONFIG, init_config, main as install_main, write_llm_config
+from installer.entrypoint import (
+    DEFAULT_CONFIG,
+    init_config,
+    main as install_main,
+    write_llm_config,
+)
 from core.kernel import Kernel
 from agents.orchestrator import Orchestrator
 from agents.base_agent import BaseAgent
@@ -46,9 +52,13 @@ class MockAgent(BaseAgent):
 class TestIntegration:
     """端到端集成测试"""
 
-    def test_install_init_creates_canonical_default_policy_without_overwrite(self, tmp_path):
+    def test_install_init_creates_canonical_default_policy_without_overwrite(
+        self, tmp_path
+    ):
         """Install.py --init 应创建核心默认策略，并在重复初始化时保留用户策略。"""
-        expected_policy = PermissionEngine.default_policy_path().read_text(encoding="utf-8")
+        expected_policy = PermissionEngine.default_policy_path().read_text(
+            encoding="utf-8"
+        )
 
         init_config(tmp_path, **_llm_kwargs())
 
@@ -63,7 +73,9 @@ class TestIntegration:
         assert target_policy.read_text(encoding="utf-8") == custom_policy
 
     @pytest.mark.core
-    def test_install_init_is_core_only_and_does_not_detect_platforms(self, tmp_path, monkeypatch):
+    def test_install_init_is_core_only_and_does_not_detect_platforms(
+        self, tmp_path, monkeypatch
+    ):
         """核心初始化不得探测 OpenCode/Claude Code 平台目录。"""
         from pathlib import Path as PathClass
 
@@ -72,7 +84,9 @@ class TestIntegration:
         def reject_platform_probe(self, *other):
             joined = "/".join(str(part) for part in other)
             if ".claude" in joined or "opencode" in joined:
-                raise AssertionError("init_config must not probe platform config directories")
+                raise AssertionError(
+                    "init_config must not probe platform config directories"
+                )
             return original_joinpath(self, *other)
 
         monkeypatch.setattr(PathClass, "joinpath", reject_platform_probe)
@@ -82,9 +96,13 @@ class TestIntegration:
         assert (tmp_path / ".supermedicine" / "config.yaml").exists()
         assert default_policy_path(tmp_path).exists()
 
-    def test_default_policy_falls_back_to_packaged_resource_when_source_tree_missing(self, tmp_path):
+    def test_default_policy_falls_back_to_packaged_resource_when_source_tree_missing(
+        self, tmp_path
+    ):
         """安装后的包缺少源码树 .supermedicine 时，应从包资源创建同一默认策略。"""
-        expected_policy = PermissionEngine.default_policy_path().read_text(encoding="utf-8")
+        expected_policy = PermissionEngine.default_policy_path().read_text(
+            encoding="utf-8"
+        )
         installed_like_root = tmp_path / "site-packages"
         project_dir = tmp_path / "project"
         installed_like_root.mkdir()
@@ -107,9 +125,13 @@ class TestIntegration:
         init_config(install_project, **_llm_kwargs())
 
         assert (cli_project / ".supermedicine").is_dir()
-        assert default_policy_path(cli_project).read_text(encoding="utf-8") == default_policy_path(install_project).read_text(encoding="utf-8")
+        assert default_policy_path(cli_project).read_text(
+            encoding="utf-8"
+        ) == default_policy_path(install_project).read_text(encoding="utf-8")
 
-    def test_install_init_writes_openai_llm_config_with_secret_redaction(self, tmp_path, caplog):
+    def test_install_init_writes_openai_llm_config_with_secret_redaction(
+        self, tmp_path, caplog
+    ):
         secret = "sk-test-install-secret"
         caplog.set_level("INFO", logger="Install")
 
@@ -121,7 +143,9 @@ class TestIntegration:
             model="gpt-test-install",
         )
 
-        config = yaml.safe_load((tmp_path / ".supermedicine" / "config.yaml").read_text(encoding="utf-8"))
+        config = yaml.safe_load(
+            (tmp_path / ".supermedicine" / "config.yaml").read_text(encoding="utf-8")
+        )
         openai = config["llm"]["providers"]["openai"]
         assert config["llm"]["provider"] == "openai"
         assert openai["base_url"] == "https://openai.example.test/v1"
@@ -134,7 +158,9 @@ class TestIntegration:
         with pytest.raises(ValueError, match="完整 LLM Provider 配置"):
             init_config(tmp_path)
 
-    def test_first_install_requires_complete_llm_setup_and_does_not_write_partial_config(self, tmp_path, monkeypatch):
+    def test_first_install_requires_complete_llm_setup_and_does_not_write_partial_config(
+        self, tmp_path, monkeypatch
+    ):
         fake_home = tmp_path / "home"
         fake_home.mkdir()
         monkeypatch.chdir(tmp_path)
@@ -147,7 +173,9 @@ class TestIntegration:
         assert not (tmp_path / ".supermedicine" / "config.yaml").exists()
         assert not (fake_home / ".supermedicine" / "config.yaml").exists()
 
-    def test_provider_added_by_manual_config_file_is_used_without_home_or_network(self, tmp_path, monkeypatch):
+    def test_provider_added_by_manual_config_file_is_used_without_home_or_network(
+        self, tmp_path, monkeypatch
+    ):
         secret = "sk-manual-file-secret"
         init_config(tmp_path, **_llm_kwargs("openai"))
         config_path = tmp_path / ".supermedicine" / "config.yaml"
@@ -159,7 +187,9 @@ class TestIntegration:
             "model": "file-model",
         }
         config["llm"]["provider"] = "file-provider"
-        config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+        config_path.write_text(
+            yaml.safe_dump(config, sort_keys=False), encoding="utf-8"
+        )
 
         def reject_home_access():
             raise AssertionError("manual provider path must not read real user home")
@@ -167,7 +197,11 @@ class TestIntegration:
         monkeypatch.setattr(Path, "home", reject_home_access)
         policies_dir = tmp_path / ".supermedicine" / "policies"
 
-        kernel = Kernel(config_path=config_path, plugins_dir=tmp_path / "plugins", policies_dir=policies_dir)
+        kernel = Kernel(
+            config_path=config_path,
+            plugins_dir=tmp_path / "plugins",
+            policies_dir=policies_dir,
+        )
         context = kernel._llm_runtime_context()
 
         assert context["configured"] is True
@@ -190,7 +224,9 @@ class TestIntegration:
             model="claude-test-install",
         )
 
-        config = yaml.safe_load((tmp_path / ".supermedicine" / "config.yaml").read_text(encoding="utf-8"))
+        config = yaml.safe_load(
+            (tmp_path / ".supermedicine" / "config.yaml").read_text(encoding="utf-8")
+        )
         anthropic = config["llm"]["providers"]["anthropic"]
         assert config["llm"]["provider"] == "anthropic"
         assert anthropic["base_url"] == "https://anthropic.example.test/v1"
@@ -206,7 +242,9 @@ class TestIntegration:
             model="custom-model",
         )
 
-        config = yaml.safe_load((tmp_path / ".supermedicine" / "config.yaml").read_text(encoding="utf-8"))
+        config = yaml.safe_load(
+            (tmp_path / ".supermedicine" / "config.yaml").read_text(encoding="utf-8")
+        )
         custom = config["llm"]["providers"]["custom-ai"]
         assert config["llm"]["provider"] == "custom-ai"
         assert custom["api_format"] == "openai"
@@ -226,23 +264,38 @@ class TestIntegration:
 
         install_main()
 
-        config = yaml.safe_load((tmp_path / ".supermedicine" / "config.yaml").read_text(encoding="utf-8"))
+        config = yaml.safe_load(
+            (tmp_path / ".supermedicine" / "config.yaml").read_text(encoding="utf-8")
+        )
         assert config["llm"]["provider"] == "openai"
-        assert config["llm"]["providers"]["openai"]["base_url"] == "https://env.example.test/v1"
+        assert (
+            config["llm"]["providers"]["openai"]["base_url"]
+            == "https://env.example.test/v1"
+        )
         assert config["llm"]["providers"]["openai"]["api_key"] == secret
         assert config["llm"]["providers"]["openai"]["model"] == "gpt-env-install"
 
-    def test_install_llm_config_merges_existing_config_without_touching_home(self, tmp_path, monkeypatch, caplog):
+    def test_install_llm_config_merges_existing_config_without_touching_home(
+        self, tmp_path, monkeypatch, caplog
+    ):
         secret = "sk-test-merge-secret"
         config_dir = tmp_path / ".supermedicine"
         config_dir.mkdir()
         (config_dir / "config.yaml").write_text(
-            yaml.safe_dump({"project_name": "legacy", "custom": {"keep": True}, "llm": {"providers": {}}}),
+            yaml.safe_dump(
+                {
+                    "project_name": "legacy",
+                    "custom": {"keep": True},
+                    "llm": {"providers": {}},
+                }
+            ),
             encoding="utf-8",
         )
 
         def fail_home_access():
-            raise AssertionError("LLM config injection must not read the real user home")
+            raise AssertionError(
+                "LLM config injection must not read the real user home"
+            )
 
         monkeypatch.setattr(Path, "home", fail_home_access)
         caplog.set_level("INFO", logger="Install")
@@ -255,17 +308,24 @@ class TestIntegration:
             model="gpt-merge",
         )
 
-        config = yaml.safe_load((config_dir / "config.yaml").read_text(encoding="utf-8"))
+        config = yaml.safe_load(
+            (config_dir / "config.yaml").read_text(encoding="utf-8")
+        )
         assert config["project_name"] == "legacy"
         assert config["custom"] == {"keep": True}
         assert config["llm"]["provider"] == "openai"
         assert config["llm"]["providers"]["openai"]["api_key"] == secret
-        assert config["llm"]["providers"]["openai"]["base_url"] == "https://merge.local.test/v1"
+        assert (
+            config["llm"]["providers"]["openai"]["base_url"]
+            == "https://merge.local.test/v1"
+        )
         assert config["llm"]["providers"]["openai"]["model"] == "gpt-merge"
         assert secret not in caplog.text
         assert "<redacted>" in caplog.text
 
-    def test_cli_diagnose_returns_actionable_secret_safe_config_llm_and_audit_snapshot(self, tmp_path, monkeypatch):
+    def test_cli_diagnose_returns_actionable_secret_safe_config_llm_and_audit_snapshot(
+        self, tmp_path, monkeypatch
+    ):
         secret = "sk-cli-diagnose-secret"
         env_secret = "cli-diagnose-env-api-key-value-not-real"
         init_config(
@@ -294,20 +354,29 @@ class TestIntegration:
             "writable_parent": True,
         }
         assert "--api-key-env" not in result["commands"]["init"]
-        assert "supermedicine init --provider <name> --base-url <url> --model <model>" in result["commands"]["init"]
+        assert (
+            "supermedicine init --provider <name> --base-url <url> --model <model>"
+            in result["commands"]["init"]
+        )
         assert "supermedicine llm switch <provider>" == result["commands"]["llm_switch"]
-        assert "python Uninstall.py --dry-run" == result["commands"]["uninstall_dry_run"]
+        assert (
+            "python Uninstall.py --dry-run" == result["commands"]["uninstall_dry_run"]
+        )
         assert secret not in str(result)
         assert env_secret not in str(result)
         assert result["config"]["config"]["llm-api-key"] == "[REDACTED]"
         assert result["llm"]["providers"]["openai"]["api_key"] == "[REDACTED]"
 
-    def test_cli_diagnose_reports_unconfigured_llm_template_as_actionable_failure(self, tmp_path, monkeypatch):
+    def test_cli_diagnose_reports_unconfigured_llm_template_as_actionable_failure(
+        self, tmp_path, monkeypatch
+    ):
         secret = "sk-unconfigured-diagnose-secret"
         config_dir = tmp_path / ".supermedicine"
         config_dir.mkdir()
         (config_dir / "config.yaml").write_text(
-            yaml.safe_dump({"llm": {"provider": "", "providers": {}, "note": f"api_key={secret}"}}),
+            yaml.safe_dump(
+                {"llm": {"provider": "", "providers": {}, "note": f"api_key={secret}"}}
+            ),
             encoding="utf-8",
         )
         monkeypatch.chdir(tmp_path)
@@ -325,19 +394,26 @@ class TestIntegration:
         assert "api_key" in result["llm"]["hints"]
         assert "base_url" in result["llm"]["hints"]
         assert "model" in result["llm"]["hints"]
-        assert "supermedicine init --provider <name> --base-url <url> --model <model>" in result["commands"]["init"]
+        assert (
+            "supermedicine init --provider <name> --base-url <url> --model <model>"
+            in result["commands"]["init"]
+        )
         assert "Traceback" not in str(result)
         assert secret not in str(result)
         assert "[REDACTED]" in str(result)
 
-    def test_init_paths_write_unicode_config_with_explicit_utf8(self, tmp_path, monkeypatch):
+    def test_init_paths_write_unicode_config_with_explicit_utf8(
+        self, tmp_path, monkeypatch
+    ):
         """初始化入口写入含中文的配置时不应依赖平台默认编码。"""
         original_write_text = Path.write_text
 
         def reject_default_encoding_for_unicode(self, data, *args, **kwargs):
             encoding = kwargs.get("encoding")
             if encoding is None and any(ord(char) > 127 for char in data):
-                raise UnicodeEncodeError("charmap", data, 0, len(data), "character maps to <undefined>")
+                raise UnicodeEncodeError(
+                    "charmap", data, 0, len(data), "character maps to <undefined>"
+                )
             return original_write_text(self, data, *args, **kwargs)
 
         monkeypatch.setattr(Path, "write_text", reject_default_encoding_for_unicode)
@@ -350,16 +426,22 @@ class TestIntegration:
         init_config(install_project, **_llm_kwargs())
         CLI().init(cli_project, **_llm_kwargs())
 
-        assert default_policy_path(install_project).read_text(encoding="utf-8") == default_policy_path(cli_project).read_text(encoding="utf-8")
+        assert default_policy_path(install_project).read_text(
+            encoding="utf-8"
+        ) == default_policy_path(cli_project).read_text(encoding="utf-8")
 
     def test_cli_resolves_params_json_object(self):
-        params = _resolve_run_params('{"source_id":"src-1","sources":{"src-1":{"title":"T"}}}', None)
+        params = _resolve_run_params(
+            '{"source_id":"src-1","sources":{"src-1":{"title":"T"}}}', None
+        )
 
         assert params == {"source_id": "src-1", "sources": {"src-1": {"title": "T"}}}
 
     def test_cli_resolves_params_file_object(self, tmp_path):
         params_file = tmp_path / "params.json"
-        params_file.write_text(json.dumps({"query": "hypertension", "top_k": 1}), encoding="utf-8")
+        params_file.write_text(
+            json.dumps({"query": "hypertension", "top_k": 1}), encoding="utf-8"
+        )
 
         params = _resolve_run_params(None, str(params_file))
 
@@ -399,12 +481,28 @@ class TestIntegration:
                 self.checkpoint_manager = FakeCheckpointManager()
 
             def execute_task(self, task, plugin_name=None, action=None, params=None):
-                captured.update({"task": task, "plugin_name": plugin_name, "action": action, "params": params})
-                return {"status": "success", "task": task, "plugin": plugin_name, "action": action, "output": {}}
+                captured.update(
+                    {
+                        "task": task,
+                        "plugin_name": plugin_name,
+                        "action": action,
+                        "params": params,
+                    }
+                )
+                return {
+                    "status": "success",
+                    "task": task,
+                    "plugin": plugin_name,
+                    "action": action,
+                    "output": {},
+                }
 
         monkeypatch.setattr("core.kernel.Kernel", FakeKernel)
 
-        params = {"source_id": "src-1", "sources": {"src-1": {"title": "Cardiovascular Risk Factors"}}}
+        params = {
+            "source_id": "src-1",
+            "sources": {"src-1": {"title": "Cardiovascular Risk Factors"}},
+        }
         result = CLI().run(
             "AMA citation task",
             plugin="medical-citation",
@@ -423,7 +521,9 @@ class TestIntegration:
     def test_full_workflow(self, tmp_path):
         """测试完整工作流程：初始化 → 权限检查 → 任务分派 → 检查点"""
         # 1. 初始化内核
-        (tmp_path / "config.yaml").write_text(yaml.dump({"project": "test"}), encoding="utf-8")
+        (tmp_path / "config.yaml").write_text(
+            yaml.dump({"project": "test"}), encoding="utf-8"
+        )
         (tmp_path / "plugins").mkdir()
         (tmp_path / "policies").mkdir()
         shutil.copyfile(
@@ -446,18 +546,25 @@ class TestIntegration:
                 "denied": [],
             },
         }
-        (tmp_path / "policies" / "analyst.yaml").write_text(yaml.dump(policy_data), encoding="utf-8")
+        (tmp_path / "policies" / "analyst.yaml").write_text(
+            yaml.dump(policy_data), encoding="utf-8"
+        )
         engine = PermissionEngine(
             policy_dir=tmp_path / "policies",
             audit_log=tmp_path / "audit.log",
         )
-        assert engine.check("analyst", "stats.ttest", "data/clinical") == PermissionResult.ALLOWED
+        assert (
+            engine.check("analyst", "stats.ttest", "data/clinical")
+            == PermissionResult.ALLOWED
+        )
 
         # 3. 任务分派
         orch = Orchestrator()
         agent = MockAgent("analyst", "analysis")
         orch.register_agent(agent)
-        result = orch.dispatch("analyst", {"action": "stats.ttest", "data": "data/clinical"})
+        result = orch.dispatch(
+            "analyst", {"action": "stats.ttest", "data": "data/clinical"}
+        )
         assert result["status"] == "success"
 
         # 4. 检查点
@@ -567,9 +674,13 @@ class TestIntegration:
         assert result["error"] is None
         assert "contract_version" in result["metadata"]
         assert "not production/clinical medical advice" in result["medical_boundary"]
-        assert "no production-grade statistical guarantee" in result["statistics_boundary"]
+        assert (
+            "no production-grade statistical guarantee" in result["statistics_boundary"]
+        )
 
-    def test_kernel_runtime_llm_context_uses_restored_provider_without_secret_leak(self, tmp_path):
+    def test_kernel_runtime_llm_context_uses_restored_provider_without_secret_leak(
+        self, tmp_path
+    ):
         config_path = tmp_path / "config.yaml"
         secret = "sk-anthropic-runtime-secret"
         config_path.write_text(
@@ -579,8 +690,18 @@ class TestIntegration:
                         "provider": "openai",
                         "last_provider": "anthropic",
                         "providers": {
-                            "openai": {"api_format": "openai", "base_url": "https://openai.test/v1", "api_key": "sk-openai", "model": "gpt-test"},
-                            "anthropic": {"api_format": "anthropic", "base_url": "https://anthropic.test/v1", "api_key": secret, "model": "claude-test"},
+                            "openai": {
+                                "api_format": "openai",
+                                "base_url": "https://openai.test/v1",
+                                "api_key": "sk-openai",
+                                "model": "gpt-test",
+                            },
+                            "anthropic": {
+                                "api_format": "anthropic",
+                                "base_url": "https://anthropic.test/v1",
+                                "api_key": secret,
+                                "model": "claude-test",
+                            },
                         },
                     }
                 },
@@ -595,7 +716,11 @@ class TestIntegration:
             policies_dir / PermissionEngine.DEFAULT_POLICY_FILENAME,
         )
 
-        kernel = Kernel(config_path=config_path, plugins_dir=tmp_path / "plugins", policies_dir=policies_dir)
+        kernel = Kernel(
+            config_path=config_path,
+            plugins_dir=tmp_path / "plugins",
+            policies_dir=policies_dir,
+        )
         context = kernel._llm_runtime_context()
 
         assert context["configured"] is True
@@ -604,14 +729,24 @@ class TestIntegration:
         assert secret not in str(context)
 
     def test_kernel_execute_task_permission_denied(self, tmp_path):
-        (tmp_path / "config.yaml").write_text(yaml.dump({"project": "test"}), encoding="utf-8")
+        (tmp_path / "config.yaml").write_text(
+            yaml.dump({"project": "test"}), encoding="utf-8"
+        )
         policies = tmp_path / "policies"
         policies.mkdir()
-        (policies / PermissionEngine.DEFAULT_POLICY_FILENAME).write_text(yaml.dump({
-            "agent_id": "alpha",
-            "role": "restricted",
-            "permissions": {"allowed": [], "denied": [{"action": "execute", "scope": "*"}]},
-        }), encoding="utf-8")
+        (policies / PermissionEngine.DEFAULT_POLICY_FILENAME).write_text(
+            yaml.dump(
+                {
+                    "agent_id": "alpha",
+                    "role": "restricted",
+                    "permissions": {
+                        "allowed": [],
+                        "denied": [{"action": "execute", "scope": "*"}],
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
         kernel = Kernel(
             config_path=tmp_path / "config.yaml",
             plugins_dir="plugins",
@@ -668,15 +803,23 @@ class TestIntegration:
         assert result["output"] is None
         assert "Invalid python-stats input" in result["error"]
 
-    def test_kernel_executes_rag_interface_manifest_plugin_without_external_service(self, tmp_path):
-        (tmp_path / "config.yaml").write_text(yaml.dump({"project": "test"}), encoding="utf-8")
+    def test_kernel_executes_rag_interface_manifest_plugin_without_external_service(
+        self, tmp_path
+    ):
+        (tmp_path / "config.yaml").write_text(
+            yaml.dump({"project": "test"}), encoding="utf-8"
+        )
         policies = tmp_path / "policies"
         policies.mkdir()
         shutil.copyfile(
             PermissionEngine.default_policy_path(),
             policies / PermissionEngine.DEFAULT_POLICY_FILENAME,
         )
-        kernel = Kernel(config_path=tmp_path / "config.yaml", plugins_dir="plugins", policies_dir=policies)
+        kernel = Kernel(
+            config_path=tmp_path / "config.yaml",
+            plugins_dir="plugins",
+            policies_dir=policies,
+        )
 
         result = kernel.execute_task(
             "rag retrieval task",
@@ -704,26 +847,40 @@ class TestIntegration:
     def test_rag_pubmed_manifest_denies_without_permission_context_before_http(self):
         from plugins.rag.main import execute
 
-        result = execute("rag.query", {"provider": "pubmed", "query": "hypertension", "top_k": 1})
+        result = execute(
+            "rag.query", {"provider": "pubmed", "query": "hypertension", "top_k": 1}
+        )
 
         assert result["status"] == "plugin_error"
         assert result["output"]["status"] == "denied"
         assert result["output"]["errors"][0]["code"] == "permission_engine_required"
 
-    def test_rag_pubmed_manifest_denies_without_agent_identity_before_http(self, tmp_path):
+    def test_rag_pubmed_manifest_denies_without_agent_identity_before_http(
+        self, tmp_path
+    ):
         from plugins.rag.main import execute
 
         policies = tmp_path / "policies"
         policies.mkdir()
-        (policies / PermissionEngine.DEFAULT_POLICY_FILENAME).write_text(yaml.dump({
-            "agent_id": "alpha",
-            "role": "rag-test",
-            "permissions": {
-                "allowed": [{"action": "rag.external.query", "scope": "https://eutils.ncbi.nlm.nih.gov/*"}],
-                "denied": [],
-                "hard_limits": {"network_access": True, "external_api": True},
-            },
-        }), encoding="utf-8")
+        (policies / PermissionEngine.DEFAULT_POLICY_FILENAME).write_text(
+            yaml.dump(
+                {
+                    "agent_id": "alpha",
+                    "role": "rag-test",
+                    "permissions": {
+                        "allowed": [
+                            {
+                                "action": "rag.external.query",
+                                "scope": "https://eutils.ncbi.nlm.nih.gov/*",
+                            }
+                        ],
+                        "denied": [],
+                        "hard_limits": {"network_access": True, "external_api": True},
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
         engine = PermissionEngine(policies, tmp_path / "audit.jsonl")
 
         result = execute(
@@ -751,19 +908,30 @@ class TestIntegration:
     def test_kernel_executes_harness_core_manifest_plugin(self, tmp_path):
         checkpoint_step = tmp_path / "checkpoints" / "task-1" / "step-1"
         checkpoint_step.mkdir(parents=True)
-        (checkpoint_step / "status.json").write_text(json.dumps({"state": "completed"}), encoding="utf-8")
-        (tmp_path / "config.yaml").write_text(yaml.dump({"project": "test"}), encoding="utf-8")
+        (checkpoint_step / "status.json").write_text(
+            json.dumps({"state": "completed"}), encoding="utf-8"
+        )
+        (tmp_path / "config.yaml").write_text(
+            yaml.dump({"project": "test"}), encoding="utf-8"
+        )
         policies = tmp_path / "policies"
         policies.mkdir()
         shutil.copyfile(
             PermissionEngine.default_policy_path(),
             policies / PermissionEngine.DEFAULT_POLICY_FILENAME,
         )
-        kernel = Kernel(config_path=tmp_path / "config.yaml", plugins_dir="plugins", policies_dir=policies)
+        kernel = Kernel(
+            config_path=tmp_path / "config.yaml",
+            plugins_dir="plugins",
+            policies_dir=policies,
+        )
 
         result = kernel.execute_task(
             "harness checkpoint task",
-            params={"checkpoint_dir": str(tmp_path / "checkpoints"), "task_id": "task-1"},
+            params={
+                "checkpoint_dir": str(tmp_path / "checkpoints"),
+                "task_id": "task-1",
+            },
         )
 
         assert result["status"] == "success"
@@ -825,14 +993,20 @@ class TestIntegration:
         assert "Invalid medical-citation input" in result["error"]
 
     def test_kernel_records_checkpoint_for_plugin_error(self, tmp_path):
-        (tmp_path / "config.yaml").write_text(yaml.dump({"project": "test"}), encoding="utf-8")
+        (tmp_path / "config.yaml").write_text(
+            yaml.dump({"project": "test"}), encoding="utf-8"
+        )
         policies = tmp_path / "policies"
         policies.mkdir()
         shutil.copyfile(
             PermissionEngine.default_policy_path(),
             policies / PermissionEngine.DEFAULT_POLICY_FILENAME,
         )
-        kernel = Kernel(config_path=tmp_path / "config.yaml", plugins_dir="plugins", policies_dir=policies)
+        kernel = Kernel(
+            config_path=tmp_path / "config.yaml",
+            plugins_dir="plugins",
+            policies_dir=policies,
+        )
         result = kernel.execute_task(
             "smoke medical task",
             plugin_name="python-stats",
@@ -842,7 +1016,9 @@ class TestIntegration:
         assert result["status"] == "plugin_error"
         task_dirs = list((tmp_path / "checkpoints").iterdir())
         assert task_dirs
-        latest = CheckpointManager(tmp_path / "checkpoints").load_latest(task_dirs[0].name)
+        latest = CheckpointManager(tmp_path / "checkpoints").load_latest(
+            task_dirs[0].name
+        )
         assert latest["state"] == "failed"
         assert latest["recoverable"] is False
         assert latest["not_recoverable_reason"] == "Plugin returned an error status."

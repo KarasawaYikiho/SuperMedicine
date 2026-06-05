@@ -1,4 +1,4 @@
-﻿"""Tool management view for SuperMedicine TUI."""
+"""Tool management view for SuperMedicine TUI."""
 
 from __future__ import annotations
 
@@ -95,12 +95,20 @@ class ToolView(Vertical):
         table.clear(columns=True)
         table.add_columns(t("tool_language"), "ID", t("dashboard_status"))
         if not workspace_path:
-            self._set_status(f"{t('tool_refreshed')}：{t('paper_select_workspace')}" if refreshed else t("paper_select_workspace"))
+            self._set_status(
+                f"{t('tool_refreshed')}：{t('paper_select_workspace')}"
+                if refreshed
+                else t("paper_select_workspace")
+            )
             return
 
         tools_dir = workspace_path / "tools"
         if not tools_dir.is_dir():
-            self._set_status(f"{t('tool_refreshed')}：{t('tool_no_tools')}" if refreshed else t("tool_no_tools"))
+            self._set_status(
+                f"{t('tool_refreshed')}：{t('tool_no_tools')}"
+                if refreshed
+                else t("tool_no_tools")
+            )
             return
 
         tool_count = 0
@@ -120,9 +128,17 @@ class ToolView(Vertical):
                             tool_count += 1
 
         if tool_count == 0:
-            self._set_status(f"{t('tool_refreshed')}：{t('tool_no_tools')}" if refreshed else t("tool_no_tools"))
+            self._set_status(
+                f"{t('tool_refreshed')}：{t('tool_no_tools')}"
+                if refreshed
+                else t("tool_no_tools")
+            )
         else:
-            self._set_status(f"{t('tool_refreshed')}: {tool_count}" if refreshed else f"{t('tool_list')}: {tool_count}")
+            self._set_status(
+                f"{t('tool_refreshed')}: {tool_count}"
+                if refreshed
+                else f"{t('tool_list')}: {tool_count}"
+            )
 
     def _set_status(self, message: str) -> None:
         status = self.query_one("#tool-status", Static)
@@ -131,7 +147,9 @@ class ToolView(Vertical):
         apply_status_style(status, safe_message)
 
     def _set_error(self, error: Exception) -> None:
-        message = f"{t('error')}: {redact_sensitive(str(error)) or t('safe_error_hint')}"
+        message = (
+            f"{t('error')}: {redact_sensitive(str(error)) or t('safe_error_hint')}"
+        )
         self._set_status(message)
         self.app.notify(message, severity="error")
 
@@ -173,7 +191,11 @@ class ToolView(Vertical):
         language_select = self.query_one("#tool-language-select", Select)
         tool_id_input = self.query_one("#tool-id-input", Input)
 
-        language = str(language_select.value) if language_select.value != Select.BLANK else "python"
+        language = (
+            str(language_select.value)
+            if language_select.value != Select.BLANK
+            else "python"
+        )
         tool_id = tool_id_input.value.strip()
 
         if not tool_id:
@@ -198,8 +220,15 @@ class ToolView(Vertical):
 
     def _run_tool(self) -> None:
         table = self.query_one("#tool-table", DataTable)
-        if table.cursor_row is None:
-            self._set_status(t("no_selection"))
+        if table.row_count == 0:
+            self._set_status(f"{t('error')}: {t('tool_no_tools')}，无法执行该操作")
+            return
+        if (
+            table.cursor_row is None
+            or table.cursor_row < 0
+            or table.cursor_row >= table.row_count
+        ):
+            self._set_status(f"{t('error')}: 未选择任何工具，无法执行该操作")
             return
 
         row_data = table.get_row_at(table.cursor_row)
@@ -222,4 +251,3 @@ class ToolView(Vertical):
 
 # Backward-compatible alias
 ToolScreen = ToolView
-

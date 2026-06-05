@@ -32,7 +32,9 @@ def _redact_sensitive_text(value: Any) -> str:
         elif "sk-" in pattern.pattern:
             text = pattern.sub("[已隐藏密钥]", text)
         else:
-            text = pattern.sub(lambda match: f"{match.group(1)}{match.group(2)}[已隐藏]", text)
+            text = pattern.sub(
+                lambda match: f"{match.group(1)}{match.group(2)}[已隐藏]", text
+            )
     return text
 
 
@@ -63,7 +65,15 @@ class ChatView(Vertical):
     def _write_separator(self, output: RichLog) -> None:
         output.write(f"[dim]{safe_display_text(t('chat_separator'))}[/dim]")
 
-    def _write_block(self, label: str, icon: str, style: str, message: str, *, blank_after: bool = True) -> None:
+    def _write_block(
+        self,
+        label: str,
+        icon: str,
+        style: str,
+        message: str,
+        *,
+        blank_after: bool = True,
+    ) -> None:
         output = self.query_one("#chat-output", RichLog)
         lines = [
             f"[dim]{safe_display_text(t('chat_separator'))}[/dim]",
@@ -78,24 +88,40 @@ class ChatView(Vertical):
     def add_user_message(self, message: str) -> None:
         """Add a user message to the chat display."""
         self._message_count += 1
-        self._write_block(f"{t('chat_user_label')} #{self._message_count}", "🧑", "bold cyan", message)
+        self._write_block(
+            f"{t('chat_user_label')} #{self._message_count}", "🧑", "bold cyan", message
+        )
 
     def add_system_message(self, message: str) -> None:
         """Add a system message to the chat display."""
-        self._write_block(t("chat_system_label"), "⚙", "dim italic", message, blank_after=False)
+        self._write_block(
+            t("chat_system_label"), "⚙", "dim italic", message, blank_after=False
+        )
 
     def add_assistant_message(self, message: str) -> None:
         """Add an assistant/AI message to the chat display."""
         self._message_count += 1
-        self._write_block(f"{t('chat_assistant_label')} #{self._message_count}", "🤖", "bold green", message)
+        self._write_block(
+            f"{t('chat_assistant_label')} #{self._message_count}",
+            "🤖",
+            "bold green",
+            message,
+        )
 
     def add_error_message(self, message: str) -> None:
         """Add an error message to the chat display."""
-        self._write_block(t("chat_error_label"), "❌", "bold red", f"{message}\n{t('chat_error_action')}")
+        self._write_block(
+            t("chat_error_label"),
+            "❌",
+            "bold red",
+            f"{message}\n{t('chat_error_action')}",
+        )
 
     def add_status_message(self, message: str) -> None:
         """Add a running/completion status message to the chat display."""
-        self._write_block(t("chat_status_label"), "⏳", "bold yellow", message, blank_after=False)
+        self._write_block(
+            t("chat_status_label"), "⏳", "bold yellow", message, blank_after=False
+        )
 
     def clear_chat(self) -> None:
         """Clear the chat display."""

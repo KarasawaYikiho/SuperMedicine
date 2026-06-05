@@ -11,7 +11,9 @@ from Uninstall import collect_removal_candidates, uninstall
 def test_dry_run_does_not_delete_project_owned_files(tmp_path):
     owned = tmp_path / ".supermedicine"
     owned.mkdir()
-    (owned / "config.yaml").write_text("project_name: supermedicine\n", encoding="utf-8")
+    (owned / "config.yaml").write_text(
+        "project_name: supermedicine\n", encoding="utf-8"
+    )
 
     result = uninstall(tmp_path, dry_run=True, force=True)
 
@@ -20,7 +22,9 @@ def test_dry_run_does_not_delete_project_owned_files(tmp_path):
     assert any(item["path"] == ".supermedicine" for item in result["planned"])
 
 
-def test_force_removes_owned_runtime_artifacts_but_not_unrecorded_platform_dirs(tmp_path):
+def test_force_removes_owned_runtime_artifacts_but_not_unrecorded_platform_dirs(
+    tmp_path,
+):
     paths = [
         tmp_path / ".supermedicine" / "config.yaml",
         tmp_path / ".supermedicine" / "policies" / "audit.jsonl",
@@ -71,7 +75,9 @@ def test_recorded_and_explicit_targets_are_removed_only_inside_project(tmp_path)
         encoding="utf-8",
     )
 
-    result = uninstall(tmp_path, force=True, explicit_targets=["platform-targets/claude/SKILL.md"])
+    result = uninstall(
+        tmp_path, force=True, explicit_targets=["platform-targets/claude/SKILL.md"]
+    )
 
     assert not inside_recorded.exists()
     assert not inside_explicit.exists()
@@ -80,8 +86,12 @@ def test_recorded_and_explicit_targets_are_removed_only_inside_project(tmp_path)
     outside.unlink()
 
 
-def test_nested_platform_install_records_are_removed_but_unrecorded_home_like_dirs_survive(tmp_path):
-    recorded_opencode = tmp_path / ".config" / "opencode" / "supermedicine" / "plugin.json"
+def test_nested_platform_install_records_are_removed_but_unrecorded_home_like_dirs_survive(
+    tmp_path,
+):
+    recorded_opencode = (
+        tmp_path / ".config" / "opencode" / "supermedicine" / "plugin.json"
+    )
     recorded_claude = tmp_path / ".claude" / "skills" / "supermedicine" / "SKILL.md"
     unrecorded_neighbor = tmp_path / ".claude" / "settings.json"
     for path in (recorded_opencode, recorded_claude, unrecorded_neighbor):
@@ -90,12 +100,18 @@ def test_nested_platform_install_records_are_removed_but_unrecorded_home_like_di
     record = tmp_path / ".supermedicine" / "install-record.json"
     record.parent.mkdir(parents=True)
     record.write_text(
-        json.dumps({
-            "platforms": {
-                "opencode": {"target_paths": [".config/opencode/supermedicine/plugin.json"]},
-                "claude-code": {"target_paths": [".claude/skills/supermedicine/SKILL.md"]},
+        json.dumps(
+            {
+                "platforms": {
+                    "opencode": {
+                        "target_paths": [".config/opencode/supermedicine/plugin.json"]
+                    },
+                    "claude-code": {
+                        "target_paths": [".claude/skills/supermedicine/SKILL.md"]
+                    },
+                }
             }
-        }),
+        ),
         encoding="utf-8",
     )
 
@@ -139,8 +155,12 @@ def test_uninstall_logs_are_secret_redacted(tmp_path, caplog):
 
 
 def test_collect_candidates_defines_project_owned_rules(tmp_path):
-    candidates, skipped = collect_removal_candidates(tmp_path, explicit_targets=[".supermedicine/custom-platform-copy"])
-    candidate_paths = {candidate.path.relative_to(tmp_path).as_posix() for candidate in candidates}
+    candidates, skipped = collect_removal_candidates(
+        tmp_path, explicit_targets=[".supermedicine/custom-platform-copy"]
+    )
+    candidate_paths = {
+        candidate.path.relative_to(tmp_path).as_posix() for candidate in candidates
+    }
 
     assert ".supermedicine" in candidate_paths
     assert "workspaces" in candidate_paths
@@ -148,7 +168,9 @@ def test_collect_candidates_defines_project_owned_rules(tmp_path):
     assert skipped == []
 
 
-def test_uninstall_removes_recorded_binary_shortcut_config_cache_log_temp_and_user_data_by_default(tmp_path):
+def test_uninstall_removes_recorded_binary_shortcut_config_cache_log_temp_and_user_data_by_default(
+    tmp_path,
+):
     recorded_paths = {
         "binaries": ["bin/supermedicine.exe"],
         "shortcuts": ["shortcuts/SuperMedicine.lnk"],
@@ -176,10 +198,16 @@ def test_uninstall_removes_recorded_binary_shortcut_config_cache_log_temp_and_us
 
 
 def test_uninstall_manifest_ownership_keys_cover_recorded_exe_and_shortcut_artifacts():
-    manifest = json.loads((__import__("pathlib").Path(__file__).resolve().parents[1] / "install.json").read_text(encoding="utf-8"))
+    manifest = json.loads(
+        (
+            __import__("pathlib").Path(__file__).resolve().parents[1] / "install.json"
+        ).read_text(encoding="utf-8")
+    )
     recorded_keys = set(manifest["uninstall"]["recorded_artifact_keys"])
 
-    assert {"binaries", "binary_paths", "shortcuts", "shortcut_paths"}.issubset(recorded_keys)
+    assert {"binaries", "binary_paths", "shortcuts", "shortcut_paths"}.issubset(
+        recorded_keys
+    )
     assert "binaries" in manifest["packaging_resources"]["source_tree_exe_policy"]
     assert "shortcut_paths" in manifest["packaging_resources"]["source_tree_exe_policy"]
 
@@ -193,7 +221,12 @@ def test_uninstall_can_preserve_recorded_user_data_explicitly(tmp_path):
     record = tmp_path / ".supermedicine" / "install-record.json"
     record.parent.mkdir(parents=True, exist_ok=True)
     record.write_text(
-        json.dumps({"user_data_paths": ["data/supermedicine/user.db"], "config_dirs": ["config/supermedicine/settings.json"]}),
+        json.dumps(
+            {
+                "user_data_paths": ["data/supermedicine/user.db"],
+                "config_dirs": ["config/supermedicine/settings.json"],
+            }
+        ),
         encoding="utf-8",
     )
 
@@ -205,7 +238,9 @@ def test_uninstall_can_preserve_recorded_user_data_explicitly(tmp_path):
     assert any("preserved-user-data" in item for item in result["skipped"])
 
 
-def test_uninstall_reports_residuals_and_repair_suggestions_when_delete_fails(tmp_path, monkeypatch):
+def test_uninstall_reports_residuals_and_repair_suggestions_when_delete_fails(
+    tmp_path, monkeypatch
+):
     blocked = tmp_path / ".supermedicine" / "blocked.log"
     blocked.parent.mkdir(parents=True)
     blocked.write_text("locked", encoding="utf-8")

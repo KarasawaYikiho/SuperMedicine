@@ -49,9 +49,14 @@ RUNTIME_DEPENDENCY_INSTALL_RE = re.compile(
 def _extract_bash_pyinstaller_command(workflow: str, exe_name: str) -> list[str]:
     for line in workflow.splitlines():
         command = line.strip()
-        if command.startswith("python -m PyInstaller") and f"--name {exe_name}" in command:
+        if (
+            command.startswith("python -m PyInstaller")
+            and f"--name {exe_name}" in command
+        ):
             return shlex.split(command, posix=True)
-    raise AssertionError(f"Could not find PyInstaller command for --name {exe_name} in CI workflow")
+    raise AssertionError(
+        f"Could not find PyInstaller command for --name {exe_name} in CI workflow"
+    )
 
 
 def _token_value(tokens: list[str], option: str) -> str | None:
@@ -62,7 +67,9 @@ def _token_value(tokens: list[str], option: str) -> str | None:
     try:
         return tokens[option_index + 1]
     except IndexError as exc:
-        raise AssertionError(f"CI PyInstaller command has {option} without a following value") from exc
+        raise AssertionError(
+            f"CI PyInstaller command has {option} without a following value"
+        ) from exc
 
 
 def _looks_absolute_or_resolved_for_ci_shell(source: str) -> bool:
@@ -78,7 +85,11 @@ def _looks_absolute_or_resolved_for_ci_shell(source: str) -> bool:
 def _relative_source_is_staged_under_specpath(source: str, specpath: str) -> bool:
     normalized_source = source.replace("\\", "/").lstrip("./")
     normalized_specpath = specpath.replace("\\", "/").lstrip("./")
-    return normalized_source == normalized_specpath or normalized_source.startswith(f"{normalized_specpath}/")
+    return normalized_source == normalized_specpath or normalized_source.startswith(
+        f"{normalized_specpath}/"
+    )
+
+
 PACKAGING_TOOLING_WITH_RUNTIME_INSTALL_RE = re.compile(
     r"^\s*python\s+-m\s+pip\s+install\b"
     r"(?=[^\n]*\bbuild\b)"
@@ -134,7 +145,9 @@ def _supports_case_distinct_names(directory: Path) -> bool:
     try:
         upper.write_text("upper", encoding="utf-8")
         lower.write_text("lower", encoding="utf-8")
-        return _has_exact_child_name(directory, upper.name) and _has_exact_child_name(directory, lower.name)
+        return _has_exact_child_name(directory, upper.name) and _has_exact_child_name(
+            directory, lower.name
+        )
     finally:
         for path in (upper, lower):
             try:
@@ -263,14 +276,18 @@ def test_extracted_release_directory_installer_entrypoint_smoke(tmp_path):
     )
     payload_output = payload_dry_run_result.stdout + payload_dry_run_result.stderr
     assert payload_dry_run_result.returncode == 0, payload_output
-    assert any(signal in payload_output for signal in PAYLOAD_DRY_RUN_SIGNALS), payload_output
+    assert any(signal in payload_output for signal in PAYLOAD_DRY_RUN_SIGNALS), (
+        payload_output
+    )
     assert not (tmp_path / "Installed").exists()
 
 
 def test_ci_release_artifacts_include_installer_usable_exe_or_dist_path():
     """Regression baseline: published CI artifacts must contain an Exe path Install.py can release."""
 
-    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
+        encoding="utf-8"
+    )
 
     # Step-2 CI investigation note:
     # These workflow assertions map the release-smoke failures to the concrete
@@ -286,17 +303,22 @@ def test_ci_release_artifacts_include_installer_usable_exe_or_dist_path():
         "SuperMedicine.exe so Install.py --release-exe has a documented, packaged source path."
     )
     assert "actions/upload-artifact" in workflow
-    assert any(f"--release-exe {path}" in workflow or f"--release-exe {path!r}" in workflow for path in INSTALLER_EXE_RELEASE_PATHS)
+    assert any(
+        f"--release-exe {path}" in workflow or f"--release-exe {path!r}" in workflow
+        for path in INSTALLER_EXE_RELEASE_PATHS
+    )
 
 
 def test_ci_release_artifacts_include_standalone_installer_exe_and_shared_payload():
     """Published CI artifacts must include the installer Exe next to the app Exe."""
 
-    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
+        encoding="utf-8"
+    )
 
     assert "--name SuperMedicineInstaller" in workflow
     assert f"dist/{INSTALLER_EXE_NAME}" in workflow
-    assert f"stage / \"{INSTALLER_EXE_NAME}\"" in workflow
+    assert f'stage / "{INSTALLER_EXE_NAME}"' in workflow
     assert "release_payload" in workflow
     assert "--extract-release-to" in workflow
     assert "dist/SuperMedicine.exe" in workflow
@@ -314,8 +336,12 @@ def test_ci_release_artifacts_include_standalone_installer_exe_and_shared_payloa
 def test_ci_standalone_installer_pyinstaller_payload_path_matches_specpath_contract():
     """Regression: --specpath must not make PyInstaller look for a missing release_payload."""
 
-    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-    command_tokens = _extract_bash_pyinstaller_command(workflow, INSTALLER_EXE_NAME.removesuffix(".exe"))
+    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
+        encoding="utf-8"
+    )
+    command_tokens = _extract_bash_pyinstaller_command(
+        workflow, INSTALLER_EXE_NAME.removesuffix(".exe")
+    )
     specpath = _token_value(command_tokens, "--specpath")
     add_data = _token_value(command_tokens, "--add-data")
 
@@ -328,11 +354,10 @@ def test_ci_standalone_installer_pyinstaller_payload_path_matches_specpath_contr
 
     add_data_source, add_data_dest = add_data.split(";", 1)
     assert add_data_dest == "release_payload"
-    assert "payload = root / \".installer-payload-stage\" / \"release_payload\"" in workflow
-    assert (
-        _looks_absolute_or_resolved_for_ci_shell(add_data_source)
-        or _relative_source_is_staged_under_specpath(add_data_source, specpath)
-    ), (
+    assert 'payload = root / ".installer-payload-stage" / "release_payload"' in workflow
+    assert _looks_absolute_or_resolved_for_ci_shell(
+        add_data_source
+    ) or _relative_source_is_staged_under_specpath(add_data_source, specpath), (
         "CI currently stages release_payload at repo-root .installer-payload-stage/release_payload "
         "but invokes PyInstaller with --specpath .pyinstaller-installer-spec and a relative "
         f"--add-data source {add_data_source!r}. PyInstaller resolves that relative source under "
@@ -346,7 +371,9 @@ def test_ci_standalone_installer_pyinstaller_payload_path_matches_specpath_contr
 def test_ci_packaging_smoke_installs_runtime_dependencies_before_installer_entrypoints():
     """Packaging smoke must install runtime deps, including PyYAML, before installer entrypoints."""
 
-    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
+        encoding="utf-8"
+    )
     packaging_job = workflow[workflow.index("  packaging-smoke:") :]
     installer_smoke_markers = (
         "python Install.py --release-exe",
@@ -354,7 +381,9 @@ def test_ci_packaging_smoke_installs_runtime_dependencies_before_installer_entry
         "./dist/SuperMedicineInstaller.exe --help",
         "./dist/SuperMedicineInstaller.exe --extract-release-to",
     )
-    first_installer_smoke_index = min(packaging_job.index(marker) for marker in installer_smoke_markers)
+    first_installer_smoke_index = min(
+        packaging_job.index(marker) for marker in installer_smoke_markers
+    )
     before_installer_smokes = packaging_job[:first_installer_smoke_index]
 
     assert RUNTIME_DEPENDENCY_INSTALL_RE.search(before_installer_smokes), (

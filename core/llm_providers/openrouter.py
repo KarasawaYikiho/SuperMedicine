@@ -1,4 +1,5 @@
 """OpenRouter LLM Provider — 聚合多个 AI 模型的 API"""
+
 from __future__ import annotations
 
 from typing import Any
@@ -19,7 +20,9 @@ class OpenRouterClient(ConfiguredLLMClient):
 
     DEFAULT_MODEL = "anthropic/claude-3.5-sonnet"
 
-    def __init__(self, api_key: str | None = None, model: str | None = None, **kwargs: Any):
+    def __init__(
+        self, api_key: str | None = None, model: str | None = None, **kwargs: Any
+    ):
         """初始化 OpenRouter 客户端
 
         Args:

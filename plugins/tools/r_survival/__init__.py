@@ -1,4 +1,5 @@
 """R 生存分析工具（Python 模拟）"""
+
 from __future__ import annotations
 
 from .kaplan_meier import kaplan_meier

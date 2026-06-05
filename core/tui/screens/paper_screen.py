@@ -1,4 +1,4 @@
-﻿"""Paper management view for SuperMedicine TUI."""
+"""Paper management view for SuperMedicine TUI."""
 
 from __future__ import annotations
 
@@ -40,9 +40,13 @@ class PaperView(Vertical):
             yield Input(placeholder=t("paper_notes_label"), id="paper-notes-input")
             yield Input(placeholder=t("paper_tags_label"), id="paper-tags-input")
         with Horizontal(classes="form-row"):
-            yield Button(t("paper_import"), id="paper-import", classes="btn btn-primary")
+            yield Button(
+                t("paper_import"), id="paper-import", classes="btn btn-primary"
+            )
             yield Button(t("refresh"), id="paper-refresh", classes="btn btn-secondary")
-            yield Button(t("paper_enrich"), id="paper-enrich", classes="btn btn-secondary")
+            yield Button(
+                t("paper_enrich"), id="paper-enrich", classes="btn btn-secondary"
+            )
         yield Static("", id="paper-status")
 
     def on_mount(self) -> None:
@@ -81,16 +85,30 @@ class PaperView(Vertical):
         workspace_id = self._get_selected_workspace()
         table = self.query_one("#paper-table", DataTable)
         table.clear(columns=True)
-        table.add_columns("ID", t("paper_title_label"), t("paper_authors"), t("paper_format"), t("paper_imported_at"))
+        table.add_columns(
+            "ID",
+            t("paper_title_label"),
+            t("paper_authors"),
+            t("paper_format"),
+            t("paper_imported_at"),
+        )
         if not workspace_id:
-            self._set_status(f"{t('paper_refreshed')}：{t('paper_select_workspace')}" if refreshed else t("paper_select_workspace"))
+            self._set_status(
+                f"{t('paper_refreshed')}：{t('paper_select_workspace')}"
+                if refreshed
+                else t("paper_select_workspace")
+            )
             return
 
         controller = self._get_paper_controller()
         try:
             papers = controller.list_papers(workspace_id)
             if not papers:
-                self._set_status(f"{t('paper_refreshed')}：{t('paper_no_papers')}" if refreshed else t("paper_no_papers"))
+                self._set_status(
+                    f"{t('paper_refreshed')}：{t('paper_no_papers')}"
+                    if refreshed
+                    else t("paper_no_papers")
+                )
                 return
             for paper in papers:
                 authors = ", ".join(paper.get("authors", []))
@@ -102,7 +120,11 @@ class PaperView(Vertical):
                     paper.get("imported_at", ""),
                     key=paper.get("id", ""),
                 )
-            self._set_status(f"{t('paper_refreshed')}: {len(papers)}" if refreshed else f"{t('paper_list')}: {len(papers)}")
+            self._set_status(
+                f"{t('paper_refreshed')}: {len(papers)}"
+                if refreshed
+                else f"{t('paper_list')}: {len(papers)}"
+            )
         except Exception as e:
             self._set_error(e)
 
@@ -113,7 +135,9 @@ class PaperView(Vertical):
         apply_status_style(status, safe_message)
 
     def _set_error(self, error: Exception) -> None:
-        message = f"{t('error')}: {redact_sensitive(str(error)) or t('safe_error_hint')}"
+        message = (
+            f"{t('error')}: {redact_sensitive(str(error)) or t('safe_error_hint')}"
+        )
         self._set_status(message)
         self.app.notify(message, severity="error")
 
@@ -157,11 +181,15 @@ class PaperView(Vertical):
         if notes_input.value.strip():
             metadata["notes"] = notes_input.value.strip()
         if tags_input.value.strip():
-            metadata["tags"] = [tag.strip() for tag in tags_input.value.split(",") if tag.strip()]
+            metadata["tags"] = [
+                tag.strip() for tag in tags_input.value.split(",") if tag.strip()
+            ]
 
         controller = self._get_paper_controller()
         try:
-            result = controller.import_paper(workspace_id, source_path, metadata=metadata)
+            result = controller.import_paper(
+                workspace_id, source_path, metadata=metadata
+            )
             self._set_status(result.get("message", t("paper_imported")))
             self.app.notify(result.get("message", t("paper_imported")))
             self._load_papers()
@@ -176,8 +204,15 @@ class PaperView(Vertical):
             return
 
         table = self.query_one("#paper-table", DataTable)
-        if table.cursor_row is None:
-            self._set_status(t("no_selection"))
+        if table.row_count == 0:
+            self._set_status(f"{t('error')}: {t('paper_no_papers')}，无法执行该操作")
+            return
+        if (
+            table.cursor_row is None
+            or table.cursor_row < 0
+            or table.cursor_row >= table.row_count
+        ):
+            self._set_status(f"{t('error')}: 未选择任何论文，无法执行该操作")
             return
 
         row_key = table.get_row_at(table.cursor_row)[0]
@@ -198,4 +233,3 @@ class PaperView(Vertical):
 
 # Backward-compatible alias
 PaperScreen = PaperView
-

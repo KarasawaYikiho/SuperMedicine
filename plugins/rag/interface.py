@@ -5,6 +5,7 @@ external database/vector-index providers.  Implementations should keep query
 results stable and expose connection/configuration failures as structured data
 instead of raising opaque exceptions to callers.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -50,7 +51,13 @@ class RAGProviderError(Exception):
 
     code = "rag_error"
 
-    def __init__(self, message: str, *, retryable: bool = False, details: dict[str, Any] | None = None):
+    def __init__(
+        self,
+        message: str,
+        *,
+        retryable: bool = False,
+        details: dict[str, Any] | None = None,
+    ):
         super().__init__(message)
         self.message = message
         self.retryable = retryable
@@ -157,7 +164,11 @@ class EmptyRAGProvider(RAGProvider):
         self._context: dict[str, Any] = {}
 
     def query(self, query_text: str, top_k: int = 5) -> dict[str, Any]:
-        return make_rag_result([], provider=self.provider_name, metadata={"query": query_text, "top_k": top_k})
+        return make_rag_result(
+            [],
+            provider=self.provider_name,
+            metadata={"query": query_text, "top_k": top_k},
+        )
 
     def store_context(self, key: str, data: Any) -> None:
         self._context[key] = data

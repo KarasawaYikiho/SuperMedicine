@@ -69,7 +69,9 @@ def _supports_case_distinct_names(directory: Path) -> bool:
     try:
         upper.write_text("upper", encoding="utf-8")
         lower.write_text("lower", encoding="utf-8")
-        return _has_exact_child_name(directory, upper.name) and _has_exact_child_name(directory, lower.name)
+        return _has_exact_child_name(directory, upper.name) and _has_exact_child_name(
+            directory, lower.name
+        )
     finally:
         for path in (upper, lower):
             try:
@@ -128,10 +130,14 @@ def _write_minimal_import_stubs(workspace: Path) -> None:
 
 def _copy_install_entrypoint_without_installer_package(workspace: Path) -> Path:
     install_path = workspace / "Install.py"
-    install_path.write_text((REPO_ROOT / "Install.py").read_text(encoding="utf-8"), encoding="utf-8")
+    install_path.write_text(
+        (REPO_ROOT / "Install.py").read_text(encoding="utf-8"), encoding="utf-8"
+    )
     if _supports_case_distinct_names(workspace):
         lowercase_install_path = workspace / "install.py"
-        lowercase_install_path.write_text(_read_exact_lowercase_install_source(), encoding="utf-8")
+        lowercase_install_path.write_text(
+            _read_exact_lowercase_install_source(), encoding="utf-8"
+        )
     _write_minimal_import_stubs(workspace)
     assert not (workspace / "installer").exists()
     return install_path
@@ -139,14 +145,20 @@ def _copy_install_entrypoint_without_installer_package(workspace: Path) -> Path:
 
 def _copy_cli_entrypoint_without_installer_package(workspace: Path) -> Path:
     cli_path = workspace / "Cli.py"
-    cli_path.write_text((REPO_ROOT / "Cli.py").read_text(encoding="utf-8"), encoding="utf-8")
-    (workspace / "Install.py").write_text((REPO_ROOT / "Install.py").read_text(encoding="utf-8"), encoding="utf-8")
+    cli_path.write_text(
+        (REPO_ROOT / "Cli.py").read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    (workspace / "Install.py").write_text(
+        (REPO_ROOT / "Install.py").read_text(encoding="utf-8"), encoding="utf-8"
+    )
     _write_minimal_import_stubs(workspace)
     assert not (workspace / "installer").exists()
     return cli_path
 
 
-def _run_isolated_install(workspace: Path, *args: str, input_text: str | None = None) -> subprocess.CompletedProcess[str]:
+def _run_isolated_install(
+    workspace: Path, *args: str, input_text: str | None = None
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, "Install.py", *args],
         cwd=workspace,
@@ -183,18 +195,24 @@ def test_lowercase_install_py_entrypoint_is_present_for_case_sensitive_platforms
     Path.exists() so it remains diagnostic on Windows case-insensitive filesystems.
     """
 
-    assert _has_exact_child_name(REPO_ROOT, "install.py") or _git_tracks_exact_path("install.py"), (
+    assert _has_exact_child_name(REPO_ROOT, "install.py") or _git_tracks_exact_path(
+        "install.py"
+    ), (
         "Missing exact lowercase installer entrypoint 'install.py'. "
         "Case-sensitive platforms cannot run the user command `python install.py` "
         "until a lowercase wrapper or renamed canonical entry is added."
     )
 
 
-def test_lowercase_install_help_works_when_optional_installer_package_is_absent(tmp_path):
+def test_lowercase_install_help_works_when_optional_installer_package_is_absent(
+    tmp_path,
+):
     """Regression: exact ``python install.py`` delegates to the installer on case-sensitive platforms."""
 
     if not _supports_case_distinct_names(tmp_path):
-        pytest.skip("filesystem cannot materialize both Install.py and install.py exact spellings")
+        pytest.skip(
+            "filesystem cannot materialize both Install.py and install.py exact spellings"
+        )
 
     _copy_install_entrypoint_without_installer_package(tmp_path)
 
@@ -269,12 +287,16 @@ def test_release_exe_missing_optional_module_reports_actionable_error(tmp_path):
     source = tmp_path / "SuperMedicine.exe"
     source.write_bytes(b"fake exe bytes")
 
-    result = _run_isolated_install(tmp_path, "--release-exe", str(source), "--exe-dry-run")
+    result = _run_isolated_install(
+        tmp_path, "--release-exe", str(source), "--exe-dry-run"
+    )
 
     output = result.stdout + result.stderr
     assert result.returncode != 0
     assert "--release-exe" in output or "installer" in output.lower()
-    assert "Install.py" in output or "pip install" in output or "release package" in output
+    assert (
+        "Install.py" in output or "pip install" in output or "release package" in output
+    )
     assert "ModuleNotFoundError" not in output
     assert "Traceback" not in output
 
@@ -295,7 +317,9 @@ def test_cli_help_works_when_optional_installer_package_is_absent(tmp_path):
     assert "UnicodeEncodeError" not in output
 
 
-def test_cli_init_without_release_exe_does_not_require_optional_installer_package(tmp_path):
+def test_cli_init_without_release_exe_does_not_require_optional_installer_package(
+    tmp_path,
+):
     """Core CLI init should remain usable without optional Exe release code."""
 
     _copy_cli_entrypoint_without_installer_package(tmp_path)
@@ -351,7 +375,9 @@ def test_cli_release_exe_missing_optional_module_reports_actionable_error(tmp_pa
     assert "Traceback" not in output
 
 
-def test_install_defaults_to_interactive_question_answer_when_args_are_absent(tmp_path, monkeypatch):
+def test_install_defaults_to_interactive_question_answer_when_args_are_absent(
+    tmp_path, monkeypatch
+):
     """Regression baseline: bare installer should be usable as an interactive flow."""
 
     from installer import entrypoint as Install
@@ -388,25 +414,30 @@ def test_install_defaults_to_interactive_question_answer_when_args_are_absent(tm
     assert any("api key" in prompt.lower() for prompt in prompts)
 
 
-def test_python_install_py_bare_interactive_flow_creates_config_without_optional_installer_package(tmp_path):
+def test_python_install_py_bare_interactive_flow_creates_config_without_optional_installer_package(
+    tmp_path,
+):
     """Regression: the exact user command `python install.py` must work as a wizard."""
 
     _copy_install_entrypoint_without_installer_package(tmp_path)
-    input_text = "\n".join(
-        [
-            "",  # installation/project path: current directory
-            "",  # full payload extraction: default no
-            "",  # initialize .supermedicine: default yes
-            "openai",
-            "https://openai.local.test/v1",
-            "gpt-test",
-            "sk-test-python-install-interactive",
-            "",  # shortcut preference: default no
-            "",  # PATH preference: default no
-            "",  # desktop Exe release: default no
-            "",  # confirmation summary: default yes
-        ]
-    ) + "\n"
+    input_text = (
+        "\n".join(
+            [
+                "",  # installation/project path: current directory
+                "",  # full payload extraction: default no
+                "",  # initialize .supermedicine: default yes
+                "openai",
+                "https://openai.local.test/v1",
+                "gpt-test",
+                "sk-test-python-install-interactive",
+                "",  # shortcut preference: default no
+                "",  # PATH preference: default no
+                "",  # desktop Exe release: default no
+                "",  # confirmation summary: default yes
+            ]
+        )
+        + "\n"
+    )
 
     result = _run_isolated_install(tmp_path, input_text=input_text)
 

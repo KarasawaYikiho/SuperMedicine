@@ -11,7 +11,9 @@ from core.workspace import WorkspaceManager
 
 def _prepare_workspace(tmp_path, monkeypatch, *workspace_ids: str) -> None:
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr("core.experience.tempfile.gettempdir", lambda: str(tmp_path / "temp"))
+    monkeypatch.setattr(
+        "core.experience.tempfile.gettempdir", lambda: str(tmp_path / "temp")
+    )
     manager = WorkspaceManager(tmp_path)
     for workspace_id in workspace_ids or ("study-a",):
         manager.initialize_workspace(workspace_id)
@@ -33,7 +35,9 @@ def test_suggested_classification_does_not_persist(tmp_path, monkeypatch):
     assert store.list_workspace_experiences("study-a") == []
 
 
-def test_confirm_writes_to_user_chosen_scope_overriding_suggestion(tmp_path, monkeypatch):
+def test_confirm_writes_to_user_chosen_scope_overriding_suggestion(
+    tmp_path, monkeypatch
+):
     _prepare_workspace(tmp_path, monkeypatch, "study-a")
     store = ExperienceStore(tmp_path)
 
@@ -111,7 +115,9 @@ def test_cli_edit_workspace_record(tmp_path, monkeypatch):
     assert edited["created_at"] == created["created_at"]
 
 
-def test_cli_delete_workspace_record_requires_matching_confirmation(tmp_path, monkeypatch):
+def test_cli_delete_workspace_record_requires_matching_confirmation(
+    tmp_path, monkeypatch
+):
     _prepare_workspace(tmp_path, monkeypatch, "study-a")
     cli = CLI()
     created = cli.experience_add(
@@ -125,7 +131,9 @@ def test_cli_delete_workspace_record_requires_matching_confirmation(tmp_path, mo
     with pytest.raises(ValueError, match="confirm"):
         cli.experience_delete(created["id"], "study-a", "workspace", "wrong-id")
 
-    deleted = cli.experience_delete(created["id"], "study-a", "workspace", created["id"])
+    deleted = cli.experience_delete(
+        created["id"], "study-a", "workspace", created["id"]
+    )
 
     assert deleted == {"status": "deleted", "id": created["id"], "scope": "workspace"}
     assert CLI().experience_list("study-a") == []
@@ -154,7 +162,9 @@ def test_export_workspace_records_as_json_and_markdown(tmp_path, monkeypatch):
     assert "Workspace export content." in exported_md
 
 
-def test_general_export_is_cross_workspace_and_rejects_project_details(tmp_path, monkeypatch):
+def test_general_export_is_cross_workspace_and_rejects_project_details(
+    tmp_path, monkeypatch
+):
     _prepare_workspace(tmp_path, monkeypatch, "study-a", "study-b")
     cli = CLI()
     general = cli.experience_add(
@@ -174,7 +184,9 @@ def test_general_export_is_cross_workspace_and_rejects_project_details(tmp_path,
             source={"project_details": {"secret": "study-a"}},
         )
 
-    exported = json.loads(cli.experience_export("study-b", "json", include_general=True))
+    exported = json.loads(
+        cli.experience_export("study-b", "json", include_general=True)
+    )
 
     assert [record["id"] for record in exported] == [general["id"]]
     assert exported[0]["workspace_id"] is None
@@ -234,11 +246,40 @@ def test_raw_conversation_and_project_markers_rejected(tmp_path, monkeypatch, pa
     "argv",
     [
         ["supermedicine", "experience", "suggest", "--summary", "Need workspace"],
-        ["supermedicine", "experience", "add", "--scope", "workspace", "--title", "T", "--summary", "S", "--confirm"],
+        [
+            "supermedicine",
+            "experience",
+            "add",
+            "--scope",
+            "workspace",
+            "--title",
+            "T",
+            "--summary",
+            "S",
+            "--confirm",
+        ],
         ["supermedicine", "experience", "list"],
         ["supermedicine", "experience", "view", "record-1"],
-        ["supermedicine", "experience", "edit", "record-1", "--scope", "workspace", "--title", "T"],
-        ["supermedicine", "experience", "delete", "record-1", "--scope", "workspace", "--confirm", "record-1"],
+        [
+            "supermedicine",
+            "experience",
+            "edit",
+            "record-1",
+            "--scope",
+            "workspace",
+            "--title",
+            "T",
+        ],
+        [
+            "supermedicine",
+            "experience",
+            "delete",
+            "record-1",
+            "--scope",
+            "workspace",
+            "--confirm",
+            "record-1",
+        ],
         ["supermedicine", "experience", "export", "--format", "json"],
     ],
 )

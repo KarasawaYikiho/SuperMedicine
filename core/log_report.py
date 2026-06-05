@@ -1,9 +1,13 @@
 """Safe log report storage for CLI-facing experiment/report commands."""
+
 from __future__ import annotations
 
 import json
+import logging
 import re
 import builtins
+import sys
+import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -20,6 +24,90 @@ _SCHEMA_VERSION = 2
 DEFAULT_MAX_MESSAGE_LENGTH = 10000
 DEFAULT_MAX_RECORDS_PER_SESSION = 1000
 DEFAULT_MAX_FILE_BYTES = 1024 * 1024
+TUI_LOG_SESSION_ID = "tui-application"
+_LOG_STORAGE_LOCK = threading.RLock()
+_SEVERITY_LABELS = {
+    "critical": "Error",
+    "error": "Error",
+    "warning": "Warning",
+    "warn": "Warning",
+    "info": "Info",
+    "information": "Info",
+    "debug": "Debug",
+    "trace": "Debug",
+    "success": "Success",
+    "ok": "Success",
+}
+_SEVERITY_ORDER = ("Error", "Warning", "Info", "Debug", "Success")
+_STAT_DIMENSIONS = ("session_id", "source", "module", "category")
+_SEVERITY_PREFIX = re.compile(
+    r"^\s*(?:【\s*(?P<cjk>critical|error|warning|warn|info|information|debug|trace|success|ok)\s*】|"
+    r"\[\s*(?P<bracket>critical|error|warning|warn|info|information|debug|trace|success|ok)\s*\]|"
+    r"(?P<plain>critical|error|warning|warn|info|information|debug|trace|success|ok)\s*[:：-])",
+    re.IGNORECASE,
+)
+
+
+def normalize_log_severity(severity: str | None) -> str:
+    """Return a supported display severity name."""
+
+    key = str(severity or "info").strip().lower()
+    return _SEVERITY_LABELS.get(key, "Info")
+
+
+def detect_log_severity(message: str, *, default: str = "Info") -> str:
+    """Infer a supported severity from an existing log message."""
+
+    text = str(message or "").strip()
+    prefix_match = _SEVERITY_PREFIX.match(text)
+    if prefix_match:
+        return normalize_log_severity(
+            next(value for value in prefix_match.groupdict().values() if value)
+        )
+
+    lowered = text.lower()
+    if "captured stderr" in lowered:
+        return "Error"
+    if (
+        re.search(
+            r"\b(critical|fatal|exception|traceback|error|failed|failure)\b", lowered
+        )
+        or "失败" in text
+    ):
+        return "Error"
+    if re.search(r"\b(warning|warn)\b", lowered) or any(
+        token in text for token in ("警告", "缺少", "请选择", "确认")
+    ):
+        return "Warning"
+    if re.search(r"\b(debug|trace)\b", lowered):
+        return "Debug"
+    if re.search(r"\b(success|succeeded|ready|ok|saved|completed)\b", lowered) or any(
+        token in text for token in ("成功", "已保存", "完成")
+    ):
+        return "Success"
+    if re.search(r"\b(info|information)\b", lowered):
+        return "Info"
+    return normalize_log_severity(default)
+
+
+def format_log_message(message: str, *, severity: str | None = None) -> str:
+    """Ensure a log message has one leading severity marker without duplicating legacy labels."""
+
+    safe_message = str(message or "").strip()
+    if not safe_message:
+        return safe_message
+    if _SEVERITY_PREFIX.match(safe_message):
+        return safe_message
+    label = (
+        normalize_log_severity(severity)
+        if severity
+        else detect_log_severity(safe_message)
+    )
+    return f"【{label}】 {safe_message}"
+
+
+def _display_message(message: Any, *, severity: str | None = None) -> str:
+    return format_log_message(str(message or ""), severity=severity)
 
 
 def _utc_now() -> str:
@@ -48,7 +136,9 @@ class LogReport:
         return cls(
             report_id=str(data["report_id"]),
             created_at=str(data["created_at"]),
-            session_id=str(data["session_id"]) if data.get("session_id") is not None else None,
+            session_id=str(data["session_id"])
+            if data.get("session_id") is not None
+            else None,
             message=str(data.get("message", "")),
         )
 
@@ -70,11 +160,21 @@ class LogReportStore:
     ) -> None:
         self.project_dir = Path(project_dir).resolve()
         self.log_dir = self.project_dir / ".supermedicine" / "logs"
-        self.max_message_length = self._positive_int(max_message_length, "max_message_length")
-        self.max_records_per_session = self._positive_int(max_records_per_session, "max_records_per_session")
+        self.max_message_length = self._positive_int(
+            max_message_length, "max_message_length"
+        )
+        self.max_records_per_session = self._positive_int(
+            max_records_per_session, "max_records_per_session"
+        )
         self.max_file_bytes = self._positive_int(max_file_bytes, "max_file_bytes")
 
-    def write(self, message: str, *, session_id: str | None = None) -> dict[str, Any]:
+    def write(
+        self,
+        message: str,
+        *,
+        session_id: str | None = None,
+        severity: str | None = None,
+    ) -> dict[str, Any]:
         """Write a redacted JSON log report.
 
         Session-scoped writes append to one safe session file. Writes without a
@@ -87,38 +187,46 @@ class LogReportStore:
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
         if safe_session_id:
-            return self.append(message, session_id=safe_session_id)
-        return self._write_isolated(message)
+            return self.append(message, session_id=safe_session_id, severity=severity)
+        return self._write_isolated(message, severity=severity)
 
-    def append(self, message: str, *, session_id: str) -> dict[str, Any]:
+    def append(
+        self, message: str, *, session_id: str, severity: str | None = None
+    ) -> dict[str, Any]:
         """Append a redacted message to a session log file."""
 
         message = self._require_message(message)
         safe_session_id = self._validate_session_id(session_id)
         if safe_session_id is None:
             raise LogReportError("session_id is required for append")
-        self.log_dir.mkdir(parents=True, exist_ok=True)
-        path = self._safe_log_path(f"session-{safe_session_id}.json")
-        entry = self._new_record(message, session_id=safe_session_id)
+        with _LOG_STORAGE_LOCK:
+            self.log_dir.mkdir(parents=True, exist_ok=True)
+            path = self._safe_log_path(f"session-{safe_session_id}.json")
+            entry = self._new_record(
+                message, session_id=safe_session_id, severity=severity
+            )
 
-        if path.exists():
-            payload = self._read_log_file(path)
-            if payload.get("session_id") != safe_session_id:
-                raise LogReportError("refusing to append to a different session log")
-            records = self._records_from_payload(payload)
-        else:
-            payload = self._new_payload(session_id=safe_session_id)
-            records = []
+            if path.exists():
+                payload = self._read_log_file(path)
+                if payload.get("session_id") != safe_session_id:
+                    raise LogReportError(
+                        "refusing to append to a different session log"
+                    )
+                records = self._records_from_payload(payload)
+            else:
+                payload = self._new_payload(session_id=safe_session_id)
+                records = []
 
-        if len(records) >= self.max_records_per_session:
-            raise LogReportError("session log record limit exceeded")
-        records.append(entry)
-        payload["records"] = records
-        payload["updated_at"] = entry["created_at"]
-        payload["message"] = entry["message"]
-        payload["entry_count"] = len(records)
-        self._write_payload(path, payload, allow_existing=True)
-        return self._public_payload(path, payload)
+            if len(records) >= self.max_records_per_session:
+                raise LogReportError("session log record limit exceeded")
+            records.append(entry)
+            payload["records"] = records
+            payload["updated_at"] = entry["created_at"]
+            payload["message"] = entry["message"]
+            payload["severity"] = entry["severity"]
+            payload["entry_count"] = len(records)
+            self._write_payload(path, payload, allow_existing=True)
+            return self._public_payload(path, payload)
 
     def list(self) -> builtins.list[dict[str, Any]]:
         if not self.log_dir.exists():
@@ -133,11 +241,43 @@ class LogReportStore:
                     "created_at": data.get("created_at"),
                     "updated_at": data.get("updated_at", data.get("created_at")),
                     "session_id": data.get("session_id"),
-                    "message": data.get("message"),
-                    "entry_count": data.get("entry_count", len(data.get("records", [])) or 1),
+                    "message": _display_message(
+                        data.get("message"), severity=data.get("severity")
+                    ),
+                    "severity": normalize_log_severity(
+                        data.get("severity")
+                        or detect_log_severity(str(data.get("message") or ""))
+                    ),
+                    "entry_count": data.get(
+                        "entry_count", len(data.get("records", [])) or 1
+                    ),
                 }
             )
         return redact_sensitive(reports)
+
+    def list_entries(
+        self,
+        *,
+        file_name: str | None = None,
+        session_id: str | None = None,
+    ) -> builtins.list[dict[str, Any]]:
+        """Return de-duplicated individual log entries from centralized Log storage."""
+
+        reports = self._reports_for_query(file_name=file_name, session_id=session_id)
+        entries: builtins.list[dict[str, Any]] = []
+        for report in reports:
+            for record in self._records_from_payload(report):
+                entries.append(self._entry_from_record(record, report=report))
+        return redact_sensitive(self._unique_entries(entries))
+
+    def statistics_for_entries(
+        self, entries: builtins.list[dict[str, Any]]
+    ) -> dict[str, Any]:
+        """Return statistics for the exact entries supplied by a caller."""
+
+        return redact_sensitive(
+            self._statistics_from_entries(self._unique_entries(entries))
+        )
 
     def show(self, file_name: str) -> dict[str, Any]:
         path = self._safe_log_path(file_name)
@@ -145,58 +285,51 @@ class LogReportStore:
             raise LogReportError(f"log report not found: {file_name}")
         return self._public_payload(path, self._read_log_file(path))
 
-    def summary(self, *, file_name: str | None = None, session_id: str | None = None) -> dict[str, Any]:
+    def summary(
+        self, *, file_name: str | None = None, session_id: str | None = None
+    ) -> dict[str, Any]:
         """Return a redacted summary for one log, one session, or all logs."""
 
         if file_name and session_id:
-            raise LogReportError("summary accepts either file_name or session_id, not both")
-        if file_name:
-            reports = [self.show(file_name)]
-        else:
-            safe_session_id = self._validate_session_id(session_id)
-            reports = [self.show(item["file"]) for item in self.list()]
-            if safe_session_id:
-                reports = [item for item in reports if item.get("session_id") == safe_session_id]
-
-        entries: builtins.list[dict[str, Any]] = []
-        for report in reports:
-            for record in self._records_from_payload(report):
-                entries.append(
-                    {
-                        "file": report.get("file"),
-                        "report_id": report.get("report_id"),
-                        "entry_id": record.get("entry_id"),
-                        "created_at": record.get("created_at"),
-                        "session_id": record.get("session_id", report.get("session_id")),
-                        "message": record.get("message"),
-                    }
-                )
+            raise LogReportError(
+                "summary accepts either file_name or session_id, not both"
+            )
+        reports = self._reports_for_query(file_name=file_name, session_id=session_id)
+        entries = self.list_entries(file_name=file_name, session_id=session_id)
+        statistics = self._statistics_from_entries(entries)
         return redact_sensitive(
             {
                 "generated_at": _utc_now(),
                 "log_count": len(reports),
                 "entry_count": len(entries),
                 "session_id": session_id,
+                "statistics": statistics,
                 "entries": entries,
             }
         )
 
-    def export_summary(self, *, file_name: str | None = None, session_id: str | None = None) -> dict[str, Any]:
+    def export_summary(
+        self, *, file_name: str | None = None, session_id: str | None = None
+    ) -> dict[str, Any]:
         """Compatibility-friendly API for exporting a redacted JSON summary."""
 
         return self.summary(file_name=file_name, session_id=session_id)
 
-    def _write_isolated(self, message: str) -> dict[str, Any]:
-        payload = self._new_payload(session_id=None)
-        entry = self._new_record(message, session_id=None)
-        payload["records"] = [entry]
-        payload["updated_at"] = entry["created_at"]
-        payload["message"] = entry["message"]
-        payload["entry_count"] = 1
-        filename = f"{payload['created_at'].replace(':', '').replace('+', 'Z')}-{payload['report_id']}.json"
-        path = self._safe_log_path(filename)
-        self._write_payload(path, payload, allow_existing=False)
-        return self._public_payload(path, payload)
+    def _write_isolated(
+        self, message: str, *, severity: str | None = None
+    ) -> dict[str, Any]:
+        with _LOG_STORAGE_LOCK:
+            payload = self._new_payload(session_id=None)
+            entry = self._new_record(message, session_id=None, severity=severity)
+            payload["records"] = [entry]
+            payload["updated_at"] = entry["created_at"]
+            payload["message"] = entry["message"]
+            payload["severity"] = entry["severity"]
+            payload["entry_count"] = 1
+            filename = f"{payload['created_at'].replace(':', '').replace('+', 'Z')}-{payload['report_id']}.json"
+            path = self._safe_log_path(filename)
+            self._write_payload(path, payload, allow_existing=False)
+            return self._public_payload(path, payload)
 
     def _new_payload(self, *, session_id: str | None) -> dict[str, Any]:
         created_at = _utc_now()
@@ -209,14 +342,20 @@ class LogReportStore:
             "session_id": session_id,
             "records": [],
             "message": "",
+            "severity": "Info",
             "entry_count": 0,
         }
 
-    def _new_record(self, message: str, *, session_id: str | None) -> dict[str, Any]:
+    def _new_record(
+        self, message: str, *, session_id: str | None, severity: str | None = None
+    ) -> dict[str, Any]:
         return {
             "entry_id": f"entry-{uuid4().hex}",
             "created_at": _utc_now(),
             "session_id": session_id,
+            "severity": normalize_log_severity(severity)
+            if severity
+            else detect_log_severity(message),
             "message": str(redact_sensitive(message)),
         }
 
@@ -266,10 +405,14 @@ class LogReportStore:
             return False
         return True
 
-    def _write_payload(self, path: Path, payload: dict[str, Any], *, allow_existing: bool) -> None:
+    def _write_payload(
+        self, path: Path, payload: dict[str, Any], *, allow_existing: bool
+    ) -> None:
         safe_payload = redact_sensitive(payload)
         if path.exists() and not allow_existing:
-            raise LogReportError(f"refusing to overwrite existing log report: {path.name}")
+            raise LogReportError(
+                f"refusing to overwrite existing log report: {path.name}"
+            )
         if path.exists():
             self._read_log_file(path)
         text = json.dumps(safe_payload, ensure_ascii=False, indent=2)
@@ -287,19 +430,196 @@ class LogReportStore:
         safe_payload["path"] = str(path)
         return redact_sensitive(safe_payload)
 
-    def _records_from_payload(self, payload: dict[str, Any]) -> builtins.list[dict[str, Any]]:
+    def _reports_for_query(
+        self,
+        *,
+        file_name: str | None = None,
+        session_id: str | None = None,
+    ) -> builtins.list[dict[str, Any]]:
+        if file_name and session_id:
+            raise LogReportError(
+                "query accepts either file_name or session_id, not both"
+            )
+        if file_name:
+            return [self.show(file_name)]
+        safe_session_id = self._validate_session_id(session_id)
+        if not self.log_dir.exists():
+            return []
+        reports: builtins.list[dict[str, Any]] = []
+        for path in sorted(self.log_dir.glob("*.json")):
+            report = self._public_payload(path, self._read_log_file(path))
+            if safe_session_id and report.get("session_id") != safe_session_id:
+                matching_records = [
+                    record
+                    for record in self._records_from_payload(report)
+                    if (record.get("session_id") or report.get("session_id"))
+                    == safe_session_id
+                ]
+                if not matching_records:
+                    continue
+                report = dict(report)
+                report["records"] = matching_records
+            reports.append(report)
+        return reports
+
+    def _entry_from_record(
+        self, record: dict[str, Any], *, report: dict[str, Any]
+    ) -> dict[str, Any]:
+        severity = self._record_severity(record)
+        dimensions = self._record_dimensions(record, report=report)
+        raw_message = str(record.get("message") or "")
+        return {
+            "file": report.get("file"),
+            "report_id": report.get("report_id"),
+            "entry_id": record.get("entry_id"),
+            "created_at": record.get("created_at"),
+            "updated_at": record.get("created_at"),
+            "session_id": dimensions.get("session_id"),
+            "source": dimensions.get("source"),
+            "module": dimensions.get("module"),
+            "category": dimensions.get("category"),
+            "raw_message": raw_message,
+            "message": _display_message(raw_message, severity=severity),
+            "severity": severity,
+        }
+
+    def _records_from_payload(
+        self, payload: dict[str, Any]
+    ) -> builtins.list[dict[str, Any]]:
         records = payload.get("records")
         if isinstance(records, list):
-            return [redact_sensitive(record) for record in records if isinstance(record, dict)]
-        legacy = LogReport.from_dict(payload).to_dict()
+            coerced_records: builtins.list[dict[str, Any]] = []
+            for index, record in enumerate(records):
+                if isinstance(record, dict):
+                    coerced_records.append(
+                        self._coerce_record(record, payload=payload, index=index)
+                    )
+            return [redact_sensitive(record) for record in coerced_records]
+        legacy = self._coerce_legacy_record(payload)
         return [
             {
                 "entry_id": legacy["report_id"],
                 "created_at": legacy["created_at"],
                 "session_id": legacy["session_id"],
+                "severity": detect_log_severity(legacy["message"]),
                 "message": legacy["message"],
             }
         ]
+
+    def _coerce_record(
+        self, record: dict[str, Any], *, payload: dict[str, Any], index: int
+    ) -> dict[str, Any]:
+        safe_record = dict(record)
+        if safe_record.get("entry_id") is None:
+            safe_record["entry_id"] = f"{payload.get('report_id') or 'legacy'}-{index}"
+        if safe_record.get("created_at") is None:
+            safe_record["created_at"] = (
+                payload.get("created_at") or payload.get("updated_at") or ""
+            )
+        if safe_record.get("session_id") is None:
+            safe_record["session_id"] = payload.get("session_id")
+        if safe_record.get("message") is None:
+            safe_record["message"] = ""
+        safe_record["severity"] = self._record_severity(safe_record)
+        return safe_record
+
+    @staticmethod
+    def _coerce_legacy_record(payload: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "report_id": str(payload.get("report_id") or "legacy-log"),
+            "created_at": str(
+                payload.get("created_at") or payload.get("updated_at") or ""
+            ),
+            "session_id": str(payload["session_id"])
+            if payload.get("session_id") is not None
+            else None,
+            "message": str(payload.get("message", "")),
+        }
+
+    @staticmethod
+    def _record_severity(record: dict[str, Any]) -> str:
+        return normalize_log_severity(
+            record.get("severity")
+            or detect_log_severity(str(record.get("message") or ""))
+        )
+
+    @staticmethod
+    def _record_dimensions(
+        record: dict[str, Any], *, report: dict[str, Any]
+    ) -> dict[str, str | None]:
+        dimensions: dict[str, str | None] = {}
+        for key in _STAT_DIMENSIONS:
+            value = record.get(key, report.get(key))
+            dimensions[key] = (
+                str(value) if value is not None and str(value) != "" else None
+            )
+        return dimensions
+
+    @staticmethod
+    def _entry_identity(
+        entry: dict[str, Any], *, fallback: int
+    ) -> tuple[str, str, str, str]:
+        return (
+            str(entry.get("file") or ""),
+            str(entry.get("report_id") or ""),
+            str(entry.get("entry_id") or fallback),
+            str(entry.get("created_at") or ""),
+        )
+
+    def _unique_entries(
+        self, entries: builtins.list[dict[str, Any]]
+    ) -> builtins.list[dict[str, Any]]:
+        unique_entries: builtins.list[dict[str, Any]] = []
+        seen_keys: set[tuple[str, str, str, str]] = set()
+        for index, entry in enumerate(entries):
+            identity = self._entry_identity(entry, fallback=index)
+            if identity in seen_keys:
+                continue
+            seen_keys.add(identity)
+            unique_entries.append(entry)
+        return unique_entries
+
+    def _statistics_from_entries(
+        self, entries: builtins.list[dict[str, Any]]
+    ) -> dict[str, Any]:
+        severity_counts = {severity: 0 for severity in _SEVERITY_ORDER}
+        dimension_counts: dict[str, dict[str, int]] = {
+            key: {} for key in _STAT_DIMENSIONS
+        }
+        first_seen: str | None = None
+        last_seen: str | None = None
+
+        for entry in entries:
+            severity = normalize_log_severity(str(entry.get("severity") or "Info"))
+            severity_counts[severity] = severity_counts.get(severity, 0) + 1
+            created_at = str(entry.get("created_at") or "")
+            if created_at:
+                first_seen = (
+                    created_at
+                    if first_seen is None or created_at < first_seen
+                    else first_seen
+                )
+                last_seen = (
+                    created_at
+                    if last_seen is None or created_at > last_seen
+                    else last_seen
+                )
+            for dimension in _STAT_DIMENSIONS:
+                value = entry.get(dimension)
+                if value is None or str(value) == "":
+                    continue
+                key = str(value)
+                dimension_counts[dimension][key] = (
+                    dimension_counts[dimension].get(key, 0) + 1
+                )
+
+        return {
+            "entry_count": len(entries),
+            "severity_counts": severity_counts,
+            "by_severity": severity_counts,
+            "dimensions": dimension_counts,
+            "time_range": {"start": first_seen, "end": last_seen},
+        }
 
     def _read_log_file(self, path: Path) -> dict[str, Any]:
         data = self._read_path(path)
@@ -320,7 +640,101 @@ class LogReportStore:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
-            raise LogReportError(f"could not read log report {path.name}: {exc}") from exc
+            raise LogReportError(
+                f"could not read log report {path.name}: {exc}"
+            ) from exc
         if not isinstance(data, dict):
             raise LogReportError(f"log report {path.name} is not a JSON object")
         return redact_sensitive(data)
+
+
+class LogReportLoggingHandler(logging.Handler):
+    """Logging handler that persists application records into Log storage."""
+
+    def __init__(
+        self, project_dir: str | Path, *, session_id: str = TUI_LOG_SESSION_ID
+    ) -> None:
+        super().__init__()
+        self.store = LogReportStore(project_dir)
+        self.session_id = session_id
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            message = self.format(record)
+            if message.strip():
+                for chunk in _log_chunks(message):
+                    self.store.append(
+                        chunk, session_id=self.session_id, severity=record.levelname
+                    )
+        except Exception:
+            pass
+
+
+def configure_tui_log_storage(project_dir: str | Path) -> None:
+    """Route TUI-mode logs only to Log storage, never console streams."""
+
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+
+    for handler in list(root.handlers):
+        root.removeHandler(handler)
+        handler.close()
+
+    handler = LogReportLoggingHandler(project_dir)
+    handler.setLevel(logging.INFO)
+    handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+    )
+    root.addHandler(handler)
+
+    for logger_name in ("core", "plugins", "permission", "adapters", "installer"):
+        named_logger = logging.getLogger(logger_name)
+        named_logger.handlers.clear()
+        named_logger.propagate = True
+
+    for existing_logger in list(logging.Logger.manager.loggerDict.values()):
+        if not isinstance(existing_logger, logging.Logger):
+            continue
+        for handler in list(existing_logger.handlers):
+            if _is_console_stream_handler(handler):
+                existing_logger.removeHandler(handler)
+                handler.close()
+        existing_logger.propagate = True
+
+
+def append_tui_stream_output(
+    project_dir: str | Path, stream_name: str, text: str
+) -> None:
+    """Persist stdout/stderr text captured during TUI background execution."""
+
+    message = str(text).strip()
+    if not message:
+        return
+    severity = "Error" if str(stream_name).lower() == "stderr" else "Info"
+    try:
+        store = LogReportStore(project_dir)
+        for chunk in _log_chunks(f"captured {stream_name}: {message}"):
+            store.append(chunk, session_id=TUI_LOG_SESSION_ID, severity=severity)
+    except Exception:
+        pass
+
+
+def _is_console_stream_handler(handler: logging.Handler) -> bool:
+    stream = getattr(handler, "stream", None)
+    return stream in {
+        sys.stdout,
+        sys.stderr,
+        getattr(sys, "__stdout__", None),
+        getattr(sys, "__stderr__", None),
+    }
+
+
+def _log_chunks(message: str) -> builtins.list[str]:
+    safe_message = str(message).strip()
+    if len(safe_message) <= DEFAULT_MAX_MESSAGE_LENGTH:
+        return [safe_message]
+    chunk_size = DEFAULT_MAX_MESSAGE_LENGTH - 32
+    return [
+        safe_message[index : index + chunk_size]
+        for index in range(0, len(safe_message), chunk_size)
+    ]

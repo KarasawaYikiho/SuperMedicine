@@ -7,7 +7,9 @@ import pytest
 from Cli import CLI, main
 
 
-def test_experiment_start_persists_session_and_show_returns_current_step(tmp_path, monkeypatch):
+def test_experiment_start_persists_session_and_show_returns_current_step(
+    tmp_path, monkeypatch
+):
     monkeypatch.chdir(tmp_path)
 
     started = CLI().experiment_start("wb", session_id="wb-session")
@@ -22,7 +24,9 @@ def test_experiment_start_persists_session_and_show_returns_current_step(tmp_pat
     assert shown["progress"]["completed_steps"] == 0
 
 
-def test_experiment_submit_advances_step_and_records_submitted_data(tmp_path, monkeypatch):
+def test_experiment_submit_advances_step_and_records_submitted_data(
+    tmp_path, monkeypatch
+):
     monkeypatch.chdir(tmp_path)
     session_file = tmp_path / ".supermedicine" / "experiments" / "wb-session.json"
     CLI().experiment_start("wb", session_id="wb-session")
@@ -43,10 +47,14 @@ def test_experiment_submit_advances_step_and_records_submitted_data(tmp_path, mo
     assert result["record"]["user_input"]["sample_id"] == "S1"
     assert result["record"]["outputs"]["sample_record"] == "ready"
     assert result["current_step"]["step_id"] == "gel_electrophoresis"
-    assert saved["records"]["sample_preparation"]["user_input"]["target_protein"] == "ACTB"
+    assert (
+        saved["records"]["sample_preparation"]["user_input"]["target_protein"] == "ACTB"
+    )
 
 
-def test_experiment_submit_with_calculate_returns_wb_calculation_output(tmp_path, monkeypatch):
+def test_experiment_submit_with_calculate_returns_wb_calculation_output(
+    tmp_path, monkeypatch
+):
     monkeypatch.chdir(tmp_path)
     session_file = tmp_path / ".supermedicine" / "experiments" / "calc-session.json"
     CLI().experiment_start("wb", session_id="calc-session")
@@ -72,10 +80,17 @@ def test_experiment_submit_with_calculate_returns_wb_calculation_output(tmp_path
     assert result["plugin_request"]["plugin_name"] == "experiment-wb"
     assert result["kernel_result"]["status"] == "success"
     assert result["kernel_result"]["output"]["samples"][0]["sample_volume"] == 10.0
-    assert result["record"]["calculation_results"][0]["value"]["samples"][0]["diluent_volume"] == 10.0
+    assert (
+        result["record"]["calculation_results"][0]["value"]["samples"][0][
+            "diluent_volume"
+        ]
+        == 10.0
+    )
 
 
-def test_experiment_submit_calculate_rejects_step_without_supported_calculation(tmp_path, monkeypatch):
+def test_experiment_submit_calculate_rejects_step_without_supported_calculation(
+    tmp_path, monkeypatch
+):
     monkeypatch.chdir(tmp_path)
     session_file = tmp_path / ".supermedicine" / "experiments" / "no-calc-session.json"
     CLI().experiment_start("wb", session_id="no-calc-session")
@@ -89,7 +104,9 @@ def test_experiment_submit_calculate_rejects_step_without_supported_calculation(
         CLI().experiment_submit(
             session_file,
             "gel_electrophoresis",
-            json.dumps({"user_input": {"gel_percentage": "10%", "run_condition": "120V 60min"}}),
+            json.dumps(
+                {"user_input": {"gel_percentage": "10%", "run_condition": "120V 60min"}}
+            ),
             calculate=True,
         )
 
@@ -114,18 +131,33 @@ def test_log_write_list_show_create_redacted_reports(tmp_path, monkeypatch):
     assert "secret-token" not in json.dumps(shown, ensure_ascii=False)
 
 
-def test_experiment_submit_invalid_json_exits_with_argparse_error(tmp_path, monkeypatch, capsys):
+def test_experiment_submit_invalid_json_exits_with_argparse_error(
+    tmp_path, monkeypatch, capsys
+):
     monkeypatch.chdir(tmp_path)
     session_file = CLI().experiment_start("wb", session_id="bad-json")["session_file"]
 
     with pytest.raises(SystemExit) as excinfo:
-        main(["experiment", "submit", "--session-file", session_file, "--step", "sample_preparation", "--input-json", "{"])
+        main(
+            [
+                "experiment",
+                "submit",
+                "--session-file",
+                session_file,
+                "--step",
+                "sample_preparation",
+                "--input-json",
+                "{",
+            ]
+        )
 
     assert excinfo.value.code == 2
     assert "--input-json must be valid JSON" in capsys.readouterr().err
 
 
-def test_log_write_empty_message_exits_with_argparse_error(tmp_path, monkeypatch, capsys):
+def test_log_write_empty_message_exits_with_argparse_error(
+    tmp_path, monkeypatch, capsys
+):
     monkeypatch.chdir(tmp_path)
 
     with pytest.raises(SystemExit) as excinfo:
@@ -135,7 +167,9 @@ def test_log_write_empty_message_exits_with_argparse_error(tmp_path, monkeypatch
     assert "--message cannot be empty" in capsys.readouterr().err
 
 
-def test_experiment_submit_wrong_step_exits_with_argparse_error(tmp_path, monkeypatch, capsys):
+def test_experiment_submit_wrong_step_exits_with_argparse_error(
+    tmp_path, monkeypatch, capsys
+):
     monkeypatch.chdir(tmp_path)
     session_file = CLI().experiment_start("wb", session_id="wrong-step")["session_file"]
 
@@ -149,7 +183,9 @@ def test_experiment_submit_wrong_step_exits_with_argparse_error(tmp_path, monkey
                 "--step",
                 "gel_electrophoresis",
                 "--input-json",
-                json.dumps({"user_input": {"sample_id": "S1", "target_protein": "ACTB"}}),
+                json.dumps(
+                    {"user_input": {"sample_id": "S1", "target_protein": "ACTB"}}
+                ),
             ]
         )
 

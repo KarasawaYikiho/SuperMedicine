@@ -6,11 +6,17 @@ import re
 from typing import Any
 
 _SENSITIVE_VALUE_PATTERNS: tuple[re.Pattern[str], ...] = (
-    re.compile(r"(?i)(api[_-]?key|token|secret|password|passwd|credential|authorization)\s*[:=]\s*([^\s,;&\"'{}\[\]]+)"),
-    re.compile(r"(?i)([?&](?:api[_-]?key|token|secret|password|passwd|credential|authorization)=)([^\s&#]+)"),
+    re.compile(
+        r"(?i)(api[_-]?key|token|secret|password|passwd|credential|authorization)\s*[:=]\s*([^\s,;&\"'{}\[\]]+)"
+    ),
+    re.compile(
+        r"(?i)([?&](?:api[_-]?key|token|secret|password|passwd|credential|authorization)=)([^\s&#]+)"
+    ),
     re.compile(r"(?i)(bearer\s+)([A-Za-z0-9._~+\-/=]+)"),
     re.compile(r"\b(sk-[A-Za-z0-9][A-Za-z0-9._\-]{8,})\b"),
-    re.compile(r"\b(ghp_[A-Za-z0-9_]{12,}|gho_[A-Za-z0-9_]{12,}|glpat-[A-Za-z0-9_\-]{12,}|xox[baprs]-[A-Za-z0-9\-]{12,})\b"),
+    re.compile(
+        r"\b(ghp_[A-Za-z0-9_]{12,}|gho_[A-Za-z0-9_]{12,}|glpat-[A-Za-z0-9_\-]{12,}|xox[baprs]-[A-Za-z0-9\-]{12,})\b"
+    ),
 )
 
 
@@ -46,9 +52,15 @@ def redact_sensitive(value: Any) -> Any:
         return tuple(redact_sensitive(item) for item in value)
     if isinstance(value, str):
         text = value
-        text = _SENSITIVE_VALUE_PATTERNS[0].sub(lambda match: f"{match.group(1)}=[REDACTED]", text)
-        text = _SENSITIVE_VALUE_PATTERNS[1].sub(lambda match: f"{match.group(1)}[REDACTED]", text)
-        text = _SENSITIVE_VALUE_PATTERNS[2].sub(lambda match: f"{match.group(1)}[REDACTED]", text)
+        text = _SENSITIVE_VALUE_PATTERNS[0].sub(
+            lambda match: f"{match.group(1)}=[REDACTED]", text
+        )
+        text = _SENSITIVE_VALUE_PATTERNS[1].sub(
+            lambda match: f"{match.group(1)}[REDACTED]", text
+        )
+        text = _SENSITIVE_VALUE_PATTERNS[2].sub(
+            lambda match: f"{match.group(1)}[REDACTED]", text
+        )
         text = _SENSITIVE_VALUE_PATTERNS[3].sub("[REDACTED]", text)
         text = _SENSITIVE_VALUE_PATTERNS[4].sub("[REDACTED]", text)
         return text

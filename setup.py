@@ -70,7 +70,10 @@ def _lowercase_install_bytes() -> bytes:
         )
     except (OSError, ValueError):
         return LOWERCASE_INSTALL_BYTES
-    if result.returncode == 0 and b"from installer.entrypoint import main" in result.stdout:
+    if (
+        result.returncode == 0
+        and b"from installer.entrypoint import main" in result.stdout
+    ):
         return result.stdout.replace(b"\r\n", b"\n")
     return LOWERCASE_INSTALL_BYTES
 
@@ -87,7 +90,11 @@ def _uppercase_install_bytes() -> bytes:
         )
     except (OSError, ValueError):
         result = None
-    if result is not None and result.returncode == 0 and b"installer.entrypoint" in result.stdout:
+    if (
+        result is not None
+        and result.returncode == 0
+        and b"installer.entrypoint" in result.stdout
+    ):
         return result.stdout.replace(b"\r\n", b"\n")
     return UPPERCASE_INSTALL_BYTES
 
@@ -141,7 +148,9 @@ def _ensure_zip_members(archive_path: Path, payloads: dict[str, bytes]) -> None:
                 if name not in payloads:
                     rewritten[name] = archive.read(name)
     rewritten.update(payloads)
-    with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+    with zipfile.ZipFile(
+        archive_path, "w", compression=zipfile.ZIP_DEFLATED
+    ) as archive:
         for name, data in rewritten.items():
             archive.writestr(name, data)
 
@@ -154,7 +163,11 @@ def _wheel_record_name(names: list[str]) -> str | None:
 
 
 def _record_line(path: str, payload: bytes) -> str:
-    digest = base64.urlsafe_b64encode(hashlib.sha256(payload).digest()).rstrip(b"=").decode("ascii")
+    digest = (
+        base64.urlsafe_b64encode(hashlib.sha256(payload).digest())
+        .rstrip(b"=")
+        .decode("ascii")
+    )
     return f"{path},sha256={digest},{len(payload)}"
 
 
@@ -172,7 +185,9 @@ def _ensure_wheel_members(archive_path: Path, payloads: dict[str, bytes]) -> Non
             kept_records = [
                 line
                 for line in existing_records
-                if not any(line.startswith(f"{member_name},") for member_name in payloads)
+                if not any(
+                    line.startswith(f"{member_name},") for member_name in payloads
+                )
                 and not line.startswith(f"{record_name},")
             ]
             for member_name, payload in payloads.items():
@@ -181,7 +196,9 @@ def _ensure_wheel_members(archive_path: Path, payloads: dict[str, bytes]) -> Non
             rewritten[record_name] = ("\n".join(kept_records) + "\n").encode("utf-8")
 
     rewritten.update(payloads)
-    with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+    with zipfile.ZipFile(
+        archive_path, "w", compression=zipfile.ZIP_DEFLATED
+    ) as archive:
         for name, data in rewritten.items():
             archive.writestr(name, data)
 
@@ -205,7 +222,9 @@ def _ensure_tar_gz_members(archive_path: Path, payloads: dict[str, bytes]) -> No
                 continue
             if member.isfile():
                 extracted = archive.extractfile(member)
-                kept.append((member, extracted.read() if extracted is not None else b""))
+                kept.append(
+                    (member, extracted.read() if extracted is not None else b"")
+                )
             else:
                 kept.append((member, None))
 
@@ -233,7 +252,10 @@ class sdist(_sdist):
             archive_path = Path(archive_name)
             if archive_path.suffix == ".zip":
                 root = archive_path.stem
-                _ensure_zip_members(archive_path, {f"{root}/{name}": payload for name, payload in payloads.items()})
+                _ensure_zip_members(
+                    archive_path,
+                    {f"{root}/{name}": payload for name, payload in payloads.items()},
+                )
             elif archive_path.name.endswith(".tar.gz"):
                 _ensure_tar_gz_members(archive_path, payloads)
 

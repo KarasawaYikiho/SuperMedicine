@@ -1,4 +1,5 @@
 """Custom provider integration tests."""
+
 from __future__ import annotations
 
 import yaml
@@ -10,7 +11,9 @@ from core.llm_providers.base import AnthropicClient, OpenAIClient
 from core.llm_providers.config import _default_api_key_env, _infer_api_format
 
 
-def _write_config(tmp_path, providers: dict, *, current: str = "", last: str = "") -> ConfigCenter:
+def _write_config(
+    tmp_path, providers: dict, *, current: str = "", last: str = ""
+) -> ConfigCenter:
     """Helper: write a config.yaml with given LLM providers and return ConfigCenter."""
     llm: dict = {"providers": providers}
     if current:

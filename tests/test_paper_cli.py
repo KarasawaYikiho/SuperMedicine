@@ -23,7 +23,9 @@ def _copy_default_policy(project_dir: Path) -> None:
     ensure_default_policy(project_dir, source_root=REPO_ROOT)
 
 
-def _write_delta_policy(project_dir: Path, *, allowed: list[dict], denied: list[dict] | None = None) -> None:
+def _write_delta_policy(
+    project_dir: Path, *, allowed: list[dict], denied: list[dict] | None = None
+) -> None:
     policies = project_dir / ".supermedicine" / "policies"
     policies.mkdir(parents=True, exist_ok=True)
     (policies / PermissionEngine.DEFAULT_POLICY_FILENAME).write_text(
@@ -47,7 +49,9 @@ def _audit_entries(project_dir: Path) -> list[dict]:
     audit_log = project_dir / ".supermedicine" / "policies" / "audit.jsonl"
     if not audit_log.exists():
         return []
-    return [json.loads(line) for line in audit_log.read_text(encoding="utf-8").splitlines()]
+    return [
+        json.loads(line) for line in audit_log.read_text(encoding="utf-8").splitlines()
+    ]
 
 
 class CountingProvider:
@@ -115,7 +119,9 @@ def test_paper_list_show_edit_use_explicit_workspace(tmp_path, monkeypatch):
     source = tmp_path / "source.md"
     source.write_text("# Editable paper\n", encoding="utf-8")
 
-    imported = CLI().paper_import("paper-study", source, metadata={"title": "Original", "tags": ["draft"]})
+    imported = CLI().paper_import(
+        "paper-study", source, metadata={"title": "Original", "tags": ["draft"]}
+    )
     paper_id = imported["metadata"]["id"]
 
     listed = CLI().paper_list("paper-study")
@@ -123,7 +129,12 @@ def test_paper_list_show_edit_use_explicit_workspace(tmp_path, monkeypatch):
     edited = CLI().paper_edit(
         "paper-study",
         paper_id,
-        {"title": "Edited", "doi": "10.1234/edited", "notes": "updated", "tags": ["edited"]},
+        {
+            "title": "Edited",
+            "doi": "10.1234/edited",
+            "notes": "updated",
+            "tags": ["edited"],
+        },
     )
 
     assert [paper["id"] for paper in listed] == [paper_id]
@@ -141,14 +152,21 @@ def test_enrichment_does_not_call_provider_without_confirm_and_audits_skip(tmp_p
     provider = CountingProvider({"title": "Should not be used"})
     source = tmp_path / "paper.md"
     source.write_text("# Skip enrichment\n", encoding="utf-8")
-    metadata = PaperImporter(WorkspaceManager(tmp_path)).import_paper(
-        WorkspaceManager(tmp_path).initialize_workspace("paper-study").id,
-        source,
-        metadata={"title": "Original"},
-    ).metadata
+    metadata = (
+        PaperImporter(WorkspaceManager(tmp_path))
+        .import_paper(
+            WorkspaceManager(tmp_path).initialize_workspace("paper-study").id,
+            source,
+            metadata={"title": "Original"},
+        )
+        .metadata
+    )
 
     result = PaperEnricher(
-        PermissionEngine(tmp_path / ".supermedicine" / "policies", tmp_path / ".supermedicine" / "policies" / "audit.jsonl"),
+        PermissionEngine(
+            tmp_path / ".supermedicine" / "policies",
+            tmp_path / ".supermedicine" / "policies" / "audit.jsonl",
+        ),
         AuditLogger(tmp_path / ".supermedicine" / "policies" / "audit.jsonl"),
         provider=provider,
     ).enrich(metadata, confirmed=False)
@@ -171,11 +189,18 @@ def test_enrichment_permission_deny_prevents_provider_call_and_audits_denial(tmp
     workspace = WorkspaceManager(tmp_path).initialize_workspace("paper-study")
     source = tmp_path / "paper.md"
     source.write_text("# Denied enrichment\n", encoding="utf-8")
-    metadata = PaperImporter(tmp_path).import_paper(workspace.id, source, metadata={"title": "Original"}).metadata
+    metadata = (
+        PaperImporter(tmp_path)
+        .import_paper(workspace.id, source, metadata={"title": "Original"})
+        .metadata
+    )
     provider = CountingProvider({"title": "Should not be used"})
 
     result = PaperEnricher(
-        PermissionEngine(tmp_path / ".supermedicine" / "policies", tmp_path / ".supermedicine" / "policies" / "audit.jsonl"),
+        PermissionEngine(
+            tmp_path / ".supermedicine" / "policies",
+            tmp_path / ".supermedicine" / "policies" / "audit.jsonl",
+        ),
         AuditLogger(tmp_path / ".supermedicine" / "policies" / "audit.jsonl"),
         provider=provider,
     ).enrich(metadata, confirmed=True)
@@ -184,16 +209,23 @@ def test_enrichment_permission_deny_prevents_provider_call_and_audits_denial(tmp
     assert provider.calls == 0
     assert metadata.title == "Original"
     entries = _audit_entries(tmp_path)
-    assert any(entry["action"] == "paper.enrich" and entry["result"] == "denied" for entry in entries)
+    assert any(
+        entry["action"] == "paper.enrich" and entry["result"] == "denied"
+        for entry in entries
+    )
 
 
-def test_cli_enrichment_allow_uses_mocked_provider_and_updates_metadata(tmp_path, monkeypatch):
+def test_cli_enrichment_allow_uses_mocked_provider_and_updates_metadata(
+    tmp_path, monkeypatch
+):
     monkeypatch.chdir(tmp_path)
     _copy_default_policy(tmp_path)
     workspace = WorkspaceManager(tmp_path).initialize_workspace("paper-study")
     source = tmp_path / "paper.md"
     source.write_text("# Enrich me\n", encoding="utf-8")
-    imported = CLI().paper_import(workspace.id, source, metadata={"title": "Original", "tags": ["seed"]})
+    imported = CLI().paper_import(
+        workspace.id, source, metadata={"title": "Original", "tags": ["seed"]}
+    )
     paper_id = imported["metadata"]["id"]
     provider = CountingProvider(
         {
@@ -203,10 +235,16 @@ def test_cli_enrichment_allow_uses_mocked_provider_and_updates_metadata(tmp_path
             "tags": ["seed", "enriched"],
         }
     )
-    monkeypatch.setattr("core.paper_import.enrichment.LocalMockMetadataProvider", lambda: provider)
+    monkeypatch.setattr(
+        "core.paper_import.enrichment.LocalMockMetadataProvider", lambda: provider
+    )
 
     result = CLI().paper_enrich(workspace.id, paper_id, confirm_enrich=True)
-    saved_metadata = json.loads((workspace.path / "papers" / "metadata" / f"{paper_id}.json").read_text(encoding="utf-8"))
+    saved_metadata = json.loads(
+        (workspace.path / "papers" / "metadata" / f"{paper_id}.json").read_text(
+            encoding="utf-8"
+        )
+    )
 
     assert provider.calls == 1
     assert result["status"] == "enriched"
@@ -229,7 +267,9 @@ def test_denied_enrichment_does_not_corrupt_import(tmp_path, monkeypatch):
     source_content = "# Import survives denied enrichment\n"
     source.write_text(source_content, encoding="utf-8")
     provider = CountingProvider({"title": "Should not be used"})
-    monkeypatch.setattr("core.paper_import.enrichment.LocalMockMetadataProvider", lambda: provider)
+    monkeypatch.setattr(
+        "core.paper_import.enrichment.LocalMockMetadataProvider", lambda: provider
+    )
 
     result = CLI().paper_import(
         "paper-study",
@@ -279,7 +319,12 @@ def test_old_cli_commands_and_run_flags_still_present(tmp_path, monkeypatch):
             captured["plugin"] = plugin_name
             captured["action"] = action
             captured["params"] = params
-            return {"status": "success", "task": task, "plugin": plugin_name, "action": action}
+            return {
+                "status": "success",
+                "task": task,
+                "plugin": plugin_name,
+                "action": action,
+            }
 
     monkeypatch.setattr("core.kernel.Kernel", FakeKernel)
     monkeypatch.setattr(

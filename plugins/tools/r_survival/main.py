@@ -5,6 +5,7 @@ log-rank, and Cox-style survival actions. When R, rpy2, and the R ``survival``
 package are available, callers may request the formal R backend. The pure Python
 fallback and R bridge are not clinical-grade statistical implementations.
 """
+
 from __future__ import annotations
 
 import logging
@@ -34,26 +35,52 @@ STATISTICS_BOUNDARY = (
 
 ACTION_CONTRACTS: dict[str, dict[str, Any]] = {
     "r.survival.km": {
-        "required_params": {"times": "list[number]", "events": "list[0|1]", "same_length": True},
-        "output_fields": ["time_points", "median_survival", "total_subjects", "total_events"],
+        "required_params": {
+            "times": "list[number]",
+            "events": "list[0|1]",
+            "same_length": True,
+        },
+        "output_fields": [
+            "time_points",
+            "median_survival",
+            "total_subjects",
+            "total_events",
+        ],
         "prototype": True,
     },
     "r.survival.logrank": {
         "required_params": {
-            "times1": "list[number]", "events1": "list[0|1]",
-            "times2": "list[number]", "events2": "list[0|1]", "same_length_by_group": True,
+            "times1": "list[number]",
+            "events1": "list[0|1]",
+            "times2": "list[number]",
+            "events2": "list[0|1]",
+            "same_length_by_group": True,
         },
-        "output_fields": ["statistic", "p_value", "df", "median_group1", "median_group2"],
+        "output_fields": [
+            "statistic",
+            "p_value",
+            "df",
+            "median_group1",
+            "median_group2",
+        ],
         "prototype": True,
     },
     "r.survival.cox": {
         "required_params": {
-            "times": "list[number]", "events": "list[0|1]", "covariates": "list[list[number]]",
+            "times": "list[number]",
+            "events": "list[0|1]",
+            "covariates": "list[list[number]]",
             "same_subject_count": True,
         },
         "output_fields": [
-            "coefficients", "hazard_ratios", "standard_errors", "confidence_intervals",
-            "p_values", "log_likelihood", "n_subjects", "n_events",
+            "coefficients",
+            "hazard_ratios",
+            "standard_errors",
+            "confidence_intervals",
+            "p_values",
+            "log_likelihood",
+            "n_subjects",
+            "n_events",
         ],
         "prototype": True,
     },
@@ -62,11 +89,15 @@ ACTION_CONTRACTS: dict[str, dict[str, Any]] = {
 DEFAULT_PARAMS: dict[str, dict[str, Any]] = {
     "r.survival.km": {"times": [1, 2, 3, 4, 5], "events": [1, 1, 0, 1, 0]},
     "r.survival.logrank": {
-        "times1": [1, 2, 3, 4, 5], "events1": [1, 1, 1, 1, 1],
-        "times2": [2, 3, 4, 5, 6], "events2": [1, 1, 1, 1, 1],
+        "times1": [1, 2, 3, 4, 5],
+        "events1": [1, 1, 1, 1, 1],
+        "times2": [2, 3, 4, 5, 6],
+        "events2": [1, 1, 1, 1, 1],
     },
     "r.survival.cox": {
-        "times": [1, 2, 3, 4, 5], "events": [1, 1, 0, 1, 0], "covariates": [[0, 1, 0, 1, 0]],
+        "times": [1, 2, 3, 4, 5],
+        "events": [1, 1, 0, 1, 0],
+        "covariates": [[0, 1, 0, 1, 0]],
     },
 }
 
@@ -92,7 +123,9 @@ def _r_backend_imports() -> tuple[Any, Any, Any, Any, Any]:
 def _r_backend_status() -> dict[str, Any]:
     """Return structured availability for rpy2, R, and R survival package."""
     try:
-        robjects, _default_converter, _pandas2ri, _localconverter, importr = _r_backend_imports()
+        robjects, _default_converter, _pandas2ri, _localconverter, importr = (
+            _r_backend_imports()
+        )
     except Exception as exc:  # ImportError, R discovery/runtime failures
         logger.debug("R backend unavailable while importing rpy2/R: %s", exc)
         return {
@@ -189,9 +222,7 @@ def cox_tool(
         "coefficients": result.coefficients,
         "hazard_ratios": result.hazard_ratios,
         "standard_errors": result.standard_errors,
-        "confidence_intervals": [
-            list(ci) for ci in result.confidence_intervals
-        ],
+        "confidence_intervals": [list(ci) for ci in result.confidence_intervals],
         "p_values": result.p_values,
         "log_likelihood": result.log_likelihood,
         "n_subjects": result.n_subjects,
@@ -201,11 +232,16 @@ def cox_tool(
 
 def km_tool_r(times: list[float], events: list[int]) -> dict[str, Any]:
     """Kaplan-Meier via R survival::survfit."""
-    robjects, _default_converter, _pandas2ri, _localconverter, importr = _r_backend_imports()
+    robjects, _default_converter, _pandas2ri, _localconverter, importr = (
+        _r_backend_imports()
+    )
     importr("survival")
     r = robjects.r
     globalenv = robjects.globalenv
-    previous = {name: globalenv.find(name) if name in globalenv else None for name in ("sm_time", "sm_event")}
+    previous = {
+        name: globalenv.find(name) if name in globalenv else None
+        for name in ("sm_time", "sm_event")
+    }
     try:
         globalenv["sm_time"] = robjects.FloatVector(times)
         globalenv["sm_event"] = robjects.IntVector(events)
@@ -223,11 +259,25 @@ def km_tool_r(times: list[float], events: list[int]) -> dict[str, Any]:
     names = list(summary.names)
     time_values = list(summary.rx2("time")) if "time" in names else []
     surv_values = list(summary.rx2("surv")) if "surv" in names else []
-    lower_values = list(summary.rx2("lower")) if "lower" in names else [None] * len(time_values)
-    upper_values = list(summary.rx2("upper")) if "upper" in names else [None] * len(time_values)
-    n_risk_values = list(summary.rx2("n.risk")) if "n.risk" in names else [None] * len(time_values)
-    n_event_values = list(summary.rx2("n.event")) if "n.event" in names else [None] * len(time_values)
-    n_censor_values = list(summary.rx2("n.censor")) if "n.censor" in names else [None] * len(time_values)
+    lower_values = (
+        list(summary.rx2("lower")) if "lower" in names else [None] * len(time_values)
+    )
+    upper_values = (
+        list(summary.rx2("upper")) if "upper" in names else [None] * len(time_values)
+    )
+    n_risk_values = (
+        list(summary.rx2("n.risk")) if "n.risk" in names else [None] * len(time_values)
+    )
+    n_event_values = (
+        list(summary.rx2("n.event"))
+        if "n.event" in names
+        else [None] * len(time_values)
+    )
+    n_censor_values = (
+        list(summary.rx2("n.censor"))
+        if "n.censor" in names
+        else [None] * len(time_values)
+    )
     table = fit.rx2("table")
     table_names = list(table.names) if table.names is not None else []
     median_survival = None
@@ -260,14 +310,19 @@ def logrank_tool_r(
     events2: list[int],
 ) -> dict[str, Any]:
     """Log-rank test via R survival::survdiff."""
-    robjects, _default_converter, _pandas2ri, _localconverter, importr = _r_backend_imports()
+    robjects, _default_converter, _pandas2ri, _localconverter, importr = (
+        _r_backend_imports()
+    )
     importr("survival")
     r = robjects.r
     all_times = times1 + times2
     all_events = events1 + events2
     groups = ["group1"] * len(times1) + ["group2"] * len(times2)
     globalenv = robjects.globalenv
-    previous = {name: globalenv.find(name) if name in globalenv else None for name in ("sm_time", "sm_event", "sm_group")}
+    previous = {
+        name: globalenv.find(name) if name in globalenv else None
+        for name in ("sm_time", "sm_event", "sm_group")
+    }
     try:
         globalenv["sm_time"] = robjects.FloatVector(all_times)
         globalenv["sm_event"] = robjects.IntVector(all_events)
@@ -284,7 +339,9 @@ def logrank_tool_r(
                 globalenv[name] = value
     statistic = float(fit.rx2("chisq")[0])
     df = max(len(fit.rx2("n")) - 1, 0)
-    p_value = float(r["pchisq"](statistic, df, **{"lower.tail": False})[0]) if df else 1.0
+    p_value = (
+        float(r["pchisq"](statistic, df, **{"lower.tail": False})[0]) if df else 1.0
+    )
     return {
         "statistic": statistic,
         "p_value": p_value,
@@ -300,13 +357,18 @@ def cox_tool_r(
     covariates: list[list[float]],
 ) -> dict[str, Any]:
     """Cox proportional hazards model via R survival::coxph."""
-    robjects, _default_converter, _pandas2ri, _localconverter, importr = _r_backend_imports()
+    robjects, _default_converter, _pandas2ri, _localconverter, importr = (
+        _r_backend_imports()
+    )
     importr("survival")
     r = robjects.r
     globalenv = robjects.globalenv
     covariate_names = [f"x{index + 1}" for index in range(len(covariates))]
     names_to_restore = ["sm_time", "sm_event", *covariate_names]
-    previous = {name: globalenv.find(name) if name in globalenv else None for name in names_to_restore}
+    previous = {
+        name: globalenv.find(name) if name in globalenv else None
+        for name in names_to_restore
+    }
     try:
         globalenv["sm_time"] = robjects.FloatVector(times)
         globalenv["sm_event"] = robjects.IntVector(events)
@@ -328,12 +390,23 @@ def cox_tool_r(
                 globalenv[name] = value
 
     n_covariates = len(covariates)
-    coefficients = [float(coefficients_matrix.rx(row + 1, 1)[0]) for row in range(n_covariates)]
-    hazard_ratios = [float(coefficients_matrix.rx(row + 1, 2)[0]) for row in range(n_covariates)]
-    standard_errors = [float(coefficients_matrix.rx(row + 1, 3)[0]) for row in range(n_covariates)]
-    p_values = [float(coefficients_matrix.rx(row + 1, 5)[0]) for row in range(n_covariates)]
+    coefficients = [
+        float(coefficients_matrix.rx(row + 1, 1)[0]) for row in range(n_covariates)
+    ]
+    hazard_ratios = [
+        float(coefficients_matrix.rx(row + 1, 2)[0]) for row in range(n_covariates)
+    ]
+    standard_errors = [
+        float(coefficients_matrix.rx(row + 1, 3)[0]) for row in range(n_covariates)
+    ]
+    p_values = [
+        float(coefficients_matrix.rx(row + 1, 5)[0]) for row in range(n_covariates)
+    ]
     confidence_intervals = [
-        [float(confint_matrix.rx(row + 1, 3)[0]), float(confint_matrix.rx(row + 1, 4)[0])]
+        [
+            float(confint_matrix.rx(row + 1, 3)[0]),
+            float(confint_matrix.rx(row + 1, 4)[0]),
+        ]
         for row in range(n_covariates)
     ]
     log_likelihood_values = list(fit.rx2("loglik"))
@@ -376,7 +449,9 @@ def execute(
         },
         "r_backend": {
             "requested": r_backend_requested,
-            "selected": "r" if r_backend_requested and r_backend["available"] else "python",
+            "selected": "r"
+            if r_backend_requested and r_backend["available"]
+            else "python",
             "available": r_backend["available"],
             "reason": r_backend.get("reason"),
             "detail": r_backend.get("detail"),
@@ -390,7 +465,9 @@ def execute(
             "prototype_path": True,
             "rpy2_available": r_backend.get("rpy2_available", False),
             "r_backend_available": r_backend["available"],
-            "r_backend_selected": "r" if r_backend_requested and r_backend["available"] else "python",
+            "r_backend_selected": "r"
+            if r_backend_requested and r_backend["available"]
+            else "python",
             "context_keys": sorted((context or {}).keys()),
         },
     }
@@ -404,24 +481,61 @@ def execute(
         )
     try:
         if action == "r.survival.km":
-            times = as_float_list(param_or_default(params, "times", DEFAULT_PARAMS[action]["times"]), "times")
-            events = _as_event_list(param_or_default(params, "events", DEFAULT_PARAMS[action]["events"]), "events")
-            result = km_tool_r(times, events) if r_backend_requested else km_tool(times, events)
+            times = as_float_list(
+                param_or_default(params, "times", DEFAULT_PARAMS[action]["times"]),
+                "times",
+            )
+            events = _as_event_list(
+                param_or_default(params, "events", DEFAULT_PARAMS[action]["events"]),
+                "events",
+            )
+            result = (
+                km_tool_r(times, events)
+                if r_backend_requested
+                else km_tool(times, events)
+            )
         elif action == "r.survival.logrank":
-            times1 = as_float_list(param_or_default(params, "times1", DEFAULT_PARAMS[action]["times1"]), "times1")
-            events1 = _as_event_list(param_or_default(params, "events1", DEFAULT_PARAMS[action]["events1"]), "events1")
-            times2 = as_float_list(param_or_default(params, "times2", DEFAULT_PARAMS[action]["times2"]), "times2")
-            events2 = _as_event_list(param_or_default(params, "events2", DEFAULT_PARAMS[action]["events2"]), "events2")
+            times1 = as_float_list(
+                param_or_default(params, "times1", DEFAULT_PARAMS[action]["times1"]),
+                "times1",
+            )
+            events1 = _as_event_list(
+                param_or_default(params, "events1", DEFAULT_PARAMS[action]["events1"]),
+                "events1",
+            )
+            times2 = as_float_list(
+                param_or_default(params, "times2", DEFAULT_PARAMS[action]["times2"]),
+                "times2",
+            )
+            events2 = _as_event_list(
+                param_or_default(params, "events2", DEFAULT_PARAMS[action]["events2"]),
+                "events2",
+            )
             result = (
                 logrank_tool_r(times1, events1, times2, events2)
                 if r_backend_requested
                 else logrank_tool(times1, events1, times2, events2)
             )
         elif action == "r.survival.cox":
-            times = as_float_list(param_or_default(params, "times", DEFAULT_PARAMS[action]["times"]), "times")
-            events = _as_event_list(param_or_default(params, "events", DEFAULT_PARAMS[action]["events"]), "events")
-            covariates = as_float_groups(param_or_default(params, "covariates", DEFAULT_PARAMS[action]["covariates"]), "covariates")
-            result = cox_tool_r(times, events, covariates) if r_backend_requested else cox_tool(times, events, covariates)
+            times = as_float_list(
+                param_or_default(params, "times", DEFAULT_PARAMS[action]["times"]),
+                "times",
+            )
+            events = _as_event_list(
+                param_or_default(params, "events", DEFAULT_PARAMS[action]["events"]),
+                "events",
+            )
+            covariates = as_float_groups(
+                param_or_default(
+                    params, "covariates", DEFAULT_PARAMS[action]["covariates"]
+                ),
+                "covariates",
+            )
+            result = (
+                cox_tool_r(times, events, covariates)
+                if r_backend_requested
+                else cox_tool(times, events, covariates)
+            )
         else:
             return plugin_result(
                 status="plugin_error",

@@ -1,4 +1,5 @@
 """权限约束引擎 — P0 优先级"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -7,11 +8,17 @@ from typing import Any
 import yaml
 
 from .audit import AuditLogger
-from .policy import DEFAULT_POLICY_RELATIVE_PATH, PermissionPolicy, PermissionResult, default_policy_path
+from .policy import (
+    DEFAULT_POLICY_RELATIVE_PATH,
+    PermissionPolicy,
+    PermissionResult,
+    default_policy_path,
+)
 
 
 class PermissionPolicyLoadError(RuntimeError):
     """Raised when permission policies cannot be loaded safely."""
+
 
 class PermissionEngine:
     DEFAULT_POLICY_FILENAME = DEFAULT_POLICY_RELATIVE_PATH.name
@@ -46,9 +53,13 @@ class PermissionEngine:
                 with open(f, encoding="utf-8") as fh:
                     data = yaml.safe_load(fh)
             except yaml.YAMLError as exc:
-                raise PermissionPolicyLoadError(f"Invalid YAML permission policy: {f}: {exc}") from exc
+                raise PermissionPolicyLoadError(
+                    f"Invalid YAML permission policy: {f}: {exc}"
+                ) from exc
             except OSError as exc:
-                raise PermissionPolicyLoadError(f"Unable to read permission policy: {f}: {exc}") from exc
+                raise PermissionPolicyLoadError(
+                    f"Unable to read permission policy: {f}: {exc}"
+                ) from exc
 
             if data is None:
                 raise PermissionPolicyLoadError(f"Empty permission policy file: {f}")
@@ -56,19 +67,30 @@ class PermissionEngine:
             # Support both Single Dict and List of Policies
             policies = data if isinstance(data, list) else [data]
             if not isinstance(policies, list):
-                raise PermissionPolicyLoadError(f"Permission policy must be a mapping or list: {f}")
+                raise PermissionPolicyLoadError(
+                    f"Permission policy must be a mapping or list: {f}"
+                )
 
             for item in policies:
                 if not isinstance(item, dict) or "agent_id" not in item:
-                    raise PermissionPolicyLoadError(f"Invalid permission policy entry in {f}")
+                    raise PermissionPolicyLoadError(
+                        f"Invalid permission policy entry in {f}"
+                    )
                 try:
                     policy = PermissionPolicy.from_dict(item)
                 except (KeyError, TypeError, ValueError) as exc:
-                    raise PermissionPolicyLoadError(f"Invalid permission policy entry in {f}: {exc}") from exc
+                    raise PermissionPolicyLoadError(
+                        f"Invalid permission policy entry in {f}: {exc}"
+                    ) from exc
                 self._policies[policy.agent_id] = policy
 
-    def check(self, agent_id: str, action: str, resource: str,
-              context: dict[str, Any] | None = None) -> PermissionResult:
+    def check(
+        self,
+        agent_id: str,
+        action: str,
+        resource: str,
+        context: dict[str, Any] | None = None,
+    ) -> PermissionResult:
         """检查操作权限
 
         Args:
@@ -79,33 +101,70 @@ class PermissionEngine:
                 plugin/action/task 等上下文，确保 CLI 与运行时共用同一策略路径）
         """
         if agent_id not in self._policies:
-            self._audit.log(agent_id=agent_id, action=action, resource=resource,
-                           result="DENIED", reason="unknown_agent")
+            self._audit.log(
+                agent_id=agent_id,
+                action=action,
+                resource=resource,
+                result="DENIED",
+                reason="unknown_agent",
+            )
             return PermissionResult.DENIED
 
         policy = self._policies[agent_id]
 
         # 先检查 hard_limits
         if context and policy.hard_limits:
-            if context.get("requires_network") and policy.hard_limits.network_access is False:
-                self._audit.log(agent_id=agent_id, action=action, resource=resource,
-                               result="DENIED", reason="hard_limit_exceeded:network_access:false")
+            if (
+                context.get("requires_network")
+                and policy.hard_limits.network_access is False
+            ):
+                self._audit.log(
+                    agent_id=agent_id,
+                    action=action,
+                    resource=resource,
+                    result="DENIED",
+                    reason="hard_limit_exceeded:network_access:false",
+                )
                 return PermissionResult.DENIED
-            if context.get("requires_external_api") and policy.hard_limits.external_api is False:
-                self._audit.log(agent_id=agent_id, action=action, resource=resource,
-                               result="DENIED", reason="hard_limit_exceeded:external_api:false")
+            if (
+                context.get("requires_external_api")
+                and policy.hard_limits.external_api is False
+            ):
+                self._audit.log(
+                    agent_id=agent_id,
+                    action=action,
+                    resource=resource,
+                    result="DENIED",
+                    reason="hard_limit_exceeded:external_api:false",
+                )
                 return PermissionResult.DENIED
             for limit_name, limit_value in policy.hard_limits.items():
                 ctx_value = context.get(limit_name)
                 if ctx_value is not None and ctx_value > limit_value:
-                    reason = f"hard_limit_exceeded:{limit_name}:{ctx_value}>{limit_value}"
-                    self._audit.log(agent_id=agent_id, action=action, resource=resource,
-                                   result="DENIED", reason=reason)
+                    reason = (
+                        f"hard_limit_exceeded:{limit_name}:{ctx_value}>{limit_value}"
+                    )
+                    self._audit.log(
+                        agent_id=agent_id,
+                        action=action,
+                        resource=resource,
+                        result="DENIED",
+                        reason=reason,
+                    )
                     return PermissionResult.DENIED
 
         # 检查 Allowed/Denied 规则
         result = policy.check(action, resource)
-        reason = "whitelist_match" if result == PermissionResult.ALLOWED else "blacklist_match_or_default_deny"
-        self._audit.log(agent_id=agent_id, action=action, resource=resource,
-                       result=result.value, reason=reason)
+        reason = (
+            "whitelist_match"
+            if result == PermissionResult.ALLOWED
+            else "blacklist_match_or_default_deny"
+        )
+        self._audit.log(
+            agent_id=agent_id,
+            action=action,
+            resource=resource,
+            result=result.value,
+            reason=reason,
+        )
         return result

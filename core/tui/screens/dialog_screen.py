@@ -1,4 +1,4 @@
-﻿"""Dialog history view for SuperMedicine TUI."""
+"""Dialog history view for SuperMedicine TUI."""
 
 from __future__ import annotations
 
@@ -67,7 +67,11 @@ class DialogView(Vertical):
         table.clear(columns=True)
         table.add_columns(t("dialog_event"), t("dialog_summary"), t("dialog_time"))
         if not workspace_id:
-            self._set_status(f"{t('dialog_refreshed')}：{t('paper_select_workspace')}" if refreshed else t("paper_select_workspace"))
+            self._set_status(
+                f"{t('dialog_refreshed')}：{t('paper_select_workspace')}"
+                if refreshed
+                else t("paper_select_workspace")
+            )
             return
 
         from core.tui.dialog_history import DialogHistoryStore
@@ -76,7 +80,11 @@ class DialogView(Vertical):
         try:
             events = store.load_events(workspace_id)
             if not events:
-                self._set_status(f"{t('dialog_refreshed')}：{t('dialog_no_history')}" if refreshed else t("dialog_no_history"))
+                self._set_status(
+                    f"{t('dialog_refreshed')}：{t('dialog_no_history')}"
+                    if refreshed
+                    else t("dialog_no_history")
+                )
                 return
             for event in events:
                 table.add_row(
@@ -85,7 +93,11 @@ class DialogView(Vertical):
                     event.created_at,
                     key=event.id,
                 )
-            self._set_status(f"{t('dialog_refreshed')}: {len(events)}" if refreshed else f"{t('dialog_title')}: {len(events)}")
+            self._set_status(
+                f"{t('dialog_refreshed')}: {len(events)}"
+                if refreshed
+                else f"{t('dialog_title')}: {len(events)}"
+            )
         except Exception as e:
             self._set_error(e)
 
@@ -96,7 +108,9 @@ class DialogView(Vertical):
         apply_status_style(status, safe_message)
 
     def _set_error(self, error: Exception) -> None:
-        message = f"{t('error')}: {redact_sensitive(str(error)) or t('safe_error_hint')}"
+        message = (
+            f"{t('error')}: {redact_sensitive(str(error)) or t('safe_error_hint')}"
+        )
         self._set_status(message)
         self.app.notify(message, severity="error")
 
@@ -112,4 +126,3 @@ class DialogView(Vertical):
 
 # Backward-compatible alias
 DialogScreen = DialogView
-

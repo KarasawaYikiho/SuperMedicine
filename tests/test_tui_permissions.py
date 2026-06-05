@@ -37,7 +37,9 @@ def test_high_risk_action_refuses_unconfirmed_request_without_permission_call():
 def test_high_risk_action_requires_permission_engine_allow():
     denied_engine = FakePermissionEngine(PermissionResult.DENIED)
 
-    denied = prepare_tool_action(denied_engine, tool="write", resource="notes/output.md", confirmed=True)
+    denied = prepare_tool_action(
+        denied_engine, tool="write", resource="notes/output.md", confirmed=True
+    )
 
     assert denied.allowed is False
     assert denied.permission == "denied"
@@ -45,7 +47,9 @@ def test_high_risk_action_requires_permission_engine_allow():
     assert denied_engine.calls[0]["context"]["sandbox_required"] is True
 
     allowed_engine = FakePermissionEngine(PermissionResult.ALLOWED)
-    allowed = prepare_tool_action(allowed_engine, tool="edit", resource="notes/output.md", confirmed=True)
+    allowed = prepare_tool_action(
+        allowed_engine, tool="edit", resource="notes/output.md", confirmed=True
+    )
 
     assert allowed.allowed is True
     assert allowed.permission == "allowed"

@@ -57,7 +57,9 @@ class WorkspaceScreenController:
         try:
             slug = validate_workspace_id(workspace_id)
         except InvalidWorkspaceId as exc:
-            raise ValueError("工作区 ID 只能使用小写字母、数字和连字符，且不能以连字符开头或结尾") from exc
+            raise ValueError(
+                "工作区 ID 只能使用小写字母、数字和连字符，且不能以连字符开头或结尾"
+            ) from exc
 
         state = TUIState(self.root)
         manager = self.workspace_manager
@@ -70,12 +72,18 @@ class WorkspaceScreenController:
 
         info = state.create_workspace(slug)
         state.save_recent_workspace(info.id, info.id)
-        return self._workspace_payload(info, selected=True, message="已创建并选择工作区")
+        return self._workspace_payload(
+            info, selected=True, message="已创建并选择工作区"
+        )
 
-    def select_workspace(self, workspace_id: str, *, state_workspace_id: str | None = None) -> dict[str, Any]:
+    def select_workspace(
+        self, workspace_id: str, *, state_workspace_id: str | None = None
+    ) -> dict[str, Any]:
         """Select an existing workspace and persist recent TUI state in workspace sessions."""
 
-        info = TUIState(self.root).select_workspace(workspace_id, state_workspace_id=state_workspace_id)
+        info = TUIState(self.root).select_workspace(
+            workspace_id, state_workspace_id=state_workspace_id
+        )
         return self._workspace_payload(info, selected=True, message="已选择工作区")
 
     def recent_workspace(self, workspace_id: str) -> str | None:
@@ -114,7 +122,9 @@ class WorkspaceScreenController:
                 result="cancelled",
                 reason="missing_default_policy",
             )
-            raise FileNotFoundError(f"默认权限策略不存在，无法删除工作区: {default_policy}")
+            raise FileNotFoundError(
+                f"默认权限策略不存在，无法删除工作区: {default_policy}"
+            )
 
         authorization = authorize_dangerous_operation(
             permission_engine=PermissionEngine(policies_dir, audit_log),
@@ -131,7 +141,12 @@ class WorkspaceScreenController:
             shutil.rmtree(authorization.path)
         else:
             authorization.path.unlink()
-        return {"status": "deleted", "id": slug, "path": str(authorization.path), "message": "工作区已硬删除"}
+        return {
+            "status": "deleted",
+            "id": slug,
+            "path": str(authorization.path),
+            "message": "工作区已硬删除",
+        }
 
     def _workspace_payload(
         self,

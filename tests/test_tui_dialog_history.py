@@ -23,7 +23,10 @@ def test_dialog_history_appends_and_loads_summary_events_only(tmp_path):
 
     assert loaded[0].id == event.id
     assert loaded[0].summary == "用户打开工作区屏幕"
-    assert store.history_path("study-a", "session1").parent == tmp_path / "workspaces" / "study-a" / ".supermedicine" / "sessions"
+    assert (
+        store.history_path("study-a", "session1").parent
+        == tmp_path / "workspaces" / "study-a" / ".supermedicine" / "sessions"
+    )
 
 
 def test_dialog_history_rejects_raw_conversation_fields(tmp_path):
@@ -45,7 +48,11 @@ def test_dialog_history_rejects_raw_conversation_on_reload(tmp_path):
     path = store.history_path("study-a")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
-        json.dumps({"event": "bad", "summary": "contains raw_conversation marker"}, ensure_ascii=False) + "\n",
+        json.dumps(
+            {"event": "bad", "summary": "contains raw_conversation marker"},
+            ensure_ascii=False,
+        )
+        + "\n",
         encoding="utf-8",
     )
 

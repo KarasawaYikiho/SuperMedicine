@@ -7,6 +7,7 @@ without inspecting OpenCode, Claude Code, or any other assistant-platform
 runtime/config directories. Platform discovery remains available only through
 the explicit optional ``--detect`` command.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -43,6 +44,7 @@ def _configure_stdio_errors() -> None:
             reconfigure(errors="backslashreplace")
         except (AttributeError, TypeError, ValueError):
             continue
+
 
 DEFAULT_CONFIG: dict[str, Any] = {
     "project_name": "supermedicine",
@@ -99,7 +101,9 @@ def _default_config_text() -> str:
     return header + yaml.safe_dump(DEFAULT_CONFIG, sort_keys=False, allow_unicode=True)
 
 
-def _deep_merge_missing(target: dict[str, Any], defaults: dict[str, Any]) -> dict[str, Any]:
+def _deep_merge_missing(
+    target: dict[str, Any], defaults: dict[str, Any]
+) -> dict[str, Any]:
     for key, value in defaults.items():
         if key not in target:
             target[key] = value
@@ -189,7 +193,9 @@ def _require_complete_llm_config(
     return normalized_provider or ""
 
 
-def _validate_install_llm_config(*, provider: str, base_url: str, api_key: str, model: str) -> None:
+def _validate_install_llm_config(
+    *, provider: str, base_url: str, api_key: str, model: str
+) -> None:
     config = LLMProviderConfig.from_mapping(
         provider,
         {
@@ -204,7 +210,9 @@ def _validate_install_llm_config(*, provider: str, base_url: str, api_key: str, 
         raise ValueError("LLM Provider 配置不完整，缺少: " + ", ".join(missing))
     parsed = urlparse(config.base_url)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-        raise ValueError(f"LLM Provider base_url 必须是有效的 http(s) URL；provider={provider} base_url={base_url}")
+        raise ValueError(
+            f"LLM Provider base_url 必须是有效的 http(s) URL；provider={provider} base_url={base_url}"
+        )
 
 
 def _redact(value: str | None) -> str:
@@ -228,7 +236,9 @@ def _resolve_api_key(provider: str | None, explicit: str | None) -> str | None:
     return None
 
 
-def _prompt_value(prompt: str, default: str | None = None, *, secret: bool = False) -> str | None:
+def _prompt_value(
+    prompt: str, default: str | None = None, *, secret: bool = False
+) -> str | None:
     suffix = f" [{default}]" if default and not secret else ""
     if secret:
         if sys.stdin.isatty():
@@ -242,7 +252,9 @@ def _prompt_value(prompt: str, default: str | None = None, *, secret: bool = Fal
     return default
 
 
-def _prompt_required_value(prompt: str, default: str | None = None, *, secret: bool = False) -> str:
+def _prompt_required_value(
+    prompt: str, default: str | None = None, *, secret: bool = False
+) -> str:
     while True:
         value = _prompt_value(prompt, default, secret=secret)
         if value and value.strip():
@@ -256,7 +268,9 @@ def _prompt_base_url(default: str | None = None) -> str:
         parsed = urlparse(value)
         if parsed.scheme in {"http", "https"} and parsed.netloc:
             return value
-        logger.info("提示: Base URL 需为 http(s) 地址，例如 https://api.openai.com/v1。")
+        logger.info(
+            "提示: Base URL 需为 http(s) 地址，例如 https://api.openai.com/v1。"
+        )
 
 
 def _prompt_yes_no(prompt: str, default: bool = False) -> bool:
@@ -348,19 +362,36 @@ def _run_interactive_installer(args: argparse.Namespace) -> None:
         logger.info("")
         logger.info("[1/4] 选择安装位置")
         install_path = _prompt_path("安装/项目路径", Path.cwd())
-        extract_release = _prompt_yes_no("释放完整程序文件到该目录", bool(getattr(sys, "frozen", False)))
+        extract_release = _prompt_yes_no(
+            "释放完整程序文件到该目录", bool(getattr(sys, "frozen", False))
+        )
 
         logger.info("")
         logger.info("[2/4] 初始化项目配置")
         init_config_enabled = _prompt_yes_no("初始化 .supermedicine 配置", True)
-        llm_config: dict[str, str | None] = {"provider": None, "base_url": None, "api_key": None, "model": None}
+        llm_config: dict[str, str | None] = {
+            "provider": None,
+            "base_url": None,
+            "api_key": None,
+            "model": None,
+        }
         if init_config_enabled:
-            imported_config = _load_llm_config_file(args.llm_config) if args.llm_config else {}
-            provider = _resolve_install_value("provider", args.provider) or cast(str | None, imported_config.get("provider"))
-            base_url = _resolve_install_value("base_url", args.base_url) or cast(str | None, imported_config.get("base_url"))
-            model = _resolve_install_value("model", args.model) or cast(str | None, imported_config.get("model"))
+            imported_config = (
+                _load_llm_config_file(args.llm_config) if args.llm_config else {}
+            )
+            provider = _resolve_install_value("provider", args.provider) or cast(
+                str | None, imported_config.get("provider")
+            )
+            base_url = _resolve_install_value("base_url", args.base_url) or cast(
+                str | None, imported_config.get("base_url")
+            )
+            model = _resolve_install_value("model", args.model) or cast(
+                str | None, imported_config.get("model")
+            )
             normalized_provider = _normalize_provider(provider)
-            api_key = _resolve_api_key(normalized_provider, args.api_key) or cast(str | None, imported_config.get("api_key"))
+            api_key = _resolve_api_key(normalized_provider, args.api_key) or cast(
+                str | None, imported_config.get("api_key")
+            )
             llm_config = _collect_interactive_llm_config(
                 provider=normalized_provider,
                 base_url=base_url,
@@ -418,9 +449,13 @@ def _run_interactive_installer(args: argparse.Namespace) -> None:
                     _align_release_exe_with_extracted_payload(args)
                 _release_exe_from_args(args)
             if add_to_path:
-                logger.info("PATH 提示: 可将 Python Scripts 目录加入系统 PATH，或使用 python Cli.py。")
+                logger.info(
+                    "PATH 提示: 可将 Python Scripts 目录加入系统 PATH，或使用 python Cli.py。"
+                )
             if create_shortcut:
-                logger.info("快捷方式提示: 当前版本请手动创建指向 supermedicine 或 python Cli.py 的快捷方式。")
+                logger.info(
+                    "快捷方式提示: 当前版本请手动创建指向 supermedicine 或 python Cli.py 的快捷方式。"
+                )
             logger.info("安装完成。可运行 python Cli.py status 检查状态。")
             return
         except (ValueError, OSError, SystemExit) as exc:
@@ -473,7 +508,9 @@ def _load_llm_config_file(config_path: Path) -> dict[str, str | None]:
     if not isinstance(llm, dict):
         raise ValueError("LLM 配置文件缺少 llm 配置段")
 
-    provider = _normalize_provider(_optional_string(llm.get("provider") or loaded.get("provider")))
+    provider = _normalize_provider(
+        _optional_string(llm.get("provider") or loaded.get("provider"))
+    )
     provider_config: dict[str, Any] = {}
     providers = llm.get("providers")
     if provider and isinstance(providers, dict):
@@ -521,7 +558,11 @@ def write_llm_config(
     api_key: str | None = None,
     model: str | None = None,
 ) -> None:
-    logger.info("Install stage=llm-config-write project_dir=%s provider=%s", project_dir, provider or "")
+    logger.info(
+        "Install stage=llm-config-write project_dir=%s provider=%s",
+        project_dir,
+        provider or "",
+    )
     normalized_provider = _require_complete_llm_config(
         provider=provider,
         base_url=base_url,
@@ -547,6 +588,7 @@ def write_llm_config(
         _redact(api_key),
     )
 
+
 def detect_platform() -> str:
     """Optionally detect installed assistant-platform add-ons.
 
@@ -559,6 +601,7 @@ def detect_platform() -> str:
     if Path.home().joinpath(".config", "opencode").exists():
         return "opencode"
     return "standalone"
+
 
 def init_config(
     project_dir: Path,
@@ -590,7 +633,13 @@ def init_config(
         config_file = config_dir / "config.yaml"
         if not config_file.exists():
             config_file.write_text(_default_config_text(), encoding="utf-8")
-        write_llm_config(project_dir, provider=normalized_provider, base_url=base_url, api_key=api_key, model=model)
+        write_llm_config(
+            project_dir,
+            provider=normalized_provider,
+            base_url=base_url,
+            api_key=api_key,
+            model=model,
+        )
         (config_dir / "agents").mkdir(exist_ok=True)
         (config_dir / "plugins").mkdir(exist_ok=True)
         ensure_default_policy(project_dir, Path(__file__).resolve().parents[1])
@@ -621,7 +670,9 @@ def _log_exe_release_result(result: dict[str, Any]) -> None:
     elif status == "dry-run":
         logger.info("桌面 Exe 释放 dry-run: target=%s reason=%s", target, reason)
     else:
-        logger.info("桌面 Exe 释放结果: status=%s target=%s reason=%s", status, target, reason)
+        logger.info(
+            "桌面 Exe 释放结果: status=%s target=%s reason=%s", status, target, reason
+        )
 
 
 def _log_payload_release_result(result: dict[str, Any]) -> None:
@@ -632,13 +683,29 @@ def _log_payload_release_result(result: dict[str, Any]) -> None:
     reason = result.get("reason", "")
     files = result.get("file_count", "")
     if status == "copied":
-        logger.info("安装 Exe 程序文件释放完成: target=%s files=%s reason=%s", target, files, reason)
+        logger.info(
+            "安装 Exe 程序文件释放完成: target=%s files=%s reason=%s",
+            target,
+            files,
+            reason,
+        )
     elif status == "skipped":
         logger.info("安装 Exe 程序文件释放跳过: target=%s reason=%s", target, reason)
     elif status == "dry-run":
-        logger.info("安装 Exe 程序文件释放 dry-run: target=%s files=%s reason=%s", target, files, reason)
+        logger.info(
+            "安装 Exe 程序文件释放 dry-run: target=%s files=%s reason=%s",
+            target,
+            files,
+            reason,
+        )
     else:
-        logger.info("安装 Exe 程序文件释放结果: status=%s target=%s files=%s reason=%s", status, target, files, reason)
+        logger.info(
+            "安装 Exe 程序文件释放结果: status=%s target=%s files=%s reason=%s",
+            status,
+            target,
+            files,
+            reason,
+        )
 
 
 def _load_release_exe_to_desktop() -> Any:
@@ -655,7 +722,9 @@ def _load_release_exe_to_desktop() -> Any:
         ) from None
 
     try:
-        return _load_release_function_from_path(release_module, "release_exe_to_desktop")
+        return _load_release_function_from_path(
+            release_module, "release_exe_to_desktop"
+        )
     except ModuleNotFoundError as exc:
         missing_module = exc.name or "installer.exe_release"
         raise SystemExit(
@@ -682,8 +751,12 @@ def _load_release_payload_to_directory() -> Any:
         if bundled_payload is not None:
             bundled_module = bundled_payload / "installer" / "exe_release.py"
             if bundled_module.is_file():
-                return _load_release_function_from_path(bundled_module, "release_payload_to_directory")
-        return _load_release_function_from_path(release_module, "release_payload_to_directory")
+                return _load_release_function_from_path(
+                    bundled_module, "release_payload_to_directory"
+                )
+        return _load_release_function_from_path(
+            release_module, "release_payload_to_directory"
+        )
     except ModuleNotFoundError as exc:
         missing_module = exc.name or "installer.exe_release"
         raise SystemExit(
@@ -697,7 +770,10 @@ def _release_entrypoint_dir() -> Path:
     """Return the release root for optional Exe helpers without falling through to unrelated packages."""
 
     script_path = Path(sys.argv[0]).resolve() if sys.argv and sys.argv[0] else None
-    if script_path is not None and script_path.name.lower() in {"install.py", "supermedicineinstaller.exe"}:
+    if script_path is not None and script_path.name.lower() in {
+        "install.py",
+        "supermedicineinstaller.exe",
+    }:
         return script_path.parent
     return Path(__file__).resolve().parents[1]
 
@@ -705,7 +781,9 @@ def _release_entrypoint_dir() -> Path:
 def _load_release_function_from_path(release_module: Path, function_name: str) -> Any:
     """Load an optional release helper from an exact local file path."""
 
-    spec = importlib.util.spec_from_file_location("_supermedicine_installer_exe_release", release_module)
+    spec = importlib.util.spec_from_file_location(
+        "_supermedicine_installer_exe_release", release_module
+    )
     if spec is None or spec.loader is None:
         raise ModuleNotFoundError("installer.exe_release")
     module = importlib.util.module_from_spec(spec)
@@ -729,7 +807,9 @@ def _release_exe_from_args(args: argparse.Namespace) -> dict[str, Any]:
         raise
     except Exception as exc:
         logger.error("桌面 Exe 释放失败: %s", redact_sensitive(str(exc)))
-        raise SystemExit(f"error: 桌面 Exe 释放失败: {redact_sensitive(str(exc))}") from exc
+        raise SystemExit(
+            f"error: 桌面 Exe 释放失败: {redact_sensitive(str(exc))}"
+        ) from exc
     _log_exe_release_result(result)
     return result
 
@@ -749,7 +829,9 @@ def _extract_release_from_args(args: argparse.Namespace) -> dict[str, Any]:
         raise
     except Exception as exc:
         logger.error("安装 Exe 程序文件释放失败: %s", redact_sensitive(str(exc)))
-        raise SystemExit(f"error: 安装 Exe 程序文件释放失败: {redact_sensitive(str(exc))}") from exc
+        raise SystemExit(
+            f"error: 安装 Exe 程序文件释放失败: {redact_sensitive(str(exc))}"
+        ) from exc
     _log_payload_release_result(result)
     return result
 
@@ -769,7 +851,9 @@ def _resolve_project_dir(args: argparse.Namespace) -> Path:
 def _align_release_exe_with_extracted_payload(args: argparse.Namespace) -> None:
     """Prefer the freshly extracted application Exe for combined installs."""
 
-    if not getattr(args, "release_exe", None) or not getattr(args, "extract_release_to", None):
+    if not getattr(args, "release_exe", None) or not getattr(
+        args, "extract_release_to", None
+    ):
         return
     release_exe = Path(args.release_exe)
     if release_exe.is_absolute() or release_exe.exists():
@@ -781,7 +865,7 @@ def _align_release_exe_with_extracted_payload(args: argparse.Namespace) -> None:
 
 def main(argv: list[str] | None = None) -> None:
     _configure_stdio_errors()
-    logging.basicConfig(level=logging.INFO, format='%(message)s')
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     parser = argparse.ArgumentParser(
         description="SuperMedicine 安装器：初始化配置、释放程序文件、复制桌面 Exe。",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -798,8 +882,14 @@ def main(argv: list[str] | None = None) -> None:
             "  测试/CI 请使用 --desktop-dir <tmp> 或 --exe-dry-run，避免写入真实桌面。"
         ),
     )
-    parser.add_argument("--detect", action="store_true", help="检测可选 OpenCode/Claude Code 适配器")
-    parser.add_argument("--init", action="store_true", help="初始化 .supermedicine 配置；脚本模式需提供完整 LLM 配置")
+    parser.add_argument(
+        "--detect", action="store_true", help="检测可选 OpenCode/Claude Code 适配器"
+    )
+    parser.add_argument(
+        "--init",
+        action="store_true",
+        help="初始化 .supermedicine 配置；脚本模式需提供完整 LLM 配置",
+    )
     parser.add_argument(
         "--unified-install",
         action="store_true",
@@ -810,10 +900,18 @@ def main(argv: list[str] | None = None) -> None:
         help="LLM provider 名称，如 openai、anthropic、deepseek 或自定义兼容网关",
     )
     parser.add_argument("--base-url", help="LLM Base URL；也可用 SM_LLM_BASE_URL")
-    parser.add_argument("--api-key", help="LLM API key；也可用 SM_LLM_API_KEY 或 provider 专用环境变量")
+    parser.add_argument(
+        "--api-key", help="LLM API key；也可用 SM_LLM_API_KEY 或 provider 专用环境变量"
+    )
     parser.add_argument("--model", help="默认 LLM model；也可用 SM_LLM_MODEL")
-    parser.add_argument("--llm-config", type=Path, help="读取包含 llm.provider / llm.providers 的 YAML 配置")
-    parser.add_argument("--interactive", action="store_true", help="在初始化时交互填写 LLM 配置")
+    parser.add_argument(
+        "--llm-config",
+        type=Path,
+        help="读取包含 llm.provider / llm.providers 的 YAML 配置",
+    )
+    parser.add_argument(
+        "--interactive", action="store_true", help="在初始化时交互填写 LLM 配置"
+    )
     parser.add_argument(
         "--project-dir",
         type=Path,
@@ -826,10 +924,20 @@ def main(argv: list[str] | None = None) -> None:
         const=Path("dist") / "SuperMedicine.exe",
         help="复制指定 Exe 到桌面；不带值时默认 dist/SuperMedicine.exe，并兼容 Dist/ 或根目录 Exe",
     )
-    parser.add_argument("--desktop-dir", type=Path, help="指定桌面目录；测试/CI 用于避免真实桌面")
-    parser.add_argument("--exe-target-name", help="桌面 Exe 文件名；默认使用源文件名并规范为 .exe")
-    parser.add_argument("--exe-overwrite", action="store_true", help="覆盖已存在的桌面 Exe；默认跳过")
-    parser.add_argument("--exe-dry-run", action="store_true", help="仅显示将执行的 Exe 释放动作，不复制文件")
+    parser.add_argument(
+        "--desktop-dir", type=Path, help="指定桌面目录；测试/CI 用于避免真实桌面"
+    )
+    parser.add_argument(
+        "--exe-target-name", help="桌面 Exe 文件名；默认使用源文件名并规范为 .exe"
+    )
+    parser.add_argument(
+        "--exe-overwrite", action="store_true", help="覆盖已存在的桌面 Exe；默认跳过"
+    )
+    parser.add_argument(
+        "--exe-dry-run",
+        action="store_true",
+        help="仅显示将执行的 Exe 释放动作，不复制文件",
+    )
     parser.add_argument(
         "--extract-release-to",
         type=Path,
@@ -840,14 +948,18 @@ def main(argv: list[str] | None = None) -> None:
         type=Path,
         help="指定发布 payload 来源；默认使用 PyInstaller 内置 payload 或当前发布根目录",
     )
-    parser.add_argument("--extract-overwrite", action="store_true", help="释放 payload 时覆盖已有文件")
+    parser.add_argument(
+        "--extract-overwrite", action="store_true", help="释放 payload 时覆盖已有文件"
+    )
     args = parser.parse_args(argv)
     if not (argv if argv is not None else sys.argv[1:]):
         _run_interactive_installer(args)
         return
     run_init = args.init or args.unified_install
     if args.unified_install and not args.release_exe:
-        parser.error("--unified-install requires --release-exe <path-to-SuperMedicine.exe>")
+        parser.error(
+            "--unified-install requires --release-exe <path-to-SuperMedicine.exe>"
+        )
     if args.detect:
         logger.info("Detected platform: %s", detect_platform())
         return
@@ -857,12 +969,22 @@ def main(argv: list[str] | None = None) -> None:
         if not run_init and not args.release_exe:
             return
     if run_init:
-        imported_config = _load_llm_config_file(args.llm_config) if args.llm_config else {}
-        provider = _resolve_install_value("provider", args.provider) or cast(str | None, imported_config.get("provider"))
-        base_url = _resolve_install_value("base_url", args.base_url) or cast(str | None, imported_config.get("base_url"))
-        model = _resolve_install_value("model", args.model) or cast(str | None, imported_config.get("model"))
+        imported_config = (
+            _load_llm_config_file(args.llm_config) if args.llm_config else {}
+        )
+        provider = _resolve_install_value("provider", args.provider) or cast(
+            str | None, imported_config.get("provider")
+        )
+        base_url = _resolve_install_value("base_url", args.base_url) or cast(
+            str | None, imported_config.get("base_url")
+        )
+        model = _resolve_install_value("model", args.model) or cast(
+            str | None, imported_config.get("model")
+        )
         normalized_provider = _normalize_provider(provider)
-        api_key = _resolve_api_key(normalized_provider, args.api_key) or cast(str | None, imported_config.get("api_key"))
+        api_key = _resolve_api_key(normalized_provider, args.api_key) or cast(
+            str | None, imported_config.get("api_key")
+        )
         if args.interactive:
             prompted_config = _collect_interactive_llm_config(
                 provider=normalized_provider,
@@ -881,7 +1003,10 @@ def main(argv: list[str] | None = None) -> None:
             api_key=api_key,
             model=model,
         )
-        logger.info("安装初始化结果: .supermedicine=%s", _resolve_project_dir(args) / ".supermedicine")
+        logger.info(
+            "安装初始化结果: .supermedicine=%s",
+            _resolve_project_dir(args) / ".supermedicine",
+        )
         if args.release_exe:
             _release_exe_from_args(args)
         return

@@ -1,4 +1,5 @@
 """SuperMedicine 微内核"""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
@@ -38,6 +39,7 @@ def __getattr__(name: str) -> Any:
     value = getattr(import_module(module_name), attr_name)
     globals()[name] = value
     return value
+
 
 __all__ = [
     "Kernel",

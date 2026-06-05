@@ -1,4 +1,5 @@
 """平台适配器基类"""
+
 from __future__ import annotations
 
 import re
@@ -28,7 +29,9 @@ class BaseAdapter(ABC):
         default_agent_id: str = "alpha",
     ):
         self._permission_engine = permission_engine
-        self._project_dir = (Path.cwd() if project_dir is None else Path(project_dir)).resolve()
+        self._project_dir = (
+            Path.cwd() if project_dir is None else Path(project_dir)
+        ).resolve()
         self._default_agent_id = default_agent_id
 
     @property
@@ -42,7 +45,9 @@ class BaseAdapter(ABC):
     def skill_load(self, skill_name: str) -> str: ...
 
     @abstractmethod
-    def subagent_dispatch(self, agent_id: str, task: dict[str, Any]) -> dict[str, Any]: ...
+    def subagent_dispatch(
+        self, agent_id: str, task: dict[str, Any]
+    ) -> dict[str, Any]: ...
 
     # ── 共享工具方法 ──────────────────────────────────────────
 
@@ -54,14 +59,22 @@ class BaseAdapter(ABC):
             return argv
         if argv[0].lower() == "echo":
             return " ".join(argv[1:]) + "\n"
-        workdir = self._resolve_sandbox_path(params.get("workdir", "."), resource_label="bash_workdir", must_exist=True)
+        workdir = self._resolve_sandbox_path(
+            params.get("workdir", "."), resource_label="bash_workdir", must_exist=True
+        )
         if isinstance(workdir, dict):
             return workdir
-        timeout = self._normalize_timeout(params.get("timeout"), self.DEFAULT_TIMEOUT_SECONDS)
+        timeout = self._normalize_timeout(
+            params.get("timeout"), self.DEFAULT_TIMEOUT_SECONDS
+        )
         try:
             result = subprocess.run(
-                argv, shell=False, capture_output=True, text=True,
-                cwd=workdir, timeout=timeout,
+                argv,
+                shell=False,
+                capture_output=True,
+                text=True,
+                cwd=workdir,
+                timeout=timeout,
             )
             return result.stdout or result.stderr
         except subprocess.TimeoutExpired:
@@ -69,16 +82,28 @@ class BaseAdapter(ABC):
 
     def _normalize_command(self, command: Any) -> list[str] | dict[str, Any]:
         """Return argv for subprocess without invoking a shell."""
-        if isinstance(command, (list, tuple)) and all(isinstance(part, str) and part for part in command):
+        if isinstance(command, (list, tuple)) and all(
+            isinstance(part, str) and part for part in command
+        ):
             return list(command)
         if not isinstance(command, str) or not command.strip():
-            return self._resource_error(status="error", resource="bash", message="Command must be a non-empty string or argv list")
+            return self._resource_error(
+                status="error",
+                resource="bash",
+                message="Command must be a non-empty string or argv list",
+            )
         try:
             argv = shlex.split(command, posix=False)
         except ValueError as exc:
-            return self._resource_error(status="error", resource="bash", message=f"Invalid shell-free command syntax: {exc}")
+            return self._resource_error(
+                status="error",
+                resource="bash",
+                message=f"Invalid shell-free command syntax: {exc}",
+            )
         if not argv:
-            return self._resource_error(status="error", resource="bash", message="Command must not be empty")
+            return self._resource_error(
+                status="error", resource="bash", message="Command must not be empty"
+            )
         return argv
 
     def _execute_permissioned_tool_call(
@@ -107,18 +132,24 @@ class BaseAdapter(ABC):
         except Exception as e:
             return {"status": "error", "tool": tool_id, "result": str(e)}
 
-    def _filesystem_tool_sandbox_denied(self, tool_id: str, params: dict[str, Any]) -> dict[str, Any] | None:
+    def _filesystem_tool_sandbox_denied(
+        self, tool_id: str, params: dict[str, Any]
+    ) -> dict[str, Any] | None:
         if tool_id not in self.FILESYSTEM_TOOLS:
             return None
         path_param = "filePath" if tool_id in {"read", "write", "edit"} else "path"
         must_exist = tool_id in {"glob", "grep"}
-        resolved = self._resolve_sandbox_path(params.get(path_param, ""), resource_label=tool_id, must_exist=must_exist)
+        resolved = self._resolve_sandbox_path(
+            params.get(path_param, ""), resource_label=tool_id, must_exist=must_exist
+        )
         if isinstance(resolved, dict):
             return resolved
         params[path_param] = str(resolved)
         return None
 
-    def _tool_permission_denied(self, tool_id: str, params: dict[str, Any]) -> dict[str, Any] | None:
+    def _tool_permission_denied(
+        self, tool_id: str, params: dict[str, Any]
+    ) -> dict[str, Any] | None:
         if tool_id not in self.PERMISSION_GATED_TOOLS:
             return None
 
@@ -145,7 +176,13 @@ class BaseAdapter(ABC):
         if engine is None:
             if tool_id == "bash" and self._allows_minimal_echo_without_engine(params):
                 return None
-            return self._permission_denied_result(tool_id, agent_id, "tool_call", resource, reason="permission_engine_unavailable")
+            return self._permission_denied_result(
+                tool_id,
+                agent_id,
+                "tool_call",
+                resource,
+                reason="permission_engine_unavailable",
+            )
 
         result = engine.check(agent_id, "tool_call", resource, context=context)
         if result == PermissionResult.ALLOWED:
@@ -162,7 +199,9 @@ class BaseAdapter(ABC):
             return self._permission_engine
         policy_dir = self._project_dir / DEFAULT_POLICY_RELATIVE_PATH.parent
         try:
-            self._permission_engine = PermissionEngine(policy_dir, policy_dir / "audit.jsonl")
+            self._permission_engine = PermissionEngine(
+                policy_dir, policy_dir / "audit.jsonl"
+            )
         except Exception:
             return None
         return self._permission_engine
@@ -205,7 +244,9 @@ class BaseAdapter(ABC):
             },
         }
 
-    def _sandbox_denied_result(self, *, tool_id: str, resource: str, message: str) -> dict[str, Any]:
+    def _sandbox_denied_result(
+        self, *, tool_id: str, resource: str, message: str
+    ) -> dict[str, Any]:
         return {
             "status": "denied",
             "tool": tool_id,
@@ -246,7 +287,10 @@ class BaseAdapter(ABC):
                 status="error",
                 resource=str(raw_path),
                 message=f"Unable to resolve path inside project sandbox: {exc}",
-                metadata={"project_dir": str(self._project_dir), "security": {"sandbox": "project_root"}},
+                metadata={
+                    "project_dir": str(self._project_dir),
+                    "security": {"sandbox": "project_root"},
+                },
             )
 
         try:
@@ -262,11 +306,16 @@ class BaseAdapter(ABC):
                 status="error",
                 resource=str(raw_path),
                 message=f"Path not found inside project sandbox: {raw_path}",
-                metadata={"project_dir": str(self._project_dir), "security": {"sandbox": "project_root"}},
+                metadata={
+                    "project_dir": str(self._project_dir),
+                    "security": {"sandbox": "project_root"},
+                },
             )
         return resolved
 
-    def _normalize_timeout(self, requested: Any, default: int | float | None = None) -> float:
+    def _normalize_timeout(
+        self, requested: Any, default: int | float | None = None
+    ) -> float:
         """Clamp timeout values to a practical adapter-wide range."""
         fallback = self.DEFAULT_TIMEOUT_SECONDS if default is None else default
         try:
@@ -298,7 +347,9 @@ class BaseAdapter(ABC):
 
     def _tool_read(self, params: dict[str, Any]) -> str | dict[str, Any]:
         """读取文件内容"""
-        file_path = self._resolve_sandbox_path(params.get("filePath", ""), resource_label="read")
+        file_path = self._resolve_sandbox_path(
+            params.get("filePath", ""), resource_label="read"
+        )
         if isinstance(file_path, dict):
             return file_path
         if not file_path.exists():
@@ -309,7 +360,7 @@ class BaseAdapter(ABC):
             limit = params.get("limit")
             lines = content.splitlines()
             if offset > 0:
-                lines = lines[offset - 1:]
+                lines = lines[offset - 1 :]
             if limit is not None:
                 lines = lines[:limit]
             return "\n".join(lines)
@@ -318,7 +369,9 @@ class BaseAdapter(ABC):
 
     def _tool_write(self, params: dict[str, Any]) -> str | dict[str, Any]:
         """写入文件"""
-        file_path = self._resolve_sandbox_path(params.get("filePath", ""), resource_label="write")
+        file_path = self._resolve_sandbox_path(
+            params.get("filePath", ""), resource_label="write"
+        )
         if isinstance(file_path, dict):
             return file_path
         content = params.get("content", "")
@@ -328,7 +381,9 @@ class BaseAdapter(ABC):
 
     def _tool_edit(self, params: dict[str, Any]) -> str | dict[str, Any]:
         """编辑文件（字符串替换）"""
-        file_path = self._resolve_sandbox_path(params.get("filePath", ""), resource_label="edit")
+        file_path = self._resolve_sandbox_path(
+            params.get("filePath", ""), resource_label="edit"
+        )
         if isinstance(file_path, dict):
             return file_path
         old_string = params.get("oldString", "")
@@ -355,7 +410,9 @@ class BaseAdapter(ABC):
     def _tool_glob(self, params: dict[str, Any]) -> str | dict[str, Any]:
         """文件模式匹配"""
         pattern = params.get("pattern", "**/*")
-        base_path = self._resolve_sandbox_path(params.get("path", "."), resource_label="glob", must_exist=True)
+        base_path = self._resolve_sandbox_path(
+            params.get("path", "."), resource_label="glob", must_exist=True
+        )
         if isinstance(base_path, dict):
             return base_path
         matches = sorted(base_path.rglob(pattern))
@@ -364,7 +421,9 @@ class BaseAdapter(ABC):
     def _tool_grep(self, params: dict[str, Any]) -> str | dict[str, Any]:
         """内容搜索（正则）"""
         pattern = params.get("pattern", "")
-        base_path = self._resolve_sandbox_path(params.get("path", "."), resource_label="grep", must_exist=True)
+        base_path = self._resolve_sandbox_path(
+            params.get("path", "."), resource_label="grep", must_exist=True
+        )
         if isinstance(base_path, dict):
             return base_path
         include = params.get("include", "*")

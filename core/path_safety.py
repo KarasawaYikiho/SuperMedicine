@@ -5,6 +5,7 @@ against a caller supplied (or current working directory) project root without
 changing any existing adapter, CLI, API, plugin, action, permission, or security
 semantics.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -110,5 +111,7 @@ def validate_destructive_path(
     root = resolve_project_root(project_root)
     resolved_path = validate_path_in_project_root(path, root)
     if is_protected_path(resolved_path, root, protected_directories):
-        raise ProtectedPathError(f"Destructive operation targets protected path: {resolved_path}")
+        raise ProtectedPathError(
+            f"Destructive operation targets protected path: {resolved_path}"
+        )
     return resolved_path

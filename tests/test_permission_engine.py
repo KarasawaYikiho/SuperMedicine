@@ -8,22 +8,57 @@ from permission.policy import PermissionResult
 
 PROJECT_ROOT = Path(__file__).parent.parent
 
+
 class TestPermissionEngine:
     def _make_engine(self, tmp_path, policy_data):
         policy_file = tmp_path / "policy.yaml"
         policy_file.write_text(yaml.dump(policy_data), encoding="utf-8")
         return PermissionEngine(policy_dir=tmp_path, audit_log=tmp_path / "audit.log")
+
     def test_check_allowed(self, tmp_path):
-        engine = self._make_engine(tmp_path, {"agent_id": "a", "role": "r", "permissions": {"allowed": [{"action": "read", "scope": "*"}], "denied": []}})
+        engine = self._make_engine(
+            tmp_path,
+            {
+                "agent_id": "a",
+                "role": "r",
+                "permissions": {
+                    "allowed": [{"action": "read", "scope": "*"}],
+                    "denied": [],
+                },
+            },
+        )
         assert engine.check("a", "read", "file") == PermissionResult.ALLOWED
+
     def test_check_denied(self, tmp_path):
-        engine = self._make_engine(tmp_path, {"agent_id": "a", "role": "r", "permissions": {"allowed": [], "denied": [{"action": "delete", "scope": "*"}]}})
+        engine = self._make_engine(
+            tmp_path,
+            {
+                "agent_id": "a",
+                "role": "r",
+                "permissions": {
+                    "allowed": [],
+                    "denied": [{"action": "delete", "scope": "*"}],
+                },
+            },
+        )
         assert engine.check("a", "delete", "file") == PermissionResult.DENIED
+
     def test_check_unknown_agent(self, tmp_path):
         engine = self._make_engine(tmp_path, [])
         assert engine.check("unknown", "read", "file") == PermissionResult.DENIED
+
     def test_audit_log_written(self, tmp_path):
-        engine = self._make_engine(tmp_path, {"agent_id": "a", "role": "r", "permissions": {"allowed": [{"action": "read", "scope": "*"}], "denied": []}})
+        engine = self._make_engine(
+            tmp_path,
+            {
+                "agent_id": "a",
+                "role": "r",
+                "permissions": {
+                    "allowed": [{"action": "read", "scope": "*"}],
+                    "denied": [],
+                },
+            },
+        )
         engine.check("a", "read", "file")
         assert (tmp_path / "audit.log").exists()
         assert "a" in (tmp_path / "audit.log").read_text(encoding="utf-8")
@@ -40,6 +75,7 @@ class TestPermissionEngineWithPolicies:
 
         # 写入测试策略
         import yaml
+
         policy = {
             "agent_id": "test_agent",
             "role": "tester",
@@ -47,7 +83,10 @@ class TestPermissionEngineWithPolicies:
             "permissions": {
                 "allowed": [{"action": "read", "scope": "*"}],
                 "denied": [{"action": "write", "scope": "*"}],
-                "hard_limits": {"max_files_per_session": 10, "max_tool_calls_per_minute": 5},
+                "hard_limits": {
+                    "max_files_per_session": 10,
+                    "max_tool_calls_per_minute": 5,
+                },
             },
         }
         (policy_dir / "test.yaml").write_text(yaml.dump(policy), encoding="utf-8")
@@ -72,6 +111,7 @@ class TestPermissionEngineWithPolicies:
     def test_hard_limits_enforced(self, tmp_path):
         """验证 hard_limits 被强制执行"""
         import yaml
+
         policy_dir = tmp_path / "policies"
         policy_dir.mkdir()
         audit_log = tmp_path / "audit.jsonl"
@@ -91,18 +131,27 @@ class TestPermissionEngineWithPolicies:
         engine = PermissionEngine(policy_dir=policy_dir, audit_log=audit_log)
 
         # 在限制范围内 — 应允许
-        result = engine.check("limited_agent", "read", "file.txt",
-                             context={"max_file_size": 50, "max_memory": 30})
+        result = engine.check(
+            "limited_agent",
+            "read",
+            "file.txt",
+            context={"max_file_size": 50, "max_memory": 30},
+        )
         assert result == PermissionResult.ALLOWED
 
         # 超出限制 — 应拒绝
-        result = engine.check("limited_agent", "read", "file.txt",
-                             context={"max_file_size": 200, "max_memory": 30})
+        result = engine.check(
+            "limited_agent",
+            "read",
+            "file.txt",
+            context={"max_file_size": 200, "max_memory": 30},
+        )
         assert result == PermissionResult.DENIED
 
     def test_hard_limits_no_context(self, tmp_path):
         """无 Context 时 Hard_Limits 不影响"""
         import yaml
+
         policy_dir = tmp_path / "policies"
         policy_dir.mkdir()
         audit_log = tmp_path / "audit.jsonl"
@@ -131,7 +180,12 @@ class TestPermissionEngineWithPolicies:
             "agent_id": "no_external",
             "role": "tester",
             "permissions": {
-                "allowed": [{"action": "rag.external.query", "scope": "https://eutils.ncbi.nlm.nih.gov/*"}],
+                "allowed": [
+                    {
+                        "action": "rag.external.query",
+                        "scope": "https://eutils.ncbi.nlm.nih.gov/*",
+                    }
+                ],
                 "denied": [],
                 "hard_limits": {"network_access": False, "external_api": False},
             },
@@ -172,7 +226,9 @@ class TestPermissionEngineWithPolicies:
             )
             assert result == PermissionResult.ALLOWED
 
-    def test_experiment_wb_policy_does_not_default_allow_unknown_or_external_actions(self, tmp_path):
+    def test_experiment_wb_policy_does_not_default_allow_unknown_or_external_actions(
+        self, tmp_path
+    ):
         policy = {
             "agent_id": "experiment_local",
             "role": "experiment_tool",
@@ -195,7 +251,10 @@ class TestPermissionEngineWithPolicies:
             "experiment_local",
             "execute",
             "experiment.wb.unknown_action",
-            context={"plugin": "experiment-wb", "action": "experiment.wb.unknown_action"},
+            context={
+                "plugin": "experiment-wb",
+                "action": "experiment.wb.unknown_action",
+            },
         )
         network_result = engine.check(
             "experiment_local",
@@ -227,7 +286,9 @@ class TestPermissionEngineWithPolicies:
             "agent_id": "experiment_local",
             "role": "experiment_tool",
             "permissions": {
-                "allowed": [{"action": "execute", "scope": "experiment.wb.normalize_loading"}],
+                "allowed": [
+                    {"action": "execute", "scope": "experiment.wb.normalize_loading"}
+                ],
                 "denied": [],
                 "hard_limits": {"network_access": False, "external_api": False},
             },

@@ -62,7 +62,14 @@ def test_cli_help_preserves_legacy_commands_and_run_flags(capsys):
         main(["run", "--help"])
     assert run_help.value.code == 0
     run_output = capsys.readouterr().out
-    for flag in ("--verbose", "--plugin", "--action", "--params-json", "--params-file", "--workspace"):
+    for flag in (
+        "--verbose",
+        "--plugin",
+        "--action",
+        "--params-json",
+        "--params-file",
+        "--workspace",
+    ):
         assert flag in run_output
 
 
@@ -87,7 +94,9 @@ def test_core_cli_kernel_imports_do_not_load_platform_adapters():
     assert "adapters.claude_code.adapter" not in sys.modules
 
 
-def test_cli_help_and_init_do_not_require_platform_runtime_or_config(monkeypatch, tmp_path, capsys):
+def test_cli_help_and_init_do_not_require_platform_runtime_or_config(
+    monkeypatch, tmp_path, capsys
+):
     for module_name in (
         "adapters.opencode",
         "adapters.opencode.adapter",
@@ -108,7 +117,12 @@ def test_cli_help_and_init_do_not_require_platform_runtime_or_config(monkeypatch
     main(_init_args(project_dir))
 
     assert (project_dir / ".supermedicine" / "config.yaml").is_file()
-    assert (project_dir / ".supermedicine" / "policies" / PermissionEngine.DEFAULT_POLICY_FILENAME).is_file()
+    assert (
+        project_dir
+        / ".supermedicine"
+        / "policies"
+        / PermissionEngine.DEFAULT_POLICY_FILENAME
+    ).is_file()
     assert not (project_dir / ".opencode").exists()
     assert not (project_dir / ".claude").exists()
     assert "adapters.opencode" not in sys.modules
@@ -128,7 +142,10 @@ def test_cli_help_documents_workspace_tui_paper_and_experience_boundaries(capsys
     help_cases = [
         (["run", "--help"], ["workspaces/<id>", "TUI"]),
         (["workspace", "delete", "--help"], ["硬删除", "权限", "审计", "--confirm"]),
-        (["paper", "import", "--help"], ["复制", "PDF", "TeX", "BibTeX", "RIS", "默认不联网", "--confirm-enrich"]),
+        (
+            ["paper", "import", "--help"],
+            ["复制", "PDF", "TeX", "BibTeX", "RIS", "默认不联网", "--confirm-enrich"],
+        ),
         (["paper", "enrich", "--help"], ["网络/API", "审计", "--confirm-enrich"]),
         (["experience", "--help"], ["不存原始对话"]),
     ]
@@ -141,7 +158,9 @@ def test_cli_help_documents_workspace_tui_paper_and_experience_boundaries(capsys
             assert fragment in output
 
 
-def test_cli_run_without_workspace_preserves_params_identity_and_ignores_tui_recent_state(monkeypatch, tmp_path):
+def test_cli_run_without_workspace_preserves_params_identity_and_ignores_tui_recent_state(
+    monkeypatch, tmp_path
+):
     monkeypatch.chdir(tmp_path)
     _copy_default_policy(tmp_path)
     captured: dict[str, object] = {}
@@ -149,7 +168,9 @@ def test_cli_run_without_workspace_preserves_params_identity_and_ignores_tui_rec
     def fail_if_tui_recent_state_is_read(*args, **kwargs):
         raise AssertionError("run must not read TUI recent workspace state")
 
-    monkeypatch.setattr("core.tui.state.load_recent_workspace", fail_if_tui_recent_state_is_read)
+    monkeypatch.setattr(
+        "core.tui.state.load_recent_workspace", fail_if_tui_recent_state_is_read
+    )
 
     class FakeRegistry:
         def discover(self):
@@ -171,12 +192,20 @@ def test_cli_run_without_workspace_preserves_params_identity_and_ignores_tui_rec
             captured["plugin_name"] = plugin_name
             captured["action"] = action
             captured["params"] = params
-            return {"status": "success", "task": task, "plugin": plugin_name, "action": action, "output": {}}
+            return {
+                "status": "success",
+                "task": task,
+                "plugin": plugin_name,
+                "action": action,
+                "output": {},
+            }
 
     monkeypatch.setattr("core.kernel.Kernel", FakeKernel)
     params = {"source_id": "legacy-source", "nested": {"unchanged": True}}
 
-    CLI().run("legacy task", plugin="python-stats", action="stats.descriptive", params=params)
+    CLI().run(
+        "legacy task", plugin="python-stats", action="stats.descriptive", params=params
+    )
 
     assert captured == {
         "task": "legacy task",
@@ -190,11 +219,24 @@ def test_cli_run_without_workspace_preserves_params_identity_and_ignores_tui_rec
 
 def test_plugin_manifest_names_and_action_ids_are_unchanged():
     expected_actions = {
-        "python-stats": {"stats.descriptive", "stats.ttest", "stats.anova", "stats.regression"},
-        "experiment-wb": {"experiment.wb.normalize_loading", "experiment.wb.antibody_dilution"},
+        "python-stats": {
+            "stats.descriptive",
+            "stats.ttest",
+            "stats.anova",
+            "stats.regression",
+        },
+        "experiment-wb": {
+            "experiment.wb.normalize_loading",
+            "experiment.wb.antibody_dilution",
+        },
         "r-survival": {"r.survival.km", "r.survival.logrank", "r.survival.cox"},
         "rag-interface": {"rag.query", "rag.context.store", "rag.context.retrieve"},
-        "medical-writing": {"standard.consort", "standard.strobe", "standard.prisma", "standard.stard"},
+        "medical-writing": {
+            "standard.consort",
+            "standard.strobe",
+            "standard.prisma",
+            "standard.stard",
+        },
         "medical-citation": {"standard.citation.vancouver", "standard.citation.ama"},
         "harness-core": {
             "harness.integration.checkpoint",
@@ -226,16 +268,31 @@ def test_permission_engine_denies_unknown_agents_and_preserves_hard_limits(tmp_p
             "permissions": {
                 "allowed": [{"action": "read", "scope": "*"}],
                 "denied": [],
-                "hard_limits": {"max_file_size": 100, "network_access": False, "external_api": False},
+                "hard_limits": {
+                    "max_file_size": 100,
+                    "network_access": False,
+                    "external_api": False,
+                },
             },
         },
     )
     engine = PermissionEngine(policies, policies / "audit.jsonl")
 
     assert engine.check("unknown", "read", "file.txt") == PermissionResult.DENIED
-    assert engine.check("limited", "read", "file.txt", context={"max_file_size": 101}) == PermissionResult.DENIED
-    assert engine.check("limited", "read", "file.txt", context={"requires_network": True}) == PermissionResult.DENIED
-    assert engine.check("limited", "read", "file.txt", context={"requires_external_api": True}) == PermissionResult.DENIED
+    assert (
+        engine.check("limited", "read", "file.txt", context={"max_file_size": 101})
+        == PermissionResult.DENIED
+    )
+    assert (
+        engine.check("limited", "read", "file.txt", context={"requires_network": True})
+        == PermissionResult.DENIED
+    )
+    assert (
+        engine.check(
+            "limited", "read", "file.txt", context={"requires_external_api": True}
+        )
+        == PermissionResult.DENIED
+    )
 
 
 def test_kernel_execute_task_result_shape_and_permission_gate_are_stable(tmp_path):
@@ -250,7 +307,9 @@ def test_kernel_execute_task_result_shape_and_permission_gate_are_stable(tmp_pat
                 "type": "tool",
                 "language": "python",
                 "entry": "main.py",
-                "provides": [{"id": "compat.action", "description": "Compatibility action"}],
+                "provides": [
+                    {"id": "compat.action", "description": "Compatibility action"}
+                ],
             },
             sort_keys=False,
         ),
@@ -265,14 +324,44 @@ def test_kernel_execute_task_result_shape_and_permission_gate_are_stable(tmp_pat
     policies = _write_policy(
         tmp_path,
         [
-            {"agent_id": "alpha", "role": "allowed", "permissions": {"allowed": [{"action": "execute", "scope": "*"}], "denied": []}},
-            {"agent_id": "blocked", "role": "denied", "permissions": {"allowed": [], "denied": [{"action": "execute", "scope": "*"}]}},
+            {
+                "agent_id": "alpha",
+                "role": "allowed",
+                "permissions": {
+                    "allowed": [{"action": "execute", "scope": "*"}],
+                    "denied": [],
+                },
+            },
+            {
+                "agent_id": "blocked",
+                "role": "denied",
+                "permissions": {
+                    "allowed": [],
+                    "denied": [{"action": "execute", "scope": "*"}],
+                },
+            },
         ],
     )
-    kernel = Kernel(config_path=tmp_path / "config.yaml", plugins_dir=plugins_dir, policies_dir=policies)
+    kernel = Kernel(
+        config_path=tmp_path / "config.yaml",
+        plugins_dir=plugins_dir,
+        policies_dir=policies,
+    )
 
-    allowed = kernel.execute_task("compat", plugin_name="compat-plugin", action="compat.action", params={"x": 1})
-    assert {"status", "task", "agent", "plugin", "action", "output", "result", "error", "metadata"}.issubset(allowed)
+    allowed = kernel.execute_task(
+        "compat", plugin_name="compat-plugin", action="compat.action", params={"x": 1}
+    )
+    assert {
+        "status",
+        "task",
+        "agent",
+        "plugin",
+        "action",
+        "output",
+        "result",
+        "error",
+        "metadata",
+    }.issubset(allowed)
     assert allowed["status"] == "success"
     assert allowed["agent"] == "alpha"
     assert allowed["plugin"] == "compat-plugin"
@@ -281,7 +370,12 @@ def test_kernel_execute_task_result_shape_and_permission_gate_are_stable(tmp_pat
     assert allowed["result"] == allowed["output"]
     assert allowed["metadata"]["security"]["permission_checked"] is True
 
-    denied = kernel.execute_task("compat", plugin_name="compat-plugin", action="compat.action", agent_id="blocked")
+    denied = kernel.execute_task(
+        "compat",
+        plugin_name="compat-plugin",
+        action="compat.action",
+        agent_id="blocked",
+    )
     assert denied["status"] == "denied"
     assert denied["agent"] == "blocked"
     assert denied["plugin"] == "compat-plugin"
@@ -299,7 +393,9 @@ def test_rag_actions_and_result_contract_are_unchanged(tmp_path):
             "query": "hypertension",
             "top_k": 1,
             "storage_dir": str(storage_dir),
-            "documents": [{"id": "doc-1", "text": "hypertension diabetes", "source": "fixture"}],
+            "documents": [
+                {"id": "doc-1", "text": "hypertension diabetes", "source": "fixture"}
+            ],
         },
         {"agent_id": "alpha", "permission_checked": True},
     )
@@ -307,18 +403,35 @@ def test_rag_actions_and_result_contract_are_unchanged(tmp_path):
     assert query["status"] == "success"
     assert query["plugin"] == "rag-interface"
     assert query["action"] == "rag.query"
-    assert {"items", "results", "relevance_scores", "source_metadata", "errors", "metadata"}.issubset(query["output"])
+    assert {
+        "items",
+        "results",
+        "relevance_scores",
+        "source_metadata",
+        "errors",
+        "metadata",
+    }.issubset(query["output"])
     assert query["metadata"]["contract"]["actions"] == rag_main.ACTION_CONTRACTS
 
-    stored = rag_main.execute("rag.context.store", {"key": "legacy", "data": {"v": 1}, "storage_dir": str(storage_dir)})
-    retrieved = rag_main.execute("rag.context.retrieve", {"key": "legacy", "storage_dir": str(storage_dir)})
+    stored = rag_main.execute(
+        "rag.context.store",
+        {"key": "legacy", "data": {"v": 1}, "storage_dir": str(storage_dir)},
+    )
+    retrieved = rag_main.execute(
+        "rag.context.retrieve", {"key": "legacy", "storage_dir": str(storage_dir)}
+    )
 
     assert stored["status"] == "success"
     assert stored["action"] == "rag.context.store"
     assert stored["output"] == {"key": "legacy", "stored": True, "provider": "local"}
     assert retrieved["status"] == "success"
     assert retrieved["action"] == "rag.context.retrieve"
-    assert retrieved["output"] == {"key": "legacy", "data": {"v": 1}, "found": True, "provider": "local"}
+    assert retrieved["output"] == {
+        "key": "legacy",
+        "data": {"v": 1},
+        "found": True,
+        "provider": "local",
+    }
 
 
 def test_adapter_gated_tools_remain_bash_write_edit():
@@ -335,19 +448,29 @@ def test_legacy_openrouter_factory_still_uses_openai_compatible_defaults():
     assert client.config.safe_dict()["api_key"] == "<redacted>"
 
 
-def test_paper_and_experience_paths_do_not_read_tui_recent_workspace_state(monkeypatch, tmp_path):
+def test_paper_and_experience_paths_do_not_read_tui_recent_workspace_state(
+    monkeypatch, tmp_path
+):
     monkeypatch.chdir(tmp_path)
     WorkspaceManager(tmp_path).initialize_workspace("explicit-workspace")
     source = tmp_path / "paper.md"
     source.write_text("# Explicit workspace paper\n", encoding="utf-8")
 
     def fail_if_tui_recent_state_is_read(*args, **kwargs):
-        raise AssertionError("paper/experience CLI paths must not read TUI recent workspace state")
+        raise AssertionError(
+            "paper/experience CLI paths must not read TUI recent workspace state"
+        )
 
-    monkeypatch.setattr("core.tui.state.load_recent_workspace", fail_if_tui_recent_state_is_read)
+    monkeypatch.setattr(
+        "core.tui.state.load_recent_workspace", fail_if_tui_recent_state_is_read
+    )
 
-    imported = CLI().paper_import("explicit-workspace", source, metadata={"title": "Explicit"})
-    suggestion = CLI().experience_suggest("explicit-workspace", "Use explicit workspace only.", title="Explicit")
+    imported = CLI().paper_import(
+        "explicit-workspace", source, metadata={"title": "Explicit"}
+    )
+    suggestion = CLI().experience_suggest(
+        "explicit-workspace", "Use explicit workspace only.", title="Explicit"
+    )
 
     assert imported["metadata"]["title"] == "Explicit"
     assert suggestion["workspace_id"] == "explicit-workspace"

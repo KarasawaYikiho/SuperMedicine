@@ -41,18 +41,22 @@ def _read_pyproject() -> dict:
             re.MULTILINE | re.DOTALL,
         )
         if dev_match:
-            result["project"].setdefault("optional-dependencies", {})["dev"] = re.findall(
-                r'"([^"]+)"',
-                dev_match.group(1),
+            result["project"].setdefault("optional-dependencies", {})["dev"] = (
+                re.findall(
+                    r'"([^"]+)"',
+                    dev_match.group(1),
+                )
             )
     # Extract core package-data entries
     current_package_data_key = None
     for line in text.splitlines():
-        package_data_match = re.match(r'^(core|installer)\s*=\s*\[', line)
+        package_data_match = re.match(r"^(core|installer)\s*=\s*\[", line)
         if package_data_match:
             current_package_data_key = package_data_match.group(1)
             entries = re.findall(r'"([^"]+)"', line)
-            result["tool"]["setuptools"]["package-data"][current_package_data_key] = entries
+            result["tool"]["setuptools"]["package-data"][current_package_data_key] = (
+                entries
+            )
         elif current_package_data_key and line.strip().startswith("]"):
             current_package_data_key = None
     return result
@@ -125,13 +129,23 @@ def test_python_sources_do_not_import_legacy_uppercase_install_module_outside_co
         tree = ast.parse(path.read_text(encoding="utf-8-sig"), filename=str(path))
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom) and node.module == "Install":
-                if (relative_path, node.lineno) not in allowed_legacy_compatibility_imports:
-                    offenders.append(f"{relative_path}:{node.lineno}: legacy uppercase Install import-from")
+                if (
+                    relative_path,
+                    node.lineno,
+                ) not in allowed_legacy_compatibility_imports:
+                    offenders.append(
+                        f"{relative_path}:{node.lineno}: legacy uppercase Install import-from"
+                    )
             elif isinstance(node, ast.Import):
                 for alias in node.names:
                     if alias.name == "Install":
-                        if (relative_path, node.lineno) not in allowed_legacy_compatibility_imports:
-                            offenders.append(f"{relative_path}:{node.lineno}: legacy uppercase Install direct import")
+                        if (
+                            relative_path,
+                            node.lineno,
+                        ) not in allowed_legacy_compatibility_imports:
+                            offenders.append(
+                                f"{relative_path}:{node.lineno}: legacy uppercase Install direct import"
+                            )
 
     assert offenders == [], (
         "Do not import the legacy uppercase top-level Install module; use the "
@@ -159,7 +173,18 @@ def test_tracked_files_do_not_include_forbidden_or_generated_artifacts():
             forbidden_matches.append(tracked_path)
         if name.lower().endswith(".exe"):
             forbidden_matches.append(tracked_path)
-        if any(part in {"__pycache__", ".pytest_cache", ".pytest-tmp", ".ruff_cache", "build", "dist"} for part in parts):
+        if any(
+            part
+            in {
+                "__pycache__",
+                ".pytest_cache",
+                ".pytest-tmp",
+                ".ruff_cache",
+                "build",
+                "dist",
+            }
+            for part in parts
+        ):
             forbidden_matches.append(tracked_path)
         if any(part in {".release-zip-stage", "release-artifacts"} for part in parts):
             forbidden_matches.append(tracked_path)
@@ -167,7 +192,9 @@ def test_tracked_files_do_not_include_forbidden_or_generated_artifacts():
             forbidden_matches.append(tracked_path)
         if tracked_path == ".supermedicine/policies/audit.jsonl":
             forbidden_matches.append(tracked_path)
-        if tracked_path == ".supermedicine/checkpoints" or tracked_path.startswith(".supermedicine/checkpoints/"):
+        if tracked_path == ".supermedicine/checkpoints" or tracked_path.startswith(
+            ".supermedicine/checkpoints/"
+        ):
             forbidden_matches.append(tracked_path)
 
     assert sorted(set(forbidden_matches)) == []
@@ -175,7 +202,9 @@ def test_tracked_files_do_not_include_forbidden_or_generated_artifacts():
 
 def test_tracked_supermedicine_config_is_limited_to_core_bootstrap_files():
     tracked_supermedicine = sorted(
-        path for path in _tracked_files() if path == ".supermedicine" or path.startswith(".supermedicine/")
+        path
+        for path in _tracked_files()
+        if path == ".supermedicine" or path.startswith(".supermedicine/")
     )
 
     assert tracked_supermedicine == [
@@ -218,7 +247,9 @@ def test_install_manifest_keeps_external_platform_config_out_of_core_product_pat
         entry = Path(platform["entry"])
         entry_parts = entry.parts
 
-        assert entry_parts[0] == "adapters", f"{platform_name} should be packaged as an optional adapter"
+        assert entry_parts[0] == "adapters", (
+            f"{platform_name} should be packaged as an optional adapter"
+        )
         assert ".claude" not in entry_parts
         assert ".opencode" not in entry_parts
         assert "superpowers" not in entry_parts
@@ -239,14 +270,26 @@ def test_install_manifest_platform_entries_point_to_existing_adapter_files():
     assert opencode_entry.is_file()
     assert (REPO_ROOT / platforms["claude-code"]["adapter_module"]).is_file()
     assert (REPO_ROOT / platforms["opencode"]["adapter_module"]).is_file()
-    assert set(platforms["claude-code"]["supported_tools"]) == ClaudeCodeAdapter.SUPPORTED_TOOLS
-    assert set(platforms["opencode"]["supported_tools"]) == OpenCodeAdapter.SUPPORTED_TOOLS
+    assert (
+        set(platforms["claude-code"]["supported_tools"])
+        == ClaudeCodeAdapter.SUPPORTED_TOOLS
+    )
+    assert (
+        set(platforms["opencode"]["supported_tools"]) == OpenCodeAdapter.SUPPORTED_TOOLS
+    )
     assert platforms["claude-code"]["native_skill_loading"] is False
     assert platforms["claude-code"]["native_subagent_runtime"] is False
-    assert set(platforms["claude-code"]["ai_provider"]["supported_api_formats"]) == {"openai", "anthropic", "openrouter"}
+    assert set(platforms["claude-code"]["ai_provider"]["supported_api_formats"]) == {
+        "openai",
+        "anthropic",
+        "openrouter",
+    }
     assert platforms["claude-code"]["ai_provider"]["custom_base_url"] is True
     assert platforms["claude-code"]["ai_provider"]["secret_redaction_required"] is True
-    assert platforms["claude-code"]["ai_provider"]["plaintext_api_keys_in_manifest"] is False
+    assert (
+        platforms["claude-code"]["ai_provider"]["plaintext_api_keys_in_manifest"]
+        is False
+    )
     assert platforms["opencode"]["native_subagent_runtime"] is False
 
 
@@ -256,20 +299,34 @@ def test_install_manifest_declares_single_user_facing_platform_agent():
     for platform_name, platform in manifest["platforms"].items():
         assert platform["user_facing_agents"] == ["SuperMedicine"], platform_name
         assert len(platform["user_facing_agents"]) == 1, platform_name
-        assert FORBIDDEN_PLATFORM_AGENT_NAMES.isdisjoint(platform["user_facing_agents"]), platform_name
-        assert platform["internal_role_contexts"] == ["alpha", "beta", "gamma", "delta"], platform_name
+        assert FORBIDDEN_PLATFORM_AGENT_NAMES.isdisjoint(
+            platform["user_facing_agents"]
+        ), platform_name
+        assert platform["internal_role_contexts"] == [
+            "alpha",
+            "beta",
+            "gamma",
+            "delta",
+        ], platform_name
         assert platform["optional_add_on"] is True, platform_name
         assert platform["core_runtime_required"] is False, platform_name
-    assert manifest["install_completeness_model"]["single_user_facing_agent"] == "SuperMedicine"
+    assert (
+        manifest["install_completeness_model"]["single_user_facing_agent"]
+        == "SuperMedicine"
+    )
 
 
 def test_release_label_and_package_version_stay_in_sync():
-    install_manifest = json.loads((REPO_ROOT / "install.json").read_text(encoding="utf-8"))
+    install_manifest = json.loads(
+        (REPO_ROOT / "install.json").read_text(encoding="utf-8")
+    )
     pyproject = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     changelog = (REPO_ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
 
-    package_version = re.search(r'^version\s*=\s*["\']([^"\']+)["\']\s*$', pyproject, re.MULTILINE)
+    package_version = re.search(
+        r'^version\s*=\s*["\']([^"\']+)["\']\s*$', pyproject, re.MULTILINE
+    )
 
     assert install_manifest["version"] == "Beta0.4.1"
     assert package_version is not None
@@ -280,7 +337,9 @@ def test_release_label_and_package_version_stay_in_sync():
 
 
 def test_release_zip_archive_name_uses_display_format_without_source_suffix():
-    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
+        encoding="utf-8"
+    )
     package_version = _read_pyproject()["project"]["version"]
     beta_match = re.fullmatch(r"(\d+\.\d+\.\d+)b\d+", package_version)
     assert beta_match is not None
@@ -292,28 +351,38 @@ def test_release_zip_archive_name_uses_display_format_without_source_suffix():
     assert "source" not in archive_body.lower()
     assert "_" not in archive_body
     assert 'archive_name = f"SuperMedicine {release_label}.zip"' in workflow
-    assert 'stage = root / ".release-zip-stage" / f"SuperMedicine {release_label}"' in workflow
+    assert (
+        'stage = root / ".release-zip-stage" / f"SuperMedicine {release_label}"'
+        in workflow
+    )
     assert "SuperMedicine-{release_label}-source" not in workflow
     assert ".source-zip-stage" not in workflow
     assert "${{ steps.source_zip.outputs.release_label }}-source" not in workflow
     assert "${{ needs.packaging-smoke.outputs.release_label }}-source" not in workflow
-    assert "output.write(f\"archive_name={archive_name}\\n\")" in workflow
+    assert 'output.write(f"archive_name={archive_name}\\n")' in workflow
     assert "ARCHIVE_NAME: ${{ needs.packaging-smoke.outputs.archive_name }}" in workflow
     assert 'asset_path="release-artifacts/${ARCHIVE_NAME}"' in workflow
     assert 'gh release upload "$RELEASE_TAG" "$asset_path"' in workflow
 
 
 def test_release_zip_layout_includes_installer_package_for_install_entrypoint():
-    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
+        encoding="utf-8"
+    )
 
     assert '"Install.py"' in workflow
-    assert 'include_dirs = ["core", "permission", "agents", "plugins", "adapters", "installer"]' in workflow
+    assert (
+        'include_dirs = ["core", "permission", "agents", "plugins", "adapters", "installer"]'
+        in workflow
+    )
     assert "installer/__init__.py" in _tracked_files()
     assert "installer/exe_release.py" in _tracked_files()
 
 
 def test_release_asset_cleanup_does_not_delete_graphql_node_ids_with_rest_endpoint():
-    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
+        encoding="utf-8"
+    )
 
     extracts_release_asset_node_ids = re.search(
         r"gh\s+release\s+view\b(?:(?!\n\s*(?:if|else|fi|while|done)\b).)*"
@@ -327,7 +396,9 @@ def test_release_asset_cleanup_does_not_delete_graphql_node_ids_with_rest_endpoi
         workflow,
     )
 
-    assert not (extracts_release_asset_node_ids and deletes_release_asset_with_rest_endpoint), (
+    assert not (
+        extracts_release_asset_node_ids and deletes_release_asset_with_rest_endpoint
+    ), (
         "Release asset cleanup must not pass GraphQL asset node IDs from "
         "`gh release view --json assets --jq ... .id` to the REST release asset delete endpoint."
     )
@@ -342,9 +413,13 @@ def test_opencode_plugin_declared_entry_skills_and_agents_exist():
     assert (plugin_dir / plugin["entry"]).is_file()
     assert (plugin_dir / plugin["install_entry_files"]["plugin_manifest"]).is_file()
     assert (plugin_dir / plugin["install_entry_files"]["adapter_module"]).is_file()
-    assert (plugin_dir / plugin["install_entry_files"]["single_user_facing_agent"]).is_file()
+    assert (
+        plugin_dir / plugin["install_entry_files"]["single_user_facing_agent"]
+    ).is_file()
     assert (plugin_dir / plugin["install_entry_files"]["skill_documents_dir"]).is_dir()
-    assert (plugin_dir / plugin["install_entry_files"]["internal_role_context_dir"]).is_dir()
+    assert (
+        plugin_dir / plugin["install_entry_files"]["internal_role_context_dir"]
+    ).is_dir()
     assert plugin["optional_add_on"] is True
     assert plugin["core_runtime_required"] is False
     assert plugin["native_opencode_subagent_runtime"] is False
@@ -357,10 +432,23 @@ def test_opencode_plugin_declared_entry_skills_and_agents_exist():
     assert user_facing_names == ["SuperMedicine"]
     assert len(plugin["user_facing_agents"]) == 1
     assert FORBIDDEN_PLATFORM_AGENT_NAMES.isdisjoint(user_facing_names)
-    assert plugin["install_entry_files"]["single_user_facing_agent"] == "agents/supermedicine.md"
-    assert plugin["install_completeness_model"]["single_user_facing_agent"] == "SuperMedicine"
-    assert set(plugin["ai_provider"]["supported_api_formats"]) == {"openai", "anthropic", "openrouter"}
-    assert plugin["ai_provider"]["supported_api_formats"]["openai"]["custom_base_url"] is True
+    assert (
+        plugin["install_entry_files"]["single_user_facing_agent"]
+        == "agents/supermedicine.md"
+    )
+    assert (
+        plugin["install_completeness_model"]["single_user_facing_agent"]
+        == "SuperMedicine"
+    )
+    assert set(plugin["ai_provider"]["supported_api_formats"]) == {
+        "openai",
+        "anthropic",
+        "openrouter",
+    }
+    assert (
+        plugin["ai_provider"]["supported_api_formats"]["openai"]["custom_base_url"]
+        is True
+    )
     assert plugin["ai_provider"]["secret_redaction_required"] is True
     assert plugin["ai_provider"]["plaintext_api_keys_in_manifest"] is False
     assert plugin["uninstall"]["remove_recorded_opencode_artifacts_only"] is True
@@ -377,7 +465,9 @@ def test_opencode_plugin_declared_entry_skills_and_agents_exist():
 
     for relative_path in plugin["internal_role_contexts"]:
         declared_path = plugin_dir / relative_path
-        assert declared_path.is_file(), f"Missing OpenCode internal role context: {relative_path}"
+        assert declared_path.is_file(), (
+            f"Missing OpenCode internal role context: {relative_path}"
+        )
         content = declared_path.read_text(encoding="utf-8")
         assert "user_facing: false" in content
         assert "internal_role_context: true" in content
@@ -385,7 +475,11 @@ def test_opencode_plugin_declared_entry_skills_and_agents_exist():
 
 def test_opencode_adapter_docs_do_not_contain_plaintext_api_key_examples():
     opencode_dir = REPO_ROOT / "adapters" / "opencode"
-    checked_paths = [opencode_dir / "plugin.json", *sorted((opencode_dir / "agents").glob("*.md")), *sorted((opencode_dir / "skills").glob("*.md"))]
+    checked_paths = [
+        opencode_dir / "plugin.json",
+        *sorted((opencode_dir / "agents").glob("*.md")),
+        *sorted((opencode_dir / "skills").glob("*.md")),
+    ]
     forbidden_secret_patterns = [
         re.compile(r"sk-[A-Za-z0-9_-]{12,}"),
         re.compile(r"sk-ant-[A-Za-z0-9_-]{12,}"),
@@ -403,7 +497,11 @@ def test_opencode_adapter_docs_do_not_contain_plaintext_api_key_examples():
 
 def test_claude_code_adapter_docs_do_not_contain_plaintext_api_key_examples():
     claude_code_dir = REPO_ROOT / "adapters" / "claude_code"
-    checked_paths = [claude_code_dir / "adapter.py", claude_code_dir / "SKILL.md", REPO_ROOT / "install.json"]
+    checked_paths = [
+        claude_code_dir / "adapter.py",
+        claude_code_dir / "SKILL.md",
+        REPO_ROOT / "install.json",
+    ]
     forbidden_secret_patterns = [
         re.compile(r"sk-[A-Za-z0-9_-]{12,}"),
         re.compile(r"sk-ant-[A-Za-z0-9_-]{12,}"),
@@ -432,7 +530,10 @@ def test_repository_docs_and_manifests_do_not_contain_realistic_plaintext_secret
     forbidden_secret_patterns = [
         re.compile(r"sk-[A-Za-z0-9_-]{12,}"),
         re.compile(r"sk-ant-[A-Za-z0-9_-]{12,}"),
-        re.compile(r"(?:api[_-]?key|authorization|token)\s*[:=]\s*['\"][^'\"<{][^'\"]{8,}['\"]", re.IGNORECASE),
+        re.compile(
+            r"(?:api[_-]?key|authorization|token)\s*[:=]\s*['\"][^'\"<{][^'\"]{8,}['\"]",
+            re.IGNORECASE,
+        ),
     ]
 
     offenders = []
@@ -477,7 +578,9 @@ def test_plugin_manifest_entry_paths_exist():
     for manifest_path in plugin_manifests:
         entry = _top_level_entry_from_yaml(manifest_path, "entry")
         if not entry:
-            missing_entries.append(f"{manifest_path.relative_to(REPO_ROOT)}: missing entry")
+            missing_entries.append(
+                f"{manifest_path.relative_to(REPO_ROOT)}: missing entry"
+            )
             continue
         entry_path = manifest_path.parent / entry
         if not entry_path.is_file():
@@ -488,7 +591,9 @@ def test_plugin_manifest_entry_paths_exist():
 
 def test_pyproject_console_script_target_is_importable():
     pyproject = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    match = re.search(r'^supermedicine\s*=\s*["\']([^"\']+)["\']\s*$', pyproject, re.MULTILINE)
+    match = re.search(
+        r'^supermedicine\s*=\s*["\']([^"\']+)["\']\s*$', pyproject, re.MULTILINE
+    )
     assert match, "Missing supermedicine console script"
 
     module_name, attribute_name = match.group(1).split(":", maxsplit=1)
@@ -499,7 +604,9 @@ def test_pyproject_console_script_target_is_importable():
 
 def test_pyproject_console_script_top_level_module_is_packaged():
     pyproject = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    match = re.search(r'^supermedicine\s*=\s*["\']([^"\']+)["\']\s*$', pyproject, re.MULTILINE)
+    match = re.search(
+        r'^supermedicine\s*=\s*["\']([^"\']+)["\']\s*$', pyproject, re.MULTILINE
+    )
     assert match, "Missing supermedicine console script"
 
     module_name, _attribute_name = match.group(1).split(":", maxsplit=1)
@@ -550,12 +657,12 @@ def test_distribution_build_forces_exact_lowercase_install_entry():
     assert "Install" not in py_modules
     assert '["git", "show", ":install.py"]' in setup_py
     assert '["git", "show", ":Install.py"]' in setup_py
-    assert "LOWERCASE_INSTALL_NAME = \"install.py\"" in setup_py
-    assert "UPPERCASE_INSTALL_NAME = \"Install.py\"" in setup_py
+    assert 'LOWERCASE_INSTALL_NAME = "install.py"' in setup_py
+    assert 'UPPERCASE_INSTALL_NAME = "Install.py"' in setup_py
     assert "class build_py" in setup_py
     assert "class sdist" in setup_py
     assert "class bdist_wheel" in setup_py
-    assert "Path(self.dist_dir).glob(\"*.whl\")" in setup_py
+    assert 'Path(self.dist_dir).glob("*.whl")' in setup_py
     assert "get_outputs()" not in setup_py
     assert "archive.writestr(name, data)" in setup_py
 
@@ -579,7 +686,9 @@ def test_gitignore_excludes_mypy_cache():
 def test_package_data_includes_tui_css():
     """pyproject.toml package-data must include core/tui/app.tcss."""
     pyproject = _read_pyproject()
-    package_data = pyproject.get("tool", {}).get("setuptools", {}).get("package-data", {})
+    package_data = (
+        pyproject.get("tool", {}).get("setuptools", {}).get("package-data", {})
+    )
     core_data = package_data.get("core", [])
     assert "tui/app.tcss" in core_data, (
         f"core package-data must include 'tui/app.tcss', got {core_data!r}"
@@ -588,7 +697,9 @@ def test_package_data_includes_tui_css():
 
 def test_packaging_declares_installer_resource_strategy_without_tracked_exe():
     pyproject = _read_pyproject()
-    package_data = pyproject.get("tool", {}).get("setuptools", {}).get("package-data", {})
+    package_data = (
+        pyproject.get("tool", {}).get("setuptools", {}).get("package-data", {})
+    )
     installer_data = package_data.get("installer", [])
     manifest = json.loads((REPO_ROOT / "install.json").read_text(encoding="utf-8"))
     resource_policy = manifest["packaging_resources"]
@@ -621,15 +732,22 @@ def test_install_manifest_uses_editable_install():
 def test_dev_optional_dependencies_include_pyyaml_type_stubs():
     """CI installs .[dev] before mypy, so PyYAML stubs must be in dev deps."""
     pyproject = _read_pyproject()
-    dev_dependencies = pyproject.get("project", {}).get("optional-dependencies", {}).get("dev", [])
+    dev_dependencies = (
+        pyproject.get("project", {}).get("optional-dependencies", {}).get("dev", [])
+    )
 
-    assert any(dep.split(";", maxsplit=1)[0].strip().lower().startswith("types-pyyaml") for dep in dev_dependencies), (
+    assert any(
+        dep.split(";", maxsplit=1)[0].strip().lower().startswith("types-pyyaml")
+        for dep in dev_dependencies
+    ), (
         "project.optional-dependencies.dev must include types-PyYAML so CI mypy has yaml stubs"
     )
 
 
 def test_ci_workflow_runs_full_quality_gates_without_hardcoded_secrets():
-    workflow_paths = sorted((REPO_ROOT / ".github" / "workflows").glob("*.yml")) + sorted((REPO_ROOT / ".github" / "workflows").glob("*.yaml"))
+    workflow_paths = sorted(
+        (REPO_ROOT / ".github" / "workflows").glob("*.yml")
+    ) + sorted((REPO_ROOT / ".github" / "workflows").glob("*.yaml"))
     assert workflow_paths, "Expected at least one CI workflow"
 
     combined = "\n".join(path.read_text(encoding="utf-8") for path in workflow_paths)
@@ -640,4 +758,8 @@ def test_ci_workflow_runs_full_quality_gates_without_hardcoded_secrets():
     assert re.search(r"pip\s+install\s+-e\s+(?:['\"])?\.\[dev\](?:['\"])?", combined)
     assert not re.search(r"sk-[A-Za-z0-9_-]{12,}", combined)
     assert not re.search(r"sk-ant-[A-Za-z0-9_-]{12,}", combined)
-    assert not re.search(r"(?:api[_-]?key|authorization|token)\s*[:=]\s*['\"][^'\"<{][^'\"]{8,}['\"]", combined, re.IGNORECASE)
+    assert not re.search(
+        r"(?:api[_-]?key|authorization|token)\s*[:=]\s*['\"][^'\"<{][^'\"]{8,}['\"]",
+        combined,
+        re.IGNORECASE,
+    )

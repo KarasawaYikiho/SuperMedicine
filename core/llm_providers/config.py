@@ -1,4 +1,5 @@
 """Unified LLM provider configuration helpers."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -66,10 +67,16 @@ class LLMProviderConfig:
     ) -> "LLMProviderConfig":
         """Build a normalized config from file/env-injected values and kwargs."""
         raw = dict(values or {})
-        raw.update({key: value for key, value in overrides.items() if value is not None})
+        raw.update(
+            {key: value for key, value in overrides.items() if value is not None}
+        )
 
         normalized_provider = str(raw.get("provider") or provider).strip().lower()
-        api_format = str(raw.get("api_format") or raw.get("format") or _default_api_format(normalized_provider)).lower()
+        api_format = str(
+            raw.get("api_format")
+            or raw.get("format")
+            or _default_api_format(normalized_provider)
+        ).lower()
         raw_base_url = raw.get("base_url", raw.get("baseURL", None))
         if raw_base_url is None and normalized_provider == "openrouter":
             raw_base_url = _default_base_url(normalized_provider)
@@ -80,7 +87,9 @@ class LLMProviderConfig:
         model = "" if raw_model is None else str(raw_model).strip()
 
         api_key = raw.get("api_key")
-        api_key_env = raw.get("api_key_env") or _default_api_key_env(normalized_provider)
+        api_key_env = raw.get("api_key_env") or _default_api_key_env(
+            normalized_provider
+        )
         if not api_key and api_key_env:
             api_key = os.environ.get(str(api_key_env), "")
 
@@ -106,7 +115,11 @@ class LLMProviderConfig:
 
     def missing_fields(self) -> list[str]:
         """Return required fields missing after env resolution and normalization."""
-        return [field for field in self.REQUIRED_FIELDS if not str(getattr(self, field, "") or "").strip()]
+        return [
+            field
+            for field in self.REQUIRED_FIELDS
+            if not str(getattr(self, field, "") or "").strip()
+        ]
 
     def validation_error(self) -> dict[str, Any] | None:
         """Return a structured validation error if required fields are missing."""

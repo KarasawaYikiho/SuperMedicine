@@ -1,4 +1,5 @@
 """LLM 客户端抽象层"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -54,7 +55,9 @@ class TrackedLLMClient(LLMClient):
     ignored so that tracking failures never break the caller.
     """
 
-    def __init__(self, wrapped: LLMClient, provider: str, tracker: "TokenTracker") -> None:
+    def __init__(
+        self, wrapped: LLMClient, provider: str, tracker: "TokenTracker"
+    ) -> None:
         self._wrapped = wrapped
         self._provider = provider
         self._tracker = tracker
@@ -64,7 +67,7 @@ class TrackedLLMClient(LLMClient):
     @property
     def config(self):
         """Proxy config from the wrapped client."""
-        return getattr(self._wrapped, 'config', None)
+        return getattr(self._wrapped, "config", None)
 
     # -- delegation -----------------------------------------------------------
 
@@ -84,14 +87,27 @@ class TrackedLLMClient(LLMClient):
         """Extract usage from *response* and record it via the tracker."""
         usage: Any = response.get("usage")
         if not usage or not isinstance(usage, dict):
-            logger.debug("LLM usage unavailable or malformed: provider=%s model=%s usage_type=%s", self._provider, response.get("model", "unknown"), type(usage).__name__)
+            logger.debug(
+                "LLM usage unavailable or malformed: provider=%s model=%s usage_type=%s",
+                self._provider,
+                response.get("model", "unknown"),
+                type(usage).__name__,
+            )
             return
 
         # Support both OpenAI-style and Anthropic-style usage dicts.
-        prompt_tokens = int(usage.get("prompt_tokens") or usage.get("input_tokens") or 0)
-        completion_tokens = int(usage.get("completion_tokens") or usage.get("output_tokens") or 0)
+        prompt_tokens = int(
+            usage.get("prompt_tokens") or usage.get("input_tokens") or 0
+        )
+        completion_tokens = int(
+            usage.get("completion_tokens") or usage.get("output_tokens") or 0
+        )
         if prompt_tokens == 0 and completion_tokens == 0:
-            logger.debug("LLM usage contains zero tokens: provider=%s model=%s", self._provider, response.get("model", "unknown"))
+            logger.debug(
+                "LLM usage contains zero tokens: provider=%s model=%s",
+                self._provider,
+                response.get("model", "unknown"),
+            )
             return
 
         model = str(response.get("model") or "unknown")
@@ -165,17 +181,22 @@ def create_llm_client(provider: str, **kwargs: Any) -> LLMClient:
 
     if api_format in ("openai", "openai_responses", "responses"):
         from core.llm_providers.base import OpenAIClient
+
         return OpenAIClient(**kwargs)
     if api_format == "anthropic":
         from core.llm_providers.base import AnthropicClient
+
         return AnthropicClient(**kwargs)
     if api_format == "openrouter" or normalized_provider == "openrouter":
         from core.llm_providers.openrouter import OpenRouterClient
+
         return OpenRouterClient(**kwargs)
     raise ValueError(f"Unsupported api_format: {redact_sensitive(api_format)}")
 
 
-def create_configured_llm_client(config_center: "ConfigCenter") -> LLMClient | dict[str, Any]:
+def create_configured_llm_client(
+    config_center: "ConfigCenter",
+) -> LLMClient | dict[str, Any]:
     """Create an LLM client from ConfigCenter runtime provider restoration logic."""
     from core.llm_manager import LLMConfigManager
 

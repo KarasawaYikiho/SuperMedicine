@@ -1,4 +1,4 @@
-﻿"""Dashboard view for SuperMedicine TUI."""
+"""Dashboard view for SuperMedicine TUI."""
 
 from __future__ import annotations
 
@@ -27,7 +27,9 @@ def collect_dashboard_context(project_root: Path | str | None = None) -> dict[st
 
     context = {
         "initialized": initialized,
-        "init_status": t("dashboard_initialized") if initialized else t("dashboard_not_initialized"),
+        "init_status": t("dashboard_initialized")
+        if initialized
+        else t("dashboard_not_initialized"),
         "workspace_count": len(workspace_infos),
         "plugin_count": _count_plugins(root),
         "module_count": _count_core_modules(root),
@@ -55,7 +57,11 @@ class DashboardOverviewController:
         token_stats = context.get("token_stats", {})
         total_tokens = token_stats.get("total_tokens", 0)
         request_count = token_stats.get("request_count", 0)
-        token_display = f"{total_tokens:,} ({request_count} 次请求)" if total_tokens > 0 else t("dashboard_no_token_data")
+        token_display = (
+            f"{total_tokens:,} ({request_count} 次请求)"
+            if total_tokens > 0
+            else t("dashboard_no_token_data")
+        )
         return [
             (t("dashboard_init_status"), str(context["init_status"])),
             (t("dashboard_workspaces"), str(context["workspace_count"])),
@@ -85,7 +91,9 @@ def _count_plugins(root: Path) -> int:
     return sum(
         1
         for item in plugins_dir.iterdir()
-        if item.is_dir() and not item.name.startswith("_") and (item / "plugin.yaml").exists()
+        if item.is_dir()
+        and not item.name.startswith("_")
+        and (item / "plugin.yaml").exists()
     )
 
 
@@ -93,12 +101,17 @@ def _count_core_modules(root: Path) -> int:
     core_dir = root / "core"
     if not core_dir.is_dir():
         return 0
-    return sum(1 for item in core_dir.iterdir() if item.is_dir() and not item.name.startswith("_"))
+    return sum(
+        1
+        for item in core_dir.iterdir()
+        if item.is_dir() and not item.name.startswith("_")
+    )
 
 
 def _safe_token_stats(root: Path) -> dict[str, int]:
     try:
         from core.token_tracker import TokenTracker
+
         tracker = TokenTracker(root / ".supermedicine" / "tokens.jsonl")
         return tracker.summary()
     except Exception:
@@ -107,7 +120,9 @@ def _safe_token_stats(root: Path) -> dict[str, int]:
 
 def _safe_llm_status(root: Path) -> tuple[str, bool]:
     try:
-        manager = LLMConfigManager(ConfigCenter(root / ".supermedicine" / "config.yaml"))
+        manager = LLMConfigManager(
+            ConfigCenter(root / ".supermedicine" / "config.yaml")
+        )
         providers = manager.list_providers(redacted=True)
         current = manager.get_current_provider(redacted=True)
         provider = str(current.get("provider") or "")
@@ -119,8 +134,13 @@ def _safe_llm_status(root: Path) -> tuple[str, bool]:
             suffix = f"（{model}）" if model else ""
             return f"{t('llm_ready')}：{provider}{suffix}", True
         missing = validation.get("error", {}).get("details", {}).get("missing", [])
-        missing_text = "、".join(str(item) for item in missing) if missing else t("llm_not_ready")
-        return f"{t('llm_not_ready')}：{provider}（{t('dashboard_llm_missing')}：{missing_text}）", False
+        missing_text = (
+            "、".join(str(item) for item in missing) if missing else t("llm_not_ready")
+        )
+        return (
+            f"{t('llm_not_ready')}：{provider}（{t('dashboard_llm_missing')}：{missing_text}）",
+            False,
+        )
     except Exception:
         return f"{t('llm_not_ready')}：{t('dashboard_llm_no_provider')}", False
 
@@ -170,9 +190,13 @@ class DashboardView(Vertical):
     def compose(self) -> ComposeResult:
         yield Static(t("dashboard_title"), classes="section-title")
         yield Static(t("sandbox_notice"), id="dashboard-summary")
-        yield DataTable(id="dashboard-table", cursor_type="row", classes="dashboard-stat")
+        yield DataTable(
+            id="dashboard-table", cursor_type="row", classes="dashboard-stat"
+        )
         yield Static("", id="dashboard-advice")
-        yield Static(t("status_shortcuts_hint"), id="dashboard-shortcuts", classes="hint")
+        yield Static(
+            t("status_shortcuts_hint"), id="dashboard-shortcuts", classes="hint"
+        )
 
     def on_mount(self) -> None:
         self._load_data()
@@ -186,9 +210,10 @@ class DashboardView(Vertical):
         self.query_one("#dashboard-advice", Static).update(
             f"{t('dashboard_action_hint')}：{self._controller.advice_text()}"
         )
-        apply_status_style(self.query_one("#dashboard-advice", Static), self._controller.advice_text())
+        apply_status_style(
+            self.query_one("#dashboard-advice", Static), self._controller.advice_text()
+        )
 
 
 # Backward-compatible alias
 DashboardScreen = DashboardView
-

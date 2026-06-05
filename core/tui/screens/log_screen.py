@@ -5,14 +5,28 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Input, Static, TextArea
 
-from core.log_report import LogReportStore
+from core.log_report import LogReportStore, detect_log_severity, format_log_message
 from core.redaction import redact_sensitive
 from core.tui.app import apply_status_style
 from core.tui.i18n import t
+
+
+_SUMMARY_LIMIT = 96
+_DETAIL_LINE_LIMIT = 160
+
+
+_SEVERITY_STYLES = {
+    "Error": "bold red",
+    "Warning": "yellow",
+    "Info": "cyan",
+    "Debug": "dim blue",
+    "Success": "green",
+}
 
 
 class LogReportView(Vertical):
@@ -54,19 +68,34 @@ class LogReportView(Vertical):
     def refresh_logs(self, *, refreshed: bool = False) -> str:
         table = self.query_one("#log-table", DataTable)
         table.clear(columns=True)
-        table.add_columns("文件", "报告 ID", "会话", "时间", "摘要")
+        table.add_columns("文件", "报告 ID", "条目 ID", "会话", "时间", "级别", "摘要")
         try:
-            reports = self.store.list()
-            for report in reports:
+            entries = self.store.list_entries()
+            for entry in entries:
+                severity = self._entry_severity(entry)
+                message = self._entry_message(entry, severity=severity)
                 table.add_row(
-                    str(report.get("file") or ""),
-                    str(report.get("report_id") or ""),
-                    str(report.get("session_id") or ""),
-                    str(report.get("created_at") or ""),
-                    str(report.get("message") or "")[:80],
+                    str(entry.get("file") or ""),
+                    str(entry.get("report_id") or ""),
+                    str(entry.get("entry_id") or ""),
+                    str(entry.get("session_id") or ""),
+                    str(entry.get("created_at") or ""),
+                    self._severity_label(severity),
+                    self._severity_text(self._preview_text(message), severity=severity),
                 )
+            stats_text = self._statistics_text(
+                self.store.statistics_for_entries(entries)
+            )
             label = t("log_refreshed") if refreshed else t("log_list")
-            status_text = f"{label}: {len(reports)}" if reports else (f"{t('log_refreshed')}：{t('log_no_reports')}" if refreshed else t("log_no_reports"))
+            status_text = (
+                f"{label}: {len(entries)}；{stats_text}"
+                if entries
+                else (
+                    f"{t('log_refreshed')}：{t('log_no_reports')}；{stats_text}"
+                    if refreshed
+                    else f"{t('log_no_reports')}；{stats_text}"
+                )
+            )
             self._set_status(status_text)
             return status_text
         except Exception as exc:
@@ -78,7 +107,9 @@ class LogReportView(Vertical):
         if not message:
             self._set_status(t("log_empty_message"))
             return
-        session_id = self.query_one("#log-session-id-input", Input).value.strip() or None
+        session_id = (
+            self.query_one("#log-session-id-input", Input).value.strip() or None
+        )
         try:
             self.store.write(message, session_id=session_id)
             self.app.notify(t("log_saved"))
@@ -89,20 +120,58 @@ class LogReportView(Vertical):
 
     def _show_selected_log(self) -> None:
         table = self.query_one("#log-table", DataTable)
-        if table.cursor_row is None:
-            self._set_status(t("no_selection"))
+        if table.row_count == 0:
+            self._set_status(f"{t('error')}: {t('log_no_reports')}，无法执行该操作")
             return
-        row = table.get_row_at(table.cursor_row)
-        file_name = str(row[0])
+        if (
+            table.cursor_row is None
+            or table.cursor_row < 0
+            or table.cursor_row >= table.row_count
+        ):
+            self._set_status(f"{t('error')}: {t('no_selection')}，无法执行该操作")
+            return
         try:
-            report = self.store.show(file_name)
-            detail = (
-                f"{t('log_loaded')}: {report.get('file')}\n"
-                f"ID: {report.get('report_id')}\n"
-                f"{t('log_session_id')}: {report.get('session_id') or ''}\n"
-                f"{t('log_message')}:\n{report.get('message') or ''}"
+            row = table.get_row_at(table.cursor_row)
+        except Exception:
+            self._set_status(f"{t('error')}: {t('no_selection')}，无法执行该操作")
+            return
+        if len(row) < 3:
+            self._set_status(f"{t('error')}: {t('no_selection')}，无法执行该操作")
+            return
+        file_name = str(row[0])
+        entry_id = str(row[2])
+        try:
+            entries = self.store.list_entries(file_name=file_name)
+            selected_entry = next(
+                (
+                    entry
+                    for entry in entries
+                    if str(entry.get("entry_id") or "") == entry_id
+                ),
+                None,
             )
-            self.query_one("#log-detail", Static).update(str(redact_sensitive(detail)))
+            if selected_entry is None:
+                self._set_status(f"{t('error')}: {t('no_selection')}，无法执行该操作")
+                return
+            severity = self._entry_severity(selected_entry)
+            message = self._wrapped_detail_text(
+                self._entry_message(selected_entry, severity=severity)
+            )
+            stats_text = self._statistics_text(
+                self.store.statistics_for_entries([selected_entry])
+            )
+            detail = (
+                f"{t('log_loaded')}: {selected_entry.get('file')}\n"
+                f"ID: {selected_entry.get('report_id')}\n"
+                f"Entry ID: {selected_entry.get('entry_id') or ''}\n"
+                f"{t('log_session_id')}: {selected_entry.get('session_id') or ''}\n"
+                f"Severity: {severity}\n"
+                f"Statistics: {stats_text}\n"
+                f"{t('log_message')}:\n{message}"
+            )
+            self.query_one("#log-detail", Static).update(
+                self._severity_text(str(redact_sensitive(detail)), severity=severity)
+            )
             self._set_status(t("log_loaded"))
         except Exception as exc:
             self._set_error(exc)
@@ -114,9 +183,83 @@ class LogReportView(Vertical):
         apply_status_style(status, safe_message)
 
     def _set_error(self, error: Exception) -> None:
-        message = f"{t('error')}: {redact_sensitive(str(error)) or t('safe_error_hint')}"
+        message = (
+            f"{t('error')}: {redact_sensitive(str(error)) or t('safe_error_hint')}"
+        )
         self._set_status(message)
         self.app.notify(message, severity="error")
+
+    @staticmethod
+    def _entry_severity(entry: dict[str, Any]) -> str:
+        explicit_severity = str(entry.get("severity") or "").strip()
+        if explicit_severity in _SEVERITY_STYLES:
+            return explicit_severity
+        raw_message = str(entry.get("raw_message") or entry.get("message") or "")
+        return detect_log_severity(raw_message)
+
+    @staticmethod
+    def _entry_message(entry: dict[str, Any], *, severity: str | None = None) -> str:
+        return format_log_message(
+            str(entry.get("raw_message") or entry.get("message") or ""),
+            severity=severity or entry.get("severity"),
+        )
+
+    @staticmethod
+    def _severity_label(severity: str) -> Text:
+        safe_severity = severity if severity in _SEVERITY_STYLES else "Info"
+        return Text(
+            f"[{safe_severity}]",
+            style=_SEVERITY_STYLES.get(safe_severity, _SEVERITY_STYLES["Info"]),
+        )
+
+    @staticmethod
+    def _severity_text(message: str, *, severity: str | None = None) -> Text:
+        safe_message = str(redact_sensitive(message))
+        detected_severity = (
+            severity
+            if severity in _SEVERITY_STYLES
+            else detect_log_severity(safe_message)
+        )
+        return Text(
+            safe_message,
+            style=_SEVERITY_STYLES.get(detected_severity, _SEVERITY_STYLES["Info"]),
+        )
+
+    @staticmethod
+    def _preview_text(message: str, *, limit: int = _SUMMARY_LIMIT) -> str:
+        compact = " ".join(str(redact_sensitive(message)).split())
+        if len(compact) <= limit:
+            return compact
+        return f"{compact[: max(0, limit - 1)].rstrip()}…"
+
+    @staticmethod
+    def _wrapped_detail_text(
+        message: str, *, line_limit: int = _DETAIL_LINE_LIMIT
+    ) -> str:
+        safe_message = str(redact_sensitive(message))
+        wrapped_lines: list[str] = []
+        for line in safe_message.splitlines() or [""]:
+            if len(line) <= line_limit:
+                wrapped_lines.append(line)
+                continue
+            for index in range(0, len(line), line_limit):
+                wrapped_lines.append(line[index : index + line_limit])
+        return "\n".join(wrapped_lines)
+
+    @staticmethod
+    def _statistics_text(statistics: dict[str, Any]) -> str:
+        severity_counts = (
+            statistics.get("severity_counts") if isinstance(statistics, dict) else {}
+        )
+        if not isinstance(severity_counts, dict):
+            severity_counts = {}
+        entry_count = (
+            statistics.get("entry_count", 0) if isinstance(statistics, dict) else 0
+        )
+        parts = [f"entries={int(entry_count or 0)}"]
+        for severity in ("Error", "Warning", "Info", "Debug", "Success"):
+            parts.append(f"{severity}={int(severity_counts.get(severity, 0) or 0)}")
+        return ", ".join(parts)
 
 
 LogScreen = LogReportView

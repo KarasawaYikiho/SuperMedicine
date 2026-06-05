@@ -11,6 +11,7 @@ unrecorded platform directories, and unrecorded user-created files are never
 removed.  Recorded user-data paths are removed by default for clean uninstall;
 use ``--preserve-user-data`` to retain them explicitly.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -64,7 +65,14 @@ USER_DATA_PATH_KEYS: tuple[str, ...] = (
     "preserve_paths",
     "data_dirs",
 )
-SENSITIVE_KEY_PARTS = ("api_key", "apikey", "token", "secret", "password", "authorization")
+SENSITIVE_KEY_PARTS = (
+    "api_key",
+    "apikey",
+    "token",
+    "secret",
+    "password",
+    "authorization",
+)
 
 
 @dataclass(frozen=True)
@@ -91,7 +99,10 @@ def _redact_data(data: Any) -> Any:
     if isinstance(data, dict):
         result: dict[str, Any] = {}
         for key, value in data.items():
-            if any(part in str(key).lower().replace("-", "_") for part in SENSITIVE_KEY_PARTS):
+            if any(
+                part in str(key).lower().replace("-", "_")
+                for part in SENSITIVE_KEY_PARTS
+            ):
                 result[key] = "<redacted>" if value else value
             else:
                 result[key] = _redact_data(value)
@@ -125,7 +136,10 @@ def _load_install_record(project_dir: Path) -> dict[str, Any]:
     try:
         loaded = json.loads(record_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
-        logger.warning("Ignoring invalid install record: %s", _safe_display(record_path, project_dir))
+        logger.warning(
+            "Ignoring invalid install record: %s",
+            _safe_display(record_path, project_dir),
+        )
         return {}
     return loaded if isinstance(loaded, dict) else {}
 
@@ -137,7 +151,10 @@ def _load_install_manifest(project_dir: Path) -> dict[str, Any]:
     try:
         loaded = json.loads(manifest_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
-        logger.warning("Ignoring invalid install manifest: %s", _safe_display(manifest_path, project_dir))
+        logger.warning(
+            "Ignoring invalid install manifest: %s",
+            _safe_display(manifest_path, project_dir),
+        )
         return {}
     return loaded if isinstance(loaded, dict) else {}
 
@@ -154,7 +171,9 @@ def _iter_string_values(value: Any) -> Iterable[str]:
             yield path_value
 
 
-def _iter_recorded_paths(record: dict[str, Any], keys: Iterable[str] = INSTALL_RECORD_PATH_KEYS) -> Iterable[str]:
+def _iter_recorded_paths(
+    record: dict[str, Any], keys: Iterable[str] = INSTALL_RECORD_PATH_KEYS
+) -> Iterable[str]:
     key_tuple = tuple(keys)
     for key in keys:
         values = record.get(key, [])
@@ -163,7 +182,11 @@ def _iter_recorded_paths(record: dict[str, Any], keys: Iterable[str] = INSTALL_R
     if isinstance(platforms, dict):
         for platform in platforms.values():
             if isinstance(platform, dict):
-                platform_keys = (*key_tuple, "target_paths") if key_tuple == INSTALL_RECORD_PATH_KEYS else key_tuple
+                platform_keys = (
+                    (*key_tuple, "target_paths")
+                    if key_tuple == INSTALL_RECORD_PATH_KEYS
+                    else key_tuple
+                )
                 for key in platform_keys:
                     yield from _iter_string_values(platform.get(key, []))
 
@@ -201,27 +224,53 @@ def collect_removal_candidates(
     skipped: list[str] = []
 
     for relative in (*RUNTIME_ARTIFACT_PATHS, *OWNED_DEFAULT_PATHS):
-        candidates.append(RemovalCandidate(project_dir / relative, "canonical-project-owned"))
+        candidates.append(
+            RemovalCandidate(project_dir / relative, "canonical-project-owned")
+        )
 
     for raw_path in _iter_recorded_paths(record):
-        candidates.append(RemovalCandidate(_resolve_candidate(project_dir, raw_path), "recorded-installer-created", recorded=True))
+        candidates.append(
+            RemovalCandidate(
+                _resolve_candidate(project_dir, raw_path),
+                "recorded-installer-created",
+                recorded=True,
+            )
+        )
 
     for raw_path in _iter_user_data_paths(record):
         candidates.append(
             RemovalCandidate(
                 _resolve_candidate(project_dir, raw_path),
-                "recorded-user-data" if not preserve_user_data else "preserved-user-data",
+                "recorded-user-data"
+                if not preserve_user_data
+                else "preserved-user-data",
                 recorded=True,
                 user_data=True,
             )
         )
 
-    uninstall_manifest = manifest.get("uninstall", {}) if isinstance(manifest.get("uninstall"), dict) else {}
+    uninstall_manifest = (
+        manifest.get("uninstall", {})
+        if isinstance(manifest.get("uninstall"), dict)
+        else {}
+    )
     for raw_path in _iter_recorded_paths(uninstall_manifest):
-        candidates.append(RemovalCandidate(_resolve_candidate(project_dir, raw_path), "manifest-uninstall-artifact", recorded=True))
+        candidates.append(
+            RemovalCandidate(
+                _resolve_candidate(project_dir, raw_path),
+                "manifest-uninstall-artifact",
+                recorded=True,
+            )
+        )
 
     for raw_path in explicit_targets:
-        candidates.append(RemovalCandidate(_resolve_candidate(project_dir, raw_path), "explicit-installer-created-target", recorded=True))
+        candidates.append(
+            RemovalCandidate(
+                _resolve_candidate(project_dir, raw_path),
+                "explicit-installer-created-target",
+                recorded=True,
+            )
+        )
 
     unique: dict[Path, RemovalCandidate] = {}
     for candidate in candidates:
@@ -237,8 +286,12 @@ def collect_removal_candidates(
             continue
         existing = unique.get(resolved)
         if existing is None or candidate.recorded:
-            unique[resolved] = RemovalCandidate(resolved, candidate.reason, candidate.recorded)
-    return sorted(unique.values(), key=lambda item: len(item.path.parts), reverse=True), skipped
+            unique[resolved] = RemovalCandidate(
+                resolved, candidate.reason, candidate.recorded
+            )
+    return sorted(
+        unique.values(), key=lambda item: len(item.path.parts), reverse=True
+    ), skipped
 
 
 def _delete_path(path: Path) -> None:
@@ -256,19 +309,36 @@ def _repair_suggestion(kind: str, target: str) -> str:
         "registry": f"Remove registry key/value '{target}' manually after confirming it belongs to SuperMedicine.",
         "file": f"Delete '{target}' manually after closing programs that may be using it.",
     }
-    return suggestions.get(kind, f"Review and remove '{target}' manually if it belongs to SuperMedicine.")
+    return suggestions.get(
+        kind, f"Review and remove '{target}' manually if it belongs to SuperMedicine."
+    )
 
 
 def _residual(kind: str, target: str, reason: str) -> Residual:
-    return Residual(kind=kind, target=target, reason=reason, suggestion=_repair_suggestion(kind, target))
+    return Residual(
+        kind=kind,
+        target=target,
+        reason=reason,
+        suggestion=_repair_suggestion(kind, target),
+    )
 
 
-def _remove_path_from_env_value(path_value: str, entries: Iterable[str]) -> tuple[str, list[str]]:
-    wanted = {os.path.normcase(os.path.normpath(os.path.expanduser(os.path.expandvars(entry)))) for entry in entries if entry}
+def _remove_path_from_env_value(
+    path_value: str, entries: Iterable[str]
+) -> tuple[str, list[str]]:
+    wanted = {
+        os.path.normcase(
+            os.path.normpath(os.path.expanduser(os.path.expandvars(entry)))
+        )
+        for entry in entries
+        if entry
+    }
     kept: list[str] = []
     removed: list[str] = []
     for item in path_value.split(os.pathsep):
-        normalized = os.path.normcase(os.path.normpath(os.path.expanduser(os.path.expandvars(item))))
+        normalized = os.path.normcase(
+            os.path.normpath(os.path.expanduser(os.path.expandvars(item)))
+        )
         if normalized in wanted:
             removed.append(item)
         else:
@@ -276,7 +346,9 @@ def _remove_path_from_env_value(path_value: str, entries: Iterable[str]) -> tupl
     return os.pathsep.join(kept), removed
 
 
-def _cleanup_process_environment(record: dict[str, Any], *, dry_run: bool) -> tuple[list[str], list[Residual]]:
+def _cleanup_process_environment(
+    record: dict[str, Any], *, dry_run: bool
+) -> tuple[list[str], list[Residual]]:
     cleaned: list[str] = []
     residuals: list[Residual] = []
     path_entries = list(_iter_recorded_names(record, "path_entries"))
@@ -296,7 +368,9 @@ def _cleanup_process_environment(record: dict[str, Any], *, dry_run: bool) -> tu
     return cleaned, residuals
 
 
-def _cleanup_windows_registry_environment(record: dict[str, Any], *, dry_run: bool) -> tuple[list[str], list[Residual]]:
+def _cleanup_windows_registry_environment(
+    record: dict[str, Any], *, dry_run: bool
+) -> tuple[list[str], list[Residual]]:
     if sys.platform != "win32":
         return [], []
     env_vars = list(_iter_recorded_names(record, "environment_variables"))
@@ -311,7 +385,10 @@ def _cleanup_windows_registry_environment(record: dict[str, Any], *, dry_run: bo
     residuals: list[Residual] = []
     hives = [
         (winreg.HKEY_CURRENT_USER, r"Environment"),
-        (winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment"),
+        (
+            winreg.HKEY_LOCAL_MACHINE,
+            r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment",
+        ),
     ]
     for hive, subkey in hives:
         try:
@@ -324,9 +401,13 @@ def _cleanup_windows_registry_environment(record: dict[str, Any], *, dry_run: bo
                         path_value = ""
                         value_type = winreg.REG_EXPAND_SZ
                     if isinstance(path_value, str):
-                        new_path, removed = _remove_path_from_env_value(path_value, path_entries)
+                        new_path, removed = _remove_path_from_env_value(
+                            path_value, path_entries
+                        )
                         if removed:
-                            cleaned.extend(f"registry-path:{entry}" for entry in removed)
+                            cleaned.extend(
+                                f"registry-path:{entry}" for entry in removed
+                            )
                             if not dry_run:
                                 winreg.SetValueEx(key, "Path", 0, value_type, new_path)
                 for name in env_vars:
@@ -344,7 +425,9 @@ def _cleanup_windows_registry_environment(record: dict[str, Any], *, dry_run: bo
     return cleaned, residuals
 
 
-def _cleanup_windows_services(record: dict[str, Any], *, dry_run: bool) -> tuple[list[str], list[Residual]]:
+def _cleanup_windows_services(
+    record: dict[str, Any], *, dry_run: bool
+) -> tuple[list[str], list[Residual]]:
     if sys.platform != "win32":
         return [], []
     cleaned: list[str] = []
@@ -354,19 +437,39 @@ def _cleanup_windows_services(record: dict[str, Any], *, dry_run: bool) -> tuple
         if dry_run:
             continue
         for command in (("sc", "stop", service_name), ("sc", "delete", service_name)):
-            completed = subprocess.run(command, capture_output=True, text=True, check=False)
+            completed = subprocess.run(
+                command, capture_output=True, text=True, check=False
+            )
             combined = f"{completed.stdout}\n{completed.stderr}"
-            if completed.returncode != 0 and "does not exist" not in combined.lower() and "1060" not in combined:
-                residuals.append(_residual("service", service_name, combined.strip() or f"command failed: {' '.join(command)}"))
+            if (
+                completed.returncode != 0
+                and "does not exist" not in combined.lower()
+                and "1060" not in combined
+            ):
+                residuals.append(
+                    _residual(
+                        "service",
+                        service_name,
+                        combined.strip() or f"command failed: {' '.join(command)}",
+                    )
+                )
                 break
     return cleaned, residuals
 
 
-def _cleanup_registry_keys(record: dict[str, Any], *, dry_run: bool) -> tuple[list[str], list[Residual]]:
+def _cleanup_registry_keys(
+    record: dict[str, Any], *, dry_run: bool
+) -> tuple[list[str], list[Residual]]:
     cleaned: list[str] = []
     residuals: list[Residual] = []
     for registry_key in _iter_recorded_names(record, "registry_keys"):
-        residuals.append(_residual("registry", registry_key, "Automatic registry key deletion is not performed unless recorded as environment cleanup"))
+        residuals.append(
+            _residual(
+                "registry",
+                registry_key,
+                "Automatic registry key deletion is not performed unless recorded as environment cleanup",
+            )
+        )
         if dry_run:
             cleaned.append(f"registry-planned:{registry_key}")
     return cleaned, residuals
@@ -382,16 +485,39 @@ def uninstall(
     preserve_user_data: bool = False,
 ) -> dict[str, Any]:
     project_dir = project_dir.resolve()
-    logger.info("Uninstall stage=collect project_dir=%s dry_run=%s force=%s preserve_user_data=%s", project_dir, dry_run, force, preserve_user_data)
+    logger.info(
+        "Uninstall stage=collect project_dir=%s dry_run=%s force=%s preserve_user_data=%s",
+        project_dir,
+        dry_run,
+        force,
+        preserve_user_data,
+    )
     record = _load_install_record(project_dir)
-    candidates, skipped = collect_removal_candidates(project_dir, explicit_targets, preserve_user_data=preserve_user_data)
-    existing = [candidate for candidate in candidates if candidate.path.exists() or candidate.path.is_symlink()]
+    candidates, skipped = collect_removal_candidates(
+        project_dir, explicit_targets, preserve_user_data=preserve_user_data
+    )
+    existing = [
+        candidate
+        for candidate in candidates
+        if candidate.path.exists() or candidate.path.is_symlink()
+    ]
 
     if not dry_run and not (force or yes):
-        confirmation = input("Type 'supermedicine' to remove SuperMedicine-owned local files: ").strip().lower()
+        confirmation = (
+            input("Type 'supermedicine' to remove SuperMedicine-owned local files: ")
+            .strip()
+            .lower()
+        )
         if confirmation != PROJECT_MARKER:
-            cancelled_result: dict[str, Any] = {"status": "cancelled", "planned": [], "removed": [], "skipped": skipped + ["confirmation-mismatch"]}
-            logger.info(json.dumps(_redact_data(cancelled_result), ensure_ascii=False, indent=2))
+            cancelled_result: dict[str, Any] = {
+                "status": "cancelled",
+                "planned": [],
+                "removed": [],
+                "skipped": skipped + ["confirmation-mismatch"],
+            }
+            logger.info(
+                json.dumps(_redact_data(cancelled_result), ensure_ascii=False, indent=2)
+            )
             return cancelled_result
 
     removed: list[str] = []
@@ -402,24 +528,42 @@ def uninstall(
         planned.append({"path": relative, "reason": candidate.reason})
         if not dry_run:
             try:
-                logger.info("Uninstall stage=remove path=%s reason=%s", relative, candidate.reason)
+                logger.info(
+                    "Uninstall stage=remove path=%s reason=%s",
+                    relative,
+                    candidate.reason,
+                )
                 _delete_path(candidate.path)
                 removed.append(relative)
             except OSError as exc:
-                logger.error("Uninstall stage=remove-failed path=%s error=%s", relative, redact_sensitive(str(exc)))
+                logger.error(
+                    "Uninstall stage=remove-failed path=%s error=%s",
+                    relative,
+                    redact_sensitive(str(exc)),
+                )
                 residuals.append(_residual("file", relative, str(exc)))
 
-    environment_cleaned, environment_residuals = _cleanup_process_environment(record, dry_run=dry_run)
-    registry_environment_cleaned, registry_environment_residuals = _cleanup_windows_registry_environment(record, dry_run=dry_run)
-    service_cleaned, service_residuals = _cleanup_windows_services(record, dry_run=dry_run)
-    registry_cleaned, registry_residuals = _cleanup_registry_keys(record, dry_run=dry_run)
+    environment_cleaned, environment_residuals = _cleanup_process_environment(
+        record, dry_run=dry_run
+    )
+    registry_environment_cleaned, registry_environment_residuals = (
+        _cleanup_windows_registry_environment(record, dry_run=dry_run)
+    )
+    service_cleaned, service_residuals = _cleanup_windows_services(
+        record, dry_run=dry_run
+    )
+    registry_cleaned, registry_residuals = _cleanup_registry_keys(
+        record, dry_run=dry_run
+    )
     residuals.extend(environment_residuals)
     residuals.extend(registry_environment_residuals)
     residuals.extend(service_residuals)
     residuals.extend(registry_residuals)
 
     result: dict[str, Any] = {
-        "status": "dry-run" if dry_run else ("removed-with-residuals" if residuals else "removed"),
+        "status": "dry-run"
+        if dry_run
+        else ("removed-with-residuals" if residuals else "removed"),
         "project_dir": _safe_display(project_dir, project_dir),
         "ownership_rule": "project-owned paths only: canonical .supermedicine/runtime artifacts plus recorded or explicit installer-created binaries, shortcuts, service/environment/PATH metadata, configuration/cache/log/temp directories, platform targets, and explicit targets inside the project root; user data is removed by default unless --preserve-user-data is set",
         "planned": planned,
@@ -437,13 +581,41 @@ def uninstall(
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    parser = argparse.ArgumentParser(description="Safely remove SuperMedicine-owned local install artifacts")
-    parser.add_argument("--project-dir", type=Path, default=Path.cwd(), help="Project directory to clean; defaults to cwd")
-    parser.add_argument("--dry-run", action="store_true", help="Show what would be removed without deleting anything")
-    parser.add_argument("--yes", action="store_true", help="Confirm interactive uninstall without typing the marker")
-    parser.add_argument("--force", action="store_true", help="Non-interactive mode; implies confirmation")
-    parser.add_argument("--target", action="append", default=[], help="Additional installer-created target path to remove if inside project")
-    parser.add_argument("--preserve-user-data", action="store_true", help="Keep paths recorded as user data; default uninstall removes them for clean deletion")
+    parser = argparse.ArgumentParser(
+        description="Safely remove SuperMedicine-owned local install artifacts"
+    )
+    parser.add_argument(
+        "--project-dir",
+        type=Path,
+        default=Path.cwd(),
+        help="Project directory to clean; defaults to cwd",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be removed without deleting anything",
+    )
+    parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="Confirm interactive uninstall without typing the marker",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Non-interactive mode; implies confirmation",
+    )
+    parser.add_argument(
+        "--target",
+        action="append",
+        default=[],
+        help="Additional installer-created target path to remove if inside project",
+    )
+    parser.add_argument(
+        "--preserve-user-data",
+        action="store_true",
+        help="Keep paths recorded as user data; default uninstall removes them for clean deletion",
+    )
     args = parser.parse_args()
     uninstall(
         args.project_dir,

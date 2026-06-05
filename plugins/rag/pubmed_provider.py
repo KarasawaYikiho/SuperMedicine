@@ -1,4 +1,5 @@
 """PubMed Entrez API Provider — 免费医学文献检索"""
+
 from __future__ import annotations
 
 import json
@@ -11,7 +12,12 @@ from typing import Any
 from permission.engine import PermissionEngine
 from permission.policy import PermissionResult
 
-from .interface import RAGConnectionError, RAGProvider, RAGQueryTimeoutError, make_rag_result
+from .interface import (
+    RAGConnectionError,
+    RAGProvider,
+    RAGQueryTimeoutError,
+    make_rag_result,
+)
 
 
 class PubmedRAGProvider(RAGProvider):
@@ -44,7 +50,11 @@ class PubmedRAGProvider(RAGProvider):
             "status": "configured",
             "provider": self.provider_name,
             "metadata": {
-                "resource": {"kind": "external_api", "endpoint": self.BASE_URL, "timeout_seconds": self._timeout_seconds},
+                "resource": {
+                    "kind": "external_api",
+                    "endpoint": self.BASE_URL,
+                    "timeout_seconds": self._timeout_seconds,
+                },
                 "security": {"external_resource": True, "authentication": "none"},
             },
         }
@@ -67,7 +77,15 @@ class PubmedRAGProvider(RAGProvider):
             # Step 1: Esearch — 获取匹配的 PubMed IDs
             ids = self._search(query_text, top_k)
             if not ids:
-                return make_rag_result([], provider=self.provider_name, metadata={"query": query_text, "top_k": top_k, **self.connect()["metadata"]})
+                return make_rag_result(
+                    [],
+                    provider=self.provider_name,
+                    metadata={
+                        "query": query_text,
+                        "top_k": top_k,
+                        **self.connect()["metadata"],
+                    },
+                )
 
             # Step 2: Efetch — 获取摘要和元数据
             articles = self._fetch(ids)
@@ -94,16 +112,60 @@ class PubmedRAGProvider(RAGProvider):
                     }
                 )
 
-            return make_rag_result(items, provider=self.provider_name, metadata={"query": query_text, "top_k": top_k, **self.connect()["metadata"]})
+            return make_rag_result(
+                items,
+                provider=self.provider_name,
+                metadata={
+                    "query": query_text,
+                    "top_k": top_k,
+                    **self.connect()["metadata"],
+                },
+            )
         except TimeoutError as exc:
-            timeout_error = RAGQueryTimeoutError("PubMed query timed out.", retryable=True, details={"cause": str(exc)})
-            return make_rag_result([], provider=self.provider_name, status="error", errors=[timeout_error.to_dict()], metadata={"query": query_text, "top_k": top_k, **self.connect()["metadata"]})
+            timeout_error = RAGQueryTimeoutError(
+                "PubMed query timed out.", retryable=True, details={"cause": str(exc)}
+            )
+            return make_rag_result(
+                [],
+                provider=self.provider_name,
+                status="error",
+                errors=[timeout_error.to_dict()],
+                metadata={
+                    "query": query_text,
+                    "top_k": top_k,
+                    **self.connect()["metadata"],
+                },
+            )
         except (urllib.error.URLError, OSError) as exc:
-            connection_error = RAGConnectionError("PubMed connection failed.", retryable=True, details={"cause": str(exc)})
-            return make_rag_result([], provider=self.provider_name, status="error", errors=[connection_error.to_dict()], metadata={"query": query_text, "top_k": top_k, **self.connect()["metadata"]})
+            connection_error = RAGConnectionError(
+                "PubMed connection failed.", retryable=True, details={"cause": str(exc)}
+            )
+            return make_rag_result(
+                [],
+                provider=self.provider_name,
+                status="error",
+                errors=[connection_error.to_dict()],
+                metadata={
+                    "query": query_text,
+                    "top_k": top_k,
+                    **self.connect()["metadata"],
+                },
+            )
         except Exception as exc:
-            provider_error = RAGConnectionError("PubMed provider failed.", retryable=True, details={"cause": str(exc)})
-            return make_rag_result([], provider=self.provider_name, status="error", errors=[provider_error.to_dict()], metadata={"query": query_text, "top_k": top_k, **self.connect()["metadata"]})
+            provider_error = RAGConnectionError(
+                "PubMed provider failed.", retryable=True, details={"cause": str(exc)}
+            )
+            return make_rag_result(
+                [],
+                provider=self.provider_name,
+                status="error",
+                errors=[provider_error.to_dict()],
+                metadata={
+                    "query": query_text,
+                    "top_k": top_k,
+                    **self.connect()["metadata"],
+                },
+            )
 
     def _search(self, query: str, max_results: int) -> list[str]:
         """Esearch: 检索 PubMed IDs"""
@@ -235,12 +297,23 @@ class PubmedRAGProvider(RAGProvider):
                         "code": "permission_engine_required",
                         "message": "PubMed external HTTP access requires an explicit permission engine and policy context.",
                         "retryable": False,
-                        "details": {"action": "rag.external.query", "resource": "https://eutils.ncbi.nlm.nih.gov/*"},
+                        "details": {
+                            "action": "rag.external.query",
+                            "resource": "https://eutils.ncbi.nlm.nih.gov/*",
+                        },
                     }
                 ],
                 metadata={
-                    "resource": {"kind": "external_api", "endpoint": self.BASE_URL, "timeout_seconds": self._timeout_seconds},
-                    "security": {"external_resource": True, "permission": "denied", "permission_checked": False},
+                    "resource": {
+                        "kind": "external_api",
+                        "endpoint": self.BASE_URL,
+                        "timeout_seconds": self._timeout_seconds,
+                    },
+                    "security": {
+                        "external_resource": True,
+                        "permission": "denied",
+                        "permission_checked": False,
+                    },
                 },
             )
 
@@ -254,12 +327,23 @@ class PubmedRAGProvider(RAGProvider):
                         "code": "agent_identity_required",
                         "message": "PubMed external HTTP access requires an explicit agent identity for permission checks.",
                         "retryable": False,
-                        "details": {"action": "rag.external.query", "resource": "https://eutils.ncbi.nlm.nih.gov/*"},
+                        "details": {
+                            "action": "rag.external.query",
+                            "resource": "https://eutils.ncbi.nlm.nih.gov/*",
+                        },
                     }
                 ],
                 metadata={
-                    "resource": {"kind": "external_api", "endpoint": self.BASE_URL, "timeout_seconds": self._timeout_seconds},
-                    "security": {"external_resource": True, "permission": "denied", "permission_checked": False},
+                    "resource": {
+                        "kind": "external_api",
+                        "endpoint": self.BASE_URL,
+                        "timeout_seconds": self._timeout_seconds,
+                    },
+                    "security": {
+                        "external_resource": True,
+                        "permission": "denied",
+                        "permission_checked": False,
+                    },
                 },
             )
 
@@ -270,7 +354,11 @@ class PubmedRAGProvider(RAGProvider):
             resource,
             context={
                 "action": "rag.external.query",
-                "resource": {"kind": "external_api", "provider": self.provider_name, "endpoint": self.BASE_URL},
+                "resource": {
+                    "kind": "external_api",
+                    "provider": self.provider_name,
+                    "endpoint": self.BASE_URL,
+                },
                 "provider": self.provider_name,
                 "requires_network": True,
                 "requires_external_api": True,
@@ -293,8 +381,16 @@ class PubmedRAGProvider(RAGProvider):
                 }
             ],
             metadata={
-                "resource": {"kind": "external_api", "endpoint": self.BASE_URL, "timeout_seconds": self._timeout_seconds},
-                "security": {"external_resource": True, "permission": "denied", "permission_checked": True},
+                "resource": {
+                    "kind": "external_api",
+                    "endpoint": self.BASE_URL,
+                    "timeout_seconds": self._timeout_seconds,
+                },
+                "security": {
+                    "external_resource": True,
+                    "permission": "denied",
+                    "permission_checked": True,
+                },
             },
         )
 

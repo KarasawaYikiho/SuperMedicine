@@ -4,6 +4,7 @@ This module is intentionally additive: it provides explicit workspace path,
 metadata, and session-state helpers without changing CLI/API/plugin/action/
 permission/security behavior or adding implicit workspace selection.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -82,7 +83,9 @@ class WorkspaceMetadata:
         workspace_id = validate_workspace_id(str(data.get("id", "")))
         return cls(
             id=workspace_id,
-            metadata_version=int(data.get("metadata_version", WORKSPACE_METADATA_VERSION)),
+            metadata_version=int(
+                data.get("metadata_version", WORKSPACE_METADATA_VERSION)
+            ),
             created_at=str(data.get("created_at", "")),
             updated_at=str(data.get("updated_at", "")),
         )
@@ -121,7 +124,9 @@ class WorkspaceManager:
 
     def __init__(self, project_root: str | Path | None = None) -> None:
         self.project_root = resolve_project_root(project_root)
-        self.workspaces_root = validate_path_in_project_root(WORKSPACES_DIR, self.project_root)
+        self.workspaces_root = validate_path_in_project_root(
+            WORKSPACES_DIR, self.project_root
+        )
 
     def workspace_anchor(self, workspace_id: str) -> Path:
         """Return the project-relative anchor path ``workspaces/<id>``."""
@@ -151,7 +156,9 @@ class WorkspaceManager:
         workspace.mkdir(parents=True, exist_ok=True)
 
         for directory in WORKSPACE_DIRECTORIES:
-            path = validate_path_in_project_root(workspace / directory, self.project_root)
+            path = validate_path_in_project_root(
+                workspace / directory, self.project_root
+            )
             path.mkdir(parents=True, exist_ok=True)
 
         metadata_file = self.metadata_path(slug)
@@ -180,11 +187,15 @@ class WorkspaceManager:
 
         metadata_file = self.metadata_path(workspace_id)
         if not metadata_file.is_file():
-            raise WorkspaceNotFoundError(f"Workspace metadata not found: {metadata_file}")
+            raise WorkspaceNotFoundError(
+                f"Workspace metadata not found: {metadata_file}"
+            )
 
         data = yaml.safe_load(metadata_file.read_text(encoding="utf-8")) or {}
         if not isinstance(data, dict):
-            raise WorkspaceError(f"Workspace metadata must be a mapping: {metadata_file}")
+            raise WorkspaceError(
+                f"Workspace metadata must be a mapping: {metadata_file}"
+            )
         metadata = WorkspaceMetadata.from_dict(data)
         expected_id = validate_workspace_id(workspace_id)
         if metadata.id != expected_id:
@@ -263,9 +274,12 @@ class WorkspaceManager:
             return None
         data = yaml.safe_load(state_path.read_text(encoding="utf-8")) or {}
         if not isinstance(data, dict):
-            raise WorkspaceError(f"Workspace session state must be a mapping: {state_path}")
+            raise WorkspaceError(
+                f"Workspace session state must be a mapping: {state_path}"
+            )
         recent = data.get("recent_workspace_id")
         return validate_workspace_id(str(recent)) if recent is not None else None
+
 
 def workspace_path(workspace_id: str, project_root: str | Path | None = None) -> Path:
     """Convenience wrapper returning a guarded workspace path."""

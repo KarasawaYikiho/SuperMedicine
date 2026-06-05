@@ -15,7 +15,9 @@ from core.llm_client import create_configured_llm_client
 from core.tui.app import PromptInput, SuperMedicineTUI, launch_tui
 
 
-def test_llm_client_must_really_call_configured_provider_or_return_explicit_failure(tmp_path, monkeypatch):
+def test_llm_client_must_really_call_configured_provider_or_return_explicit_failure(
+    tmp_path, monkeypatch
+):
     """Regression baseline: configured LLM calls may not be faked as success."""
 
     config_path = tmp_path / "config.yaml"
@@ -138,7 +140,9 @@ def test_tui_visible_logging_does_not_show_llm_client_creation_noise(tmp_path, c
     assert "sk-baseline-llm-secret" not in caplog.text
 
 
-def test_tui_input_submission_clears_input_without_raw_terminal_echo_or_screen_clear(tmp_path, capsys, monkeypatch):
+def test_tui_input_submission_clears_input_without_raw_terminal_echo_or_screen_clear(
+    tmp_path, capsys, monkeypatch
+):
     """Regression baseline: submitted input stays inside TUI state and is not echoed to the raw terminal."""
 
     processed: list[str] = []
@@ -184,7 +188,9 @@ def test_tui_input_submission_clears_input_without_raw_terminal_echo_or_screen_c
     assert "sensitive prompt that must not leak" not in capsys.readouterr().out
 
 
-def test_tui_interactive_launch_does_not_print_status_before_alternate_screen(tmp_path, capsys, monkeypatch):
+def test_tui_interactive_launch_does_not_print_status_before_alternate_screen(
+    tmp_path, capsys, monkeypatch
+):
     """Regression baseline: interactive launch lets Textual own terminal output and input mode."""
 
     run_kwargs: dict[str, object] = {}
@@ -216,7 +222,9 @@ def test_tui_interactive_launch_does_not_print_status_before_alternate_screen(tm
         ("0", "log"),
     ],
 )
-def test_tui_prompt_starts_clean_and_numeric_shortcuts_do_not_enter_prompt(tmp_path, shortcut, expected_view):
+def test_tui_prompt_starts_clean_and_numeric_shortcuts_do_not_enter_prompt(
+    tmp_path, shortcut, expected_view
+):
     """Regression baseline: startup focus/nav keys must not seed prompt text with shortcut digits."""
 
     import asyncio
@@ -248,7 +256,9 @@ def test_tui_prompt_filters_terminal_control_sequences_but_preserves_pasted_digi
     assert prompt._clean_terminal_control_text("\x1b[<0;12;34M") == ""
     assert prompt._clean_terminal_control_text("[<0;12;34M") == ""
     assert prompt._clean_terminal_control_text("\x1b[200~abc123\x1b[201~") == "abc123"
-    assert prompt._clean_terminal_control_text("ordinary 123 text") == "ordinary 123 text"
+    assert (
+        prompt._clean_terminal_control_text("ordinary 123 text") == "ordinary 123 text"
+    )
 
 
 def test_tui_prompt_swallow_digits_while_terminal_sequence_is_incomplete():
@@ -339,7 +349,10 @@ def test_tui_sources_do_not_use_terminal_clear_sequences_that_cause_flicker():
     """Regression baseline: TUI code should not manually clear the raw terminal."""
 
     root = Path(__file__).resolve().parents[1]
-    tui_sources = [root / "core" / "tui" / "app.py", *sorted((root / "core" / "tui" / "screens").glob("*.py"))]
+    tui_sources = [
+        root / "core" / "tui" / "app.py",
+        *sorted((root / "core" / "tui" / "screens").glob("*.py")),
+    ]
     combined = "\n".join(path.read_text(encoding="utf-8") for path in tui_sources)
 
     forbidden_fragments = [
@@ -362,7 +375,16 @@ def test_experiment_and_log_tui_views_are_additive_to_existing_navigation():
     binding_keys = {binding.key for binding in SuperMedicineTUI.BINDINGS}
 
     assert {"1", "2", "3", "4", "5", "6", "7", "8"}.issubset(nav_keys)
-    assert {"chat", "dashboard", "workspace", "tool", "llm", "paper", "experience", "dialog"}.issubset(nav_views)
+    assert {
+        "chat",
+        "dashboard",
+        "workspace",
+        "tool",
+        "llm",
+        "paper",
+        "experience",
+        "dialog",
+    }.issubset(nav_views)
     assert nav_by_key["9"].view_id == "experiment"
     assert nav_by_key["9"].label == "实验指导器"
     assert nav_by_key["0"].view_id == "log"
@@ -396,7 +418,14 @@ def test_uninstall_removes_installed_artifacts_and_recorded_config_residue(tmp_p
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("generated", encoding="utf-8")
     (tmp_path / ".supermedicine" / "install-record.json").write_text(
-        json.dumps({"created_paths": created_paths, "platform_target_paths": ["platform-targets/opencode/supermedicine.json"]}),
+        json.dumps(
+            {
+                "created_paths": created_paths,
+                "platform_target_paths": [
+                    "platform-targets/opencode/supermedicine.json"
+                ],
+            }
+        ),
         encoding="utf-8",
     )
     user_file = tmp_path / "user-notes.md"
@@ -407,5 +436,7 @@ def test_uninstall_removes_installed_artifacts_and_recorded_config_residue(tmp_p
     assert result["status"] == "removed"
     assert not (tmp_path / ".supermedicine").exists()
     assert not (tmp_path / "workspaces").exists()
-    assert not (tmp_path / "platform-targets" / "opencode" / "supermedicine.json").exists()
+    assert not (
+        tmp_path / "platform-targets" / "opencode" / "supermedicine.json"
+    ).exists()
     assert user_file.exists()

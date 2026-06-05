@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import logging
 import re
 import sys
+import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -28,6 +30,88 @@ from core.tui.i18n import LABELS, t
 logger = logging.getLogger(__name__)
 
 
+class _TUILogTextSink:
+    """File-like sink that routes background stdout/stderr text into Log storage."""
+
+    def __init__(self, project_root: Path, stream_name: str) -> None:
+        self.project_root = project_root
+        self.stream_name = stream_name
+        self._buffer = ""
+
+    def write(self, value: str) -> int:
+        text = str(value)
+        self._buffer += text
+        while "\n" in self._buffer:
+            line, self._buffer = self._buffer.split("\n", 1)
+            self._append(line)
+        return len(text)
+
+    def flush(self) -> None:
+        if self._buffer:
+            self._append(self._buffer)
+            self._buffer = ""
+
+    def _append(self, text: str) -> None:
+        if not text.strip():
+            return
+        from core.log_report import append_tui_stream_output
+
+        append_tui_stream_output(self.project_root, self.stream_name, text)
+
+
+class _TUIThreadRoutedStream:
+    """Route only the current worker thread stream writes to Log storage."""
+
+    def __init__(
+        self, original: Any, sink: _TUILogTextSink, owner_thread_id: int
+    ) -> None:
+        self._original = original
+        self._sink = sink
+        self._owner_thread_id = owner_thread_id
+        self.encoding = getattr(original, "encoding", None)
+        self.errors = getattr(original, "errors", None)
+
+    def write(self, value: str) -> int:
+        if threading.get_ident() == self._owner_thread_id:
+            return self._sink.write(value)
+        return self._original.write(value)
+
+    def flush(self) -> None:
+        if threading.get_ident() == self._owner_thread_id:
+            self._sink.flush()
+            return
+        self._original.flush()
+
+    def isatty(self) -> bool:
+        return False
+
+    def fileno(self) -> int:
+        return self._original.fileno()
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._original, name)
+
+
+@contextlib.contextmanager
+def _capture_current_thread_tui_streams(project_root: Path):
+    """Capture Kernel stdout/stderr without redirecting TUI renderer writes."""
+
+    stdout_sink = _TUILogTextSink(project_root, "stdout")
+    stderr_sink = _TUILogTextSink(project_root, "stderr")
+    owner_thread_id = threading.get_ident()
+    original_stdout = sys.stdout
+    original_stderr = sys.stderr
+    sys.stdout = _TUIThreadRoutedStream(original_stdout, stdout_sink, owner_thread_id)  # type: ignore[assignment]
+    sys.stderr = _TUIThreadRoutedStream(original_stderr, stderr_sink, owner_thread_id)  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        stdout_sink.flush()
+        stderr_sink.flush()
+        sys.stdout = original_stdout
+        sys.stderr = original_stderr
+
+
 _DISPLAY_SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"(?i)(api[_-]?key|token|secret|password|passwd)\s*([:=])\s*([^\s,;]+)"),
     re.compile(r"\bsk-[A-Za-z0-9][A-Za-z0-9_-]{8,}\b"),
@@ -45,11 +129,20 @@ def _redact_display_secrets(value: str) -> str:
         elif "sk-" in pattern.pattern:
             text = pattern.sub("[已隐藏密钥]", text)
         else:
-            text = pattern.sub(lambda match: f"{match.group(1)}{match.group(2)}[已隐藏]", text)
+            text = pattern.sub(
+                lambda match: f"{match.group(1)}{match.group(2)}[已隐藏]", text
+            )
     return text
 
 
-_KERNEL_OUTPUT_ASSISTANT_KEYS = ("assistant", "answer", "response", "content", "message", "text")
+_KERNEL_OUTPUT_ASSISTANT_KEYS = (
+    "assistant",
+    "answer",
+    "response",
+    "content",
+    "message",
+    "text",
+)
 _KERNEL_OUTPUT_INTERNAL_KEYS = {
     "backend_command",
     "debug",
@@ -95,7 +188,10 @@ def _strip_internal_kernel_output(value: Any) -> tuple[Any, list[Any]]:
             key_normalized = key_text.lower()
             if (
                 key_normalized in _KERNEL_OUTPUT_INTERNAL_KEYS
-                or (key_normalized in _KERNEL_OUTPUT_INTERNAL_COMMAND_KEYS and _looks_like_internal_kernel_text(item))
+                or (
+                    key_normalized in _KERNEL_OUTPUT_INTERNAL_COMMAND_KEYS
+                    and _looks_like_internal_kernel_text(item)
+                )
                 or _looks_like_internal_kernel_text(item)
             ):
                 removed.append({key_text: item})
@@ -134,7 +230,12 @@ def _strip_internal_kernel_output(value: Any) -> tuple[Any, list[Any]]:
 
 _CSS_PATH = Path(__file__).parent / "app.tcss"
 
-STATUS_STYLE_CLASSES = ("status-info", "status-success", "status-warning", "status-error")
+STATUS_STYLE_CLASSES = (
+    "status-info",
+    "status-success",
+    "status-warning",
+    "status-error",
+)
 
 
 def apply_status_style(widget: Static, message: str) -> None:
@@ -144,7 +245,9 @@ def apply_status_style(widget: Static, message: str) -> None:
     text = message.lower()
     if t("error").lower() in text or "error" in text or "失败" in message:
         widget.add_class("status-error")
-    elif "缺少" in message or "未" in message or "请选择" in message or "确认" in message:
+    elif (
+        "缺少" in message or "未" in message or "请选择" in message or "确认" in message
+    ):
         widget.add_class("status-warning")
     elif "成功" in message or "已" in message or "ready" in text or "ok" in text:
         widget.add_class("status-success")
@@ -215,7 +318,9 @@ class PromptInput(Input):
     INCOMPLETE_CONTROL_SEQUENCE_PATTERN = re.compile(
         r"(?:\x1b(?:\[[0-?;<>]*[ -/]*|\][^\x07\x1b]*|)$|(?:\[<\d*(?:;\d*){0,2}|\[\?\d*(?:;\d*)*|\[\d+(?:;\d*)*)$)"
     )
-    CONTROL_SEQUENCE_FINAL_CHARS = frozenset("@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~")
+    CONTROL_SEQUENCE_FINAL_CHARS = frozenset(
+        "@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
+    )
 
     NUMERIC_NAVIGATION: dict[str, str] = {
         "1": "chat",
@@ -315,7 +420,9 @@ class PromptInput(Input):
         """Remove terminal control/mouse escape sequences while preserving normal text."""
 
         without_sequences = cls.ANSI_CONTROL_SEQUENCE_PATTERN.sub("", value)
-        without_incomplete_sequences = cls.INCOMPLETE_CONTROL_SEQUENCE_PATTERN.sub("", without_sequences)
+        without_incomplete_sequences = cls.INCOMPLETE_CONTROL_SEQUENCE_PATTERN.sub(
+            "", without_sequences
+        )
         return cls.RAW_CONTROL_CHARS_PATTERN.sub("", without_incomplete_sequences)
 
 
@@ -331,14 +438,40 @@ class SuperMedicineTUI(App[Any]):
         Binding("f", "toggle_maximize", t("nav_maximize"), show=True),
         Binding("question_mark", "show_help", t("help_title"), show=True),
         Binding("1", "switch_view('chat')", t("nav_chat"), show=False, priority=True),
-        Binding("2", "switch_view('dashboard')", t("nav_dashboard"), show=False, priority=True),
-        Binding("3", "switch_view('workspace')", t("nav_workspace"), show=False, priority=True),
+        Binding(
+            "2",
+            "switch_view('dashboard')",
+            t("nav_dashboard"),
+            show=False,
+            priority=True,
+        ),
+        Binding(
+            "3",
+            "switch_view('workspace')",
+            t("nav_workspace"),
+            show=False,
+            priority=True,
+        ),
         Binding("4", "switch_view('paper')", t("nav_paper"), show=False, priority=True),
-        Binding("5", "switch_view('experience')", t("nav_experience"), show=False, priority=True),
+        Binding(
+            "5",
+            "switch_view('experience')",
+            t("nav_experience"),
+            show=False,
+            priority=True,
+        ),
         Binding("6", "switch_view('tool')", t("nav_tool"), show=False, priority=True),
-        Binding("7", "switch_view('dialog')", t("nav_dialog"), show=False, priority=True),
+        Binding(
+            "7", "switch_view('dialog')", t("nav_dialog"), show=False, priority=True
+        ),
         Binding("8", "switch_view('llm')", t("nav_llm"), show=False, priority=True),
-        Binding("9", "switch_view('experiment')", t("nav_experiment"), show=False, priority=True),
+        Binding(
+            "9",
+            "switch_view('experiment')",
+            t("nav_experiment"),
+            show=False,
+            priority=True,
+        ),
         Binding("0", "switch_view('log')", t("nav_log"), show=False, priority=True),
     ]
 
@@ -386,8 +519,14 @@ class SuperMedicineTUI(App[Any]):
         yield Header()
         with Horizontal(id="app-body"):
             with Vertical(id="sidebar"):
-                yield Static(t("layout_sidebar_title"), id="sidebar-title", classes="shell-title")
-                yield Static(t("layout_sidebar_subtitle"), id="sidebar-subtitle", classes="shell-subtitle")
+                yield Static(
+                    t("layout_sidebar_title"), id="sidebar-title", classes="shell-title"
+                )
+                yield Static(
+                    t("layout_sidebar_subtitle"),
+                    id="sidebar-subtitle",
+                    classes="shell-subtitle",
+                )
                 yield ListView(
                     *(
                         NavItem(f"{item.key} {item.icon} {item.label}", item.view_id)
@@ -395,7 +534,11 @@ class SuperMedicineTUI(App[Any]):
                     ),
                     id="nav-list",
                 )
-                yield Static(f"{t('layout_shortcuts')}\n{self.shortcut_hint_text()}", id="sidebar-shortcuts", classes="shortcut-hint")
+                yield Static(
+                    f"{t('layout_shortcuts')}\n{self.shortcut_hint_text()}",
+                    id="sidebar-shortcuts",
+                    classes="shortcut-hint",
+                )
             with Vertical(id="main-area"):
                 yield Static(t("nav_chat"), id="view-title", classes="view-heading")
                 yield Vertical(id="content-pane")
@@ -472,7 +615,9 @@ class SuperMedicineTUI(App[Any]):
                     break
             self._focus_current_view_default()
 
-    def refresh_workspace_views(self, *, selected_workspace_id: str | None = None) -> None:
+    def refresh_workspace_views(
+        self, *, selected_workspace_id: str | None = None
+    ) -> None:
         """Refresh mounted views that expose workspace-dependent selectors."""
 
         for name, view in self._views.items():
@@ -537,19 +682,27 @@ class SuperMedicineTUI(App[Any]):
         """Build current status bar text without mutating widgets."""
 
         current_view = view_id or self._current_view
-        task_state = t("status_task_running") if self._task_running else t("status_task_idle")
+        task_state = (
+            t("status_task_running") if self._task_running else t("status_task_idle")
+        )
         layout_state = self._layout_status_label()
         left = f"📁 {self._workspace_count()} {t('status_workspaces')}"
         center = f"🔌 {self._plugin_count()} {t('status_plugins')}  |  {self._llm_status_label()}  |  {task_state}"
         right = f"{t('layout_current_view')}：{self.view_title_text(current_view)}  |  {t('layout_mode')}：{layout_state}  |  SuperMedicine {self._package_version()}"
         focus = f"{t('layout_focus')}：{t('status_focus_input')}"
-        return ShellStatusText(left=left, center=center, right=right, focus=focus, layout=layout_state)
+        return ShellStatusText(
+            left=left, center=center, right=right, focus=focus, layout=layout_state
+        )
 
     def _layout_status_label(self) -> str:
         """Return maximize state text safely for mounted and dry-run contexts."""
 
         try:
-            return t("status_layout_maximized") if self.screen.maximized is not None else t("status_layout_normal")
+            return (
+                t("status_layout_maximized")
+                if self.screen.maximized is not None
+                else t("status_layout_normal")
+            )
         except Exception:
             return t("status_layout_normal")
 
@@ -578,16 +731,31 @@ class SuperMedicineTUI(App[Any]):
         """Toggle maximize on the focused widget."""
         if self.screen.maximized is not None:
             self.screen.minimize()
-            self.notify(t("status_restored"), title=t("layout_mode"), severity="information", timeout=3)
+            self.notify(
+                t("status_restored"),
+                title=t("layout_mode"),
+                severity="information",
+                timeout=3,
+            )
             self._update_status_bar()
         else:
             focused = self.screen.focused
             if focused is not None and getattr(focused, "allow_maximize", False):
                 self.screen.maximize(focused)
-                self.notify(t("status_maximized"), title=t("layout_mode"), severity="information", timeout=3)
+                self.notify(
+                    t("status_maximized"),
+                    title=t("layout_mode"),
+                    severity="information",
+                    timeout=3,
+                )
                 self._update_status_bar()
             else:
-                self.notify(t("status_maximize_unavailable"), title=t("layout_mode"), severity="warning", timeout=4)
+                self.notify(
+                    t("status_maximize_unavailable"),
+                    title=t("layout_mode"),
+                    severity="warning",
+                    timeout=4,
+                )
 
     def action_show_help(self) -> None:
         """Show help information."""
@@ -600,7 +768,9 @@ class SuperMedicineTUI(App[Any]):
     def _update_view_title(self, view_id: str) -> None:
         """Update the view title bar."""
         title_widget = self.query_one("#view-title", Static)
-        title_widget.update(f"{t('layout_current_view')}：{self.view_title_text(view_id)}  ·  {self.shortcut_hint_text()}")
+        title_widget.update(
+            f"{t('layout_current_view')}：{self.view_title_text(view_id)}  ·  {self.shortcut_hint_text()}"
+        )
 
     def _update_status_bar(self) -> None:
         """Update the bottom status bar with context info."""
@@ -610,11 +780,19 @@ class SuperMedicineTUI(App[Any]):
         status = self.status_text()
         now = self._status_clock_text()
 
-        self._update_static_if_changed(status_left, "status-left", f"  {status.left}  |  {status.focus}")
-        self._update_static_if_changed(status_center, "status-center", f"  {status.center}")
-        self._update_static_if_changed(status_right, "status-right", f"  🕐 {now}  |  {status.right}  ")
+        self._update_static_if_changed(
+            status_left, "status-left", f"  {status.left}  |  {status.focus}"
+        )
+        self._update_static_if_changed(
+            status_center, "status-center", f"  {status.center}"
+        )
+        self._update_static_if_changed(
+            status_right, "status-right", f"  🕐 {now}  |  {status.right}  "
+        )
 
-    def _update_static_if_changed(self, widget: Static, cache_key: str, value: str) -> None:
+    def _update_static_if_changed(
+        self, widget: Static, cache_key: str, value: str
+    ) -> None:
         """Avoid redundant widget updates that force unnecessary repaints."""
 
         if self._status_cache.get(cache_key) != value:
@@ -637,15 +815,23 @@ class SuperMedicineTUI(App[Any]):
 
     def _plugin_count(self) -> int:
         plugins_dir = self.project_root / "plugins"
-        return sum(
-            1 for d in plugins_dir.iterdir()
-            if d.is_dir() and not d.name.startswith("_") and (d / "plugin.yaml").exists()
-        ) if plugins_dir.is_dir() else 0
+        return (
+            sum(
+                1
+                for d in plugins_dir.iterdir()
+                if d.is_dir()
+                and not d.name.startswith("_")
+                and (d / "plugin.yaml").exists()
+            )
+            if plugins_dir.is_dir()
+            else 0
+        )
 
     @staticmethod
     def _package_version() -> str:
         try:
             from importlib.metadata import version as pkg_version
+
             return pkg_version("supermedicine")
         except Exception:
             return "0.4.1b0"
@@ -702,7 +888,8 @@ class SuperMedicineTUI(App[Any]):
             )
             if hasattr(chat_view, "add_status_message"):
                 chat_view.add_status_message(t("chat_running"))
-            result = kernel.execute_task(message)
+            with _capture_current_thread_tui_streams(self.project_root):
+                result = kernel.execute_task(message)
             formatted = self._format_kernel_result(result)
 
             if formatted["kind"] == "error":
@@ -727,7 +914,9 @@ class SuperMedicineTUI(App[Any]):
             return _redact_display_secrets(output or t("chat_no_output"))
         if isinstance(output, (dict, list, tuple)):
             try:
-                return _redact_display_secrets(json.dumps(output, ensure_ascii=False, indent=2, sort_keys=True))
+                return _redact_display_secrets(
+                    json.dumps(output, ensure_ascii=False, indent=2, sort_keys=True)
+                )
             except TypeError:
                 return _redact_display_secrets(str(output))
         return _redact_display_secrets(str(output))
@@ -739,7 +928,9 @@ class SuperMedicineTUI(App[Any]):
         if isinstance(output, dict):
             for key in _KERNEL_OUTPUT_ASSISTANT_KEYS:
                 if key in output and output.get(key) not in (None, ""):
-                    assistant_value, assistant_removed = _strip_internal_kernel_output(output.get(key))
+                    assistant_value, assistant_removed = _strip_internal_kernel_output(
+                        output.get(key)
+                    )
                     _, payload_removed = _strip_internal_kernel_output(output)
                     return assistant_value, payload_removed + assistant_removed
         return _strip_internal_kernel_output(output)
@@ -750,7 +941,10 @@ class SuperMedicineTUI(App[Any]):
 
         if not isinstance(result, dict):
             output = cls._format_kernel_output(result)
-            return {"kind": "assistant", "message": f"{t('chat_result_status')}: unknown\n{t('chat_result_output')}:\n{output}"}
+            return {
+                "kind": "assistant",
+                "message": f"{t('chat_result_status')}: unknown\n{t('chat_result_output')}:\n{output}",
+            }
 
         status = str(result.get("status") or "unknown")
         error = result.get("error") or result.get("reason")
@@ -766,8 +960,14 @@ class SuperMedicineTUI(App[Any]):
         header = f"{t('chat_result_status')}: {status}"
 
         if error:
-            return {"kind": "error", "message": f"{header}\n{_redact_display_secrets(str(error))}"}
-        return {"kind": "assistant", "message": f"{header}\n{t('chat_result_output')}:\n{output}"}
+            return {
+                "kind": "error",
+                "message": f"{header}\n{_redact_display_secrets(str(error))}",
+            }
+        return {
+            "kind": "assistant",
+            "message": f"{header}\n{t('chat_result_output')}:\n{output}",
+        }
 
     def _llm_manager(self) -> LLMConfigManager:
         config_path = self.project_root / ".supermedicine" / "config.yaml"
@@ -795,7 +995,9 @@ class SuperMedicineTUI(App[Any]):
         self._save_llm_exit_state()
 
 
-def launch_tui(*, dry_run: bool = False, project_root: Path | str | None = None) -> TUIStatus:
+def launch_tui(
+    *, dry_run: bool = False, project_root: Path | str | None = None
+) -> TUIStatus:
     """Launch or describe the Chinese TUI foundation.
 
     ``dry_run`` returns a status object and prints a minimal Chinese readiness
@@ -803,6 +1005,10 @@ def launch_tui(*, dry_run: bool = False, project_root: Path | str | None = None)
     """
 
     root = Path(project_root) if project_root else Path.cwd()
+    if not dry_run:
+        from core.log_report import configure_tui_log_storage
+
+        configure_tui_log_storage(root)
     llm_ready, llm_provider = _describe_llm_status(root)
     shell = SuperMedicineTUI(project_root=root)
     shell_status = shell.status_text("chat")
@@ -810,9 +1016,17 @@ def launch_tui(*, dry_run: bool = False, project_root: Path | str | None = None)
     shortcut_hint = shell.shortcut_hint_text()
     status_message = t("dry_run_status") if dry_run else t("welcome")
     if dry_run:
-        llm_text = f"{t('llm_ready')}: {llm_provider}" if llm_ready else t("llm_not_ready")
+        llm_text = (
+            f"{t('llm_ready')}: {llm_provider}" if llm_ready else t("llm_not_ready")
+        )
         status_message = f"{status_message}；{llm_text}"
-    logger.info("TUI launch: stage=start dry_run=%s project_root=%s llm_ready=%s provider=%s", dry_run, root, llm_ready, llm_provider)
+    logger.info(
+        "TUI launch: stage=start dry_run=%s project_root=%s llm_ready=%s provider=%s",
+        dry_run,
+        root,
+        llm_ready,
+        llm_provider,
+    )
 
     status = TUIStatus(
         title=t("app_title"),
@@ -831,14 +1045,32 @@ def launch_tui(*, dry_run: bool = False, project_root: Path | str | None = None)
     )
     if dry_run:
         console = Console()
-        console_encoding = getattr(console.file, "encoding", None) or getattr(sys.stdout, "encoding", None)
-        console.print(f"[bold]{_console_safe_text(status.title, console_encoding)}[/bold]")
+        console_encoding = getattr(console.file, "encoding", None) or getattr(
+            sys.stdout, "encoding", None
+        )
+        console.print(
+            f"[bold]{_console_safe_text(status.title, console_encoding)}[/bold]"
+        )
         console.print(_console_safe_text(status.message, console_encoding))
         console.print(_console_safe_text(t("sandbox_notice"), console_encoding))
-        console.print(_console_safe_text(f"{t('layout_current_view')}：{status.view_title}（{t('layout_mode')}：{shell_status.layout}）", console_encoding))
-        console.print(_console_safe_text(f"{t('layout_shortcuts')}：{status.shortcut_hint}", console_encoding))
+        console.print(
+            _console_safe_text(
+                f"{t('layout_current_view')}：{status.view_title}（{t('layout_mode')}：{shell_status.layout}）",
+                console_encoding,
+            )
+        )
+        console.print(
+            _console_safe_text(
+                f"{t('layout_shortcuts')}：{status.shortcut_hint}", console_encoding
+            )
+        )
         console.print(_console_safe_text(shell_status.focus, console_encoding))
-        console.print(_console_safe_text(f"{t('layout_status_bar')}：{status.status_left} | {status.status_center} | {status.status_right}", console_encoding))
+        console.print(
+            _console_safe_text(
+                f"{t('layout_status_bar')}：{status.status_left} | {status.status_center} | {status.status_right}",
+                console_encoding,
+            )
+        )
         return status
 
     console = Console()
@@ -846,7 +1078,10 @@ def launch_tui(*, dry_run: bool = False, project_root: Path | str | None = None)
         app = SuperMedicineTUI(project_root=project_root or Path.cwd())
         app.run(mouse=True)
     except ImportError:
-        logger.error("TUI launch failed: stage=import textual_missing project_root=%s", project_root or Path.cwd())
+        logger.error(
+            "TUI launch failed: stage=import textual_missing project_root=%s",
+            project_root or Path.cwd(),
+        )
         console.print("Textual 未安装，无法启动交互界面。")
         return TUIStatus(
             title=status.title,
@@ -872,23 +1107,33 @@ def _console_safe_text(value: str, encoding: str | None = None) -> str:
         value.encode(target_encoding)
     except (LookupError, UnicodeEncodeError):
         try:
-            return value.encode(target_encoding, errors="replace").decode(target_encoding, errors="replace")
+            return value.encode(target_encoding, errors="replace").decode(
+                target_encoding, errors="replace"
+            )
         except LookupError:
-            return value.encode("utf-8", errors="replace").decode("utf-8", errors="replace")
+            return value.encode("utf-8", errors="replace").decode(
+                "utf-8", errors="replace"
+            )
     return value
 
 
 def _describe_llm_status(project_root: Path | str) -> tuple[bool, str]:
     try:
         root = Path(project_root)
-        manager = LLMConfigManager(ConfigCenter(root / ".supermedicine" / "config.yaml"))
+        manager = LLMConfigManager(
+            ConfigCenter(root / ".supermedicine" / "config.yaml")
+        )
         current = manager.get_current_provider(redacted=True)
         provider = str(current.get("provider") or "")
         if not provider:
             return False, ""
         return manager.validate_provider(provider) is None, provider
     except Exception as exc:
-        logger.warning("TUI LLM status diagnostic failed: stage=config project_root=%s error=%s", project_root, exc)
+        logger.warning(
+            "TUI LLM status diagnostic failed: stage=config project_root=%s error=%s",
+            project_root,
+            exc,
+        )
         return False, ""
 
 
@@ -897,7 +1142,9 @@ def build_parser() -> argparse.ArgumentParser:
         prog="supermedicine tui",
         description=t("app_title"),
     )
-    parser.add_argument("--dry-run", action="store_true", help="输出中文 TUI 就绪状态，不启动交互界面")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="输出中文 TUI 就绪状态，不启动交互界面"
+    )
     return parser
 
 

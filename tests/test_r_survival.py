@@ -25,7 +25,10 @@ def assert_prototype_contract(result, action):
     assert result["metadata"]["requires_human_review"] is True
     assert result["metadata"]["contract"]["stage"] == "prototype-interface-tests-only"
     assert result["metadata"]["contract"]["actions"][action]["prototype"] is True
-    assert "no production-grade or clinical-grade" in result["metadata"]["statistics_boundary"]
+    assert (
+        "no production-grade or clinical-grade"
+        in result["metadata"]["statistics_boundary"]
+    )
 
 
 class TestKaplanMeier:
@@ -90,7 +93,11 @@ class TestCoxPH:
 
 class TestRSurvivalContract:
     def test_km_execute_contract_is_deterministic_prototype(self):
-        result = execute("r.survival.km", {"times": TOY_TIMES, "events": TOY_EVENTS}, {"caller": "test"})
+        result = execute(
+            "r.survival.km",
+            {"times": TOY_TIMES, "events": TOY_EVENTS},
+            {"caller": "test"},
+        )
         assert_prototype_contract(result, "r.survival.km")
         assert result["output"]["total_subjects"] == 5
         assert result["output"]["total_events"] == 3
@@ -99,28 +106,46 @@ class TestRSurvivalContract:
         assert result["metadata"]["r_backend"]["selected"] == "python"
 
     def test_logrank_execute_contract_shape(self):
-        result = execute("r.survival.logrank", {
-            "times1": [1, 2, 3, 4, 5], "events1": [1, 1, 1, 1, 1],
-            "times2": [1, 2, 3, 4, 5], "events2": [1, 1, 1, 1, 1],
-        })
+        result = execute(
+            "r.survival.logrank",
+            {
+                "times1": [1, 2, 3, 4, 5],
+                "events1": [1, 1, 1, 1, 1],
+                "times2": [1, 2, 3, 4, 5],
+                "events2": [1, 1, 1, 1, 1],
+            },
+        )
         assert_prototype_contract(result, "r.survival.logrank")
-        assert set(result["output"]) == {"statistic", "p_value", "df", "median_group1", "median_group2"}
+        assert set(result["output"]) == {
+            "statistic",
+            "p_value",
+            "df",
+            "median_group1",
+            "median_group2",
+        }
 
     def test_invalid_event_indicator_returns_structured_error(self):
         result = execute("r.survival.km", {"times": [1, 2, 3], "events": [1, 2, 0]})
         assert result["status"] == "plugin_error"
         assert result["output"] is None
         assert "Invalid r-survival input" in result["error"]
-        assert result["metadata"]["contract"]["stage"] == "prototype-interface-tests-only"
+        assert (
+            result["metadata"]["contract"]["stage"] == "prototype-interface-tests-only"
+        )
 
     def test_unsupported_action_returns_structured_error_with_boundary(self):
         result = execute("r.survival.missing", {})
         assert result["status"] == "plugin_error"
         assert result["output"] is None
         assert "Unsupported r-survival action" in result["error"]
-        assert "not production/clinical medical advice" in result["metadata"]["medical_boundary"]
+        assert (
+            "not production/clinical medical advice"
+            in result["metadata"]["medical_boundary"]
+        )
 
-    def test_requested_r_backend_unavailable_returns_structured_unavailable(self, monkeypatch):
+    def test_requested_r_backend_unavailable_returns_structured_unavailable(
+        self, monkeypatch
+    ):
         r_survival_main._r_backend_status.cache_clear()
         monkeypatch.setattr(
             r_survival_main,
@@ -133,7 +158,9 @@ class TestRSurvivalContract:
                 "r_survival_available": False,
             },
         )
-        result = execute("r.survival.km", {"backend": "r", "times": TOY_TIMES, "events": TOY_EVENTS})
+        result = execute(
+            "r.survival.km", {"backend": "r", "times": TOY_TIMES, "events": TOY_EVENTS}
+        )
         assert result["status"] == "plugin_unavailable"
         assert result["output"] is None
         assert "R survival backend unavailable" in result["error"]
@@ -159,11 +186,21 @@ class TestRSurvivalContract:
         monkeypatch.setattr(
             r_survival_main,
             "km_tool_r",
-            lambda times, events: {"backend_marker": "r", "total_subjects": len(times), "total_events": sum(events)},
+            lambda times, events: {
+                "backend_marker": "r",
+                "total_subjects": len(times),
+                "total_events": sum(events),
+            },
         )
-        result = execute("r.survival.km", {"backend": "r", "times": TOY_TIMES, "events": TOY_EVENTS})
+        result = execute(
+            "r.survival.km", {"backend": "r", "times": TOY_TIMES, "events": TOY_EVENTS}
+        )
         assert_prototype_contract(result, "r.survival.km")
-        assert result["output"] == {"backend_marker": "r", "total_subjects": 5, "total_events": 3}
+        assert result["output"] == {
+            "backend_marker": "r",
+            "total_subjects": 5,
+            "total_events": 3,
+        }
         assert result["metadata"]["r_backend"]["requested"] is True
         assert result["metadata"]["r_backend"]["selected"] == "r"
         assert result["metadata"]["r_backend"]["r_survival_available"] is True

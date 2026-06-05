@@ -1,4 +1,5 @@
 """LLM 客户端测试"""
+
 from __future__ import annotations
 
 import json
@@ -7,7 +8,12 @@ from unittest.mock import patch
 import yaml
 
 from core.config_center import ConfigCenter
-from core.llm_client import LLMClient, TrackedLLMClient, create_configured_llm_client, create_llm_client
+from core.llm_client import (
+    LLMClient,
+    TrackedLLMClient,
+    create_configured_llm_client,
+    create_llm_client,
+)
 from core.llm_providers.base import AnthropicClient, OpenAIClient
 from core.llm_providers.config import LLMProviderConfig
 from core.llm_providers.openrouter import OpenRouterClient
@@ -36,11 +42,15 @@ class TestOpenRouterClient:
     def test_chat_mock_response(self):
         """模拟 API 响应"""
         client = OpenRouterClient(api_key="test-key")
-        with patch.object(client, 'chat', return_value={
-            "content": "Hello, I am Claude.",
-            "model": "anthropic/claude-3.5-sonnet",
-            "usage": {"prompt_tokens": 5, "completion_tokens": 10},
-        }):
+        with patch.object(
+            client,
+            "chat",
+            return_value={
+                "content": "Hello, I am Claude.",
+                "model": "anthropic/claude-3.5-sonnet",
+                "usage": {"prompt_tokens": 5, "completion_tokens": 10},
+            },
+        ):
             result = client.chat([{"role": "user", "content": "Hi"}])
             assert result["content"] == "Hello, I am Claude."
             assert result["model"] == "anthropic/claude-3.5-sonnet"
@@ -48,11 +58,15 @@ class TestOpenRouterClient:
     def test_complete_mock_response(self):
         """模拟 Complete 调用"""
         client = OpenRouterClient(api_key="test-key")
-        with patch.object(client, '_openai_request', return_value={
-            "content": "Response text",
-            "model": "anthropic/claude-3.5-sonnet",
-            "usage": {},
-        }):
+        with patch.object(
+            client,
+            "_openai_request",
+            return_value={
+                "content": "Response text",
+                "model": "anthropic/claude-3.5-sonnet",
+                "usage": {},
+            },
+        ):
             result = client.complete("Test prompt", temperature=0.5)
             assert result["content"] == "Response text"
 
@@ -125,14 +139,18 @@ class TestTrackedLLMClientDiagnostics:
                 raise AssertionError("missing usage should not be recorded")
 
         caplog.set_level("DEBUG", logger="core.llm_client")
-        TrackedLLMClient(FakeClient(), "fake", FakeTracker()).chat([{"role": "user", "content": "hi"}])
+        TrackedLLMClient(FakeClient(), "fake", FakeTracker()).chat(
+            [{"role": "user", "content": "hi"}]
+        )
 
         assert "LLM usage unavailable or malformed" in caplog.text
 
 
 class TestUnifiedProviderConfig:
     def test_openai_missing_api_key_structured_error(self):
-        client = create_llm_client("openai", api_key="", base_url="https://example.test/v1")
+        client = create_llm_client(
+            "openai", api_key="", base_url="https://example.test/v1"
+        )
         result = client.complete("Hello")
         assert result["error"]["code"] == "missing_api_key"
 
@@ -157,7 +175,10 @@ class TestUnifiedProviderConfig:
     def test_safe_dict_redacts_secret_headers(self):
         config = LLMProviderConfig.from_mapping(
             "openai",
-            {"api_key": "sk-test-secret", "headers": {"Authorization": "Bearer sk-test-secret"}},
+            {
+                "api_key": "sk-test-secret",
+                "headers": {"Authorization": "Bearer sk-test-secret"},
+            },
         )
         safe = config.safe_dict()
         assert safe["api_key"] == "<redacted>"
@@ -175,11 +196,13 @@ class TestUnifiedProviderConfig:
                 return False
 
             def read(self):
-                return json.dumps({
-                    "model": "gpt-fake",
-                    "choices": [{"message": {"content": "local fake response"}}],
-                    "usage": {"prompt_tokens": 1, "completion_tokens": 2},
-                }).encode("utf-8")
+                return json.dumps(
+                    {
+                        "model": "gpt-fake",
+                        "choices": [{"message": {"content": "local fake response"}}],
+                        "usage": {"prompt_tokens": 1, "completion_tokens": 2},
+                    }
+                ).encode("utf-8")
 
         def fake_urlopen(request, timeout):
             captured["url"] = request.full_url
@@ -197,7 +220,9 @@ class TestUnifiedProviderConfig:
             model="gpt-fake",
             timeout=3,
         )
-        result = client.chat([{"role": "user", "content": "hello"}], temperature=0.2, max_tokens=7)
+        result = client.chat(
+            [{"role": "user", "content": "hello"}], temperature=0.2, max_tokens=7
+        )
 
         assert result["content"] == "local fake response"
         assert captured["url"] == "https://openai.local.test/v1/chat/completions"
@@ -210,7 +235,9 @@ class TestUnifiedProviderConfig:
         }
         assert captured["timeout"] == 3
 
-    def test_anthropic_request_uses_messages_api_without_real_network(self, monkeypatch):
+    def test_anthropic_request_uses_messages_api_without_real_network(
+        self, monkeypatch
+    ):
         secret = "anthropic-test-fake-key"
         captured = {}
 
@@ -222,11 +249,13 @@ class TestUnifiedProviderConfig:
                 return False
 
             def read(self):
-                return json.dumps({
-                    "model": "claude-fake",
-                    "content": [{"type": "text", "text": "anthropic local fake"}],
-                    "usage": {"input_tokens": 1, "output_tokens": 2},
-                }).encode("utf-8")
+                return json.dumps(
+                    {
+                        "model": "claude-fake",
+                        "content": [{"type": "text", "text": "anthropic local fake"}],
+                        "usage": {"input_tokens": 1, "output_tokens": 2},
+                    }
+                ).encode("utf-8")
 
         def fake_urlopen(request, timeout):
             captured["url"] = request.full_url
@@ -255,7 +284,9 @@ class TestUnifiedProviderConfig:
 
         assert result["content"] == "anthropic local fake"
         assert captured["url"] == "https://anthropic.local.test/v1/messages"
-        captured_headers = {key.lower(): value for key, value in captured["headers"].items()}
+        captured_headers = {
+            key.lower(): value for key, value in captured["headers"].items()
+        }
         assert captured_headers["x-api-key"] == secret
         assert captured["payload"] == {
             "model": "claude-fake",
@@ -266,11 +297,16 @@ class TestUnifiedProviderConfig:
         }
         assert captured["timeout"] == 4
 
-    def test_config_mapping_reads_provider_env_without_exposing_secret(self, monkeypatch):
+    def test_config_mapping_reads_provider_env_without_exposing_secret(
+        self, monkeypatch
+    ):
         secret = "sk-test-env-only-secret"
         monkeypatch.setenv("OPENAI_API_KEY", secret)
 
-        client = create_llm_client("openai", config={"base_url": "https://env.local.test/v1", "model": "gpt-env"})
+        client = create_llm_client(
+            "openai",
+            config={"base_url": "https://env.local.test/v1", "model": "gpt-env"},
+        )
 
         assert isinstance(client, OpenAIClient)
         assert client.config.api_key == secret
@@ -286,8 +322,18 @@ class TestUnifiedProviderConfig:
                         "provider": "openai",
                         "last_provider": "anthropic",
                         "providers": {
-                            "openai": {"api_format": "openai", "base_url": "https://openai.test/v1", "api_key": "sk-openai", "model": "gpt-test"},
-                            "anthropic": {"api_format": "anthropic", "base_url": "https://anthropic.test/v1", "api_key": "sk-anthropic", "model": "claude-test"},
+                            "openai": {
+                                "api_format": "openai",
+                                "base_url": "https://openai.test/v1",
+                                "api_key": "sk-openai",
+                                "model": "gpt-test",
+                            },
+                            "anthropic": {
+                                "api_format": "anthropic",
+                                "base_url": "https://anthropic.test/v1",
+                                "api_key": "sk-anthropic",
+                                "model": "claude-test",
+                            },
                         },
                     }
                 },
@@ -314,7 +360,10 @@ class TestUnifiedProviderConfig:
         client = create_llm_client("openai", config=provider_config)
 
         safe_config = config.safe_dict()
-        error = config.error("request_error", f"Authorization failed for Bearer {secret}; api_key={secret}")
+        error = config.error(
+            "request_error",
+            f"Authorization failed for Bearer {secret}; api_key={secret}",
+        )
         client_error = client.config.error("request_error", f"token={secret}")
 
         assert safe_config["api_key"] == "<redacted>"

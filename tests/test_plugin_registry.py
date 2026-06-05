@@ -6,7 +6,9 @@ from plugins.base_plugin import BasePlugin
 
 
 class TestAdapterDiscoveryRegistry:
-    def test_top_level_adapters_import_exposes_static_metadata_without_platform_imports(self):
+    def test_top_level_adapters_import_exposes_static_metadata_without_platform_imports(
+        self,
+    ):
         import sys
 
         sys.modules.pop("adapters", None)
@@ -24,7 +26,11 @@ class TestAdapterDiscoveryRegistry:
         assert "adapters.claude_code.adapter" not in sys.modules
 
         registrations = adapters.list_adapter_registrations()
-        assert {item["platform"] for item in registrations} == {"standalone", "opencode", "claude-code"}
+        assert {item["platform"] for item in registrations} == {
+            "standalone",
+            "opencode",
+            "claude-code",
+        }
         assert adapters.default_adapter_registration()["platform"] == "standalone"
 
         for registration in registrations:
@@ -51,31 +57,47 @@ class TestAdapterDiscoveryRegistry:
         assert claude["optional"] is True
         assert claude["core"] is False
         assert claude["requires_core_runtime"] is False
-        assert adapters.list_adapter_registrations(include_optional=False) == [standalone]
+        assert adapters.list_adapter_registrations(include_optional=False) == [
+            standalone
+        ]
 
 
 class TestPluginRegistry:
     def _create_plugin(self, tmp_path, name="test-plugin"):
         d = tmp_path / name
         d.mkdir(parents=True)
-        (d / "plugin.yaml").write_text(yaml.dump({"name": name, "version": "0.1.0", "type": "tool", "provides": ["test.action"]}), encoding="utf-8")
+        (d / "plugin.yaml").write_text(
+            yaml.dump(
+                {
+                    "name": name,
+                    "version": "0.1.0",
+                    "type": "tool",
+                    "provides": ["test.action"],
+                }
+            ),
+            encoding="utf-8",
+        )
         return d
+
     def test_discover(self, tmp_path):
         self._create_plugin(tmp_path, "a")
         self._create_plugin(tmp_path, "b")
         assert len(PluginRegistry(tmp_path).discover()) == 2
+
     def test_load_meta(self, tmp_path):
         self._create_plugin(tmp_path)
         r = PluginRegistry(tmp_path)
         r.discover()
         m = r.get_meta("test-plugin")
         assert m is not None and m.name == "test-plugin" and m.version == "0.1.0"
+
     def test_get_plugin(self, tmp_path):
         self._create_plugin(tmp_path)
         r = PluginRegistry(tmp_path)
         r.discover()
         p = r.get("test-plugin")
         assert p is not None and isinstance(p, BasePlugin)
+
     def test_unknown_returns_none(self, tmp_path):
         r = PluginRegistry(tmp_path)
         assert r.get("nope") is None and r.get_meta("nope") is None
@@ -108,7 +130,9 @@ class TestPluginRegistry:
         assert result["error"] is None
         assert "contract_version" in result["metadata"]
 
-    def test_direct_plugin_execution_requires_permission_proof_outside_dev_test(self, tmp_path, monkeypatch):
+    def test_direct_plugin_execution_requires_permission_proof_outside_dev_test(
+        self, tmp_path, monkeypatch
+    ):
         d = self._create_plugin(tmp_path, "secured-plugin")
         (d / "main.py").write_text(
             "def execute(action, params, context=None):\n"
@@ -124,7 +148,12 @@ class TestPluginRegistry:
         allowed = r.get("secured-plugin").execute(
             "demo.action",
             {"ok": True},
-            {"security": {"permission_checked": True, "permission_entrypoint": "kernel"}},
+            {
+                "security": {
+                    "permission_checked": True,
+                    "permission_entrypoint": "kernel",
+                }
+            },
         )
 
         assert denied["status"] == "denied"
@@ -159,14 +188,24 @@ class TestPluginRegistry:
     def test_medical_statistics_plugins_expose_prototype_boundary_contract(self):
         r = PluginRegistry("plugins")
         r.discover()
-        py_result = r.get("python-stats").execute("stats.descriptive", {"data": [1, 2, 3]})
-        survival_result = r.get("r-survival").execute("r.survival.km", {"times": [1, 2, 3], "events": [1, 0, 1]})
+        py_result = r.get("python-stats").execute(
+            "stats.descriptive", {"data": [1, 2, 3]}
+        )
+        survival_result = r.get("r-survival").execute(
+            "r.survival.km", {"times": [1, 2, 3], "events": [1, 0, 1]}
+        )
         for result in (py_result, survival_result):
             assert result["status"] == "success"
             assert result["metadata"]["audit"]["interface_only"] is True
             assert result["metadata"]["audit"]["prototype_path"] is True
-            assert result["metadata"]["contract"]["stage"] == "prototype-interface-tests-only"
-            assert "not clinical-grade statistics" in result["metadata"]["medical_boundary"]
+            assert (
+                result["metadata"]["contract"]["stage"]
+                == "prototype-interface-tests-only"
+            )
+            assert (
+                "not clinical-grade statistics"
+                in result["metadata"]["medical_boundary"]
+            )
 
     def test_rag_interface_manifest_actions_execute_with_stable_shape(self, tmp_path):
         r = PluginRegistry("plugins")
@@ -174,7 +213,11 @@ class TestPluginRegistry:
         meta = r.get_meta("rag-interface")
         assert meta is not None
         assert meta.name in [item.name for item in metas]
-        assert {item["id"] for item in meta.provides} == {"rag.query", "rag.context.store", "rag.context.retrieve"}
+        assert {item["id"] for item in meta.provides} == {
+            "rag.query",
+            "rag.context.store",
+            "rag.context.retrieve",
+        }
 
         result = r.get("rag-interface").execute(
             "rag.query",
@@ -218,7 +261,9 @@ class TestPluginRegistry:
     def test_harness_core_manifest_actions_execute_with_stable_shape(self, tmp_path):
         checkpoint_task = tmp_path / "checkpoints" / "task-1" / "step-1"
         checkpoint_task.mkdir(parents=True)
-        (checkpoint_task / "status.json").write_text('{"state": "completed"}', encoding="utf-8")
+        (checkpoint_task / "status.json").write_text(
+            '{"state": "completed"}', encoding="utf-8"
+        )
 
         r = PluginRegistry("plugins")
         metas = r.discover()
@@ -252,7 +297,9 @@ class TestPluginRegistry:
 
     def test_harness_core_monitor_malformed_jsonl_returns_warnings(self, tmp_path):
         audit_log = tmp_path / "audit.jsonl"
-        audit_log.write_text('{"agent_id":"alpha","result":"DENIED"}\n{not-json\n', encoding="utf-8")
+        audit_log.write_text(
+            '{"agent_id":"alpha","result":"DENIED"}\n{not-json\n', encoding="utf-8"
+        )
         r = PluginRegistry("plugins")
         r.discover()
 
@@ -269,7 +316,9 @@ class TestPluginRegistry:
         r = PluginRegistry("plugins")
         r.discover()
 
-        result = r.get("harness-core").execute("harness.integration.checkpoint", {"task_id": "task-1"})
+        result = r.get("harness-core").execute(
+            "harness.integration.checkpoint", {"task_id": "task-1"}
+        )
 
         assert result["status"] == "plugin_error"
         assert result["output"] is None
@@ -281,7 +330,10 @@ class TestPluginRegistry:
         meta = r.get_meta("medical-citation")
         assert meta is not None
         assert meta.name in [item.name for item in metas]
-        assert {item["id"] for item in meta.provides} == {"standard.citation.ama", "standard.citation.vancouver"}
+        assert {item["id"] for item in meta.provides} == {
+            "standard.citation.ama",
+            "standard.citation.vancouver",
+        }
 
         result = r.get("medical-citation").execute(
             "standard.citation.ama",
@@ -313,7 +365,9 @@ class TestPluginRegistry:
         r = PluginRegistry("plugins")
         r.discover()
 
-        result = r.get("medical-citation").execute("standard.citation.ama", {"source_id": "missing", "sources": {}})
+        result = r.get("medical-citation").execute(
+            "standard.citation.ama", {"source_id": "missing", "sources": {}}
+        )
 
         assert result["status"] == "plugin_error"
         assert result["output"] is None

@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import yaml
 
-from core.tui.screens.dashboard import DashboardOverviewController, collect_dashboard_context
+from core.tui.screens.dashboard import (
+    DashboardOverviewController,
+    collect_dashboard_context,
+)
 from core.workspace import WorkspaceManager
 
 
@@ -19,7 +22,9 @@ def test_dashboard_context_for_uninitialized_project_is_chinese_and_stable(tmp_p
     assert "初始化" in context["action_hint"]
 
 
-def test_dashboard_context_for_initialized_project_with_workspace_and_ready_llm_redacts_secret(tmp_path):
+def test_dashboard_context_for_initialized_project_with_workspace_and_ready_llm_redacts_secret(
+    tmp_path,
+):
     secret = "sk-dashboard-secret"
     (tmp_path / ".supermedicine").mkdir()
     plugin_dir = tmp_path / "plugins" / "demo_plugin"
@@ -65,7 +70,9 @@ def test_dashboard_context_for_initialized_project_with_workspace_and_ready_llm_
     assert secret not in rendered
 
 
-def test_dashboard_context_reports_initialized_project_without_workspace_or_provider(tmp_path):
+def test_dashboard_context_reports_initialized_project_without_workspace_or_provider(
+    tmp_path,
+):
     (tmp_path / ".supermedicine").mkdir()
 
     context = collect_dashboard_context(tmp_path)
@@ -77,12 +84,18 @@ def test_dashboard_context_reports_initialized_project_without_workspace_or_prov
     assert "创建工作区" in context["action_hint"]
 
 
-def test_dashboard_context_collects_counts_recent_hint_and_ready_advice_without_network(tmp_path):
+def test_dashboard_context_collects_counts_recent_hint_and_ready_advice_without_network(
+    tmp_path,
+):
     (tmp_path / ".supermedicine").mkdir()
     (tmp_path / "plugins" / "good_plugin").mkdir(parents=True)
-    (tmp_path / "plugins" / "good_plugin" / "plugin.yaml").write_text("name: good\n", encoding="utf-8")
+    (tmp_path / "plugins" / "good_plugin" / "plugin.yaml").write_text(
+        "name: good\n", encoding="utf-8"
+    )
     (tmp_path / "plugins" / "_ignored").mkdir(parents=True)
-    (tmp_path / "plugins" / "_ignored" / "plugin.yaml").write_text("name: ignored\n", encoding="utf-8")
+    (tmp_path / "plugins" / "_ignored" / "plugin.yaml").write_text(
+        "name: ignored\n", encoding="utf-8"
+    )
     (tmp_path / "core" / "agents").mkdir(parents=True)
     (tmp_path / "core" / "_private").mkdir(parents=True)
     manager = WorkspaceManager(tmp_path)

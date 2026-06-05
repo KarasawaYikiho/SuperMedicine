@@ -1,4 +1,5 @@
 """检查点验证器 — 验证检查点完整性和可恢复性"""
+
 from __future__ import annotations
 
 import json
@@ -49,25 +50,63 @@ class CheckpointVerifier:
                         try:
                             data = json.loads(status_file.read_text(encoding="utf-8"))
                         except json.JSONDecodeError as exc:
-                            warnings.append({"step": step_num, "path": str(status_file), "code": "malformed_json", "message": str(exc)})
+                            warnings.append(
+                                {
+                                    "step": step_num,
+                                    "path": str(status_file),
+                                    "code": "malformed_json",
+                                    "message": str(exc),
+                                }
+                            )
                             continue
                         if not isinstance(data, dict):
-                            warnings.append({"step": step_num, "path": str(status_file), "code": "non_object_json", "message": "status.json must contain an object"})
+                            warnings.append(
+                                {
+                                    "step": step_num,
+                                    "path": str(status_file),
+                                    "code": "non_object_json",
+                                    "message": "status.json must contain an object",
+                                }
+                            )
                             continue
-                        steps.append({"step": step_num, "state": data.get("state", "unknown")})
+                        steps.append(
+                            {"step": step_num, "state": data.get("state", "unknown")}
+                        )
                     else:
-                        warnings.append({"path": str(d), "code": "missing_status", "message": "step directory has no status.json"})
+                        warnings.append(
+                            {
+                                "path": str(d),
+                                "code": "missing_status",
+                                "message": "step directory has no status.json",
+                            }
+                        )
                 except ValueError:
-                    warnings.append({"path": str(d), "code": "invalid_step_name", "message": "step directory suffix must be an integer"})
+                    warnings.append(
+                        {
+                            "path": str(d),
+                            "code": "invalid_step_name",
+                            "message": "step directory suffix must be an integer",
+                        }
+                    )
                     continue
 
         steps.sort(key=lambda x: x["step"])
         existing_steps = {s["step"] for s in steps}
         max_step = max(existing_steps) if existing_steps else 0
         missing = [i for i in range(1, max_step + 1) if i not in existing_steps]
-        structurally_complete = len(missing) == 0 and max_step > 0 and not any(w.get("code") in {"missing_status", "malformed_json", "non_object_json"} for w in warnings)
+        structurally_complete = (
+            len(missing) == 0
+            and max_step > 0
+            and not any(
+                w.get("code") in {"missing_status", "malformed_json", "non_object_json"}
+                for w in warnings
+            )
+        )
         final_step = steps[-1] if steps else None
-        final_state_success = bool(final_step and final_step.get("state") in {"completed", "success", "succeeded"})
+        final_state_success = bool(
+            final_step
+            and final_step.get("state") in {"completed", "success", "succeeded"}
+        )
 
         return {
             "task_id": task_id,

@@ -1,4 +1,5 @@
 """配置中心 — YAML 配置管理，支持 SM_* 环境变量覆盖"""
+
 from __future__ import annotations
 
 import os
@@ -57,13 +58,25 @@ class ConfigCenter:
                     self._config = loaded
                 else:
                     self._load_error = f"config root must be a mapping: {config_path}"
-                    logger.error("Config load failed: stage=parse path=%s error=%s", config_path, self._load_error)
+                    logger.error(
+                        "Config load failed: stage=parse path=%s error=%s",
+                        config_path,
+                        self._load_error,
+                    )
             except yaml.YAMLError as exc:
                 self._load_error = f"invalid YAML in config file {config_path}: {exc}"
-                logger.error("Config load failed: stage=parse path=%s error=%s", config_path, redact_sensitive(str(exc)))
+                logger.error(
+                    "Config load failed: stage=parse path=%s error=%s",
+                    config_path,
+                    redact_sensitive(str(exc)),
+                )
             except OSError as exc:
                 self._load_error = f"cannot read config file {config_path}: {exc}"
-                logger.error("Config load failed: stage=read path=%s error=%s", config_path, redact_sensitive(str(exc)))
+                logger.error(
+                    "Config load failed: stage=read path=%s error=%s",
+                    config_path,
+                    redact_sensitive(str(exc)),
+                )
 
     @property
     def config_path(self) -> Path:
@@ -105,14 +118,20 @@ class ConfigCenter:
     def diagnostics(self) -> dict[str, Any]:
         """Return a user-shareable diagnostic snapshot for config loading."""
         env_overrides = sorted(key for key in os.environ if key.startswith("SM_"))
-        return redact_sensitive({
-            "config_path": str(self._config_path),
-            "exists": self._config_path.exists(),
-            "load_error": self._load_error,
-            "env_override_keys": env_overrides,
-            "precedence": ["SM_* environment variables", "config file", "code defaults"],
-            "config": self.safe_all(),
-        })
+        return redact_sensitive(
+            {
+                "config_path": str(self._config_path),
+                "exists": self._config_path.exists(),
+                "load_error": self._load_error,
+                "env_override_keys": env_overrides,
+                "precedence": [
+                    "SM_* environment variables",
+                    "config file",
+                    "code defaults",
+                ],
+                "config": self.safe_all(),
+            }
+        )
 
     def diagnose_llm_config(self) -> dict[str, Any]:
         """Diagnose LLM provider selection and required fields without exposing secrets."""
@@ -126,7 +145,9 @@ class ConfigCenter:
             missing.append("providers." + current)
         if current and current in raw_providers:
             selected = raw_providers.get(current, {})
-            missing.extend(LLMProviderConfig.from_mapping(current, selected).missing_fields())
+            missing.extend(
+                LLMProviderConfig.from_mapping(current, selected).missing_fields()
+            )
         return {
             "ok": not self._load_error and not missing,
             "stage": "config.llm",
@@ -152,13 +173,17 @@ class ConfigCenter:
 
     def get_experiment_guide_config(self) -> dict[str, Any]:
         """获取实验引导配置，缺失用户配置时返回安全默认值。"""
-        return self._merged_default_section("experiment_guide", DEFAULT_EXPERIMENT_GUIDE_CONFIG)
+        return self._merged_default_section(
+            "experiment_guide", DEFAULT_EXPERIMENT_GUIDE_CONFIG
+        )
 
     def get_log_report_config(self) -> dict[str, Any]:
         """获取日志报告配置，缺失用户配置时返回安全默认值。"""
         return self._merged_default_section("log_report", DEFAULT_LOG_REPORT_CONFIG)
 
-    def _merged_default_section(self, key: str, defaults: dict[str, Any]) -> dict[str, Any]:
+    def _merged_default_section(
+        self, key: str, defaults: dict[str, Any]
+    ) -> dict[str, Any]:
         """Return a shallow, default-compatible config section merge."""
         value = self.get(key, {})
         result = dict(defaults)
@@ -174,7 +199,9 @@ class ConfigCenter:
             self._config["llm"] = llm_config
         providers = llm_config.setdefault("providers", {})
         if not isinstance(providers, dict):
-            llm_config["providers"] = self._normalized_llm_providers() if isinstance(providers, list) else {}
+            llm_config["providers"] = (
+                self._normalized_llm_providers() if isinstance(providers, list) else {}
+            )
         return llm_config
 
     def get_llm_providers(self, *, redacted: bool = False) -> dict[str, Any]:
@@ -218,12 +245,16 @@ class ConfigCenter:
 
     def get_llm_runtime_provider_name(self) -> str:
         """获取运行时应使用的 LLM provider 名称。"""
-        current_provider = str(self.get_llm_current_provider_name() or "").strip().lower()
+        current_provider = (
+            str(self.get_llm_current_provider_name() or "").strip().lower()
+        )
         if current_provider:
             return current_provider
         return str(self.get_llm_last_provider_name() or "").strip().lower()
 
-    def get_llm_provider_config(self, provider: str | None = None, *, redacted: bool = False) -> dict[str, Any]:
+    def get_llm_provider_config(
+        self, provider: str | None = None, *, redacted: bool = False
+    ) -> dict[str, Any]:
         """获取可注入 LLM Provider 配置。
 
         默认返回运行时注入所需原始值；日志、错误、测试快照和能力输出必须使用
@@ -231,7 +262,9 @@ class ConfigCenter:
         """
         providers = self.get_llm_providers()
 
-        provider_name = str(provider or self.get_llm_runtime_provider_name() or "").strip().lower()
+        provider_name = (
+            str(provider or self.get_llm_runtime_provider_name() or "").strip().lower()
+        )
         provider_config = providers.get(provider_name, {})
         if not isinstance(provider_config, dict):
             provider_config = {}
@@ -251,7 +284,12 @@ class ConfigCenter:
         elif isinstance(providers, list):
             for index, value in enumerate(providers):
                 if isinstance(value, dict):
-                    name = value.get("provider") or value.get("name") or value.get("id") or f"provider_{index}"
+                    name = (
+                        value.get("provider")
+                        or value.get("name")
+                        or value.get("id")
+                        or f"provider_{index}"
+                    )
                     items.append((name, value))
 
         for name, value in items:
@@ -259,14 +297,18 @@ class ConfigCenter:
             if not provider_name:
                 continue
             provider_config = dict(value) if isinstance(value, dict) else {}
-            provider_config["provider"] = str(provider_config.get("provider") or provider_name).strip().lower()
+            provider_config["provider"] = (
+                str(provider_config.get("provider") or provider_name).strip().lower()
+            )
             normalized[provider_name] = provider_config
         return normalized
 
 
 def _redact_llm_providers(providers: dict[str, Any]) -> dict[str, Any]:
     """Redact LLM provider configs, including secret-looking header names."""
-    return {str(name): _redact_llm_provider(config) for name, config in providers.items()}
+    return {
+        str(name): _redact_llm_provider(config) for name, config in providers.items()
+    }
 
 
 def _redact_llm_provider(config: Any) -> Any:

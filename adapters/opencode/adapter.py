@@ -5,6 +5,7 @@ SuperMedicine core.  It must not be required for core runtime execution, and
 it only reports native OpenCode sub-agent behavior when an explicit
 orchestrator/runtime bridge is supplied by the caller.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -26,7 +27,17 @@ class OpenCodeAdapter(BaseAdapter):
       状态和本地非用户可见 role context 文档上下文，不声称原生 OpenCode 子代理运行时已执行。
     """
 
-    SUPPORTED_TOOLS = {"bash", "read", "write", "edit", "glob", "grep", "skill", "task", "opencode.capabilities"}
+    SUPPORTED_TOOLS = {
+        "bash",
+        "read",
+        "write",
+        "edit",
+        "glob",
+        "grep",
+        "skill",
+        "task",
+        "opencode.capabilities",
+    }
 
     SKILL_FILES = {
         "rag-query": "rag-query.md",
@@ -44,7 +55,11 @@ class OpenCodeAdapter(BaseAdapter):
         "delta": "delta-orchestrator.md",
     }
 
-    USER_FACING_AGENT = {"name": "SuperMedicine", "id": "supermedicine", "file": "supermedicine.md"}
+    USER_FACING_AGENT = {
+        "name": "SuperMedicine",
+        "id": "supermedicine",
+        "file": "supermedicine.md",
+    }
 
     AI_PROVIDER_SUPPORT = {
         "config_sources": [
@@ -93,7 +108,11 @@ class OpenCodeAdapter(BaseAdapter):
         project_dir: Path | None = None,
         default_agent_id: str = "beta",
     ):
-        super().__init__(permission_engine=permission_engine, project_dir=project_dir, default_agent_id=default_agent_id)
+        super().__init__(
+            permission_engine=permission_engine,
+            project_dir=project_dir,
+            default_agent_id=default_agent_id,
+        )
         self._orchestrator = orchestrator
 
     # Runtime ID → SuperMedicine role-position mapping

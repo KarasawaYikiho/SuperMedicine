@@ -1,4 +1,5 @@
 """RAG 检索增强生成插件"""
+
 from __future__ import annotations
 
 from plugins.rag.interface import (

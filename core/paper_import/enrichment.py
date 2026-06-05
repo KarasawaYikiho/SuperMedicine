@@ -77,7 +77,9 @@ class PaperEnricher:
         self.provider = provider or LocalMockMetadataProvider()
         self.agent_id = agent_id
 
-    def enrich(self, metadata: PaperMetadata, *, confirmed: bool) -> PaperEnrichmentResult:
+    def enrich(
+        self, metadata: PaperMetadata, *, confirmed: bool
+    ) -> PaperEnrichmentResult:
         resource = self.provider.resource
         paper_id = metadata.id or "<unknown>"
         if not confirmed:
@@ -157,10 +159,14 @@ class PaperEnricher:
             result="enriched",
             reason=",".join(applied) if applied else "no_fields_applied",
         )
-        return PaperEnrichmentResult(metadata=metadata, status="enriched", applied_fields=applied)
+        return PaperEnrichmentResult(
+            metadata=metadata, status="enriched", applied_fields=applied
+        )
 
 
-def _apply_provider_fields(metadata: PaperMetadata, fetched: dict[str, Any]) -> list[str]:
+def _apply_provider_fields(
+    metadata: PaperMetadata, fetched: dict[str, Any]
+) -> list[str]:
     applied: list[str] = []
     for field_name in ("title", "authors", "doi", "pmid", "notes", "tags"):
         if field_name not in fetched or fetched[field_name] is None:

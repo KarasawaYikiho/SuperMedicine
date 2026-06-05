@@ -66,8 +66,15 @@ class ExperienceScreenController:
         payload["message"] = "经验已确认写入"
         return payload
 
-    def list_experiences(self, workspace_id: str, *, include_general: bool = False) -> list[dict[str, Any]]:
-        return [self._record_payload(record) for record in self.store.list_experiences(workspace_id, include_general=include_general)]
+    def list_experiences(
+        self, workspace_id: str, *, include_general: bool = False
+    ) -> list[dict[str, Any]]:
+        return [
+            self._record_payload(record)
+            for record in self.store.list_experiences(
+                workspace_id, include_general=include_general
+            )
+        ]
 
     def edit_experience(
         self,
@@ -89,11 +96,20 @@ class ExperienceScreenController:
         )
         return self._record_payload(record, message="经验已更新")
 
-    def delete_experience(self, record_id: str, *, workspace_id: str, scope: ExperienceScope, confirm: str) -> dict[str, Any]:
+    def delete_experience(
+        self, record_id: str, *, workspace_id: str, scope: ExperienceScope, confirm: str
+    ) -> dict[str, Any]:
         if confirm != record_id:
             raise ValueError("删除经验需要输入完全一致的经验 ID 作为确认")
-        deleted = self.store.delete_experience(record_id, workspace_id=workspace_id, scope=scope)
-        return {"status": "deleted", "id": deleted.id, "scope": deleted.scope, "message": "经验已删除"}
+        deleted = self.store.delete_experience(
+            record_id, workspace_id=workspace_id, scope=scope
+        )
+        return {
+            "status": "deleted",
+            "id": deleted.id,
+            "scope": deleted.scope,
+            "message": "经验已删除",
+        }
 
     def export_experiences(
         self,

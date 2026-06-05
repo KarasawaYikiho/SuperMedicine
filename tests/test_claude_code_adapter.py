@@ -1,4 +1,5 @@
 """Claude Code 适配器测试 — 最小真实行为与权限边界。"""
+
 from __future__ import annotations
 
 import importlib
@@ -60,7 +61,9 @@ class TestClaudeCodeAdapter:
         adapter = ClaudeCodeAdapter(project_dir=tmp_path)
         assert isinstance(adapter, BaseAdapter)
 
-    def test_explicit_optional_import_degrades_without_claude_runtime(self, tmp_path, monkeypatch):
+    def test_explicit_optional_import_degrades_without_claude_runtime(
+        self, tmp_path, monkeypatch
+    ):
         _write_policy(tmp_path)
         sys.modules.pop("adapters.claude_code", None)
         sys.modules.pop("adapters.claude_code.adapter", None)
@@ -69,7 +72,9 @@ class TestClaudeCodeAdapter:
 
         adapter = module.ClaudeCodeAdapter(project_dir=tmp_path)
         capabilities = adapter.tool_call("claude.capabilities", {})
-        invoke = adapter.tool_call("claude.invoke", {"agent_id": "beta", "prompt": "hello"})
+        invoke = adapter.tool_call(
+            "claude.invoke", {"agent_id": "beta", "prompt": "hello"}
+        )
 
         assert capabilities["status"] == "ok"
         assert capabilities["result"]["optional"] is True
@@ -88,13 +93,21 @@ class TestClaudeCodeAdapter:
         assert adapter.registration["core"] is False
         assert adapter.registration["default"] is False
         assert adapter.registration["requires_core_runtime"] is False
-        assert set(adapter.registration["ai_provider_support"]["supported_api_formats"]) == {"openai", "anthropic", "openrouter"}
-        assert adapter.registration["ai_provider_support"]["secret_redaction"]["required"] is True
+        assert set(
+            adapter.registration["ai_provider_support"]["supported_api_formats"]
+        ) == {"openai", "anthropic", "openrouter"}
+        assert (
+            adapter.registration["ai_provider_support"]["secret_redaction"]["required"]
+            is True
+        )
         assert "not imported" in adapter.registration["limitations"][0]
 
     def test_capabilities_available_with_mock_runtime(self, tmp_path, monkeypatch):
         _write_policy(tmp_path)
-        monkeypatch.setattr("adapters.claude_code.adapter.shutil.which", lambda command: "/usr/bin/claude")
+        monkeypatch.setattr(
+            "adapters.claude_code.adapter.shutil.which",
+            lambda command: "/usr/bin/claude",
+        )
         adapter = ClaudeCodeAdapter(project_dir=tmp_path)
         result = adapter.tool_call("claude.capabilities", {})
         assert result["status"] == "ok"
@@ -104,23 +117,43 @@ class TestClaudeCodeAdapter:
         assert result["result"]["features"]["ai_provider_config_discovery"] is True
         assert result["result"]["features"]["ai_provider_secret_redaction"] is True
         assert result["result"]["features"]["custom_ai_provider_base_url"] is True
-        assert set(result["result"]["ai_provider"]["supported_api_formats"]) == {"openai", "anthropic", "openrouter"}
-        assert result["result"]["ai_provider"]["secret_redaction"]["plain_text_keys_in_manifest_or_docs"] is False
+        assert set(result["result"]["ai_provider"]["supported_api_formats"]) == {
+            "openai",
+            "anthropic",
+            "openrouter",
+        }
+        assert (
+            result["result"]["ai_provider"]["secret_redaction"][
+                "plain_text_keys_in_manifest_or_docs"
+            ]
+            is False
+        )
         assert result["result"]["optional"] is True
         assert result["result"]["status"] == "available"
-        user_facing_names = [agent["name"] for agent in result["result"]["user_facing_agents"]]
+        user_facing_names = [
+            agent["name"] for agent in result["result"]["user_facing_agents"]
+        ]
         assert user_facing_names == ["SuperMedicine"]
         assert len(result["result"]["user_facing_agents"]) == 1
         assert FORBIDDEN_PLATFORM_AGENT_NAMES.isdisjoint(user_facing_names)
-        assert result["result"]["internal_role_contexts"] == ["alpha", "beta", "gamma", "delta"]
+        assert result["result"]["internal_role_contexts"] == [
+            "alpha",
+            "beta",
+            "gamma",
+            "delta",
+        ]
 
-    def test_capabilities_do_not_expose_environment_api_keys(self, tmp_path, monkeypatch):
+    def test_capabilities_do_not_expose_environment_api_keys(
+        self, tmp_path, monkeypatch
+    ):
         _write_policy(tmp_path)
         openai_secret = "sk-test-claude-env-secret"
         anthropic_secret = "anthropic-test-claude-env-secret"
         monkeypatch.setenv("OPENAI_API_KEY", openai_secret)
         monkeypatch.setenv("ANTHROPIC_API_KEY", anthropic_secret)
-        monkeypatch.setattr("adapters.claude_code.adapter.shutil.which", lambda command: None)
+        monkeypatch.setattr(
+            "adapters.claude_code.adapter.shutil.which", lambda command: None
+        )
 
         adapter = ClaudeCodeAdapter(project_dir=tmp_path)
         result = adapter.tool_call("claude.capabilities", {})
@@ -132,51 +165,84 @@ class TestClaudeCodeAdapter:
 
     def test_runtime_unavailable_returns_structured_state(self, tmp_path, monkeypatch):
         _write_policy(tmp_path)
-        monkeypatch.setattr("adapters.claude_code.adapter.shutil.which", lambda command: None)
+        monkeypatch.setattr(
+            "adapters.claude_code.adapter.shutil.which", lambda command: None
+        )
         adapter = ClaudeCodeAdapter(project_dir=tmp_path)
-        result = adapter.tool_call("claude.invoke", {"agent_id": "beta", "prompt": "hello"})
+        result = adapter.tool_call(
+            "claude.invoke", {"agent_id": "beta", "prompt": "hello"}
+        )
         assert result["status"] == "unavailable"
         assert result["runtime"]["available"] is False
         assert result["runtime"]["required_for_core"] is False
-        assert result["runtime"]["ai_provider_configured"]["supported_api_formats"] == ["anthropic", "openai", "openrouter"]
-        assert result["runtime"]["ai_provider_configured"]["secret_redaction_required"] is True
-        assert result["runtime"]["ai_provider_configured"]["plaintext_api_keys_in_manifest_or_docs"] is False
+        assert result["runtime"]["ai_provider_configured"]["supported_api_formats"] == [
+            "anthropic",
+            "openai",
+            "openrouter",
+        ]
+        assert (
+            result["runtime"]["ai_provider_configured"]["secret_redaction_required"]
+            is True
+        )
+        assert (
+            result["runtime"]["ai_provider_configured"][
+                "plaintext_api_keys_in_manifest_or_docs"
+            ]
+            is False
+        )
         assert result["metadata"]["adapter"]["core_failure"] is False
         assert "error" in result
 
     def test_invoke_available_mock_path(self, tmp_path, monkeypatch):
         _write_policy(tmp_path)
-        monkeypatch.setattr("adapters.claude_code.adapter.shutil.which", lambda command: "/usr/bin/claude")
+        monkeypatch.setattr(
+            "adapters.claude_code.adapter.shutil.which",
+            lambda command: "/usr/bin/claude",
+        )
 
         def fake_run(command, cwd, capture_output, text, encoding, errors, timeout):
-            return subprocess.CompletedProcess(command, 0, stdout="mock claude output", stderr="")
+            return subprocess.CompletedProcess(
+                command, 0, stdout="mock claude output", stderr=""
+            )
 
         monkeypatch.setattr("adapters.claude_code.adapter.subprocess.run", fake_run)
         adapter = ClaudeCodeAdapter(project_dir=tmp_path)
-        result = adapter.tool_call("claude.invoke", {"agent_id": "beta", "prompt": "hello"})
+        result = adapter.tool_call(
+            "claude.invoke", {"agent_id": "beta", "prompt": "hello"}
+        )
         assert result["status"] == "ok"
         assert result["result"] == "mock claude output"
         assert result["metadata"]["security"]["permission_checked"] is True
 
     def test_invoke_timeout_returns_structured_timeout(self, tmp_path, monkeypatch):
         _write_policy(tmp_path)
-        monkeypatch.setattr("adapters.claude_code.adapter.shutil.which", lambda command: "/usr/bin/claude")
+        monkeypatch.setattr(
+            "adapters.claude_code.adapter.shutil.which",
+            lambda command: "/usr/bin/claude",
+        )
 
         def fake_run(command, cwd, capture_output, text, encoding, errors, timeout):
             raise subprocess.TimeoutExpired(command, timeout)
 
         monkeypatch.setattr("adapters.claude_code.adapter.subprocess.run", fake_run)
         adapter = ClaudeCodeAdapter(project_dir=tmp_path)
-        result = adapter.tool_call("claude.invoke", {"agent_id": "beta", "prompt": "hello", "timeout": 1})
+        result = adapter.tool_call(
+            "claude.invoke", {"agent_id": "beta", "prompt": "hello", "timeout": 1}
+        )
 
         assert result["status"] == "timeout"
         assert result["error_code"] == "timeout"
         assert result["retryable"] is True
         assert result["metadata"]["resource"]["timeout_seconds"] == 1
 
-    def test_invoke_redacts_secret_like_prompt_and_runtime_error(self, tmp_path, monkeypatch):
+    def test_invoke_redacts_secret_like_prompt_and_runtime_error(
+        self, tmp_path, monkeypatch
+    ):
         _write_policy(tmp_path)
-        monkeypatch.setattr("adapters.claude_code.adapter.shutil.which", lambda command: "/usr/bin/claude")
+        monkeypatch.setattr(
+            "adapters.claude_code.adapter.shutil.which",
+            lambda command: "/usr/bin/claude",
+        )
         adapter = ClaudeCodeAdapter(project_dir=tmp_path)
         api_key_label = "api" + "_" + "key"
         token_label = "tok" + "en"
@@ -185,40 +251,60 @@ class TestClaudeCodeAdapter:
 
         dry_run = adapter.tool_call(
             "claude.invoke",
-            {"agent_id": "beta", "prompt": f"use {api_key_label}={prompt_payload}", "dry_run": True},
+            {
+                "agent_id": "beta",
+                "prompt": f"use {api_key_label}={prompt_payload}",
+                "dry_run": True,
+            },
         )
         assert prompt_payload not in str(dry_run)
         assert "[REDACTED]" in str(dry_run)
         assert dry_run["metadata"]["security"]["permission_checked"] is True
 
         def fake_run(command, cwd, capture_output, text, encoding, errors, timeout):
-            return subprocess.CompletedProcess(command, 1, stdout="", stderr=f"{token_label}={runtime_payload} failed")
+            return subprocess.CompletedProcess(
+                command, 1, stdout="", stderr=f"{token_label}={runtime_payload} failed"
+            )
 
         monkeypatch.setattr("adapters.claude_code.adapter.subprocess.run", fake_run)
-        error = adapter.tool_call("claude.invoke", {"agent_id": "beta", "prompt": "hello"})
+        error = adapter.tool_call(
+            "claude.invoke", {"agent_id": "beta", "prompt": "hello"}
+        )
         assert error["status"] == "runtime_error"
         assert runtime_payload not in str(error)
         assert "[REDACTED]" in str(error)
 
     def test_permission_denied_before_invoke(self, tmp_path, monkeypatch):
         _write_policy(tmp_path)
-        monkeypatch.setattr("adapters.claude_code.adapter.shutil.which", lambda command: "/usr/bin/claude")
+        monkeypatch.setattr(
+            "adapters.claude_code.adapter.shutil.which",
+            lambda command: "/usr/bin/claude",
+        )
         adapter = ClaudeCodeAdapter(project_dir=tmp_path)
-        result = adapter.tool_call("claude.invoke", {"agent_id": "gamma", "prompt": "hello"})
+        result = adapter.tool_call(
+            "claude.invoke", {"agent_id": "gamma", "prompt": "hello"}
+        )
         assert result["status"] == "denied"
         assert result["resource"] == "claude.invoke"
 
     def test_permission_denied_before_runtime_subprocess(self, tmp_path, monkeypatch):
         _write_policy(tmp_path)
-        monkeypatch.setattr("adapters.claude_code.adapter.shutil.which", lambda command: "/usr/bin/claude")
+        monkeypatch.setattr(
+            "adapters.claude_code.adapter.shutil.which",
+            lambda command: "/usr/bin/claude",
+        )
 
         def fail_if_invoked(*args, **kwargs):
             raise AssertionError("denied claude.invoke must not call subprocess")
 
-        monkeypatch.setattr("adapters.claude_code.adapter.subprocess.run", fail_if_invoked)
+        monkeypatch.setattr(
+            "adapters.claude_code.adapter.subprocess.run", fail_if_invoked
+        )
         adapter = ClaudeCodeAdapter(project_dir=tmp_path)
 
-        result = adapter.tool_call("claude.invoke", {"agent_id": "gamma", "prompt": "hello"})
+        result = adapter.tool_call(
+            "claude.invoke", {"agent_id": "gamma", "prompt": "hello"}
+        )
 
         assert result["status"] == "denied"
         assert result["resource"] == "claude.invoke"
@@ -250,7 +336,9 @@ class TestClaudeCodeAdapter:
         assert "supported_tools" in result
 
     def test_skill_doc_stable_api_examples_and_boundary(self):
-        content = (Path(__file__).parent.parent / "adapters" / "claude_code" / "SKILL.md").read_text(encoding="utf-8")
+        content = (
+            Path(__file__).parent.parent / "adapters" / "claude_code" / "SKILL.md"
+        ).read_text(encoding="utf-8")
 
         assert "from plugins.rag.main import execute" in content
         assert "RAGProvider()" not in content

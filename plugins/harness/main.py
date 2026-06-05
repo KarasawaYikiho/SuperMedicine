@@ -1,4 +1,5 @@
 """Executable entrypoint for the harness-core manifest plugin."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -15,7 +16,16 @@ PLUGIN_NAME = "harness-core"
 ACTION_CONTRACTS: dict[str, dict[str, Any]] = {
     "harness.integration.checkpoint": {
         "required_params": {"checkpoint_dir": "str", "task_id": "str"},
-        "output_fields": ["task_id", "total_steps", "steps", "missing_steps", "complete", "structurally_complete", "final_state_success", "warnings"],
+        "output_fields": [
+            "task_id",
+            "total_steps",
+            "steps",
+            "missing_steps",
+            "complete",
+            "structurally_complete",
+            "final_state_success",
+            "warnings",
+        ],
     },
     "harness.integration.checkpoint_all": {
         "required_params": {"checkpoint_dir": "str"},
@@ -131,7 +141,11 @@ def _execute_anomaly(params: dict[str, Any]) -> dict[str, Any]:
     threshold = _optional_positive_int(params, "anomaly_threshold", default=100)
     monitor = AgentMonitor(audit_log_path, anomaly_threshold=threshold)
     anomalies = monitor.detect_anomalies()
-    return {"anomalies": anomalies, "total": len(anomalies), "warnings": monitor.warnings}
+    return {
+        "anomalies": anomalies,
+        "total": len(anomalies),
+        "warnings": monitor.warnings,
+    }
 
 
 def _execute_performance(params: dict[str, Any]) -> dict[str, Any]:
@@ -153,7 +167,10 @@ def _execute_failure_patterns(params: dict[str, Any]) -> dict[str, Any]:
 def _base_metadata(context: dict[str, Any]) -> dict[str, Any]:
     return {
         "resource": {"kind": "harness", "plugin": PLUGIN_NAME},
-        "security": {"permission_entrypoint": "kernel", "permission_checked": bool(context)},
+        "security": {
+            "permission_entrypoint": "kernel",
+            "permission_checked": bool(context),
+        },
         "contract": {"actions": ACTION_CONTRACTS, "provider_contract": "harness-core"},
         "audit": {"context_keys": sorted(context.keys())},
     }

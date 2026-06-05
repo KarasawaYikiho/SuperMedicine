@@ -3,6 +3,7 @@
 Interface boundary: deterministic test fixture path only. This implementation is
 not a production-grade, clinical-grade, or regulatory survival analysis engine.
 """
+
 from __future__ import annotations
 
 import math
@@ -12,6 +13,7 @@ from dataclasses import dataclass
 @dataclass
 class KMSurvivalPoint:
     """生存曲线数据点"""
+
     time: float
     survival_prob: float
     confidence_lower: float
@@ -24,6 +26,7 @@ class KMSurvivalPoint:
 @dataclass
 class KMResult:
     """Kaplan-Meier 分析结果"""
+
     time_points: list[KMSurvivalPoint]
     median_survival: float | None
     total_subjects: int
@@ -67,26 +70,19 @@ def kaplan_meier(times: list[float], events: list[int]) -> KMResult:
     for t in unique_times:
         # 在时间 t 之前的删失
         censored_before = sum(
-            1 for ti, ei in zip(sorted_times, sorted_events)
-            if ti < t and ei == 0
+            1 for ti, ei in zip(sorted_times, sorted_events) if ti < t and ei == 0
         )
         at_risk -= censored_before
 
         # 在时间 t 的事件数
-        d = sum(
-            1 for ti, ei in zip(sorted_times, sorted_events)
-            if ti == t and ei == 1
-        )
+        d = sum(1 for ti, ei in zip(sorted_times, sorted_events) if ti == t and ei == 1)
 
         # 在时间 t 的删失数
-        c = sum(
-            1 for ti, ei in zip(sorted_times, sorted_events)
-            if ti == t and ei == 0
-        )
+        c = sum(1 for ti, ei in zip(sorted_times, sorted_events) if ti == t and ei == 0)
 
         # 更新生存概率
         if at_risk > 0:
-            survival_prob *= (1 - d / at_risk)
+            survival_prob *= 1 - d / at_risk
             # Greenwood 公式
             if at_risk - d > 0:
                 greenwood_var += d / (at_risk * (at_risk - d))
@@ -96,15 +92,17 @@ def kaplan_meier(times: list[float], events: list[int]) -> KMResult:
         ci_lower = max(0, survival_prob - 1.96 * se)
         ci_upper = min(1, survival_prob + 1.96 * se)
 
-        result_points.append(KMSurvivalPoint(
-            time=t,
-            survival_prob=round(survival_prob, 4),
-            confidence_lower=round(ci_lower, 4),
-            confidence_upper=round(ci_upper, 4),
-            at_risk=at_risk,
-            events=d,
-            censored=c,
-        ))
+        result_points.append(
+            KMSurvivalPoint(
+                time=t,
+                survival_prob=round(survival_prob, 4),
+                confidence_lower=round(ci_lower, 4),
+                confidence_upper=round(ci_upper, 4),
+                at_risk=at_risk,
+                events=d,
+                censored=c,
+            )
+        )
 
         at_risk -= d
 

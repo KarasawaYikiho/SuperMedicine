@@ -20,7 +20,6 @@ LABELS: dict[str, str] = {
     "permission_allowed": "权限策略允许该操作",
     "dry_run_status": "TUI 基础组件已就绪（未启动交互界面）",
     "sandbox_notice": "工具执行必须经过权限引擎、适配器沙箱、审计与确认",
-
     # Navigation
     "nav_chat": "对话",
     "nav_dashboard": "仪表盘",
@@ -41,7 +40,6 @@ LABELS: dict[str, str] = {
     "layout_status_bar": "状态栏",
     "layout_sidebar_title": "SuperMedicine",
     "layout_sidebar_subtitle": "智能医学工作台",
-
     # Dashboard
     "dashboard_title": "运行上下文总览",
     "dashboard_version": "版本",
@@ -73,7 +71,6 @@ LABELS: dict[str, str] = {
     "dashboard_completion_tokens": "输出 Token",
     "dashboard_token_requests": "请求次数",
     "dashboard_no_token_data": "暂无 Token 消耗记录",
-
     # Workspace
     "workspace_title": "工作区管理",
     "workspace_list": "工作区列表",
@@ -94,7 +91,6 @@ LABELS: dict[str, str] = {
     "workspace_refreshed": "工作区列表已刷新",
     "workspace_path": "路径",
     "workspace_created_at": "创建时间",
-
     # Paper
     "paper_title": "论文管理",
     "paper_import": "导入论文",
@@ -115,7 +111,6 @@ LABELS: dict[str, str] = {
     "paper_enrich_confirm": "在线补全将发起网络请求。请在 DOI 输入框输入选中论文 ID 后再点击在线补全。",
     "paper_refreshed": "论文列表已刷新",
     "paper_action_hint": "操作提示：先选择工作区，再填写文件路径导入；在线补全会发起网络请求，必须在 DOI 输入框输入选中论文 ID。",
-
     # Experience
     "experience_title": "经验学习",
     "experience_suggest": "建议分类",
@@ -136,7 +131,6 @@ LABELS: dict[str, str] = {
     "experience_delete_requires_confirm": "危险操作：删除经验前，请在经验标题输入框输入完全一致的经验 ID。此操作不可恢复。",
     "experience_refreshed": "经验列表已刷新",
     "experience_action_hint": "操作提示：建议分类不会写入经验库；确认写入需填写标题和摘要；删除需在标题输入框输入完全一致的经验 ID。",
-
     # Tool
     "tool_title": "工具管理",
     "tool_init": "初始化工具目录",
@@ -153,7 +147,6 @@ LABELS: dict[str, str] = {
     "tool_run": "运行工具",
     "tool_refreshed": "工具列表已刷新",
     "tool_action_hint": "操作提示：先选择工作区，可初始化工具目录、添加工具元数据或查看工具路径；运行真实工具仍需权限与沙箱边界。",
-
     # Dialog
     "dialog_title": "对话历史",
     "dialog_no_history": "暂无对话历史",
@@ -162,7 +155,6 @@ LABELS: dict[str, str] = {
     "dialog_time": "时间",
     "dialog_refreshed": "对话历史已刷新",
     "dialog_action_hint": "操作提示：选择工作区后可查看审计友好的对话事件摘要；敏感内容会在展示前隐藏。",
-
     # LLM
     "llm_title": "LLM 管理",
     "llm_current": "当前默认 LLM",
@@ -189,7 +181,6 @@ LABELS: dict[str, str] = {
     "llm_refreshed": "LLM Provider 列表已刷新",
     "safe_error_hint": "操作失败，敏感信息已隐藏。请检查输入、配置与权限后重试。",
     "llm_action_hint": "操作提示：API Key 输入框会隐藏内容，保存后状态栏和通知不会显示密钥；切换 Provider 前请确认配置完整。",
-
     # Common
     "confirm": "确认",
     "cancel": "取消",
@@ -244,7 +235,6 @@ LABELS: dict[str, str] = {
     "help_status": "状态栏：左侧显示工作区和焦点；中间显示插件数、LLM 状态和任务运行状态（任务空闲/任务执行中）；右侧显示当前视图和版本。",
     "help_global": "全局：Q 退出 | ? 帮助 | F 最大化/还原焦点组件 | Esc 退出最大化",
     "help_escape_hint": "按 Esc 可退出最大化",
-
     # Experiment guide
     "experiment_title": "实验指导器",
     "experiment_protocol": "实验方案",
@@ -267,7 +257,6 @@ LABELS: dict[str, str] = {
     "experiment_parse_error": "输入格式无法解析，请使用 JSON 或 key=value",
     "experiment_boundary": "仅供科研记录与实验辅助，不构成临床或生产建议；使用前需专家复核。",
     "experiment_action_hint": "操作提示：按步骤填写 JSON 或 key=value 输入；计算会通过权限引擎和插件沙箱；保存日志前会自动脱敏。",
-
     # Log reports
     "log_title": "Log 报告",
     "log_message": "日志内容",

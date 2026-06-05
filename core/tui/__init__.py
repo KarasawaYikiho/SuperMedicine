@@ -1,4 +1,5 @@
 """Chinese TUI foundation for SuperMedicine."""
+
 from __future__ import annotations
 
 from core.tui.app import TUIStatus, launch_tui, main
@@ -32,6 +33,7 @@ def __getattr__(name: str) -> object:
     if name in _lazy:
         mod_path, attr = _lazy[name]
         import importlib
+
         mod = importlib.import_module(mod_path)
         return getattr(mod, attr)
     raise AttributeError(f"module 'core.tui' has no attribute {name!r}")

@@ -1,4 +1,5 @@
 """共享 Pytest Fixtures"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -26,7 +27,9 @@ def block_real_network(monkeypatch):
 def sample_config_yaml(tmp_path) -> Path:
     """创建含基本配置的 Config.YAML，返回文件路径"""
     config_path = tmp_path / "config.yaml"
-    config_path.write_text(yaml.dump({"project": "test", "debug": True}), encoding="utf-8")
+    config_path.write_text(
+        yaml.dump({"project": "test", "debug": True}), encoding="utf-8"
+    )
     return config_path
 
 

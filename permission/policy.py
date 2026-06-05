@@ -1,4 +1,5 @@
 """权限声明解析与检查"""
+
 from __future__ import annotations
 import fnmatch
 import os
@@ -21,7 +22,11 @@ def default_policy_path(project_dir: Path | None = None) -> Path:
 
 def _bundled_default_policy_text() -> str:
     """Return the packaged default permission policy content."""
-    return resources.files(__package__).joinpath(BUNDLED_DEFAULT_POLICY_RESOURCE).read_text(encoding="utf-8")
+    return (
+        resources.files(__package__)
+        .joinpath(BUNDLED_DEFAULT_POLICY_RESOURCE)
+        .read_text(encoding="utf-8")
+    )
 
 
 def ensure_default_policy(project_dir: Path, source_root: Path | None = None) -> Path:
@@ -36,7 +41,9 @@ def ensure_default_policy(project_dir: Path, source_root: Path | None = None) ->
     if target_policy.exists():
         return target_policy
 
-    source_policy = default_policy_path(source_root or Path(__file__).resolve().parent.parent)
+    source_policy = default_policy_path(
+        source_root or Path(__file__).resolve().parent.parent
+    )
     if source_policy.exists():
         if source_policy.resolve() == target_policy.resolve():
             return target_policy
@@ -84,7 +91,10 @@ class PermissionRule:
             return False
         if cls._has_wildcard(value):
             return any(separator in value for separator in ("/", "\\"))
-        return any(separator in value for separator in ("/", "\\")) or Path(value).is_absolute()
+        return (
+            any(separator in value for separator in ("/", "\\"))
+            or Path(value).is_absolute()
+        )
 
     @staticmethod
     def _normalize_path_scope(value: str) -> str | None:
@@ -107,11 +117,13 @@ class HardLimits:
     def items(self) -> list[tuple[str, int]]:
         """返回非零/非默认的限制项"""
         return [
-            (k, v) for k, v in (
+            (k, v)
+            for k, v in (
                 ("max_file_size", self.max_file_size),
                 ("max_execution_time", self.max_execution_time),
                 ("max_memory", self.max_memory),
-            ) if v > 0
+            )
+            if v > 0
         ]
 
     @classmethod
@@ -131,8 +143,14 @@ class PermissionPolicy:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> PermissionPolicy:
         perms = data.get("permissions", {})
-        allowed = [PermissionRule(action=r["action"], scope=r["scope"]) for r in perms.get("allowed", [])]
-        denied = [PermissionRule(action=r["action"], scope=r["scope"]) for r in perms.get("denied", [])]
+        allowed = [
+            PermissionRule(action=r["action"], scope=r["scope"])
+            for r in perms.get("allowed", [])
+        ]
+        denied = [
+            PermissionRule(action=r["action"], scope=r["scope"])
+            for r in perms.get("denied", [])
+        ]
         hard_limits = HardLimits.from_dict(perms.get("hard_limits", {}))
         return cls(
             agent_id=data["agent_id"],

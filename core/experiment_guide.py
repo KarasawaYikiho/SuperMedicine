@@ -4,6 +4,7 @@ The guide is a standalone, UI-free service for progressing through experiment
 protocols and recording per-step inputs, calculation requests, calculation
 results, outputs, progress, completion, and error state.
 """
+
 from __future__ import annotations
 
 import json
@@ -44,9 +45,14 @@ def _compact_summary(value: Any, *, max_text: int = 500) -> Any:
 
     safe_value = redact_sensitive(value)
     if isinstance(safe_value, dict):
-        return {str(key): _compact_summary(item, max_text=max_text) for key, item in safe_value.items()}
+        return {
+            str(key): _compact_summary(item, max_text=max_text)
+            for key, item in safe_value.items()
+        }
     if isinstance(safe_value, list):
-        summarized = [_compact_summary(item, max_text=max_text) for item in safe_value[:10]]
+        summarized = [
+            _compact_summary(item, max_text=max_text) for item in safe_value[:10]
+        ]
         if len(safe_value) > 10:
             summarized.append({"truncated_items": len(safe_value) - 10})
         return summarized
@@ -74,7 +80,9 @@ def build_experiment_log_event(
         "event_type": event_type,
         "session_id": session.session_id,
         "protocol_id": session.protocol.protocol_id,
-        "status": session.status.value if hasattr(session.status, "value") else str(session.status),
+        "status": session.status.value
+        if hasattr(session.status, "value")
+        else str(session.status),
         "progress": session.progress,
         "medical_boundary": MEDICAL_BOUNDARY,
     }
@@ -115,7 +123,10 @@ def build_experiment_log_event(
         event.setdefault("plugin", kernel_result.get("plugin"))
         event.setdefault("action", kernel_result.get("action"))
     if next_step is None:
-        event["completion"] = {"completed": session.is_completed, "completed_at": session.updated_at}
+        event["completion"] = {
+            "completed": session.is_completed,
+            "completed_at": session.updated_at,
+        }
     else:
         event["next_step"] = _compact_summary(
             {
@@ -152,8 +163,7 @@ class KernelExecutor(Protocol):
         action: str | None = None,
         params: dict[str, Any] | None = None,
         agent_id: str = "alpha",
-    ) -> dict[str, Any]:
-        ...
+    ) -> dict[str, Any]: ...
 
 
 EXPERIMENT_WB_ACTIONS: dict[tuple[str, str], tuple[str, str]] = {
@@ -214,7 +224,9 @@ class StepRecord:
             "step_id": self.step_id,
             "user_input": dict(self.user_input),
             "outputs": dict(self.outputs),
-            "calculation_results": [result.to_dict() for result in self.calculation_results],
+            "calculation_results": [
+                result.to_dict() for result in self.calculation_results
+            ],
             "completed": self.completed,
             "submitted_at": self.submitted_at,
         }
@@ -256,7 +268,9 @@ class ExperimentSession:
         session_id: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> "ExperimentSession":
-        selected_protocol = get_protocol(protocol) if isinstance(protocol, str) else protocol
+        selected_protocol = (
+            get_protocol(protocol) if isinstance(protocol, str) else protocol
+        )
         return cls(
             session_id=session_id or f"experiment-{uuid4().hex}",
             protocol=selected_protocol,
@@ -301,7 +315,9 @@ class ExperimentSession:
 
         current_step = self.current_step
         if current_step is None or step_id != current_step.step_id:
-            self._fail(f"expected step {current_step.step_id if current_step else None}, got {step_id}")
+            self._fail(
+                f"expected step {current_step.step_id if current_step else None}, got {step_id}"
+            )
 
         provided_input = dict(user_input or {})
         missing = [
@@ -313,7 +329,9 @@ class ExperimentSession:
             self._fail(f"missing required input fields: {', '.join(missing)}")
 
         normalized_results = [
-            result if isinstance(result, CalculationResult) else CalculationResult.from_dict(result)
+            result
+            if isinstance(result, CalculationResult)
+            else CalculationResult.from_dict(result)
             for result in calculation_results or []
         ]
         record = StepRecord(
@@ -347,12 +365,16 @@ class ExperimentSession:
 
         current_step = self.current_step
         if current_step is None or step_id != current_step.step_id:
-            self._fail(f"expected step {current_step.step_id if current_step else None}, got {step_id}")
+            self._fail(
+                f"expected step {current_step.step_id if current_step else None}, got {step_id}"
+            )
 
         params_by_request = calculation_params or {}
         requests: list[dict[str, Any]] = []
         for calculation_request in current_step.calculation_requests:
-            plugin_action = EXPERIMENT_WB_ACTIONS.get((current_step.step_id, calculation_request.kind))
+            plugin_action = EXPERIMENT_WB_ACTIONS.get(
+                (current_step.step_id, calculation_request.kind)
+            )
             if plugin_action is None:
                 continue
             plugin_name, action = plugin_action
@@ -390,7 +412,8 @@ class ExperimentSession:
 
         status = str(kernel_result.get("status", "plugin_error"))
         calculation = CalculationResult(
-            request_id=request_id or str(kernel_result.get("action") or "plugin_result"),
+            request_id=request_id
+            or str(kernel_result.get("action") or "plugin_result"),
             status="completed" if status == "success" else status,
             value=kernel_result.get("output") if status == "success" else None,
             metadata={
@@ -402,7 +425,11 @@ class ExperimentSession:
             },
         )
         if status != "success":
-            self._fail(str(kernel_result.get("error") or f"plugin calculation failed: {status}"))
+            self._fail(
+                str(
+                    kernel_result.get("error") or f"plugin calculation failed: {status}"
+                )
+            )
         return self.submit_step(
             step_id,
             user_input,
@@ -419,7 +446,9 @@ class ExperimentSession:
         if self.status == ExperimentStatus.ERROR:
             raise ExperimentGuideError(self.error or "experiment is in error state")
         current_step = self.protocol.steps[self.current_step_index]
-        if not self.records.get(current_step.step_id, StepRecord(current_step.step_id)).completed:
+        if not self.records.get(
+            current_step.step_id, StepRecord(current_step.step_id)
+        ).completed:
             self._fail(f"cannot advance before completing step {current_step.step_id}")
         if self.current_step_index >= len(self.protocol.steps) - 1:
             self.status = ExperimentStatus.COMPLETED
@@ -456,7 +485,9 @@ class ExperimentSession:
             session_id=str(data["session_id"]),
             protocol=protocol,
             current_step_index=int(data.get("current_step_index", 0)),
-            status=ExperimentStatus(data.get("status", ExperimentStatus.IN_PROGRESS.value)),
+            status=ExperimentStatus(
+                data.get("status", ExperimentStatus.IN_PROGRESS.value)
+            ),
             records={
                 str(key): StepRecord.from_dict(value)
                 for key, value in data.get("records", {}).items()
@@ -467,7 +498,9 @@ class ExperimentSession:
             metadata=dict(data.get("metadata", {})),
         )
         if not 0 <= session.current_step_index < len(session.protocol.steps):
-            raise ExperimentGuideError("saved experiment session has invalid step index")
+            raise ExperimentGuideError(
+                "saved experiment session has invalid step index"
+            )
         return session
 
     def _fail(self, message: str) -> None:

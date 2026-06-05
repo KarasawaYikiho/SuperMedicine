@@ -1,4 +1,5 @@
 """引用格式化工具函数"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -99,7 +100,9 @@ def validate_source_id(
     )
 
 
-def citation_state_from_validation(result: CitationValidationResult) -> dict[str, object]:
+def citation_state_from_validation(
+    result: CitationValidationResult,
+) -> dict[str, object]:
     """将引用校验结果转为稳定、可观察的状态字典。"""
     return {
         "source_id": result.source_id,

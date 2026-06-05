@@ -6,7 +6,10 @@ import json
 import pytest
 
 from core.paper_import import PaperImporter
-from core.paper_import.errors import MissingPaperSourceError, UnsupportedPaperFormatError
+from core.paper_import.errors import (
+    MissingPaperSourceError,
+    UnsupportedPaperFormatError,
+)
 from core.workspace import WorkspaceManager
 from core.workspace import WorkspaceNotFoundError
 
@@ -42,7 +45,9 @@ def test_import_supports_expected_extensions_and_preserves_source(tmp_path, exte
     result = PaperImporter(manager).import_paper(workspace.id, source)
 
     expected_sha256 = hashlib.sha256(source_content).hexdigest()
-    expected_copy = workspace.path / "papers" / "originals" / f"{expected_sha256}{extension}"
+    expected_copy = (
+        workspace.path / "papers" / "originals" / f"{expected_sha256}{extension}"
+    )
     assert result.metadata.sha256 == expected_sha256
     assert result.metadata.format == extension
     assert result.metadata.stored_path == expected_copy
@@ -71,7 +76,9 @@ def test_import_writes_metadata_json_and_import_log_jsonl(tmp_path):
         metadata=editable_fields,
     )
 
-    metadata_path = workspace.path / "papers" / "metadata" / f"{result.metadata.id}.json"
+    metadata_path = (
+        workspace.path / "papers" / "metadata" / f"{result.metadata.id}.json"
+    )
     import_log_path = workspace.path / "papers" / "imports" / "import-log.jsonl"
     expected_sha256 = hashlib.sha256(source.read_bytes()).hexdigest()
     expected_copy = workspace.path / "papers" / "originals" / f"{expected_sha256}.md"
@@ -98,7 +105,9 @@ def test_import_writes_metadata_json_and_import_log_jsonl(tmp_path):
     assert source.read_text(encoding="utf-8") == source_content
 
 
-def test_import_duplicate_sha256_reuses_existing_original_metadata_and_logs_attempt(tmp_path):
+def test_import_duplicate_sha256_reuses_existing_original_metadata_and_logs_attempt(
+    tmp_path,
+):
     manager = WorkspaceManager(tmp_path)
     workspace = manager.initialize_workspace("duplicate-study")
     source = tmp_path / "paper.md"
@@ -111,12 +120,19 @@ def test_import_duplicate_sha256_reuses_existing_original_metadata_and_logs_atte
         source,
         metadata={"title": "Original curated title", "notes": "Keep this note."},
     )
-    metadata_path = workspace.path / "papers" / "metadata" / f"{first_result.metadata.id}.json"
-    stored_path = workspace.path / "papers" / "originals" / f"{first_result.metadata.sha256}.md"
+    metadata_path = (
+        workspace.path / "papers" / "metadata" / f"{first_result.metadata.id}.json"
+    )
+    stored_path = (
+        workspace.path / "papers" / "originals" / f"{first_result.metadata.sha256}.md"
+    )
     saved_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     saved_metadata["title"] = "User edited title"
     saved_metadata["notes"] = "User edited notes should survive duplicate imports."
-    metadata_path.write_text(json.dumps(saved_metadata, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    metadata_path.write_text(
+        json.dumps(saved_metadata, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+        encoding="utf-8",
+    )
 
     second_result = importer.import_paper(
         workspace.id,
@@ -127,7 +143,11 @@ def test_import_duplicate_sha256_reuses_existing_original_metadata_and_logs_atte
     metadata_files = list((workspace.path / "papers" / "metadata").glob("*.json"))
     original_files = list((workspace.path / "papers" / "originals").glob("*"))
     preserved_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-    log_lines = (workspace.path / "papers" / "imports" / "import-log.jsonl").read_text(encoding="utf-8").splitlines()
+    log_lines = (
+        (workspace.path / "papers" / "imports" / "import-log.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    )
     duplicate_log_record = json.loads(log_lines[-1])
 
     assert first_result.duplicate is False
@@ -137,11 +157,17 @@ def test_import_duplicate_sha256_reuses_existing_original_metadata_and_logs_atte
     assert second_result.metadata.id == first_result.metadata.id
     assert second_result.metadata.sha256 == first_result.metadata.sha256
     assert second_result.metadata.title == "User edited title"
-    assert second_result.metadata.notes == "User edited notes should survive duplicate imports."
+    assert (
+        second_result.metadata.notes
+        == "User edited notes should survive duplicate imports."
+    )
     assert metadata_files == [metadata_path]
     assert original_files == [stored_path]
     assert preserved_metadata["title"] == "User edited title"
-    assert preserved_metadata["notes"] == "User edited notes should survive duplicate imports."
+    assert (
+        preserved_metadata["notes"]
+        == "User edited notes should survive duplicate imports."
+    )
     assert len(log_lines) == 2
     assert duplicate_log_record["paper_id"] == first_result.metadata.id
     assert duplicate_log_record["sha256"] == first_result.metadata.sha256
@@ -149,22 +175,35 @@ def test_import_duplicate_sha256_reuses_existing_original_metadata_and_logs_atte
     assert duplicate_log_record["duplicate_reason"] == "sha256_already_imported"
 
 
-def test_import_duplicate_doi_reuses_existing_metadata_without_copying_new_original(tmp_path):
+def test_import_duplicate_doi_reuses_existing_metadata_without_copying_new_original(
+    tmp_path,
+):
     manager = WorkspaceManager(tmp_path)
     workspace = manager.initialize_workspace("doi-duplicate-study")
     first_source = tmp_path / "first.md"
     second_source = tmp_path / "second.md"
-    first_source.write_text("# First DOI paper\n\nOriginal source bytes.\n", encoding="utf-8")
-    second_source.write_text("# Second DOI paper\n\nDifferent source bytes.\n", encoding="utf-8")
+    first_source.write_text(
+        "# First DOI paper\n\nOriginal source bytes.\n", encoding="utf-8"
+    )
+    second_source.write_text(
+        "# Second DOI paper\n\nDifferent source bytes.\n", encoding="utf-8"
+    )
 
     importer = PaperImporter(manager)
     first_result = importer.import_paper(
         workspace.id,
         first_source,
-        metadata={"title": "Original DOI title", "doi": "  https://doi.org/10.1234/SuperMedicine.DOI  "},
+        metadata={
+            "title": "Original DOI title",
+            "doi": "  https://doi.org/10.1234/SuperMedicine.DOI  ",
+        },
     )
-    metadata_path = workspace.path / "papers" / "metadata" / f"{first_result.metadata.id}.json"
-    stored_path = workspace.path / "papers" / "originals" / f"{first_result.metadata.sha256}.md"
+    metadata_path = (
+        workspace.path / "papers" / "metadata" / f"{first_result.metadata.id}.json"
+    )
+    stored_path = (
+        workspace.path / "papers" / "originals" / f"{first_result.metadata.sha256}.md"
+    )
 
     second_result = importer.import_paper(
         workspace.id,
@@ -174,7 +213,11 @@ def test_import_duplicate_doi_reuses_existing_metadata_without_copying_new_origi
 
     metadata_files = list((workspace.path / "papers" / "metadata").glob("*.json"))
     original_files = list((workspace.path / "papers" / "originals").glob("*"))
-    log_lines = (workspace.path / "papers" / "imports" / "import-log.jsonl").read_text(encoding="utf-8").splitlines()
+    log_lines = (
+        (workspace.path / "papers" / "imports" / "import-log.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    )
     duplicate_log_record = json.loads(log_lines[-1])
 
     assert second_result.duplicate is True
@@ -189,13 +232,19 @@ def test_import_duplicate_doi_reuses_existing_metadata_without_copying_new_origi
     assert duplicate_log_record["duplicate_reason"] == "doi_already_imported"
 
 
-def test_import_duplicate_pmid_reuses_existing_metadata_without_copying_new_original(tmp_path):
+def test_import_duplicate_pmid_reuses_existing_metadata_without_copying_new_original(
+    tmp_path,
+):
     manager = WorkspaceManager(tmp_path)
     workspace = manager.initialize_workspace("pmid-duplicate-study")
     first_source = tmp_path / "first.md"
     second_source = tmp_path / "second.md"
-    first_source.write_text("# First PMID paper\n\nOriginal source bytes.\n", encoding="utf-8")
-    second_source.write_text("# Second PMID paper\n\nDifferent source bytes.\n", encoding="utf-8")
+    first_source.write_text(
+        "# First PMID paper\n\nOriginal source bytes.\n", encoding="utf-8"
+    )
+    second_source.write_text(
+        "# Second PMID paper\n\nDifferent source bytes.\n", encoding="utf-8"
+    )
 
     importer = PaperImporter(manager)
     first_result = importer.import_paper(
@@ -203,8 +252,12 @@ def test_import_duplicate_pmid_reuses_existing_metadata_without_copying_new_orig
         first_source,
         metadata={"title": "Original PMID title", "pmid": " PMID: 12345678 "},
     )
-    metadata_path = workspace.path / "papers" / "metadata" / f"{first_result.metadata.id}.json"
-    stored_path = workspace.path / "papers" / "originals" / f"{first_result.metadata.sha256}.md"
+    metadata_path = (
+        workspace.path / "papers" / "metadata" / f"{first_result.metadata.id}.json"
+    )
+    stored_path = (
+        workspace.path / "papers" / "originals" / f"{first_result.metadata.sha256}.md"
+    )
 
     second_result = importer.import_paper(
         workspace.id,
@@ -214,7 +267,11 @@ def test_import_duplicate_pmid_reuses_existing_metadata_without_copying_new_orig
 
     metadata_files = list((workspace.path / "papers" / "metadata").glob("*.json"))
     original_files = list((workspace.path / "papers" / "originals").glob("*"))
-    log_lines = (workspace.path / "papers" / "imports" / "import-log.jsonl").read_text(encoding="utf-8").splitlines()
+    log_lines = (
+        (workspace.path / "papers" / "imports" / "import-log.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    )
     duplicate_log_record = json.loads(log_lines[-1])
 
     assert second_result.duplicate is True
@@ -260,10 +317,14 @@ def test_import_rejects_missing_source_without_partial_writes(tmp_path):
     assert not any((workspace.path / "papers" / "imports").iterdir())
 
 
-def test_import_propagates_missing_workspace_without_creating_workspace_or_partial_writes(tmp_path):
+def test_import_propagates_missing_workspace_without_creating_workspace_or_partial_writes(
+    tmp_path,
+):
     manager = WorkspaceManager(tmp_path)
     source = tmp_path / "paper.md"
-    source.write_text("# Existing source\n\nDo not create a workspace implicitly.\n", encoding="utf-8")
+    source.write_text(
+        "# Existing source\n\nDo not create a workspace implicitly.\n", encoding="utf-8"
+    )
     missing_workspace_path = manager.workspace_path("missing-workspace-study")
 
     with pytest.raises(WorkspaceNotFoundError):

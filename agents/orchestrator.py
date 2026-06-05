@@ -1,4 +1,5 @@
 """Orchestrator"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -8,10 +9,17 @@ from .base_agent import BaseAgent
 from .checkpoint import CheckpointManager
 from .state_machine import StateMachine, TaskState
 
+
 class Orchestrator:
-    def __init__(self, checkpoint_manager: CheckpointManager | None = None, checkpoint_dir: Path | None = None):
+    def __init__(
+        self,
+        checkpoint_manager: CheckpointManager | None = None,
+        checkpoint_dir: Path | None = None,
+    ):
         self._agents: dict[str, BaseAgent] = {}
-        self._checkpoint_manager = checkpoint_manager or CheckpointManager(checkpoint_dir or Path(".supermedicine") / "checkpoints")
+        self._checkpoint_manager = checkpoint_manager or CheckpointManager(
+            checkpoint_dir or Path(".supermedicine") / "checkpoints"
+        )
         self._task_steps: dict[str, int] = {}
         self._task_states: dict[str, StateMachine] = {}
 
@@ -21,12 +29,18 @@ class Orchestrator:
 
     def register_agent(self, agent: BaseAgent) -> None:
         self._agents[agent.agent_id] = agent
+
     def get_agent(self, agent_id: str) -> BaseAgent | None:
         return self._agents.get(agent_id)
+
     def list_agents(self) -> list[BaseAgent]:
         return list(self._agents.values())
+
     def describe(self) -> dict[str, Any]:
-        return {"agents": [agent.describe_state() for agent in self.list_agents()], "checkpoint_dir": str(self._checkpoint_manager.base_dir)}
+        return {
+            "agents": [agent.describe_state() for agent in self.list_agents()],
+            "checkpoint_dir": str(self._checkpoint_manager.base_dir),
+        }
 
     def _next_step(self, task_id: str) -> int:
         current = self._task_steps.get(task_id)
@@ -65,17 +79,33 @@ class Orchestrator:
         )
 
     def dispatch(self, agent_id: str, task: dict[str, Any]) -> dict[str, Any]:
-        task_id = str(task.get("task_id") or task.get("id") or f"task-{len(self._task_states) + 1}")
+        task_id = str(
+            task.get("task_id")
+            or task.get("id")
+            or f"task-{len(self._task_states) + 1}"
+        )
         machine = self._task_states.get(task_id) or StateMachine(task_id=task_id)
         self._task_states[task_id] = machine
         if machine.state == TaskState.PLANNING:
-            machine.transition(TaskState.DISPATCH, status="agent_selected", details={"agent_id": agent_id})
-        self._save_stage(task_id=task_id, agent_id=agent_id, machine=machine, state=machine.state, task=task)
+            machine.transition(
+                TaskState.DISPATCH,
+                status="agent_selected",
+                details={"agent_id": agent_id},
+            )
+        self._save_stage(
+            task_id=task_id,
+            agent_id=agent_id,
+            machine=machine,
+            state=machine.state,
+            task=task,
+        )
 
         agent = self._agents.get(agent_id)
         if agent is None:
             machine.transition(TaskState.RUNNING, status="agent_lookup")
-            machine.transition(TaskState.FAILED, status="unknown_agent", details={"agent_id": agent_id})
+            machine.transition(
+                TaskState.FAILED, status="unknown_agent", details={"agent_id": agent_id}
+            )
             self._save_stage(
                 task_id=task_id,
                 agent_id=agent_id,
@@ -88,19 +118,49 @@ class Orchestrator:
             )
             raise KeyError(f"Unknown agent: {agent_id}")
         try:
-            machine.transition(TaskState.RUNNING, status="agent_executing", details={"agent_id": agent_id})
-            self._save_stage(task_id=task_id, agent_id=agent_id, machine=machine, state=machine.state, task=task)
+            machine.transition(
+                TaskState.RUNNING,
+                status="agent_executing",
+                details={"agent_id": agent_id},
+            )
+            self._save_stage(
+                task_id=task_id,
+                agent_id=agent_id,
+                machine=machine,
+                state=machine.state,
+                task=task,
+            )
             result = agent.execute(task)
-            machine.transition(TaskState.VERIFYING, status="agent_completed", details={"agent_id": agent_id})
-            machine.transition(TaskState.COMPLETED, status="dispatch_completed", details={"agent_id": agent_id})
-            self._save_stage(task_id=task_id, agent_id=agent_id, machine=machine, state=TaskState.COMPLETED, task=task, result=result, recoverable=False)
+            machine.transition(
+                TaskState.VERIFYING,
+                status="agent_completed",
+                details={"agent_id": agent_id},
+            )
+            machine.transition(
+                TaskState.COMPLETED,
+                status="dispatch_completed",
+                details={"agent_id": agent_id},
+            )
+            self._save_stage(
+                task_id=task_id,
+                agent_id=agent_id,
+                machine=machine,
+                state=TaskState.COMPLETED,
+                task=task,
+                result=result,
+                recoverable=False,
+            )
             result.setdefault("task_id", task_id)
             result.setdefault("agent_id", agent_id)
             result.setdefault("state", TaskState.COMPLETED.value)
             return result
         except Exception as exc:
             if machine.state == TaskState.RUNNING:
-                machine.transition(TaskState.FAILED, status="agent_error", details={"agent_id": agent_id})
+                machine.transition(
+                    TaskState.FAILED,
+                    status="agent_error",
+                    details={"agent_id": agent_id},
+                )
             self._save_stage(
                 task_id=task_id,
                 agent_id=agent_id,

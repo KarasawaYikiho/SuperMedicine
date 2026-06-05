@@ -3,6 +3,7 @@
 Interface boundary: deterministic test fixture path only. This implementation is
 not a production-grade, clinical-grade, or regulatory survival analysis engine.
 """
+
 from __future__ import annotations
 
 import math
@@ -12,6 +13,7 @@ from dataclasses import dataclass
 @dataclass
 class LogRankResult:
     """Log-Rank 检验结果"""
+
     statistic: float
     p_value: float
     df: int
@@ -69,7 +71,7 @@ def logrank_test(
         if n > 0:
             # 期望事件数
             e1 = d * at_risk1 / n
-            o_minus_e += (d1 - e1)
+            o_minus_e += d1 - e1
 
             # 方差
             if n > 1:
@@ -79,12 +81,12 @@ def logrank_test(
         censored1 = sum(1 for ti, ei in zip(times1, events1) if ti == t and ei == 0)
         censored2 = sum(1 for ti, ei in zip(times2, events2) if ti == t and ei == 0)
 
-        at_risk1 -= (d1 + censored1)
-        at_risk2 -= (d2 + censored2)
+        at_risk1 -= d1 + censored1
+        at_risk2 -= d2 + censored2
 
     # 卡方统计量
     if variance > 0:
-        chi2 = o_minus_e ** 2 / variance
+        chi2 = o_minus_e**2 / variance
     else:
         chi2 = 0.0
 
@@ -93,6 +95,7 @@ def logrank_test(
 
     # 计算中位生存时间
     from .kaplan_meier import kaplan_meier
+
     km1 = kaplan_meier(times1, events1)
     km2 = kaplan_meier(times2, events2)
 

@@ -5,6 +5,7 @@ The plugin exposes deterministic bench-calculation helpers through the standard
 only arithmetic and input validation; it does not provide clinical advice or
 replace local laboratory SOP review.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -32,12 +33,25 @@ ACTION_CONTRACTS: dict[str, dict[str, Any]] = {
             "concentration_unit": "ug_per_ul|mg_per_ml",
             "volume_unit": "ul",
         },
-        "output_fields": ["samples", "target_protein_amount", "final_well_volume", "volume_unit"],
+        "output_fields": [
+            "samples",
+            "target_protein_amount",
+            "final_well_volume",
+            "volume_unit",
+        ],
     },
     "experiment.wb.antibody_dilution": {
-        "required_params": {"total_volume": "number", "dilution_ratio": "number|str 1:N"},
+        "required_params": {
+            "total_volume": "number",
+            "dilution_ratio": "number|str 1:N",
+        },
         "optional_params": {"antibody_name": "str", "volume_unit": "ul"},
-        "output_fields": ["antibody_volume", "diluent_volume", "total_volume", "dilution_ratio"],
+        "output_fields": [
+            "antibody_volume",
+            "diluent_volume",
+            "total_volume",
+            "dilution_ratio",
+        ],
     },
 }
 
@@ -71,10 +85,16 @@ def normalize_loading(
             raise ValueError(f"samples[{index}] must be a dictionary")
         name = sample.get("name", f"sample-{index + 1}")
         if not isinstance(name, str) or not name.strip():
-            raise ValueError(f"samples[{index}].name must be a non-empty string when provided")
-        concentration = _positive_float(sample.get("concentration"), f"samples[{index}].concentration")
+            raise ValueError(
+                f"samples[{index}].name must be a non-empty string when provided"
+            )
+        concentration = _positive_float(
+            sample.get("concentration"), f"samples[{index}].concentration"
+        )
         sample_volume = target_protein_amount / concentration
-        violates_max_sample_volume = max_sample_volume is not None and sample_volume > max_sample_volume
+        violates_max_sample_volume = (
+            max_sample_volume is not None and sample_volume > max_sample_volume
+        )
         if final_well_volume is not None:
             diluent_volume = final_well_volume - sample_volume
             below_final_volume = diluent_volume < 0
@@ -90,10 +110,15 @@ def normalize_loading(
                 "protein_amount_unit": "ug",
                 "sample_volume": _round(sample_volume),
                 "diluent_volume": _round(diluent_volume),
-                "final_well_volume": _round(final_well_volume) if final_well_volume is not None else _round(sample_volume),
+                "final_well_volume": _round(final_well_volume)
+                if final_well_volume is not None
+                else _round(sample_volume),
                 "volume_unit": volume_unit,
-                "within_limits": not violates_max_sample_volume and not below_final_volume,
-                "warnings": _normalization_warnings(violates_max_sample_volume, below_final_volume),
+                "within_limits": not violates_max_sample_volume
+                and not below_final_volume,
+                "warnings": _normalization_warnings(
+                    violates_max_sample_volume, below_final_volume
+                ),
             }
         )
 
@@ -101,8 +126,12 @@ def normalize_loading(
         "samples": rows,
         "target_protein_amount": _round(target_protein_amount),
         "protein_amount_unit": "ug",
-        "final_well_volume": _round(final_well_volume) if final_well_volume is not None else None,
-        "max_sample_volume": _round(max_sample_volume) if max_sample_volume is not None else None,
+        "final_well_volume": _round(final_well_volume)
+        if final_well_volume is not None
+        else None,
+        "max_sample_volume": _round(max_sample_volume)
+        if max_sample_volume is not None
+        else None,
         "volume_unit": volume_unit,
         "concentration_unit": concentration_unit,
     }
@@ -147,9 +176,15 @@ def execute(
         if action == "experiment.wb.normalize_loading":
             output = normalize_loading(
                 _required_samples(params),
-                _positive_float(params.get("target_protein_amount"), "target_protein_amount"),
-                final_well_volume=_optional_positive_float(params.get("final_well_volume"), "final_well_volume"),
-                max_sample_volume=_optional_positive_float(params.get("max_sample_volume"), "max_sample_volume"),
+                _positive_float(
+                    params.get("target_protein_amount"), "target_protein_amount"
+                ),
+                final_well_volume=_optional_positive_float(
+                    params.get("final_well_volume"), "final_well_volume"
+                ),
+                max_sample_volume=_optional_positive_float(
+                    params.get("max_sample_volume"), "max_sample_volume"
+                ),
                 concentration_unit=str(params.get("concentration_unit", "ug_per_ul")),
                 volume_unit=str(params.get("volume_unit", "ul")),
             )
@@ -157,7 +192,9 @@ def execute(
             output = antibody_dilution(
                 _positive_float(params.get("total_volume"), "total_volume"),
                 _dilution_ratio(params.get("dilution_ratio")),
-                antibody_name=_optional_str(params.get("antibody_name"), "antibody_name"),
+                antibody_name=_optional_str(
+                    params.get("antibody_name"), "antibody_name"
+                ),
                 volume_unit=str(params.get("volume_unit", "ul")),
             )
         else:
@@ -189,9 +226,20 @@ def execute(
 def _base_metadata(context: dict[str, Any]) -> dict[str, Any]:
     return {
         "medical_boundary": MEDICAL_BOUNDARY,
-        "resource": {"kind": "experiment_calculation", "plugin": PLUGIN_NAME, "experiment": "western_blot"},
-        "contract": {"actions": ACTION_CONTRACTS, "calculation_scope": "deterministic_arithmetic"},
-        "audit": {"interface_only": True, "deterministic_calculation": True, "context_keys": sorted(context.keys())},
+        "resource": {
+            "kind": "experiment_calculation",
+            "plugin": PLUGIN_NAME,
+            "experiment": "western_blot",
+        },
+        "contract": {
+            "actions": ACTION_CONTRACTS,
+            "calculation_scope": "deterministic_arithmetic",
+        },
+        "audit": {
+            "interface_only": True,
+            "deterministic_calculation": True,
+            "context_keys": sorted(context.keys()),
+        },
     }
 
 
@@ -240,12 +288,24 @@ def _dilution_ratio(value: Any) -> float:
     return _positive_float(value, "dilution_ratio")
 
 
-def _normalization_warnings(violates_max_sample_volume: bool, below_final_volume: bool) -> list[dict[str, str]]:
+def _normalization_warnings(
+    violates_max_sample_volume: bool, below_final_volume: bool
+) -> list[dict[str, str]]:
     warnings: list[dict[str, str]] = []
     if violates_max_sample_volume:
-        warnings.append({"code": "sample_volume_exceeds_max", "message": "Calculated sample volume exceeds max_sample_volume."})
+        warnings.append(
+            {
+                "code": "sample_volume_exceeds_max",
+                "message": "Calculated sample volume exceeds max_sample_volume.",
+            }
+        )
     if below_final_volume:
-        warnings.append({"code": "sample_volume_exceeds_final", "message": "Calculated sample volume exceeds final_well_volume."})
+        warnings.append(
+            {
+                "code": "sample_volume_exceeds_final",
+                "message": "Calculated sample volume exceeds final_well_volume.",
+            }
+        )
     return warnings
 
 

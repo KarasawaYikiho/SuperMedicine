@@ -1,4 +1,5 @@
 """HTTP clients for unified LLM provider configs."""
+
 from __future__ import annotations
 
 import json
@@ -9,7 +10,11 @@ import urllib.request
 from typing import Any, Iterable
 
 from core.llm_client import LLMClient
-from core.llm_providers.config import LLMProviderConfig, sanitize_error_message, sanitized_headers
+from core.llm_providers.config import (
+    LLMProviderConfig,
+    sanitize_error_message,
+    sanitized_headers,
+)
 from core.redaction import redact_sensitive
 
 
@@ -37,8 +42,14 @@ class ConfiguredLLMClient(LLMClient):
             return validation_error
 
         if not self._valid_messages(messages):
-            logger.warning("LLM request rejected because messages are empty or malformed: provider=%s", self.config.provider)
-            return self.config.error("invalid_request", "LLM request requires at least one non-empty message with role and content")
+            logger.warning(
+                "LLM request rejected because messages are empty or malformed: provider=%s",
+                self.config.provider,
+            )
+            return self.config.error(
+                "invalid_request",
+                "LLM request requires at least one non-empty message with role and content",
+            )
 
         api_format = kwargs.pop("api_format", self.config.api_format).lower()
         if api_format == "anthropic":
@@ -50,7 +61,9 @@ class ConfiguredLLMClient(LLMClient):
     def complete(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
         return self.chat([{"role": "user", "content": prompt}], **kwargs)
 
-    def _openai_request(self, messages: list[dict[str, str]], **kwargs: Any) -> dict[str, Any]:
+    def _openai_request(
+        self, messages: list[dict[str, str]], **kwargs: Any
+    ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "model": self.config.model,
             "messages": messages,
@@ -58,7 +71,14 @@ class ConfiguredLLMClient(LLMClient):
         self._copy_options(
             payload,
             kwargs,
-            allowed=("temperature", "max_tokens", "top_p", "frequency_penalty", "presence_penalty", "stop"),
+            allowed=(
+                "temperature",
+                "max_tokens",
+                "top_p",
+                "frequency_penalty",
+                "presence_penalty",
+                "stop",
+            ),
             defaults={"temperature": 0.7, "max_tokens": 1024},
         )
         headers = {
@@ -71,7 +91,9 @@ class ConfiguredLLMClient(LLMClient):
             return response
         return self._parse_openai_chat_response(response)
 
-    def _openai_responses_request(self, messages: list[dict[str, str]], **kwargs: Any) -> dict[str, Any]:
+    def _openai_responses_request(
+        self, messages: list[dict[str, str]], **kwargs: Any
+    ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "model": self.config.model,
             "input": self._openai_responses_input(messages),
@@ -83,7 +105,10 @@ class ConfiguredLLMClient(LLMClient):
             payload,
             kwargs,
             allowed=("temperature", "max_output_tokens", "top_p", "truncation"),
-            defaults={"temperature": 0.7, "max_output_tokens": kwargs.get("max_tokens", 1024)},
+            defaults={
+                "temperature": 0.7,
+                "max_output_tokens": kwargs.get("max_tokens", 1024),
+            },
         )
         headers = {
             "Authorization": f"Bearer {self.config.api_key}",
@@ -99,16 +124,24 @@ class ConfiguredLLMClient(LLMClient):
         choices = response.get("choices") or [{}]
         choice = choices[0] if isinstance(choices, list) and choices else {}
         message = choice.get("message", {}) if isinstance(choice, dict) else {}
-        content = self._content_to_text(message.get("content", "")) if isinstance(message, dict) else ""
+        content = (
+            self._content_to_text(message.get("content", ""))
+            if isinstance(message, dict)
+            else ""
+        )
         if not content:
-            return self._invalid_response("OpenAI chat response did not contain message.content", response)
+            return self._invalid_response(
+                "OpenAI chat response did not contain message.content", response
+            )
         return {
             "content": content,
             "model": response.get("model", self.config.model),
             "usage": response.get("usage", {}),
         }
 
-    def _parse_openai_responses_response(self, response: dict[str, Any]) -> dict[str, Any]:
+    def _parse_openai_responses_response(
+        self, response: dict[str, Any]
+    ) -> dict[str, Any]:
         content = response.get("output_text")
         if not content:
             parts: list[str] = []
@@ -117,17 +150,23 @@ class ConfiguredLLMClient(LLMClient):
                     continue
                 for block in item.get("content", []) or []:
                     if isinstance(block, dict):
-                        parts.append(str(block.get("text") or block.get("content") or ""))
+                        parts.append(
+                            str(block.get("text") or block.get("content") or "")
+                        )
             content = "".join(parts)
         if not content:
-            return self._invalid_response("OpenAI responses response did not contain output text", response)
+            return self._invalid_response(
+                "OpenAI responses response did not contain output text", response
+            )
         return {
             "content": str(content or ""),
             "model": response.get("model", self.config.model),
             "usage": response.get("usage", {}),
         }
 
-    def _anthropic_request(self, messages: list[dict[str, str]], **kwargs: Any) -> dict[str, Any]:
+    def _anthropic_request(
+        self, messages: list[dict[str, str]], **kwargs: Any
+    ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "model": self.config.model,
             "max_tokens": kwargs.get("max_tokens", 1024),
@@ -152,14 +191,18 @@ class ConfiguredLLMClient(LLMClient):
             return response
         content = self._content_to_text(response.get("content", []))
         if not content:
-            return self._invalid_response("Anthropic response did not contain text content", response)
+            return self._invalid_response(
+                "Anthropic response did not contain text content", response
+            )
         return {
             "content": content,
             "model": response.get("model", self.config.model),
             "usage": response.get("usage", {}),
         }
 
-    def _post_json(self, path: str, payload: dict[str, Any], headers: dict[str, str]) -> dict[str, Any]:
+    def _post_json(
+        self, path: str, payload: dict[str, Any], headers: dict[str, str]
+    ) -> dict[str, Any]:
         url = self.config.base_url.rstrip("/") + path
         safe_url = redact_sensitive(url)
         logger.info(
@@ -179,25 +222,64 @@ class ConfiguredLLMClient(LLMClient):
                 raw = resp.read().decode("utf-8")
                 parsed = json.loads(raw)
                 if not isinstance(parsed, dict):
-                    logger.error("LLM provider returned non-object JSON: provider=%s", self.config.provider)
-                    return self.config.error("invalid_response", "LLM provider returned non-object JSON response")
-                logger.info("LLM request completed: provider=%s model=%s", self.config.provider, parsed.get("model", self.config.model))
+                    logger.error(
+                        "LLM provider returned non-object JSON: provider=%s",
+                        self.config.provider,
+                    )
+                    return self.config.error(
+                        "invalid_response",
+                        "LLM provider returned non-object JSON response",
+                    )
+                logger.info(
+                    "LLM request completed: provider=%s model=%s",
+                    self.config.provider,
+                    parsed.get("model", self.config.model),
+                )
                 return parsed
         except urllib.error.HTTPError as exc:
             return self._http_error(exc)
         except socket.timeout as exc:
-            logger.error("LLM request timed out: provider=%s url=%s timeout=%s", self.config.provider, safe_url, self.config.timeout)
-            return self.config.error("timeout", f"LLM provider request timed out after {self.config.timeout} seconds: {exc}")
+            logger.error(
+                "LLM request timed out: provider=%s url=%s timeout=%s",
+                self.config.provider,
+                safe_url,
+                self.config.timeout,
+            )
+            return self.config.error(
+                "timeout",
+                f"LLM provider request timed out after {self.config.timeout} seconds: {exc}",
+            )
         except urllib.error.URLError as exc:
-            reason = sanitize_error_message(str(getattr(exc, "reason", exc)), [self.config.api_key])
-            logger.error("LLM network failure: provider=%s url=%s error=%s", self.config.provider, safe_url, reason)
-            return self.config.error("network_error", f"LLM provider network failure: {reason}")
+            reason = sanitize_error_message(
+                str(getattr(exc, "reason", exc)), [self.config.api_key]
+            )
+            logger.error(
+                "LLM network failure: provider=%s url=%s error=%s",
+                self.config.provider,
+                safe_url,
+                reason,
+            )
+            return self.config.error(
+                "network_error", f"LLM provider network failure: {reason}"
+            )
         except json.JSONDecodeError as exc:
-            logger.error("LLM provider returned invalid JSON: provider=%s url=%s error=%s", self.config.provider, safe_url, exc)
-            return self.config.error("invalid_response", f"LLM provider returned invalid JSON: {exc}")
+            logger.error(
+                "LLM provider returned invalid JSON: provider=%s url=%s error=%s",
+                self.config.provider,
+                safe_url,
+                exc,
+            )
+            return self.config.error(
+                "invalid_response", f"LLM provider returned invalid JSON: {exc}"
+            )
         except Exception as exc:
             message = sanitize_error_message(str(exc), [self.config.api_key])
-            logger.error("LLM request failed: provider=%s url=%s error=%s", self.config.provider, safe_url, message)
+            logger.error(
+                "LLM request failed: provider=%s url=%s error=%s",
+                self.config.provider,
+                safe_url,
+                message,
+            )
             return self.config.error("request_error", message)
 
     def _http_error(self, exc: urllib.error.HTTPError) -> dict[str, Any]:
@@ -209,12 +291,21 @@ class ConfiguredLLMClient(LLMClient):
         except Exception:
             details = ""
         reason = details or getattr(exc, "reason", "") or "HTTP error"
-        message = sanitize_error_message(f"HTTP {exc.code}: {reason}", [self.config.api_key])
+        message = sanitize_error_message(
+            f"HTTP {exc.code}: {reason}", [self.config.api_key]
+        )
         code = "authentication_failed" if exc.code in (401, 403) else "http_error"
-        logger.error("LLM HTTP failure: provider=%s status=%s error=%s", self.config.provider, exc.code, message)
+        logger.error(
+            "LLM HTTP failure: provider=%s status=%s error=%s",
+            self.config.provider,
+            exc.code,
+            message,
+        )
         return self.config.error(code, message)
 
-    def _invalid_response(self, message: str, response: dict[str, Any]) -> dict[str, Any]:
+    def _invalid_response(
+        self, message: str, response: dict[str, Any]
+    ) -> dict[str, Any]:
         logger.error(
             "LLM response parsing failed: provider=%s model=%s reason=%s keys=%s",
             self.config.provider,
@@ -268,7 +359,11 @@ class ConfiguredLLMClient(LLMClient):
 
     @staticmethod
     def _combined_system_prompt(messages: list[dict[str, str]]) -> str:
-        return "\n\n".join(str(message.get("content", "")) for message in messages if message.get("role") == "system")
+        return "\n\n".join(
+            str(message.get("content", ""))
+            for message in messages
+            if message.get("role") == "system"
+        )
 
     @staticmethod
     def _anthropic_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
@@ -283,7 +378,12 @@ class ConfiguredLLMClient(LLMClient):
         if isinstance(parsed, dict):
             error = parsed.get("error")
             if isinstance(error, dict):
-                return str(error.get("message") or error.get("error") or error.get("type") or "")
+                return str(
+                    error.get("message")
+                    or error.get("error")
+                    or error.get("type")
+                    or ""
+                )
             if isinstance(error, str):
                 return error
             return str(parsed.get("message") or parsed.get("detail") or "")

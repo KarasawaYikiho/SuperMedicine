@@ -1,4 +1,5 @@
 """Harness 监控器测试"""
+
 from __future__ import annotations
 
 import json
@@ -28,11 +29,28 @@ class TestAgentMonitor:
         """按 agent_id 过滤正确"""
         audit_path = tmp_path / "audit.jsonl"
         entries = [
-            {"agent_id": "alpha", "action": "read", "result": "ALLOWED", "timestamp": "2024-01-01T00:00:00Z"},
-            {"agent_id": "alpha", "action": "write", "result": "DENIED", "timestamp": "2024-01-01T00:01:00Z"},
-            {"agent_id": "beta", "action": "read", "result": "ALLOWED", "timestamp": "2024-01-01T00:02:00Z"},
+            {
+                "agent_id": "alpha",
+                "action": "read",
+                "result": "ALLOWED",
+                "timestamp": "2024-01-01T00:00:00Z",
+            },
+            {
+                "agent_id": "alpha",
+                "action": "write",
+                "result": "DENIED",
+                "timestamp": "2024-01-01T00:01:00Z",
+            },
+            {
+                "agent_id": "beta",
+                "action": "read",
+                "result": "ALLOWED",
+                "timestamp": "2024-01-01T00:02:00Z",
+            },
         ]
-        audit_path.write_text("\n".join(json.dumps(e) for e in entries) + "\n", encoding="utf-8")
+        audit_path.write_text(
+            "\n".join(json.dumps(e) for e in entries) + "\n", encoding="utf-8"
+        )
 
         monitor = AgentMonitor(audit_log_path=audit_path)
 
@@ -58,17 +76,37 @@ class TestAgentMonitor:
 
         assert len(entries) == 1
         assert entries[0]["agent_id"] == "alpha"
-        assert [warning["code"] for warning in monitor.warnings] == ["malformed_json", "non_object_json"]
+        assert [warning["code"] for warning in monitor.warnings] == [
+            "malformed_json",
+            "non_object_json",
+        ]
 
     def test_get_denied_actions(self, tmp_path):
         """过滤出 DENIED 条目"""
         audit_path = tmp_path / "audit.jsonl"
         entries = [
-            {"agent_id": "alpha", "action": "read", "result": "ALLOWED", "timestamp": "2024-01-01T00:00:00Z"},
-            {"agent_id": "alpha", "action": "write", "result": "DENIED", "timestamp": "2024-01-01T00:01:00Z"},
-            {"agent_id": "beta", "action": "delete", "result": "DENIED", "timestamp": "2024-01-01T00:02:00Z"},
+            {
+                "agent_id": "alpha",
+                "action": "read",
+                "result": "ALLOWED",
+                "timestamp": "2024-01-01T00:00:00Z",
+            },
+            {
+                "agent_id": "alpha",
+                "action": "write",
+                "result": "DENIED",
+                "timestamp": "2024-01-01T00:01:00Z",
+            },
+            {
+                "agent_id": "beta",
+                "action": "delete",
+                "result": "DENIED",
+                "timestamp": "2024-01-01T00:02:00Z",
+            },
         ]
-        audit_path.write_text("\n".join(json.dumps(e) for e in entries) + "\n", encoding="utf-8")
+        audit_path.write_text(
+            "\n".join(json.dumps(e) for e in entries) + "\n", encoding="utf-8"
+        )
 
         monitor = AgentMonitor(audit_log_path=audit_path)
         denied = monitor.get_denied_actions()
@@ -80,10 +118,17 @@ class TestAgentMonitor:
         audit_path = tmp_path / "audit.jsonl"
         # 创建 150 条来自 Alpha 的日志
         entries = [
-            {"agent_id": "alpha", "action": "read", "result": "ALLOWED", "timestamp": f"2024-01-01T00:{i:02d}:00Z"}
+            {
+                "agent_id": "alpha",
+                "action": "read",
+                "result": "ALLOWED",
+                "timestamp": f"2024-01-01T00:{i:02d}:00Z",
+            }
             for i in range(150)
         ]
-        audit_path.write_text("\n".join(json.dumps(e) for e in entries) + "\n", encoding="utf-8")
+        audit_path.write_text(
+            "\n".join(json.dumps(e) for e in entries) + "\n", encoding="utf-8"
+        )
 
         monitor = AgentMonitor(audit_log_path=audit_path)
         anomalies = monitor.detect_anomalies()
@@ -114,10 +159,19 @@ class TestAgentPerformanceMonitor:
     def test_get_stats_skips_malformed_and_invalid_jsonl_with_warnings(self, tmp_path):
         """Malformed performance JSONL lines are observable and do not crash stats."""
         log_path = tmp_path / "perf.jsonl"
-        valid = {"agent_id": "alpha", "task_id": "task-1", "duration_ms": 150.0, "success": True, "retries": 1}
+        valid = {
+            "agent_id": "alpha",
+            "task_id": "task-1",
+            "duration_ms": 150.0,
+            "success": True,
+            "retries": 1,
+        }
         missing = {"agent_id": "beta", "duration_ms": 100.0, "success": False}
         log_path.write_text(
-            "\n".join([json.dumps(valid), "{not-json", json.dumps([]), json.dumps(missing)]) + "\n",
+            "\n".join(
+                [json.dumps(valid), "{not-json", json.dumps([]), json.dumps(missing)]
+            )
+            + "\n",
             encoding="utf-8",
         )
 
@@ -126,7 +180,11 @@ class TestAgentPerformanceMonitor:
 
         assert stats["alpha"]["total"] == 1
         assert "beta" not in stats
-        assert {warning["code"] for warning in monitor.warnings} == {"malformed_json", "non_object_json", "missing_fields"}
+        assert {warning["code"] for warning in monitor.warnings} == {
+            "malformed_json",
+            "non_object_json",
+            "missing_fields",
+        }
 
     def test_detect_failure_patterns(self, tmp_path):
         """验证失败模式检测"""

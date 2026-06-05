@@ -1,4 +1,4 @@
-﻿"""Workspace management view for SuperMedicine TUI."""
+"""Workspace management view for SuperMedicine TUI."""
 
 from __future__ import annotations
 
@@ -23,18 +23,34 @@ class WorkspaceView(Vertical):
 
     def compose(self) -> ComposeResult:
         yield Static(t("workspace_title"), classes="section-title")
-        yield Static(t("workspace_manual_create_hint"), id="workspace-create-hint", classes="hint")
-        yield Static(t("workspace_action_hint"), id="workspace-action-hint", classes="hint")
+        yield Static(
+            t("workspace_manual_create_hint"),
+            id="workspace-create-hint",
+            classes="hint",
+        )
+        yield Static(
+            t("workspace_action_hint"), id="workspace-action-hint", classes="hint"
+        )
         yield DataTable(id="workspace-table", cursor_type="row")
         with Horizontal(classes="form-row"):
             yield Input(
                 placeholder=t("workspace_create_placeholder"),
                 id="workspace-id-input",
             )
-            yield Button(t("workspace_create"), id="workspace-create", classes="btn btn-primary")
-            yield Button(t("workspace_select"), id="workspace-select", classes="btn btn-secondary")
-            yield Button(t("refresh"), id="workspace-refresh", classes="btn btn-secondary")
-            yield Button(t("workspace_delete"), id="workspace-delete", classes="btn btn-danger")
+            yield Button(
+                t("workspace_create"), id="workspace-create", classes="btn btn-primary"
+            )
+            yield Button(
+                t("workspace_select"),
+                id="workspace-select",
+                classes="btn btn-secondary",
+            )
+            yield Button(
+                t("refresh"), id="workspace-refresh", classes="btn btn-secondary"
+            )
+            yield Button(
+                t("workspace_delete"), id="workspace-delete", classes="btn btn-danger"
+            )
         yield Static("", id="workspace-status")
 
     def on_mount(self) -> None:
@@ -59,7 +75,9 @@ class WorkspaceView(Vertical):
 
         return WorkspaceScreenController(project_root=self._project_root)
 
-    def _load_workspaces(self, *, preserve_status: bool = False, refreshed: bool = False) -> None:
+    def _load_workspaces(
+        self, *, preserve_status: bool = False, refreshed: bool = False
+    ) -> None:
         table = self.query_one("#workspace-table", DataTable)
         selected_key = self._selected_workspace_id()
         table.clear(columns=True)
@@ -69,7 +87,11 @@ class WorkspaceView(Vertical):
         try:
             workspaces = controller.list_workspaces()
             if not workspaces:
-                self._set_status(f"{t('workspace_refreshed')}：{t('workspace_no_workspaces')}" if refreshed else t("workspace_no_workspaces"))
+                self._set_status(
+                    f"{t('workspace_refreshed')}：{t('workspace_no_workspaces')}"
+                    if refreshed
+                    else t("workspace_no_workspaces")
+                )
                 return
             for ws in workspaces:
                 metadata = ws.get("metadata", {})
@@ -78,7 +100,11 @@ class WorkspaceView(Vertical):
             if selected_key is not None:
                 self._select_table_row(selected_key)
             if not preserve_status:
-                self._set_status(f"{t('workspace_refreshed')}: {len(workspaces)}" if refreshed else f"{t('workspace_list')}: {len(workspaces)}")
+                self._set_status(
+                    f"{t('workspace_refreshed')}: {len(workspaces)}"
+                    if refreshed
+                    else f"{t('workspace_list')}: {len(workspaces)}"
+                )
         except Exception as e:
             self._set_error(e)
 
@@ -89,7 +115,9 @@ class WorkspaceView(Vertical):
         apply_status_style(status, safe_message)
 
     def _set_error(self, error: Exception) -> None:
-        message = f"{t('error')}: {tui_redact_sensitive(str(error)) or t('safe_error_hint')}"
+        message = (
+            f"{t('error')}: {tui_redact_sensitive(str(error)) or t('safe_error_hint')}"
+        )
         self._set_status(message)
         self.app.notify(message, severity="error")
 
@@ -178,13 +206,15 @@ class WorkspaceView(Vertical):
                 f"请在输入框手动输入 {confirm_prefix}<workspace-id> 后再删除"
             )
             return
-        confirmed_workspace_id = workspace_id[len(confirm_prefix):].strip()
+        confirmed_workspace_id = workspace_id[len(confirm_prefix) :].strip()
         if not confirmed_workspace_id:
             self._set_status(f"{t('error')}: {t('workspace_delete_requires_confirm')}")
             return
         controller = self._get_controller()
         try:
-            result = controller.delete_workspace(confirmed_workspace_id, confirm=confirmed_workspace_id)
+            result = controller.delete_workspace(
+                confirmed_workspace_id, confirm=confirmed_workspace_id
+            )
             self._set_status(result.get("message", t("workspace_deleted")))
             self.app.notify(result.get("message", t("workspace_deleted")))
             self._load_workspaces()
@@ -195,4 +225,3 @@ class WorkspaceView(Vertical):
 
 # Backward-compatible alias
 WorkspaceScreen = WorkspaceView
-

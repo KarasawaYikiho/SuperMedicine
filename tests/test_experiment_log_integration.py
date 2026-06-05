@@ -13,7 +13,11 @@ def _message(record: dict[str, Any]) -> dict[str, Any]:
 def _submit_payload(step_id: str) -> dict[str, Any]:
     payloads: dict[str, dict[str, Any]] = {
         "sample_preparation": {
-            "user_input": {"sample_id": "S1", "target_protein": "ACTB", "notes": "token=secret-token"},
+            "user_input": {
+                "sample_id": "S1",
+                "target_protein": "ACTB",
+                "notes": "token=secret-token",
+            },
             "outputs": {"sample_record": "ready"},
             "calculation_params": {
                 "protein_loading_normalization": {
@@ -28,11 +32,18 @@ def _submit_payload(step_id: str) -> dict[str, Any]:
             "outputs": {"electrophoresis_record": "bands separated"},
         },
         "transfer": {
-            "user_input": {"membrane_type": "PVDF", "transfer_condition": "wet transfer"},
+            "user_input": {
+                "membrane_type": "PVDF",
+                "transfer_condition": "wet transfer",
+            },
             "outputs": {"transfer_record": "transfer complete"},
         },
         "blocking_and_antibody": {
-            "user_input": {"blocking_buffer": "5% milk", "primary_antibody": "anti-ACTB", "secondary_antibody": "HRP"},
+            "user_input": {
+                "blocking_buffer": "5% milk",
+                "primary_antibody": "anti-ACTB",
+                "secondary_antibody": "HRP",
+            },
             "outputs": {"antibody_incubation_record": "overnight 4C"},
             "calculation_params": {
                 "antibody_dilution": {
@@ -43,7 +54,11 @@ def _submit_payload(step_id: str) -> dict[str, Any]:
             },
         },
         "detection_and_analysis": {
-            "user_input": {"detection_method": "ECL", "image_reference": "image-1", "analysis_notes": "complete"},
+            "user_input": {
+                "detection_method": "ECL",
+                "image_reference": "image-1",
+                "analysis_notes": "complete",
+            },
             "outputs": {"analysis_record": "quantified"},
         },
     }
@@ -82,20 +97,45 @@ def test_complete_wb_cli_flow_writes_structured_session_log(tmp_path, monkeypatc
     assert event_types.count("step_guidance") == len(step_ids) - 1
     assert event_types[-1] == "experiment_completed"
 
-    submitted_steps = [message["step_id"] for message in messages if message["event_type"] == "step_input_submitted"]
+    submitted_steps = [
+        message["step_id"]
+        for message in messages
+        if message["event_type"] == "step_input_submitted"
+    ]
     assert submitted_steps == step_ids
-    assert all("user_input" in message and "outputs" in message for message in messages if message["event_type"] == "step_input_submitted")
+    assert all(
+        "user_input" in message and "outputs" in message
+        for message in messages
+        if message["event_type"] == "step_input_submitted"
+    )
     assert "secret-token" not in json.dumps(report, ensure_ascii=False)
     assert "[REDACTED]" in json.dumps(report, ensure_ascii=False)
 
-    plugin_events = [message for message in messages if message["event_type"] == "plugin_result"]
-    assert {event["request_id"] for event in plugin_events} == {"protein_loading_normalization", "antibody_dilution"}
+    plugin_events = [
+        message for message in messages if message["event_type"] == "plugin_result"
+    ]
+    assert {event["request_id"] for event in plugin_events} == {
+        "protein_loading_normalization",
+        "antibody_dilution",
+    }
     assert all(event["plugin"] == "experiment-wb" for event in plugin_events)
     plugin_events_by_request = {event["request_id"]: event for event in plugin_events}
-    assert plugin_events_by_request["protein_loading_normalization"]["plugin_result_summary"]["output"]["samples"][0]["sample_volume"] == 10.0
-    assert plugin_events_by_request["antibody_dilution"]["plugin_result_summary"]["output"]["antibody_volume"] == 1.0
+    assert (
+        plugin_events_by_request["protein_loading_normalization"][
+            "plugin_result_summary"
+        ]["output"]["samples"][0]["sample_volume"]
+        == 10.0
+    )
+    assert (
+        plugin_events_by_request["antibody_dilution"]["plugin_result_summary"][
+            "output"
+        ]["antibody_volume"]
+        == 1.0
+    )
 
-    guidance_events = [message for message in messages if message["event_type"] == "step_guidance"]
+    guidance_events = [
+        message for message in messages if message["event_type"] == "step_guidance"
+    ]
     assert [event["next_step"]["step_id"] for event in guidance_events] == step_ids[1:]
 
     completion = messages[-1]

@@ -1,4 +1,5 @@
 """SessionManager 测试"""
+
 from __future__ import annotations
 
 from core.session_manager import SessionManager, Session

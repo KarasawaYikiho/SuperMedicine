@@ -1,4 +1,5 @@
 """Claude Code 适配器 — 最小可选附加适配器实现。"""
+
 from __future__ import annotations
 
 import shutil
@@ -74,7 +75,11 @@ class ClaudeCodeAdapter(BaseAdapter):
         runtime_command: str = "claude",
         timeout_seconds: int = 30,
     ):
-        super().__init__(permission_engine=permission_engine, project_dir=project_dir, default_agent_id=default_agent_id)
+        super().__init__(
+            permission_engine=permission_engine,
+            project_dir=project_dir,
+            default_agent_id=default_agent_id,
+        )
         self._project_dir = Path.cwd() if project_dir is None else Path(project_dir)
         self._default_agent_id = default_agent_id
         self._runtime_command = runtime_command
@@ -161,7 +166,12 @@ class ClaudeCodeAdapter(BaseAdapter):
                 "error": f"Unsupported Claude Code adapter tool: {redact_sensitive(tool_id)}",
                 "error_code": "unsupported_tool",
                 "supported_tools": sorted(self.SUPPORTED_TOOLS),
-                "metadata": {"security": {"permission_checked": False, "reason": "unsupported_tool"}},
+                "metadata": {
+                    "security": {
+                        "permission_checked": False,
+                        "reason": "unsupported_tool",
+                    }
+                },
             }
 
         agent_id = params.get("agent_id", self._default_agent_id)
@@ -176,7 +186,11 @@ class ClaudeCodeAdapter(BaseAdapter):
             return {"status": "ok", "tool": tool_id, "result": self._runtime_status()}
         if tool_id == "claude.invoke":
             return self._invoke(params)
-        return {"status": "error", "tool": tool_id, "error": "Unhandled Claude Code adapter tool."}
+        return {
+            "status": "error",
+            "tool": tool_id,
+            "error": "Unhandled Claude Code adapter tool.",
+        }
 
     def skill_load(self, skill_name: str) -> str:
         """Return contract metadata for Claude Code skill loading.
@@ -184,7 +198,9 @@ class ClaudeCodeAdapter(BaseAdapter):
         Native Claude Code skill loading is intentionally not claimed as supported yet, but
         this method is a real permission-checked adapter response rather than Coming Soon.
         """
-        denied = self._permission_denied(self._default_agent_id, "skill_load", skill_name)
+        denied = self._permission_denied(
+            self._default_agent_id, "skill_load", skill_name
+        )
         if denied is not None:
             return f"Permission denied loading Claude Code skill '{skill_name}': {denied['error']}"
         return (
@@ -194,7 +210,9 @@ class ClaudeCodeAdapter(BaseAdapter):
 
     def subagent_dispatch(self, agent_id: str, task: dict[str, Any]) -> dict[str, Any]:
         """Report explicit unavailable state for native Claude Code sub-agent dispatch."""
-        denied = self._permission_denied(agent_id, "execute", f"claude.subagent.{agent_id}")
+        denied = self._permission_denied(
+            agent_id, "execute", f"claude.subagent.{agent_id}"
+        )
         if denied is not None:
             denied["agent_id"] = agent_id
             return denied
@@ -212,7 +230,12 @@ class ClaudeCodeAdapter(BaseAdapter):
     def _invoke(self, params: dict[str, Any]) -> dict[str, Any]:
         prompt = params.get("prompt") or params.get("task") or ""
         if not isinstance(prompt, str) or not prompt.strip():
-            return {"status": "error", "tool": "claude.invoke", "error": "Missing non-empty prompt.", "error_code": "invalid_input"}
+            return {
+                "status": "error",
+                "tool": "claude.invoke",
+                "error": "Missing non-empty prompt.",
+                "error_code": "invalid_input",
+            }
 
         runtime = self._runtime_status()
         if not runtime["available"]:
@@ -225,19 +248,30 @@ class ClaudeCodeAdapter(BaseAdapter):
                 "runtime": runtime,
                 "metadata": {
                     "adapter": {"optional": True, "core_failure": False},
-                    "resource": {"kind": "local_cli", "timeout_seconds": self._timeout_seconds},
+                    "resource": {
+                        "kind": "local_cli",
+                        "timeout_seconds": self._timeout_seconds,
+                    },
                 },
             }
 
         timeout = self._normalize_timeout(params.get("timeout"), self._timeout_seconds)
         command = [runtime["command_path"], "--print", prompt]
         if params.get("dry_run", False):
-            safe_command = redact_sensitive([runtime["command_path"], "--print", prompt])
+            safe_command = redact_sensitive(
+                [runtime["command_path"], "--print", prompt]
+            )
             return {
                 "status": "ok",
                 "tool": "claude.invoke",
                 "result": {"command": safe_command, "dry_run": True},
-                "metadata": {"resource": {"timeout_seconds": timeout}, "security": {"permission_checked": True, "redacted": safe_command != command}},
+                "metadata": {
+                    "resource": {"timeout_seconds": timeout},
+                    "security": {
+                        "permission_checked": True,
+                        "redacted": safe_command != command,
+                    },
+                },
             }
 
         try:
@@ -257,7 +291,9 @@ class ClaudeCodeAdapter(BaseAdapter):
                 "error": f"Timed out after {timeout:g}s.",
                 "error_code": "timeout",
                 "retryable": True,
-                "metadata": {"resource": {"timeout_seconds": timeout, "kind": "local_cli"}},
+                "metadata": {
+                    "resource": {"timeout_seconds": timeout, "kind": "local_cli"}
+                },
             }
         except OSError as exc:
             return {
@@ -266,23 +302,33 @@ class ClaudeCodeAdapter(BaseAdapter):
                 "error": redact_sensitive(str(exc)),
                 "error_code": "runtime_os_error",
                 "retryable": True,
-                "metadata": {"adapter": {"optional": True, "core_failure": False}, "resource": {"kind": "local_cli", "timeout_seconds": timeout}},
+                "metadata": {
+                    "adapter": {"optional": True, "core_failure": False},
+                    "resource": {"kind": "local_cli", "timeout_seconds": timeout},
+                },
             }
 
         if result.returncode != 0:
             return {
                 "status": "runtime_error",
                 "tool": "claude.invoke",
-                "error": redact_sensitive(result.stderr or f"Claude CLI exited with {result.returncode}."),
+                "error": redact_sensitive(
+                    result.stderr or f"Claude CLI exited with {result.returncode}."
+                ),
                 "error_code": "runtime_error",
                 "returncode": result.returncode,
-                "metadata": {"resource": {"timeout_seconds": timeout, "kind": "local_cli"}},
+                "metadata": {
+                    "resource": {"timeout_seconds": timeout, "kind": "local_cli"}
+                },
             }
         return {
             "status": "ok",
             "tool": "claude.invoke",
             "result": redact_sensitive(result.stdout),
-            "metadata": {"resource": {"timeout_seconds": timeout, "kind": "local_cli"}, "security": {"permission_checked": True}},
+            "metadata": {
+                "resource": {"timeout_seconds": timeout, "kind": "local_cli"},
+                "security": {"permission_checked": True},
+            },
         }
 
     def _runtime_status(self) -> dict[str, Any]:
@@ -294,15 +340,23 @@ class ClaudeCodeAdapter(BaseAdapter):
             "required_for_core": False,
             "unavailable_is_core_failure": False,
             "ai_provider_configured": {
-                "supported_api_formats": sorted(self.AI_PROVIDER_SUPPORT["supported_api_formats"].keys()),
+                "supported_api_formats": sorted(
+                    self.AI_PROVIDER_SUPPORT["supported_api_formats"].keys()
+                ),
                 "config_sources": self.AI_PROVIDER_SUPPORT["config_sources"],
-                "secret_redaction_required": self.AI_PROVIDER_SUPPORT["secret_redaction"]["required"],
-                "plaintext_api_keys_in_manifest_or_docs": self.AI_PROVIDER_SUPPORT["secret_redaction"]["plain_text_keys_in_manifest_or_docs"],
+                "secret_redaction_required": self.AI_PROVIDER_SUPPORT[
+                    "secret_redaction"
+                ]["required"],
+                "plaintext_api_keys_in_manifest_or_docs": self.AI_PROVIDER_SUPPORT[
+                    "secret_redaction"
+                ]["plain_text_keys_in_manifest_or_docs"],
                 "custom_base_url": self.AI_PROVIDER_SUPPORT["custom_base_url"],
             },
         }
 
-    def _permission_denied(self, agent_id: str, action: str, resource: str) -> dict[str, Any] | None:
+    def _permission_denied(
+        self, agent_id: str, action: str, resource: str
+    ) -> dict[str, Any] | None:
         engine = self._get_permission_engine_or_error()
         if isinstance(engine, dict):
             return engine
@@ -336,12 +390,16 @@ class ClaudeCodeAdapter(BaseAdapter):
             return self._permission_engine
         policy_dir = self._project_dir / DEFAULT_POLICY_RELATIVE_PATH.parent
         try:
-            self._permission_engine = PermissionEngine(policy_dir, policy_dir / "audit.jsonl")
+            self._permission_engine = PermissionEngine(
+                policy_dir, policy_dir / "audit.jsonl"
+            )
         except Exception as exc:
             return {
                 "status": "configuration_error",
                 "platform": self.platform_name,
                 "error": f"Unable to load canonical permission policy: {exc}",
-                "metadata": {"policy_path": str(policy_dir / DEFAULT_POLICY_RELATIVE_PATH.name)},
+                "metadata": {
+                    "policy_path": str(policy_dir / DEFAULT_POLICY_RELATIVE_PATH.name)
+                },
             }
         return self._permission_engine

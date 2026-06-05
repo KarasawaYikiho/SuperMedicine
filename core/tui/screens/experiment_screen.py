@@ -32,24 +32,42 @@ class ExperimentGuideView(Vertical):
         super().__init__(**kwargs)
         self._project_root = Path(project_root) if project_root else Path.cwd()
         self._guide = ExperimentGuide()
-        self._session: ExperimentSession = self._guide.create_session("wb", metadata={"source": "tui"})
+        self._session: ExperimentSession = self._guide.create_session(
+            "wb", metadata={"source": "tui"}
+        )
         self._last_calculation: dict[str, Any] | None = None
         self._started_logged = False
 
     def compose(self) -> ComposeResult:
         yield Static(t("experiment_title"), classes="section-title")
         yield Static(t("experiment_boundary"), id="experiment-boundary")
-        yield Static(t("experiment_action_hint"), id="experiment-action-hint", classes="hint")
+        yield Static(
+            t("experiment_action_hint"), id="experiment-action-hint", classes="hint"
+        )
         yield Static("", id="experiment-session")
         yield Static("", id="experiment-step")
         yield Static("", id="experiment-instructions")
         yield DataTable(id="experiment-input-table", cursor_type="row")
         yield TextArea.code_editor("", language="json", id="experiment-data-input")
-        yield Input(placeholder=t("experiment_output_data"), id="experiment-output-input")
+        yield Input(
+            placeholder=t("experiment_output_data"), id="experiment-output-input"
+        )
         with Horizontal(classes="form-row"):
-            yield Button(t("experiment_calculate_step"), id="experiment-calculate", classes="btn btn-secondary")
-            yield Button(t("experiment_submit_step"), id="experiment-submit", classes="btn btn-primary")
-            yield Button(t("experiment_save_log"), id="experiment-save-log", classes="btn btn-secondary")
+            yield Button(
+                t("experiment_calculate_step"),
+                id="experiment-calculate",
+                classes="btn btn-secondary",
+            )
+            yield Button(
+                t("experiment_submit_step"),
+                id="experiment-submit",
+                classes="btn btn-primary",
+            )
+            yield Button(
+                t("experiment_save_log"),
+                id="experiment-save-log",
+                classes="btn btn-secondary",
+            )
         yield Static("", id="experiment-reagent-result")
         yield Static("", id="experiment-status")
 
@@ -58,7 +76,9 @@ class ExperimentGuideView(Vertical):
 
     def on_show(self) -> None:
         if not self._started_logged:
-            self._append_log_event("experiment_started", message="experiment guide session started")
+            self._append_log_event(
+                "experiment_started", message="experiment guide session started"
+            )
             self._started_logged = True
 
     def refresh_session_view(self, status_message: str | None = None) -> None:
@@ -78,7 +98,12 @@ class ExperimentGuideView(Vertical):
                 f"{t('experiment_step_instructions')}：{current_step.instructions}"
             )
             for field in current_step.input_fields:
-                table.add_row(field.name, field.label, t("yes") if field.required else t("no"), field.help_text)
+                table.add_row(
+                    field.name,
+                    field.label,
+                    t("yes") if field.required else t("no"),
+                    field.help_text,
+                )
         if status_message:
             self._set_status(status_message)
 
@@ -100,7 +125,9 @@ class ExperimentGuideView(Vertical):
             requests = self._session.build_plugin_requests(current_step.step_id)
             if not requests:
                 self._last_calculation = None
-                self.query_one("#experiment-reagent-result", Static).update(t("experiment_no_calculation"))
+                self.query_one("#experiment-reagent-result", Static).update(
+                    t("experiment_no_calculation")
+                )
                 self._set_status(t("experiment_no_calculation"))
                 return
             ensure_default_policy(self._project_root)
@@ -108,9 +135,16 @@ class ExperimentGuideView(Vertical):
                 config_path=self._project_root / ".supermedicine" / "config.yaml",
                 policies_dir=self._project_root / ".supermedicine" / "policies",
             )
-            calculation_params = self._calculation_params_for_request(requests[0], user_input)
+            calculation_params = self._calculation_params_for_request(
+                requests[0], user_input
+            )
             rendered_request = dict(requests[0])
-            rendered_request["params"] = {**dict(rendered_request.get("params", {})), **calculation_params.get(str(rendered_request.get("request_id") or ""), {})}
+            rendered_request["params"] = {
+                **dict(rendered_request.get("params", {})),
+                **calculation_params.get(
+                    str(rendered_request.get("request_id") or ""), {}
+                ),
+            }
             calculation = self._guide.execute_step_calculation(
                 kernel,
                 self._session,
@@ -132,7 +166,9 @@ class ExperimentGuideView(Vertical):
                 self.query_one("#experiment-reagent-result", Static).update(
                     f"{t('error')}：\n{json.dumps(redact_sensitive(calculation), ensure_ascii=False, indent=2)}"
                 )
-                self._set_status(f"{t('error')}: {redact_sensitive(kernel_result.get('error') or calculation.get('status'))}")
+                self._set_status(
+                    f"{t('error')}: {redact_sensitive(kernel_result.get('error') or calculation.get('status'))}"
+                )
                 return
             self.query_one("#experiment-reagent-result", Static).update(
                 f"{t('experiment_reagent_result')}：\n{json.dumps(redact_sensitive(self._last_calculation), ensure_ascii=False, indent=2)}"
@@ -149,7 +185,9 @@ class ExperimentGuideView(Vertical):
         try:
             user_input = self._parse_user_data()
             outputs = self._parse_outputs()
-            record = self._session.submit_step(current_step.step_id, user_input, outputs=outputs, advance=True)
+            record = self._session.submit_step(
+                current_step.step_id, user_input, outputs=outputs, advance=True
+            )
             self._append_log_event(
                 "step_input_submitted",
                 step_id=current_step.step_id,
@@ -158,11 +196,17 @@ class ExperimentGuideView(Vertical):
                 record=record.to_dict(),
             )
             self._append_log_event(
-                "experiment_completed" if self._session.is_completed else "step_guidance",
+                "experiment_completed"
+                if self._session.is_completed
+                else "step_guidance",
                 step_id=current_step.step_id,
                 record=record.to_dict(),
             )
-            self.refresh_session_view(t("experiment_completed") if self._session.is_completed else t("experiment_step_saved"))
+            self.refresh_session_view(
+                t("experiment_completed")
+                if self._session.is_completed
+                else t("experiment_step_saved")
+            )
         except ExperimentGuideError as exc:
             self._session.recover()
             self._set_error(exc)
@@ -178,18 +222,22 @@ class ExperimentGuideView(Vertical):
         )
 
     def _save_log(self) -> None:
-        payload = redact_sensitive({
-            "session_id": self._session.session_id,
-            "event": "experiment_log_saved",
-            "session": {
-                "protocol_id": self._session.protocol.protocol_id,
-                "status": self._session.status.value,
-                "progress": self._session.progress,
-                "current_step": self._session.current_step.step_id if self._session.current_step else None,
-            },
-            "last_calculation": self._compact_log_value(self._last_calculation),
-            "medical_boundary": MEDICAL_BOUNDARY,
-        })
+        payload = redact_sensitive(
+            {
+                "session_id": self._session.session_id,
+                "event": "experiment_log_saved",
+                "session": {
+                    "protocol_id": self._session.protocol.protocol_id,
+                    "status": self._session.status.value,
+                    "progress": self._session.progress,
+                    "current_step": self._session.current_step.step_id
+                    if self._session.current_step
+                    else None,
+                },
+                "last_calculation": self._compact_log_value(self._last_calculation),
+                "medical_boundary": MEDICAL_BOUNDARY,
+            }
+        )
         try:
             result = LogReportStore(self._project_root).append(
                 json.dumps(payload, ensure_ascii=False, sort_keys=True),
@@ -211,9 +259,15 @@ class ExperimentGuideView(Vertical):
         data = self._parse_mapping(raw)
         current_step = self._session.current_step
         if current_step is not None:
-            missing = [field.label for field in current_step.input_fields if field.required and field.name not in data]
+            missing = [
+                field.label
+                for field in current_step.input_fields
+                if field.required and field.name not in data
+            ]
             if missing:
-                raise ValueError(f"{t('experiment_missing_required')}: {', '.join(missing)}")
+                raise ValueError(
+                    f"{t('experiment_missing_required')}: {', '.join(missing)}"
+                )
         return data
 
     def _parse_outputs(self) -> dict[str, Any]:
@@ -222,7 +276,9 @@ class ExperimentGuideView(Vertical):
             return {}
         return {"note": raw}
 
-    def _calculation_params_for_request(self, request: dict[str, Any], user_input: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    def _calculation_params_for_request(
+        self, request: dict[str, Any], user_input: dict[str, Any]
+    ) -> dict[str, dict[str, Any]]:
         request_id = str(request.get("request_id") or "")
         params = user_input.get("calculation_params")
         if isinstance(params, dict):
@@ -232,18 +288,27 @@ class ExperimentGuideView(Vertical):
             return {request_id: params}
         if request.get("action") == "experiment.wb.normalize_loading":
             sample_name = str(user_input.get("sample_id") or "sample-1")
-            raw_concentration = user_input.get("concentration", user_input.get("sample_concentration", 1.0))
+            raw_concentration = user_input.get(
+                "concentration", user_input.get("sample_concentration", 1.0)
+            )
             raw_target = user_input.get("target_protein_amount", 10.0)
             raw_final = user_input.get("final_well_volume", 20.0)
             return {
                 request_id: {
-                    "samples": [{"name": sample_name, "concentration": raw_concentration}],
+                    "samples": [
+                        {"name": sample_name, "concentration": raw_concentration}
+                    ],
                     "target_protein_amount": raw_target,
                     "final_well_volume": raw_final,
                 }
             }
         if request.get("action") == "experiment.wb.antibody_dilution":
-            return {request_id: {"total_volume": user_input.get("total_volume", 1000.0), "dilution_ratio": user_input.get("dilution_ratio", "1:1000")}}
+            return {
+                request_id: {
+                    "total_volume": user_input.get("total_volume", 1000.0),
+                    "dilution_ratio": user_input.get("dilution_ratio", "1:1000"),
+                }
+            }
         return {}
 
     def _parse_mapping(self, raw: str) -> dict[str, Any]:
@@ -279,7 +344,9 @@ class ExperimentGuideView(Vertical):
         apply_status_style(status, safe_message)
 
     def _set_error(self, error: Exception) -> None:
-        message = f"{t('error')}: {redact_sensitive(str(error)) or t('safe_error_hint')}"
+        message = (
+            f"{t('error')}: {redact_sensitive(str(error)) or t('safe_error_hint')}"
+        )
         self._set_status(message)
         self.app.notify(message, severity="error")
 

@@ -18,7 +18,9 @@ from permission.engine import PermissionEngine
 
 
 def _kernel_with_real_plugins(tmp_path):
-    (tmp_path / "config.yaml").write_text(yaml.dump({"project": "test"}), encoding="utf-8")
+    (tmp_path / "config.yaml").write_text(
+        yaml.dump({"project": "test"}), encoding="utf-8"
+    )
     (tmp_path / "policies").mkdir()
     shutil.copyfile(
         PermissionEngine.default_policy_path(),
@@ -68,7 +70,10 @@ def test_submit_user_data_records_input_output_and_advances():
     assert record.completed is True
     assert session.records["sample_preparation"].user_input["sample_id"] == "S1"
     assert session.records["sample_preparation"].outputs["sample_record"] == "ready"
-    assert session.records["sample_preparation"].calculation_results[0].status == "deferred"
+    assert (
+        session.records["sample_preparation"].calculation_results[0].status
+        == "deferred"
+    )
     assert session.current_step.step_id == "gel_electrophoresis"
 
 
@@ -240,10 +245,21 @@ def test_experiment_guide_calls_wb_plugin_through_kernel_permission_path(tmp_pat
 
     assert result["status"] == "success"
     assert result["kernel_result"]["metadata"]["security"]["permission_checked"] is True
-    assert result["kernel_result"]["metadata"]["security"]["permission_entrypoint"] == "kernel"
+    assert (
+        result["kernel_result"]["metadata"]["security"]["permission_entrypoint"]
+        == "kernel"
+    )
     assert result["plugin_request"]["plugin_name"] == "experiment-wb"
-    assert result["record"]["calculation_results"][0]["request_id"] == "protein_loading_normalization"
-    assert result["record"]["calculation_results"][0]["value"]["samples"][0]["sample_volume"] == 10.0
+    assert (
+        result["record"]["calculation_results"][0]["request_id"]
+        == "protein_loading_normalization"
+    )
+    assert (
+        result["record"]["calculation_results"][0]["value"]["samples"][0][
+            "sample_volume"
+        ]
+        == 10.0
+    )
     assert result["next_step"]["step_id"] == "gel_electrophoresis"
 
 

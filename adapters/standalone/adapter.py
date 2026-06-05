@@ -1,4 +1,5 @@
 """Standalone 适配器 — 自包含实现，工具方法继承自 BaseAdapter"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -17,7 +18,11 @@ class StandaloneAdapter(BaseAdapter):
         project_dir: Path | None = None,
         default_agent_id: str = "beta",
     ):
-        super().__init__(permission_engine=permission_engine, project_dir=project_dir, default_agent_id=default_agent_id)
+        super().__init__(
+            permission_engine=permission_engine,
+            project_dir=project_dir,
+            default_agent_id=default_agent_id,
+        )
 
     @property
     def platform_name(self) -> str:
@@ -67,7 +72,9 @@ class StandaloneAdapter(BaseAdapter):
     def _tool_task(self, params: dict[str, Any]) -> dict[str, Any]:
         agent_id = params.get("agent_id", "standalone")
         task = params.get("task", params.get("prompt", ""))
-        return self.subagent_dispatch(agent_id, task if isinstance(task, dict) else {"description": task})
+        return self.subagent_dispatch(
+            agent_id, task if isinstance(task, dict) else {"description": task}
+        )
 
     def skill_load(self, skill_name: str) -> str:
         """Return standalone skill metadata without depending on OpenCode files."""

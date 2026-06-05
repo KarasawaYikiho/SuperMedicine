@@ -1,4 +1,5 @@
 """Tests for core.token_tracker."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -55,7 +56,9 @@ class TestTokenTracker:
         """Records for different models are correctly grouped."""
         tracker = TokenTracker(tmp_path / "usage.jsonl")
         tracker.record("openai", "gpt-4o", prompt_tokens=100, completion_tokens=50)
-        tracker.record("openai", "gpt-3.5-turbo", prompt_tokens=200, completion_tokens=80)
+        tracker.record(
+            "openai", "gpt-3.5-turbo", prompt_tokens=200, completion_tokens=80
+        )
 
         by_model = tracker.summary_by_model()
         assert set(by_model.keys()) == {"gpt-4o", "gpt-3.5-turbo"}

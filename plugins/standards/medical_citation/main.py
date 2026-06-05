@@ -1,4 +1,5 @@
 """Executable entrypoint for the medical-citation manifest plugin."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -28,12 +29,24 @@ ACTION_CONTRACTS: dict[str, dict[str, Any]] = {
     "standard.citation.ama": {
         "required_params": {"source_id": "str", "sources": "dict[str, source]"},
         "optional_params": {"reference_type": "journal|book"},
-        "output_fields": ["citation", "format", "source_id", "validation", "reference_type"],
+        "output_fields": [
+            "citation",
+            "format",
+            "source_id",
+            "validation",
+            "reference_type",
+        ],
     },
     "standard.citation.vancouver": {
         "required_params": {"source_id": "str", "sources": "dict[str, source]"},
         "optional_params": {"reference_type": "journal|book"},
-        "output_fields": ["citation", "format", "source_id", "validation", "reference_type"],
+        "output_fields": [
+            "citation",
+            "format",
+            "source_id",
+            "validation",
+            "reference_type",
+        ],
     },
 }
 
@@ -94,7 +107,9 @@ def _execute_citation(action: str, params: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(reference, (JournalArticle, Book)):
         raise ValueError("source reference must be structured journal or book metadata")
     reference_type = _reference_type(reference)
-    formatter = AMAFormatter() if action == "standard.citation.ama" else VancouverFormatter()
+    formatter = (
+        AMAFormatter() if action == "standard.citation.ama" else VancouverFormatter()
+    )
     citation_format = "AMA" if action == "standard.citation.ama" else "Vancouver"
 
     if isinstance(reference, JournalArticle):
@@ -123,9 +138,18 @@ def _base_metadata(context: dict[str, Any]) -> dict[str, Any]:
         "not_for_clinical_advice": True,
         "requires_human_review": True,
         "resource": {"kind": "standard", "plugin": PLUGIN_NAME},
-        "security": {"permission_entrypoint": "kernel", "permission_checked": bool(context)},
-        "contract": {"actions": ACTION_CONTRACTS, "provider_contract": "medical-citation-formatters"},
-        "audit": {"context_keys": sorted(context.keys()), "citation_fabrication": "not_generated"},
+        "security": {
+            "permission_entrypoint": "kernel",
+            "permission_checked": bool(context),
+        },
+        "contract": {
+            "actions": ACTION_CONTRACTS,
+            "provider_contract": "medical-citation-formatters",
+        },
+        "audit": {
+            "context_keys": sorted(context.keys()),
+            "citation_fabrication": "not_generated",
+        },
     }
 
 
@@ -142,7 +166,9 @@ def _sources_from_params(value: Any) -> dict[str, CitationSource]:
             sources[source_id] = item
             continue
         if not isinstance(item, dict):
-            raise ValueError("sources entries must be dictionaries or CitationSource objects")
+            raise ValueError(
+                "sources entries must be dictionaries or CitationSource objects"
+            )
         sources[source_id] = _source_from_dict(source_id, item)
     return sources
 
@@ -178,7 +204,9 @@ def _reference_from_source_dict(item: dict[str, Any]) -> JournalArticle | Book:
         return reference
     if isinstance(reference, dict):
         data = reference
-        reference_type = str(reference.get("reference_type") or reference.get("type") or reference_type).lower()
+        reference_type = str(
+            reference.get("reference_type") or reference.get("type") or reference_type
+        ).lower()
     else:
         data = item
 

@@ -6,6 +6,7 @@ implementations are imported explicitly from their subpackages so core
 startup/import paths never trigger optional assistant-platform imports,
 initialization, or runtime probing.
 """
+
 from __future__ import annotations
 
 import importlib
@@ -99,11 +100,15 @@ _ADAPTER_REGISTRY: MappingProxyType[str, AdapterRegistration] = MappingProxyType
 ADAPTER_REGISTRY = _ADAPTER_REGISTRY
 
 
-def list_adapter_registrations(*, include_optional: bool = True) -> list[dict[str, Any]]:
+def list_adapter_registrations(
+    *, include_optional: bool = True
+) -> list[dict[str, Any]]:
     """Return static adapter metadata without importing concrete adapters."""
     registrations = list(_ADAPTER_REGISTRY.values())
     if not include_optional:
-        registrations = [registration for registration in registrations if not registration.optional]
+        registrations = [
+            registration for registration in registrations if not registration.optional
+        ]
     return [registration.as_dict() for registration in registrations]
 
 

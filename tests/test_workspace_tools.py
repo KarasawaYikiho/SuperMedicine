@@ -66,7 +66,18 @@ def test_tool_id_validation_accepts_safe_slugs(tool_id):
 
 @pytest.mark.parametrize(
     "tool_id",
-    ["", "Heatmap", "heat_map", "heat map", "-heatmap", "heatmap-", "../heatmap", "heatmap/one", "..", "."],
+    [
+        "",
+        "Heatmap",
+        "heat_map",
+        "heat map",
+        "-heatmap",
+        "heatmap-",
+        "../heatmap",
+        "heatmap/one",
+        "..",
+        ".",
+    ],
 )
 def test_tool_id_validation_rejects_traversal_and_unsafe_ids(tool_id):
     with pytest.raises(InvalidToolId):
@@ -92,7 +103,9 @@ def test_tool_init_creates_python_and_r_directories_under_workspace(tmp_path):
         ("r", "umap", "runner.R"),
     ],
 )
-def test_builtin_templates_can_be_scaffolded_and_loaded(tmp_path, language, tool_id, entrypoint):
+def test_builtin_templates_can_be_scaffolded_and_loaded(
+    tmp_path, language, tool_id, entrypoint
+):
     service = WorkspaceToolService(tmp_path)
     service.initialize_tools("trial-1")
 
@@ -126,7 +139,9 @@ def test_manifest_schema_requires_expected_fields_and_validates_identity():
         "version": "1.0.0",
     }
 
-    manifest = ToolManifest.from_dict(data, expected_id="heatmap", expected_language="python")
+    manifest = ToolManifest.from_dict(
+        data, expected_id="heatmap", expected_language="python"
+    )
 
     assert manifest.to_dict()["id"] == "heatmap"
     with pytest.raises(ToolManifestError, match="missing required fields"):
@@ -177,7 +192,9 @@ def test_runner_templates_report_missing_dependency_messages_without_heavy_impor
 
 
 def test_prepare_invocation_is_permission_guarded_and_audited(tmp_path, monkeypatch):
-    monkeypatch.setattr("core.workspace_tools.shutil.which", lambda executable: f"/bin/{executable}")
+    monkeypatch.setattr(
+        "core.workspace_tools.shutil.which", lambda executable: f"/bin/{executable}"
+    )
     service = WorkspaceToolService(tmp_path)
     service.initialize_tools("trial-1")
     service.add_builtin_tool("trial-1", "python", "heatmap")
@@ -233,9 +250,20 @@ def test_unsafe_entrypoint_input_and_output_paths_are_rejected(tmp_path):
     service = WorkspaceToolService(tmp_path)
     service.initialize_tools("trial-1")
     service.add_builtin_tool("trial-1", "python", "heatmap")
-    manifest_path = tmp_path / "workspaces" / "trial-1" / "tools" / "python" / "heatmap" / "tool.yaml"
+    manifest_path = (
+        tmp_path
+        / "workspaces"
+        / "trial-1"
+        / "tools"
+        / "python"
+        / "heatmap"
+        / "tool.yaml"
+    )
 
-    manifest_path.write_text(manifest_path.read_text(encoding="utf-8").replace("runner.py", "../runner.py"), encoding="utf-8")
+    manifest_path.write_text(
+        manifest_path.read_text(encoding="utf-8").replace("runner.py", "../runner.py"),
+        encoding="utf-8",
+    )
     with pytest.raises(ToolManifestError, match="relative path"):
         service.load_manifest("trial-1", "python", "heatmap")
 
@@ -281,7 +309,9 @@ def test_cli_tool_commands_do_not_read_tui_recent_state(tmp_path, monkeypatch):
     def fail_if_called(*args, **kwargs):
         raise AssertionError("CLI tool commands must not read TUI recent state")
 
-    monkeypatch.setattr("core.workspace.WorkspaceManager.load_recent_selection", fail_if_called)
+    monkeypatch.setattr(
+        "core.workspace.WorkspaceManager.load_recent_selection", fail_if_called
+    )
 
     result = CLI().tool_list("trial-1")
 
@@ -297,14 +327,18 @@ def test_cli_tool_run_uses_default_policy_and_writes_audit(tmp_path, monkeypatch
 
     result = cli.tool_run("trial-1", "python", "heatmap", dry_run=True)
 
-
     assert result["status"] == "prepared"
     assert result["command"][0] == "python"
     audit_entries = [
         json.loads(line)
-        for line in (tmp_path / ".supermedicine" / "policies" / "audit.jsonl").read_text(encoding="utf-8").splitlines()
+        for line in (tmp_path / ".supermedicine" / "policies" / "audit.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
     ]
-    assert any(entry["action"] == "tool.run" and entry["result"] == "allowed" for entry in audit_entries)
+    assert any(
+        entry["action"] == "tool.run" and entry["result"] == "allowed"
+        for entry in audit_entries
+    )
 
 
 def test_legacy_cli_run_flags_still_work_without_workspace(monkeypatch, tmp_path):
@@ -336,7 +370,9 @@ def test_legacy_cli_run_flags_still_work_without_workspace(monkeypatch, tmp_path
 
     monkeypatch.setattr("core.kernel.Kernel", FakeKernel)
 
-    CLI().run("legacy task", plugin="python_stats", action="describe", params={"alpha": 1})
+    CLI().run(
+        "legacy task", plugin="python_stats", action="describe", params={"alpha": 1}
+    )
 
     assert captured == {
         "task": "legacy task",

@@ -1,4 +1,5 @@
 """会话管理器 — UUID 会话 + TTL 超时清理"""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -47,7 +48,8 @@ class SessionManager:
         if self._ttl_seconds is None:
             return 0
         expired = [
-            sid for sid, s in self._sessions.items()
+            sid
+            for sid, s in self._sessions.items()
             if s.age_seconds > self._ttl_seconds
         ]
         for sid in expired:
@@ -58,4 +60,6 @@ class SessionManager:
         """列出所有未过期会话"""
         if self._ttl_seconds is None:
             return list(self._sessions.values())
-        return [s for s in self._sessions.values() if s.age_seconds <= self._ttl_seconds]
+        return [
+            s for s in self._sessions.values() if s.age_seconds <= self._ttl_seconds
+        ]

@@ -1,4 +1,5 @@
 """Shared helper utilities for tool plugins."""
+
 from __future__ import annotations
 
 import math
@@ -54,7 +55,9 @@ def as_float_groups(value: Any, name: str) -> list[list[float]]:
     """
     if not isinstance(value, list):
         raise ValueError(f"{name} must be a list of numeric lists")
-    return [as_float_list(group, f"{name}[{index}]") for index, group in enumerate(value)]
+    return [
+        as_float_list(group, f"{name}[{index}]") for index, group in enumerate(value)
+    ]
 
 
 def normal_cdf(z: float) -> float:
@@ -84,5 +87,7 @@ def required_str(params: dict[str, Any], key: str) -> str:
     """
     value = params.get(key)
     if not value or not isinstance(value, str):
-        raise ValueError(f"Parameter '{key}' is required and must be a non-empty string")
+        raise ValueError(
+            f"Parameter '{key}' is required and must be a non-empty string"
+        )
     return value

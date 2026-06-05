@@ -10,17 +10,29 @@ from core.tui.state import TUIState, load_recent_workspace, save_recent_workspac
 from core.workspace import WorkspaceManager
 
 
-def test_recent_workspace_selection_saved_and_loaded_from_workspace_session_state(tmp_path):
+def test_recent_workspace_selection_saved_and_loaded_from_workspace_session_state(
+    tmp_path,
+):
     manager = WorkspaceManager(tmp_path)
     manager.initialize_workspace("trial-1")
     manager.initialize_workspace("trial-2")
 
     state_path = save_recent_workspace("trial-1", "trial-2", project_root=tmp_path)
 
-    assert state_path == tmp_path / "workspaces" / "trial-1" / ".supermedicine" / "sessions" / "tui_recent_selection.yaml"
+    assert (
+        state_path
+        == tmp_path
+        / "workspaces"
+        / "trial-1"
+        / ".supermedicine"
+        / "sessions"
+        / "tui_recent_selection.yaml"
+    )
     assert load_recent_workspace("trial-1", project_root=tmp_path) == "trial-2"
     assert load_recent_workspace("trial-2", project_root=tmp_path) is None
-    assert not (tmp_path / ".supermedicine" / "sessions" / "tui_recent_selection.yaml").exists()
+    assert not (
+        tmp_path / ".supermedicine" / "sessions" / "tui_recent_selection.yaml"
+    ).exists()
 
 
 def test_tui_state_facade_uses_workspace_session_only(tmp_path):
@@ -32,19 +44,33 @@ def test_tui_state_facade_uses_workspace_session_only(tmp_path):
     assert state.load_recent_workspace("trial-1") == "trial-1"
 
 
-def test_recent_workspace_state_is_scoped_per_workspace_and_not_global_cli_state(tmp_path):
+def test_recent_workspace_state_is_scoped_per_workspace_and_not_global_cli_state(
+    tmp_path,
+):
     manager = WorkspaceManager(tmp_path)
     manager.initialize_workspace("trial-1")
     manager.initialize_workspace("trial-2")
 
-    first_state_path = save_recent_workspace("trial-1", "trial-2", project_root=tmp_path)
-    second_state_path = save_recent_workspace("trial-2", "trial-1", project_root=tmp_path)
+    first_state_path = save_recent_workspace(
+        "trial-1", "trial-2", project_root=tmp_path
+    )
+    second_state_path = save_recent_workspace(
+        "trial-2", "trial-1", project_root=tmp_path
+    )
 
     assert load_recent_workspace("trial-1", project_root=tmp_path) == "trial-2"
     assert load_recent_workspace("trial-2", project_root=tmp_path) == "trial-1"
-    assert first_state_path.parent == tmp_path / "workspaces" / "trial-1" / ".supermedicine" / "sessions"
-    assert second_state_path.parent == tmp_path / "workspaces" / "trial-2" / ".supermedicine" / "sessions"
-    assert not (tmp_path / ".supermedicine" / "sessions" / "tui_recent_selection.yaml").exists()
+    assert (
+        first_state_path.parent
+        == tmp_path / "workspaces" / "trial-1" / ".supermedicine" / "sessions"
+    )
+    assert (
+        second_state_path.parent
+        == tmp_path / "workspaces" / "trial-2" / ".supermedicine" / "sessions"
+    )
+    assert not (
+        tmp_path / ".supermedicine" / "sessions" / "tui_recent_selection.yaml"
+    ).exists()
 
 
 def test_tui_state_does_not_affect_cli_workspace_requirement(monkeypatch, tmp_path):
@@ -96,8 +122,18 @@ def test_llm_startup_restore_is_separate_from_tui_workspace_session_state(tmp_pa
                     "provider": "openai",
                     "last_provider": "anthropic",
                     "providers": {
-                        "openai": {"api_format": "openai", "base_url": "https://openai.test/v1", "api_key": "sk-openai-state", "model": "gpt-test"},
-                        "anthropic": {"api_format": "anthropic", "base_url": "https://anthropic.test/v1", "api_key": "sk-anthropic-state", "model": "claude-test"},
+                        "openai": {
+                            "api_format": "openai",
+                            "base_url": "https://openai.test/v1",
+                            "api_key": "sk-openai-state",
+                            "model": "gpt-test",
+                        },
+                        "anthropic": {
+                            "api_format": "anthropic",
+                            "base_url": "https://anthropic.test/v1",
+                            "api_key": "sk-anthropic-state",
+                            "model": "claude-test",
+                        },
                     },
                 }
             },
@@ -113,7 +149,9 @@ def test_llm_startup_restore_is_separate_from_tui_workspace_session_state(tmp_pa
     assert ConfigCenter(config_path).get_llm_current_provider_name() == "anthropic"
 
 
-def test_tui_shell_status_object_exposes_workspace_plugin_llm_version_and_task_state(tmp_path):
+def test_tui_shell_status_object_exposes_workspace_plugin_llm_version_and_task_state(
+    tmp_path,
+):
     plugins_dir = tmp_path / "plugins" / "demo_plugin"
     plugins_dir.mkdir(parents=True)
     (plugins_dir / "plugin.yaml").write_text("name: demo\n", encoding="utf-8")
@@ -153,10 +191,23 @@ def test_tui_shell_status_object_exposes_workspace_plugin_llm_version_and_task_s
     assert status.focus == "焦点：输入栏"
 
 
-def test_tui_navigation_metadata_preserves_numeric_shortcuts_and_chinese_titles(tmp_path):
+def test_tui_navigation_metadata_preserves_numeric_shortcuts_and_chinese_titles(
+    tmp_path,
+):
     app = SuperMedicineTUI(project_root=tmp_path)
 
-    assert [item.key for item in app.nav_items()] == ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]
+    assert [item.key for item in app.nav_items()] == [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "0",
+    ]
     assert [item.view_id for item in app.nav_items()] == [
         "chat",
         "dashboard",

@@ -1,4 +1,5 @@
 """Executable entrypoint for the rag-interface manifest plugin."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -17,8 +18,19 @@ PLUGIN_NAME = "rag-interface"
 ACTION_CONTRACTS: dict[str, dict[str, Any]] = {
     "rag.query": {
         "required_params": {"query": "str"},
-        "optional_params": {"top_k": "int", "provider": "local|mock_external|pubmed", "documents": "list[dict|str]"},
-        "output_fields": ["items", "results", "relevance_scores", "source_metadata", "errors", "metadata"],
+        "optional_params": {
+            "top_k": "int",
+            "provider": "local|mock_external|pubmed",
+            "documents": "list[dict|str]",
+        },
+        "output_fields": [
+            "items",
+            "results",
+            "relevance_scores",
+            "source_metadata",
+            "errors",
+            "metadata",
+        ],
     },
     "rag.context.store": {
         "required_params": {"key": "str", "data": "any"},
@@ -88,7 +100,8 @@ def execute(
             plugin=PLUGIN_NAME,
             action=action,
             output=output,
-            error=_first_error_message(output) or "RAG provider returned an error status.",
+            error=_first_error_message(output)
+            or "RAG provider returned an error status.",
             metadata=metadata,
         )
 
@@ -101,19 +114,30 @@ def execute(
     )
 
 
-def _execute_query(params: dict[str, Any], context: dict[str, Any] | None = None) -> dict[str, Any]:
+def _execute_query(
+    params: dict[str, Any], context: dict[str, Any] | None = None
+) -> dict[str, Any]:
     context = context or {}
     query = required_str(params, "query")
     top_k = _top_k(params.get("top_k", 5))
-    provider_name = str(params.get("provider") or params.get("provider_type") or "local").lower()
+    provider_name = str(
+        params.get("provider") or params.get("provider_type") or "local"
+    ).lower()
 
     if provider_name in {"local", "local-tfidf"}:
         local_provider = LocalRAGProvider(_storage_dir(params))
         documents = params.get("documents", DEFAULT_DOCUMENTS)
         _seed_local_documents(local_provider, documents)
-        return local_provider.query(query, top_k=top_k, scope=str(params.get("scope", "literature")))
+        return local_provider.query(
+            query, top_k=top_k, scope=str(params.get("scope", "literature"))
+        )
 
-    if provider_name in {"mock", "mock_external", "mock-external-vector-store", "external_vector"}:
+    if provider_name in {
+        "mock",
+        "mock_external",
+        "mock-external-vector-store",
+        "external_vector",
+    }:
         config = _provider_config(params)
         records = _records_from_params(params)
         mock_provider = MockExternalVectorStoreProvider(config, records=records)
@@ -127,7 +151,9 @@ def _execute_query(params: dict[str, Any], context: dict[str, Any] | None = None
         )
         return pubmed_provider.query(query, top_k=top_k)
 
-    raise ValueError(f"provider must be one of local, mock_external, or pubmed; got {provider_name!r}")
+    raise ValueError(
+        f"provider must be one of local, mock_external, or pubmed; got {provider_name!r}"
+    )
 
 
 def _execute_context_store(params: dict[str, Any]) -> dict[str, Any]:
@@ -147,10 +173,15 @@ def _execute_context_retrieve(params: dict[str, Any]) -> dict[str, Any]:
 
 
 def _base_metadata(context: dict[str, Any]) -> dict[str, Any]:
-    audit_context_keys = sorted(key for key in context.keys() if key != "permission_engine")
+    audit_context_keys = sorted(
+        key for key in context.keys() if key != "permission_engine"
+    )
     return {
         "resource": {"kind": "rag", "plugin": PLUGIN_NAME},
-        "security": {"permission_entrypoint": "kernel", "permission_checked": bool(context)},
+        "security": {
+            "permission_entrypoint": "kernel",
+            "permission_checked": bool(context),
+        },
         "contract": {"actions": ACTION_CONTRACTS, "provider_contract": "RAGProvider"},
         "audit": {"context_keys": audit_context_keys},
     }
@@ -179,13 +210,19 @@ def _seed_local_documents(provider: LocalRAGProvider, documents: Any) -> None:
         text = document.get("text") or document.get("snippet")
         if not isinstance(text, str) or not text:
             raise ValueError("document text must be a non-empty string")
-        metadata = {key: value for key, value in document.items() if key not in {"text", "snippet"}}
+        metadata = {
+            key: value
+            for key, value in document.items()
+            if key not in {"text", "snippet"}
+        }
         provider.add_document(text, metadata)
 
 
 def _provider_config(params: dict[str, Any]) -> RAGProviderConfig:
     provider_metadata = params.get("provider_metadata")
-    metadata: dict[str, Any] = provider_metadata if isinstance(provider_metadata, dict) else {}
+    metadata: dict[str, Any] = (
+        provider_metadata if isinstance(provider_metadata, dict) else {}
+    )
     return RAGProviderConfig(
         provider_type="external_vector",
         endpoint=str(params.get("endpoint") or "mock://vector-store"),
@@ -220,7 +257,9 @@ def _top_k(value: Any) -> int:
 
 
 def _explicit_agent_id(params: dict[str, Any], context: dict[str, Any]) -> str | None:
-    agent_id = context.get("agent_id") if "agent_id" in context else params.get("agent_id")
+    agent_id = (
+        context.get("agent_id") if "agent_id" in context else params.get("agent_id")
+    )
     if agent_id is None:
         return None
     return str(agent_id)

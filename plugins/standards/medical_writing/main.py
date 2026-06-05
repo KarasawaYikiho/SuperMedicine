@@ -1,4 +1,5 @@
 """Executable entrypoint for the medical-writing manifest plugin."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -22,23 +23,67 @@ MEDICAL_BOUNDARY = (
 ACTION_CONTRACTS: dict[str, dict[str, Any]] = {
     "standard.consort": {
         "required_params": {"text": "str"},
-        "optional_params": {"claims": "list[dict|MedicalClaim]", "sources": "dict[str, CitationSource|dict|str]"},
-        "output_fields": ["standard", "version", "total_items", "found_items", "compliance_rate", "details", "human_review_message"],
+        "optional_params": {
+            "claims": "list[dict|MedicalClaim]",
+            "sources": "dict[str, CitationSource|dict|str]",
+        },
+        "output_fields": [
+            "standard",
+            "version",
+            "total_items",
+            "found_items",
+            "compliance_rate",
+            "details",
+            "human_review_message",
+        ],
     },
     "standard.strobe": {
         "required_params": {"text": "str"},
-        "optional_params": {"claims": "list[dict|MedicalClaim]", "sources": "dict[str, CitationSource|dict|str]"},
-        "output_fields": ["standard", "version", "total_items", "found_items", "compliance_rate", "details", "human_review_message"],
+        "optional_params": {
+            "claims": "list[dict|MedicalClaim]",
+            "sources": "dict[str, CitationSource|dict|str]",
+        },
+        "output_fields": [
+            "standard",
+            "version",
+            "total_items",
+            "found_items",
+            "compliance_rate",
+            "details",
+            "human_review_message",
+        ],
     },
     "standard.prisma": {
         "required_params": {"text": "str"},
-        "optional_params": {"claims": "list[dict|MedicalClaim]", "sources": "dict[str, CitationSource|dict|str]"},
-        "output_fields": ["standard", "version", "total_items", "found_items", "compliance_rate", "details", "human_review_message"],
+        "optional_params": {
+            "claims": "list[dict|MedicalClaim]",
+            "sources": "dict[str, CitationSource|dict|str]",
+        },
+        "output_fields": [
+            "standard",
+            "version",
+            "total_items",
+            "found_items",
+            "compliance_rate",
+            "details",
+            "human_review_message",
+        ],
     },
     "standard.stard": {
         "required_params": {"text": "str"},
-        "optional_params": {"claims": "list[dict|MedicalClaim]", "sources": "dict[str, CitationSource|dict|str]"},
-        "output_fields": ["standard", "version", "total_items", "found_items", "compliance_rate", "details", "human_review_message"],
+        "optional_params": {
+            "claims": "list[dict|MedicalClaim]",
+            "sources": "dict[str, CitationSource|dict|str]",
+        },
+        "output_fields": [
+            "standard",
+            "version",
+            "total_items",
+            "found_items",
+            "compliance_rate",
+            "details",
+            "human_review_message",
+        ],
     },
 }
 
@@ -107,9 +152,18 @@ def _base_metadata(context: dict[str, Any]) -> dict[str, Any]:
         "requires_human_review": True,
         "human_review_message": HUMAN_REVIEW_MESSAGE,
         "resource": {"kind": "standard", "plugin": PLUGIN_NAME},
-        "security": {"permission_entrypoint": "kernel", "permission_checked": bool(context)},
-        "contract": {"actions": ACTION_CONTRACTS, "provider_contract": "medical-writing-checklist"},
-        "audit": {"context_keys": sorted(context.keys()), "citation_fabrication": "not_generated"},
+        "security": {
+            "permission_entrypoint": "kernel",
+            "permission_checked": bool(context),
+        },
+        "contract": {
+            "actions": ACTION_CONTRACTS,
+            "provider_contract": "medical-writing-checklist",
+        },
+        "audit": {
+            "context_keys": sorted(context.keys()),
+            "citation_fabrication": "not_generated",
+        },
     }
 
 
@@ -132,7 +186,9 @@ def _claims_from_params(value: Any) -> list[MedicalClaim] | None:
             claims.append(item)
             continue
         if not isinstance(item, dict):
-            raise ValueError("claims entries must be dictionaries or MedicalClaim objects")
+            raise ValueError(
+                "claims entries must be dictionaries or MedicalClaim objects"
+            )
         text = item.get("text")
         if not isinstance(text, str) or not text.strip():
             raise ValueError("claim text must be a non-empty string")
@@ -145,7 +201,14 @@ def _claims_from_params(value: Any) -> list[MedicalClaim] | None:
         confidence = item.get("confidence")
         if confidence is not None and not isinstance(confidence, (int, float)):
             raise ValueError("claim confidence must be numeric when provided")
-        claims.append(MedicalClaim(text=text, claim_type=claim_type, source_id=source_id, confidence=confidence))
+        claims.append(
+            MedicalClaim(
+                text=text,
+                claim_type=claim_type,
+                source_id=source_id,
+                confidence=confidence,
+            )
+        )
     return claims
 
 
@@ -165,7 +228,9 @@ def _sources_from_params(value: Any) -> dict[str, CitationSource] | None:
             sources[source_id] = CitationSource(source_id=source_id, reference=item)
             continue
         if not isinstance(item, dict):
-            raise ValueError("sources entries must be dictionaries, strings, or CitationSource objects")
+            raise ValueError(
+                "sources entries must be dictionaries, strings, or CitationSource objects"
+            )
         declared_id = item.get("source_id", source_id)
         if declared_id != source_id:
             raise ValueError("source_id must match its sources dictionary key")

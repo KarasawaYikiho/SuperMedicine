@@ -5,6 +5,7 @@ existing :class:`permission.engine.PermissionEngine` contract.  They do not
 change default policies or execute user-facing workspace/import/RAG/TUI
 behavior.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -112,6 +113,8 @@ def authorize_dangerous_operation(
         )
 
     if not allowed:
-        raise DangerousOperationDenied(f"Dangerous operation denied: {action} {resource}")
+        raise DangerousOperationDenied(
+            f"Dangerous operation denied: {action} {resource}"
+        )
 
     return OperationAuthorization(path=resolved_path, audit_record=audit_record)

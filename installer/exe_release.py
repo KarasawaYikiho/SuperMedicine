@@ -5,6 +5,7 @@ installer tests can use temporary Desktop directories instead of touching a real
 user profile.  They do not inspect external assistant-platform configuration and
 do not read or log secrets.
 """
+
 from __future__ import annotations
 
 import logging
@@ -32,7 +33,12 @@ RELEASE_PAYLOAD_REQUIRED_PATHS = (
     Path("permission"),
     Path("dist") / DEFAULT_TARGET_FILENAME,
 )
-_PAYLOAD_EXCLUDED_DIR_NAMES = {"__pycache__", ".pytest_cache", ".ruff_cache", ".mypy_cache"}
+_PAYLOAD_EXCLUDED_DIR_NAMES = {
+    "__pycache__",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".mypy_cache",
+}
 _PAYLOAD_EXCLUDED_SUFFIXES = {".pyc", ".pyo", ".tmp", ".token"}
 _INVALID_FILENAME_CHARS = set('<>:"/\\|?*')
 _WINDOWS_RESERVED_NAMES = {
@@ -73,7 +79,9 @@ def resolve_exe_path(exe_path: str | os.PathLike[str]) -> Path:
     for candidate in candidates:
         if candidate.exists():
             if candidate.suffix.lower() != ".exe":
-                raise ExeReleaseError(f"Exe source must use .exe suffix: {candidate.name}")
+                raise ExeReleaseError(
+                    f"Exe source must use .exe suffix: {candidate.name}"
+                )
             if not candidate.is_file():
                 raise ExeReleaseError(f"Exe source must be a file: {candidate}")
             return candidate
@@ -96,7 +104,9 @@ def bundled_release_payload_root() -> Path | None:
     return payload_root if payload_root.exists() else None
 
 
-def resolve_release_payload_root(source_root: str | os.PathLike[str] | None = None) -> Path:
+def resolve_release_payload_root(
+    source_root: str | os.PathLike[str] | None = None,
+) -> Path:
     """Resolve the release payload root shared by Python and Exe installers."""
 
     if source_root is not None:
@@ -107,11 +117,17 @@ def resolve_release_payload_root(source_root: str | os.PathLike[str] | None = No
     return _release_root()
 
 
-def validate_release_payload_root(source_root: str | os.PathLike[str] | None = None) -> Path:
+def validate_release_payload_root(
+    source_root: str | os.PathLike[str] | None = None,
+) -> Path:
     """Validate that a payload root follows the unified release layout."""
 
     root = resolve_release_payload_root(source_root)
-    missing = [relative.as_posix() for relative in RELEASE_PAYLOAD_REQUIRED_PATHS if not (root / relative).exists()]
+    missing = [
+        relative.as_posix()
+        for relative in RELEASE_PAYLOAD_REQUIRED_PATHS
+        if not (root / relative).exists()
+    ]
     if missing:
         raise FileNotFoundError(
             "Release payload is incomplete; missing required path(s): "
@@ -126,14 +142,19 @@ def _is_payload_excluded(relative: Path) -> bool:
         return True
     if relative.suffix in _PAYLOAD_EXCLUDED_SUFFIXES:
         return True
-    if relative.name in {DEFAULT_INSTALLER_FILENAME, f"{DEFAULT_INSTALLER_FILENAME}.manifest"}:
+    if relative.name in {
+        DEFAULT_INSTALLER_FILENAME,
+        f"{DEFAULT_INSTALLER_FILENAME}.manifest",
+    }:
         return True
     if relative.name.endswith("~") or relative.name.endswith(".log"):
         return True
     return False
 
 
-def iter_release_payload_files(source_root: str | os.PathLike[str] | None = None) -> list[tuple[Path, Path]]:
+def iter_release_payload_files(
+    source_root: str | os.PathLike[str] | None = None,
+) -> list[tuple[Path, Path]]:
     """Return ``(source, relative)`` pairs for files in the unified payload."""
 
     root = validate_release_payload_root(source_root)
@@ -157,7 +178,9 @@ def _safe_directory_target(root: Path, relative: Path) -> Path:
     try:
         target_resolved.relative_to(root_resolved)
     except ValueError as exc:
-        raise ExeReleaseError(f"Release payload target escapes install directory: {target}") from exc
+        raise ExeReleaseError(
+            f"Release payload target escapes install directory: {target}"
+        ) from exc
     return target
 
 
@@ -173,7 +196,9 @@ def release_payload_to_directory(
     payload_root = validate_release_payload_root(source_root)
     install_dir = Path(target_dir).expanduser()
     files = iter_release_payload_files(payload_root)
-    planned_targets = [_safe_directory_target(install_dir, relative) for _, relative in files]
+    planned_targets = [
+        _safe_directory_target(install_dir, relative) for _, relative in files
+    ]
     existing = [target for target in planned_targets if target.exists()]
     result: dict[str, Any] = {
         "source_root": payload_root,
@@ -185,8 +210,12 @@ def release_payload_to_directory(
     }
 
     if existing and not overwrite:
-        result.update({"status": "skipped", "reason": "target-exists", "target_path": existing[0]})
-        logger.info("Release payload extraction skipped: target exists at %s", existing[0])
+        result.update(
+            {"status": "skipped", "reason": "target-exists", "target_path": existing[0]}
+        )
+        logger.info(
+            "Release payload extraction skipped: target exists at %s", existing[0]
+        )
         return result
 
     if dry_run:
@@ -206,11 +235,22 @@ def release_payload_to_directory(
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
     except Exception as exc:
-        logger.error("Release payload extraction failed: source=%s target=%s error=%s", payload_root, install_dir, exc)
+        logger.error(
+            "Release payload extraction failed: source=%s target=%s error=%s",
+            payload_root,
+            install_dir,
+            exc,
+        )
         raise
 
-    result.update({"status": "copied", "reason": "overwritten" if existing else "created"})
-    logger.info("Release payload extraction completed: target=%s files=%s", install_dir, len(files))
+    result.update(
+        {"status": "copied", "reason": "overwritten" if existing else "created"}
+    )
+    logger.info(
+        "Release payload extraction completed: target=%s files=%s",
+        install_dir,
+        len(files),
+    )
     return result
 
 
@@ -254,20 +294,32 @@ def _missing_exe_message(requested: Path, candidates: list[Path]) -> str:
     )
 
 
-def normalize_target_filename(target_filename: str | os.PathLike[str] | None, source: Path) -> str:
+def normalize_target_filename(
+    target_filename: str | os.PathLike[str] | None, source: Path
+) -> str:
     """Return a safe desktop target filename for the released Exe."""
 
-    raw_name = str(target_filename) if target_filename is not None else source.name or DEFAULT_TARGET_FILENAME
+    raw_name = (
+        str(target_filename)
+        if target_filename is not None
+        else source.name or DEFAULT_TARGET_FILENAME
+    )
     name = raw_name.strip()
     if not name:
         name = DEFAULT_TARGET_FILENAME
     if name != Path(name).name:
-        raise ExeReleaseError(f"Target filename must not include directories: {raw_name!r}")
+        raise ExeReleaseError(
+            f"Target filename must not include directories: {raw_name!r}"
+        )
     if name in {".", ".."} or any(char in _INVALID_FILENAME_CHARS for char in name):
-        raise ExeReleaseError(f"Target filename contains invalid characters: {raw_name!r}")
+        raise ExeReleaseError(
+            f"Target filename contains invalid characters: {raw_name!r}"
+        )
     stem = Path(name).stem
     if stem.upper() in _WINDOWS_RESERVED_NAMES:
-        raise ExeReleaseError(f"Target filename uses a reserved Windows name: {raw_name!r}")
+        raise ExeReleaseError(
+            f"Target filename uses a reserved Windows name: {raw_name!r}"
+        )
     if Path(name).suffix.lower() != ".exe":
         name = f"{name}.exe"
     return name
@@ -280,7 +332,9 @@ def _safe_target_path(desktop: Path, filename: str) -> Path:
     try:
         target_resolved.relative_to(desktop_resolved)
     except ValueError as exc:
-        raise ExeReleaseError(f"Target path escapes desktop directory: {target}") from exc
+        raise ExeReleaseError(
+            f"Target path escapes desktop directory: {target}"
+        ) from exc
     return target
 
 
@@ -319,8 +373,18 @@ def release_exe_to_desktop(
         return result
 
     if dry_run:
-        result.update({"status": "dry-run", "reason": "would-overwrite" if target_exists else "would-copy"})
-        logger.info("Exe release dry-run: source=%s target=%s overwrite=%s", source, target, overwrite)
+        result.update(
+            {
+                "status": "dry-run",
+                "reason": "would-overwrite" if target_exists else "would-copy",
+            }
+        )
+        logger.info(
+            "Exe release dry-run: source=%s target=%s overwrite=%s",
+            source,
+            target,
+            overwrite,
+        )
         return result
 
     try:
@@ -329,9 +393,13 @@ def release_exe_to_desktop(
             raise ExeReleaseError(f"Desktop path is not a directory: {desktop}")
         shutil.copy2(source, target)
     except Exception as exc:
-        logger.error("Exe release failed: source=%s target=%s error=%s", source, target, exc)
+        logger.error(
+            "Exe release failed: source=%s target=%s error=%s", source, target, exc
+        )
         raise
 
-    result.update({"status": "copied", "reason": "overwritten" if target_exists else "created"})
+    result.update(
+        {"status": "copied", "reason": "overwritten" if target_exists else "created"}
+    )
     logger.info("Exe release completed: target=%s", target)
     return result

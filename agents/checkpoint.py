@@ -1,4 +1,5 @@
 """检查点管理 — 结构化、可审计、敏感信息脱敏。"""
+
 from __future__ import annotations
 import json
 from pathlib import Path
@@ -26,7 +27,9 @@ def sanitize_for_checkpoint(value: Any, max_string: int = 500) -> Any:
     """Return a JSON-safe summary with common secret fields redacted."""
     if isinstance(value, dict):
         return {
-            str(k): "[REDACTED]" if _is_sensitive_key(str(k)) else sanitize_for_checkpoint(v, max_string)
+            str(k): "[REDACTED]"
+            if _is_sensitive_key(str(k))
+            else sanitize_for_checkpoint(v, max_string)
             for k, v in value.items()
         }
     if isinstance(value, list):
@@ -38,6 +41,7 @@ def sanitize_for_checkpoint(value: Any, max_string: int = 500) -> Any:
             return value[:max_string] + "...[truncated]"
         return value
     return repr(value)[:max_string]
+
 
 class CheckpointManager:
     def __init__(self, base_dir: Path):
@@ -75,14 +79,20 @@ class CheckpointManager:
             "status": status or state,
             "timestamp": utc_now(),
             "input_summary": sanitize_for_checkpoint(input_data or {}),
-            "output_summary": sanitize_for_checkpoint(output_data if output_data is not None else safe_result),
-            "error_summary": sanitize_for_checkpoint(error) if error is not None else None,
+            "output_summary": sanitize_for_checkpoint(
+                output_data if output_data is not None else safe_result
+            ),
+            "error_summary": sanitize_for_checkpoint(error)
+            if error is not None
+            else None,
             "recoverable": recoverable,
             "not_recoverable_reason": not_recoverable_reason,
             "stage_history": sanitize_for_checkpoint(stage_history or []),
             "result": safe_result,
         }
-        (step_dir / "status.json").write_text(json.dumps(checkpoint, ensure_ascii=False, indent=2), encoding="utf-8")
+        (step_dir / "status.json").write_text(
+            json.dumps(checkpoint, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
         return step_dir
 
     def load(self, task_id: str, step: int) -> dict[str, Any] | None:
@@ -125,10 +135,14 @@ class CheckpointManager:
                 "task_id": task_id,
                 "status": "not_recoverable",
                 "recoverable": False,
-                "reason": checkpoint.get("not_recoverable_reason") or "Latest checkpoint is marked not recoverable.",
+                "reason": checkpoint.get("not_recoverable_reason")
+                or "Latest checkpoint is marked not recoverable.",
                 "checkpoint": checkpoint,
             }
-        if checkpoint.get("state") in {"completed", "failed"} and checkpoint.get("recoverable") is not True:
+        if (
+            checkpoint.get("state") in {"completed", "failed"}
+            and checkpoint.get("recoverable") is not True
+        ):
             return {
                 "task_id": task_id,
                 "status": "not_recoverable",

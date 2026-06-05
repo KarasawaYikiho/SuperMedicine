@@ -32,7 +32,9 @@ class TUIState:
     ) -> Path:
         """Save TUI recent selection in the source workspace session state."""
 
-        return self.workspace_manager.save_recent_selection(workspace_id, selected_workspace_id)
+        return self.workspace_manager.save_recent_selection(
+            workspace_id, selected_workspace_id
+        )
 
     def load_recent_workspace(self, workspace_id: str) -> str | None:
         """Load TUI recent selection only from the requested workspace state."""
@@ -64,7 +66,10 @@ class TUIState:
     def workspace_payloads(self) -> list[dict[str, Any]]:
         """Return display-ready workspace records from the shared persistent list."""
 
-        return [self._workspace_payload(info, selected=False) for info in self.list_workspaces()]
+        return [
+            self._workspace_payload(info, selected=False)
+            for info in self.list_workspaces()
+        ]
 
     @staticmethod
     def _workspace_payload(info: WorkspaceInfo, *, selected: bool) -> dict[str, Any]:
@@ -84,7 +89,9 @@ def save_recent_workspace(
 ) -> Path:
     """Convenience wrapper for workspace-local recent workspace state."""
 
-    return TUIState(project_root).save_recent_workspace(workspace_id, selected_workspace_id)
+    return TUIState(project_root).save_recent_workspace(
+        workspace_id, selected_workspace_id
+    )
 
 
 def load_recent_workspace(

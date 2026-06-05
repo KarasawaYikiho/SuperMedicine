@@ -1,4 +1,5 @@
 """OpenCode 适配器集成测试"""
+
 from __future__ import annotations
 
 import json
@@ -26,21 +27,36 @@ def adapter():
     return OpenCodeAdapter()
 
 
-def _adapter_with_policy(tmp_path: Path, *, allowed: list[dict[str, str]], denied: list[dict[str, str]] | None = None, agent_id: str = "alpha") -> OpenCodeAdapter:
+def _adapter_with_policy(
+    tmp_path: Path,
+    *,
+    allowed: list[dict[str, str]],
+    denied: list[dict[str, str]] | None = None,
+    agent_id: str = "alpha",
+) -> OpenCodeAdapter:
     policy_dir = tmp_path / ".supermedicine" / "policies"
     policy_dir.mkdir(parents=True)
-    (policy_dir / PermissionEngine.DEFAULT_POLICY_FILENAME).write_text(yaml.dump({
-        "agent_id": agent_id,
-        "role": "adapter-test",
-        "permissions": {"allowed": allowed, "denied": denied or []},
-    }), encoding="utf-8")
+    (policy_dir / PermissionEngine.DEFAULT_POLICY_FILENAME).write_text(
+        yaml.dump(
+            {
+                "agent_id": agent_id,
+                "role": "adapter-test",
+                "permissions": {"allowed": allowed, "denied": denied or []},
+            }
+        ),
+        encoding="utf-8",
+    )
     engine = PermissionEngine(policy_dir, policy_dir / "audit.jsonl")
-    return OpenCodeAdapter(permission_engine=engine, project_dir=tmp_path, default_agent_id=agent_id)
+    return OpenCodeAdapter(
+        permission_engine=engine, project_dir=tmp_path, default_agent_id=agent_id
+    )
 
 
 @pytest.fixture
 def permissive_adapter(tmp_path: Path) -> OpenCodeAdapter:
-    return _adapter_with_policy(tmp_path, allowed=[{"action": "tool_call", "scope": "*"}])
+    return _adapter_with_policy(
+        tmp_path, allowed=[{"action": "tool_call", "scope": "*"}]
+    )
 
 
 class TestAdapterImport:
@@ -59,12 +75,16 @@ class TestAdapterImport:
         explicit_adapter = module.OpenCodeAdapter()
 
         capabilities = explicit_adapter.tool_call("opencode.capabilities", {})
-        dispatch = explicit_adapter.subagent_dispatch("alpha", {"action": "standalone-check"})
+        dispatch = explicit_adapter.subagent_dispatch(
+            "alpha", {"action": "standalone-check"}
+        )
 
         assert capabilities["status"] == "ok"
         assert capabilities["result"]["optional_add_on"] is True
         assert capabilities["result"]["status"] == "degraded"
-        assert capabilities["result"]["features"]["orchestrator_backed_dispatch"] is False
+        assert (
+            capabilities["result"]["features"]["orchestrator_backed_dispatch"] is False
+        )
         assert dispatch["status"] == "degraded"
         assert dispatch["error_code"] == "orchestrator_unavailable"
         assert dispatch["context"]["native_dispatch_executed"] is False
@@ -86,12 +106,26 @@ class TestAdapterImport:
         assert capabilities["features"]["ai_provider_config_discovery"] is True
         assert capabilities["features"]["ai_provider_secret_redaction"] is True
         assert capabilities["features"]["custom_ai_provider_base_url"] is True
-        assert set(capabilities["ai_provider"]["supported_api_formats"]) == {"openai", "anthropic", "openrouter"}
-        assert capabilities["ai_provider"]["supported_api_formats"]["openai"]["custom_base_url"] is True
+        assert set(capabilities["ai_provider"]["supported_api_formats"]) == {
+            "openai",
+            "anthropic",
+            "openrouter",
+        }
+        assert (
+            capabilities["ai_provider"]["supported_api_formats"]["openai"][
+                "custom_base_url"
+            ]
+            is True
+        )
         assert capabilities["ai_provider"]["secret_redaction"]["required"] is True
-        assert capabilities["ai_provider"]["secret_redaction"]["redacted_value"] == "<redacted>"
+        assert (
+            capabilities["ai_provider"]["secret_redaction"]["redacted_value"]
+            == "<redacted>"
+        )
         assert capabilities["ai_provider"]["degraded_without_orchestrator"] is True
-        user_facing_names = [agent["name"] for agent in capabilities["user_facing_agents"]]
+        user_facing_names = [
+            agent["name"] for agent in capabilities["user_facing_agents"]
+        ]
         assert user_facing_names == ["SuperMedicine"]
         assert len(capabilities["user_facing_agents"]) == 1
         assert FORBIDDEN_PLATFORM_AGENT_NAMES.isdisjoint(user_facing_names)
@@ -102,7 +136,9 @@ class TestAdapterImport:
             "delta-orchestrator.md",
         }
 
-    def test_capabilities_do_not_expose_environment_api_keys(self, adapter, monkeypatch):
+    def test_capabilities_do_not_expose_environment_api_keys(
+        self, adapter, monkeypatch
+    ):
         openai_secret = "sk-test-opencode-env-secret"
         anthropic_secret = "anthropic-test-opencode-env-secret"
         monkeypatch.setenv("OPENAI_API_KEY", openai_secret)
@@ -141,19 +177,27 @@ class TestToolCall:
         with tempfile.TemporaryDirectory() as tmpdir:
             project_dir = Path(tmpdir)
             file_path = Path(tmpdir) / "test.txt"
-            adapter = _adapter_with_policy(project_dir, allowed=[{"action": "tool_call", "scope": str(file_path)}])
+            adapter = _adapter_with_policy(
+                project_dir, allowed=[{"action": "tool_call", "scope": str(file_path)}]
+            )
             # Write
-            write_result = adapter.tool_call("write", {
-                "filePath": str(file_path),
-                "content": "Hello, SuperMedicine!",
-            })
+            write_result = adapter.tool_call(
+                "write",
+                {
+                    "filePath": str(file_path),
+                    "content": "Hello, SuperMedicine!",
+                },
+            )
             assert write_result["status"] == "ok"
             assert file_path.exists()
 
             # Read
-            read_result = adapter.tool_call("read", {
-                "filePath": str(file_path),
-            })
+            read_result = adapter.tool_call(
+                "read",
+                {
+                    "filePath": str(file_path),
+                },
+            )
             assert read_result["status"] == "ok"
             assert "Hello, SuperMedicine!" in read_result["result"]
 
@@ -164,7 +208,9 @@ class TestToolCall:
         assert "Unsupported" in result["result"]
 
     def test_task_tool_without_orchestrator_returns_degraded_result(self, adapter):
-        result = adapter.tool_call("task", {"agent_id": "alpha", "task": {"action": "test"}})
+        result = adapter.tool_call(
+            "task", {"agent_id": "alpha", "task": {"action": "test"}}
+        )
 
         assert result["status"] == "degraded"
         assert result["tool"] == "task"
@@ -172,10 +218,14 @@ class TestToolCall:
         assert result["context"]["native_dispatch_executed"] is False
 
     def test_high_risk_tool_denied_before_write_mutation(self, tmp_path):
-        adapter = _adapter_with_policy(tmp_path, allowed=[], denied=[{"action": "tool_call", "scope": "*"}])
+        adapter = _adapter_with_policy(
+            tmp_path, allowed=[], denied=[{"action": "tool_call", "scope": "*"}]
+        )
         file_path = tmp_path / "blocked.txt"
 
-        result = adapter.tool_call("write", {"filePath": str(file_path), "content": "blocked"})
+        result = adapter.tool_call(
+            "write", {"filePath": str(file_path), "content": "blocked"}
+        )
 
         assert result["status"] == "denied"
         assert result["error_code"] == "permission_denied"
@@ -183,14 +233,20 @@ class TestToolCall:
 
     def test_high_risk_tool_allowed_with_explicit_policy(self, tmp_path):
         target = tmp_path / "allowed.txt"
-        adapter = _adapter_with_policy(tmp_path, allowed=[{"action": "tool_call", "scope": str(target)}])
+        adapter = _adapter_with_policy(
+            tmp_path, allowed=[{"action": "tool_call", "scope": str(target)}]
+        )
 
-        result = adapter.tool_call("write", {"filePath": str(target), "content": "allowed"})
+        result = adapter.tool_call(
+            "write", {"filePath": str(target), "content": "allowed"}
+        )
 
         assert result["status"] == "ok"
         assert target.read_text(encoding="utf-8") == "allowed"
 
-    def test_tool_call_read_write_allows_same_file_when_policy_scope_uses_unresolved_path(self, tmp_path):
+    def test_tool_call_read_write_allows_same_file_when_policy_scope_uses_unresolved_path(
+        self, tmp_path
+    ):
         """Same-file policy scopes must survive adapter path resolution.
 
         The adapter checks permissions against BaseAdapter._tool_permission_resource(),
@@ -208,60 +264,85 @@ class TestToolCall:
             allowed=[{"action": "tool_call", "scope": str(policy_scope)}],
         )
 
-        write_result = adapter.tool_call("write", {
-            "filePath": str(policy_scope),
-            "content": "same file through unresolved policy scope",
-        })
+        write_result = adapter.tool_call(
+            "write",
+            {
+                "filePath": str(policy_scope),
+                "content": "same file through unresolved policy scope",
+            },
+        )
 
         assert write_result["status"] == "ok"
         read_result = adapter.tool_call("read", {"filePath": str(policy_scope)})
         assert read_result["status"] == "ok"
         assert "same file through unresolved policy scope" in read_result["result"]
 
-    def test_tool_call_read_write_allows_resolved_policy_scope_with_raw_params(self, tmp_path):
+    def test_tool_call_read_write_allows_resolved_policy_scope_with_raw_params(
+        self, tmp_path
+    ):
         project_dir = tmp_path / "project"
         project_dir.mkdir()
-        raw_file_path = project_dir / "nested" / ".." / "nested" / "same-file-reversed.txt"
+        raw_file_path = (
+            project_dir / "nested" / ".." / "nested" / "same-file-reversed.txt"
+        )
         resolved_policy_scope = raw_file_path.resolve(strict=False)
         adapter = _adapter_with_policy(
             project_dir,
             allowed=[{"action": "tool_call", "scope": str(resolved_policy_scope)}],
         )
 
-        write_result = adapter.tool_call("write", {
-            "filePath": str(raw_file_path),
-            "content": "same file through resolved policy scope",
-        })
+        write_result = adapter.tool_call(
+            "write",
+            {
+                "filePath": str(raw_file_path),
+                "content": "same file through resolved policy scope",
+            },
+        )
 
         assert write_result["status"] == "ok"
         read_result = adapter.tool_call("read", {"filePath": str(raw_file_path)})
         assert read_result["status"] == "ok"
         assert "same file through resolved policy scope" in read_result["result"]
 
-    def test_tool_call_read_write_does_not_allow_different_normalized_file(self, tmp_path):
+    def test_tool_call_read_write_does_not_allow_different_normalized_file(
+        self, tmp_path
+    ):
         project_dir = tmp_path / "project"
         project_dir.mkdir()
         allowed_file = project_dir / "nested" / "allowed.txt"
         different_file = project_dir / "nested" / "allowed.txt.bak"
         adapter = _adapter_with_policy(
             project_dir,
-            allowed=[{"action": "tool_call", "scope": str(allowed_file.resolve(strict=False))}],
+            allowed=[
+                {
+                    "action": "tool_call",
+                    "scope": str(allowed_file.resolve(strict=False)),
+                }
+            ],
         )
 
-        write_result = adapter.tool_call("write", {
-            "filePath": str(different_file),
-            "content": "must not be written",
-        })
+        write_result = adapter.tool_call(
+            "write",
+            {
+                "filePath": str(different_file),
+                "content": "must not be written",
+            },
+        )
 
         assert write_result["status"] == "denied"
         assert not different_file.exists()
 
     def test_tool_call_glob(self, adapter):
         """验证 Glob 工具调用"""
-        result = adapter.tool_call("glob", {
-            "pattern": "*.py",
-            "path": str(Path(__file__).parent.parent / "Cli.py").rsplit("\\", 1)[0] if "\\" in str(Path(__file__).parent.parent) else str(Path(__file__).parent.parent),
-        })
+        result = adapter.tool_call(
+            "glob",
+            {
+                "pattern": "*.py",
+                "path": str(Path(__file__).parent.parent / "Cli.py").rsplit("\\", 1)[0]
+                if "\\" in str(Path(__file__).parent.parent)
+                else str(Path(__file__).parent.parent),
+            },
+        )
         assert result["status"] == "ok"
         # Should Find at Least CLI.Py
         assert len(result["result"]) > 0
@@ -269,23 +350,36 @@ class TestToolCall:
     def test_tool_call_grep(self, adapter):
         """验证 Grep 工具调用"""
         adapter_dir = Path(__file__).parent.parent
-        result = adapter.tool_call("grep", {
-            "pattern": "class OpenCodeAdapter",
-            "path": str(adapter_dir / "adapters" / "opencode"),
-            "include": "*.py",
-        })
+        result = adapter.tool_call(
+            "grep",
+            {
+                "pattern": "class OpenCodeAdapter",
+                "path": str(adapter_dir / "adapters" / "opencode"),
+                "include": "*.py",
+            },
+        )
         assert result["status"] == "ok"
         assert "OpenCodeAdapter" in result["result"]
 
-    def test_filesystem_tools_deny_paths_outside_project_root(self, permissive_adapter, tmp_path):
+    def test_filesystem_tools_deny_paths_outside_project_root(
+        self, permissive_adapter, tmp_path
+    ):
         outside_dir = tmp_path.parent / f"{tmp_path.name}-outside"
         outside_file = outside_dir / "blocked.txt"
         assert not outside_file.exists()
 
-        write_result = permissive_adapter.tool_call("write", {"filePath": str(outside_file), "content": "blocked"})
-        read_result = permissive_adapter.tool_call("read", {"filePath": str(outside_file)})
-        glob_result = permissive_adapter.tool_call("glob", {"path": str(outside_dir), "pattern": "*"})
-        grep_result = permissive_adapter.tool_call("grep", {"path": str(outside_dir), "pattern": "blocked"})
+        write_result = permissive_adapter.tool_call(
+            "write", {"filePath": str(outside_file), "content": "blocked"}
+        )
+        read_result = permissive_adapter.tool_call(
+            "read", {"filePath": str(outside_file)}
+        )
+        glob_result = permissive_adapter.tool_call(
+            "glob", {"path": str(outside_dir), "pattern": "*"}
+        )
+        grep_result = permissive_adapter.tool_call(
+            "grep", {"path": str(outside_dir), "pattern": "blocked"}
+        )
 
         assert write_result["status"] == "denied"
         assert write_result["error_code"] == "sandbox_denied"
@@ -294,13 +388,18 @@ class TestToolCall:
         assert glob_result["status"] == "denied"
         assert grep_result["status"] == "denied"
 
-    def test_edit_does_not_mutate_outside_project_root(self, permissive_adapter, tmp_path):
+    def test_edit_does_not_mutate_outside_project_root(
+        self, permissive_adapter, tmp_path
+    ):
         outside_dir = tmp_path.parent / f"{tmp_path.name}-outside-edit"
         outside_dir.mkdir(exist_ok=True)
         outside_file = outside_dir / "blocked.txt"
         outside_file.write_text("old", encoding="utf-8")
 
-        result = permissive_adapter.tool_call("edit", {"filePath": str(outside_file), "oldString": "old", "newString": "new"})
+        result = permissive_adapter.tool_call(
+            "edit",
+            {"filePath": str(outside_file), "oldString": "old", "newString": "new"},
+        )
 
         assert result["status"] == "denied"
         assert result["error_code"] == "sandbox_denied"
@@ -308,19 +407,40 @@ class TestToolCall:
 
     def test_bash_permission_denied_before_execution(self, tmp_path):
         marker = tmp_path / "should_not_exist.txt"
-        adapter = _adapter_with_policy(tmp_path, allowed=[], denied=[{"action": "tool_call", "scope": "bash"}])
+        adapter = _adapter_with_policy(
+            tmp_path, allowed=[], denied=[{"action": "tool_call", "scope": "bash"}]
+        )
 
-        result = adapter.tool_call("bash", {"command": f"python -c \"from pathlib import Path; Path(r'{marker}').write_text('ran')\"", "workdir": str(tmp_path)})
+        result = adapter.tool_call(
+            "bash",
+            {
+                "command": f"python -c \"from pathlib import Path; Path(r'{marker}').write_text('ran')\"",
+                "workdir": str(tmp_path),
+            },
+        )
 
         assert result["status"] == "denied"
         assert result["resource"] == "bash"
 
-    def test_bash_uses_shell_free_argv_and_does_not_expand_metacharacters(self, tmp_path):
+    def test_bash_uses_shell_free_argv_and_does_not_expand_metacharacters(
+        self, tmp_path
+    ):
         marker = tmp_path / "shell-injection-marker"
-        adapter = _adapter_with_policy(tmp_path, allowed=[{"action": "tool_call", "scope": "bash"}])
+        adapter = _adapter_with_policy(
+            tmp_path, allowed=[{"action": "tool_call", "scope": "bash"}]
+        )
 
-        result = adapter.tool_call("bash", {"command": ["python", "-c", "print('safe')"], "workdir": str(tmp_path)})
-        injected = adapter.tool_call("bash", {"command": f"echo safe && python -c \"open(r'{marker}', 'w').write('bad')\"", "workdir": str(tmp_path)})
+        result = adapter.tool_call(
+            "bash",
+            {"command": ["python", "-c", "print('safe')"], "workdir": str(tmp_path)},
+        )
+        injected = adapter.tool_call(
+            "bash",
+            {
+                "command": f"echo safe && python -c \"open(r'{marker}', 'w').write('bad')\"",
+                "workdir": str(tmp_path),
+            },
+        )
 
         assert result["status"] == "ok"
         assert "safe" in result["result"]
@@ -337,7 +457,11 @@ class TestSkillLoad:
         assert content is not None
         assert len(content) > 0
         # Should Contain Markdown Content
-        assert "rag" in content.lower() or "RAG" in content or "rag-query" in content.lower()
+        assert (
+            "rag" in content.lower()
+            or "RAG" in content
+            or "rag-query" in content.lower()
+        )
 
     def test_skill_load_invalid(self, adapter):
         """验证 skill_load 对不存在的技能返回合理错误信息"""
@@ -350,7 +474,9 @@ class TestSubagentDispatch:
 
     def test_subagent_dispatch(self, adapter):
         """验证 subagent_dispatch 返回有效响应"""
-        result = adapter.subagent_dispatch("alpha", {"action": "test", "data": "sample"})
+        result = adapter.subagent_dispatch(
+            "alpha", {"action": "test", "data": "sample"}
+        )
         assert result["agent_id"] == "alpha"
         assert result["status"] == "degraded"
         assert result["error_code"] == "orchestrator_unavailable"
@@ -366,13 +492,22 @@ class TestPluginJson:
 
     def test_plugin_json_valid(self):
         """验证 Plugin.JSON 可被 JSON 解析且包含所有必填字段"""
-        plugin_path = Path(__file__).parent.parent / "adapters" / "opencode" / "plugin.json"
+        plugin_path = (
+            Path(__file__).parent.parent / "adapters" / "opencode" / "plugin.json"
+        )
         assert plugin_path.exists(), "plugin.json not found"
 
         with open(plugin_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        required_fields = ["name", "version", "description", "type", "entry", "permissions"]
+        required_fields = [
+            "name",
+            "version",
+            "description",
+            "type",
+            "entry",
+            "permissions",
+        ]
         for field in required_fields:
             assert field in data, f"Missing required field: {field}"
 
@@ -381,21 +516,48 @@ class TestPluginJson:
         assert len(data["permissions"]["tools"]) >= 9
         assert set(data["permissions"]["tools"]) == OpenCodeAdapter.SUPPORTED_TOOLS
         assert "opencode.capabilities" in data["permissions"]["tools"]
-        assert set(data["permissions"]["high_risk_checked_tools"]) == {"bash", "write", "edit", "task"}
-        assert set(data["permissions"]["high_risk_checked_tools"]).issubset(OpenCodeAdapter.SUPPORTED_TOOLS)
+        assert set(data["permissions"]["high_risk_checked_tools"]) == {
+            "bash",
+            "write",
+            "edit",
+            "task",
+        }
+        assert set(data["permissions"]["high_risk_checked_tools"]).issubset(
+            OpenCodeAdapter.SUPPORTED_TOOLS
+        )
         assert "read" in data["permissions"]["sandboxed_filesystem_tools"]
         assert data["optional_add_on"] is True
         assert data["native_opencode_subagent_runtime"] is False
         assert data["core_runtime_required"] is False
         assert data["install_entry_files"]["adapter_module"] == "adapter.py"
-        assert (plugin_path.parent / data["install_entry_files"]["plugin_manifest"]).is_file()
-        assert (plugin_path.parent / data["install_entry_files"]["adapter_module"]).is_file()
-        assert (plugin_path.parent / data["install_entry_files"]["single_user_facing_agent"]).is_file()
-        assert (plugin_path.parent / data["install_entry_files"]["skill_documents_dir"]).is_dir()
-        assert (plugin_path.parent / data["install_entry_files"]["internal_role_context_dir"]).is_dir()
-        assert data["install_completeness_model"]["degraded_without_orchestrator"] is True
-        assert set(data["ai_provider"]["supported_api_formats"]) == {"openai", "anthropic", "openrouter"}
-        assert data["ai_provider"]["supported_api_formats"]["anthropic"]["custom_base_url"] is True
+        assert (
+            plugin_path.parent / data["install_entry_files"]["plugin_manifest"]
+        ).is_file()
+        assert (
+            plugin_path.parent / data["install_entry_files"]["adapter_module"]
+        ).is_file()
+        assert (
+            plugin_path.parent / data["install_entry_files"]["single_user_facing_agent"]
+        ).is_file()
+        assert (
+            plugin_path.parent / data["install_entry_files"]["skill_documents_dir"]
+        ).is_dir()
+        assert (
+            plugin_path.parent
+            / data["install_entry_files"]["internal_role_context_dir"]
+        ).is_dir()
+        assert (
+            data["install_completeness_model"]["degraded_without_orchestrator"] is True
+        )
+        assert set(data["ai_provider"]["supported_api_formats"]) == {
+            "openai",
+            "anthropic",
+            "openrouter",
+        }
+        assert (
+            data["ai_provider"]["supported_api_formats"]["anthropic"]["custom_base_url"]
+            is True
+        )
         assert data["ai_provider"]["secret_redaction_required"] is True
         assert data["ai_provider"]["redacted_value"] == "<redacted>"
         assert data["ai_provider"]["plaintext_api_keys_in_manifest"] is False
@@ -407,7 +569,9 @@ class TestPluginJson:
         assert "skills" in data
         assert len(data["skills"]) == 6
         for skill_path in data["skills"]:
-            assert (plugin_path.parent / skill_path).is_file(), f"Missing declared OpenCode skill: {skill_path}"
+            assert (plugin_path.parent / skill_path).is_file(), (
+                f"Missing declared OpenCode skill: {skill_path}"
+            )
 
         # Check Agents: exactly one user-facing OpenCode agent
         assert "agents" in data
@@ -416,12 +580,14 @@ class TestPluginJson:
         assert user_facing_names == ["SuperMedicine"]
         assert len(data["user_facing_agents"]) == 1
         assert FORBIDDEN_PLATFORM_AGENT_NAMES.isdisjoint(user_facing_names)
-        assert sorted(data["internal_role_contexts"]) == sorted([
-            "agents/alpha-analyst.md",
-            "agents/beta-reviewer.md",
-            "agents/gamma-writer.md",
-            "agents/delta-orchestrator.md",
-        ])
+        assert sorted(data["internal_role_contexts"]) == sorted(
+            [
+                "agents/alpha-analyst.md",
+                "agents/beta-reviewer.md",
+                "agents/gamma-writer.md",
+                "agents/delta-orchestrator.md",
+            ]
+        )
 
 
 class TestSkillsExist:
@@ -455,7 +621,7 @@ class TestSkillsExist:
 
         citation_doc = (skills_dir / "medical-citation.md").read_text(encoding="utf-8")
         assert "JournalArticle" in citation_doc
-        assert "volume=\"331\"" in citation_doc
+        assert 'volume="331"' in citation_doc
         assert "standard.citation.ama" in citation_doc
 
         python_stats_doc = (skills_dir / "python-stats.md").read_text(encoding="utf-8")
@@ -470,7 +636,14 @@ class TestSkillsExist:
     def test_skill_docs_preserve_interface_and_human_review_boundaries(self):
         """OpenCode skill docs must not overclaim clinical/production readiness."""
         skills_dir = Path(__file__).parent.parent / "adapters" / "opencode" / "skills"
-        for skill_file in ["rag-query.md", "medical-citation.md", "medical-writing.md", "python-stats.md", "r-survival.md", "harness-monitor.md"]:
+        for skill_file in [
+            "rag-query.md",
+            "medical-citation.md",
+            "medical-writing.md",
+            "python-stats.md",
+            "r-survival.md",
+            "harness-monitor.md",
+        ]:
             content = (skills_dir / skill_file).read_text(encoding="utf-8").lower()
             assert "human" in content or "expert review" in content
             assert "openai-compatible" in content
@@ -487,7 +660,9 @@ class TestAgentsExist:
         """验证唯一用户可见 Agent 和内部 role context 文件存在"""
         agents_dir = Path(__file__).parent.parent / "adapters" / "opencode" / "agents"
         user_facing_agent = agents_dir / "supermedicine.md"
-        assert user_facing_agent.exists(), "Missing SuperMedicine user-facing agent file"
+        assert user_facing_agent.exists(), (
+            "Missing SuperMedicine user-facing agent file"
+        )
         user_facing_content = user_facing_agent.read_text(encoding="utf-8")
         assert "name: SuperMedicine" in user_facing_content
         assert "user_facing: true" in user_facing_content
@@ -505,7 +680,9 @@ class TestAgentsExist:
         ]
         for agent_file in expected_contexts:
             agent_path = agents_dir / agent_file
-            assert agent_path.exists(), f"Missing internal role context file: {agent_file}"
+            assert agent_path.exists(), (
+                f"Missing internal role context file: {agent_file}"
+            )
             content = agent_path.read_text(encoding="utf-8")
             assert len(content) > 0, f"Empty internal role context file: {agent_file}"
             assert "user_facing: false" in content

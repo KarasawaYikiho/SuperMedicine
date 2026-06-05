@@ -4,6 +4,7 @@ This module provides additive JSONL storage primitives for user-confirmed
 experience summaries. It deliberately does not integrate with CLI, TUI, or RAG
 actions yet.
 """
+
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
@@ -149,9 +150,13 @@ def validate_confirmed_record(record: ExperienceRecord) -> None:
     """Validate a record before it can enter confirmed storage."""
 
     if record.scope not in ("general", "workspace"):
-        raise ExperienceValidationError("Experience scope must be 'general' or 'workspace'")
+        raise ExperienceValidationError(
+            "Experience scope must be 'general' or 'workspace'"
+        )
     if not record.confirmed:
-        raise ExperienceValidationError("Only user-confirmed experiences may be persisted")
+        raise ExperienceValidationError(
+            "Only user-confirmed experiences may be persisted"
+        )
     if record.raw_conversation_stored:
         raise ExperiencePrivacyError("Raw conversation storage is not allowed")
     if not record.title.strip():
@@ -161,23 +166,35 @@ def validate_confirmed_record(record: ExperienceRecord) -> None:
     if record.scope == "workspace" and not record.workspace_id:
         raise ExperienceValidationError("Workspace experiences require a workspace_id")
     if record.scope == "general" and record.workspace_id is not None:
-        raise ExperiencePrivacyError("General experiences must not include a workspace_id")
+        raise ExperiencePrivacyError(
+            "General experiences must not include a workspace_id"
+        )
     _reject_raw_conversation_fields(record.to_dict())
 
 
-def validate_general_experience_privacy(record: ExperienceRecord, source: dict[str, Any] | None = None) -> None:
+def validate_general_experience_privacy(
+    record: ExperienceRecord, source: dict[str, Any] | None = None
+) -> None:
     """Reject deterministic project-detail markers in the general method layer."""
 
     payload = record.to_dict() if source is None else dict(source)
     if payload.get("contains_project_details") is True:
-        raise ExperiencePrivacyError("General experiences must not contain project details")
+        raise ExperiencePrivacyError(
+            "General experiences must not contain project details"
+        )
     if payload.get("workspace_id") is not None:
-        raise ExperiencePrivacyError("General experiences must not contain workspace_id")
+        raise ExperiencePrivacyError(
+            "General experiences must not contain workspace_id"
+        )
     for marker in ("project_details", "paper_ids", "paper_paths"):
         if _contains_key(payload, {marker}):
-            raise ExperiencePrivacyError(f"General experiences must not contain {marker}")
+            raise ExperiencePrivacyError(
+                f"General experiences must not contain {marker}"
+            )
     if _contains_marker_text(payload, _PROJECT_DETAIL_MARKERS):
-        raise ExperiencePrivacyError("General experiences must not contain project detail markers")
+        raise ExperiencePrivacyError(
+            "General experiences must not contain project detail markers"
+        )
 
 
 class ExperienceStore:
@@ -207,12 +224,16 @@ class ExperienceStore:
             / CONFIRMED_EXPERIENCE_FILENAME
         )
 
-    def store_confirmed_experience(self, record: ExperienceRecord | dict[str, Any]) -> ExperienceRecord:
+    def store_confirmed_experience(
+        self, record: ExperienceRecord | dict[str, Any]
+    ) -> ExperienceRecord:
         """Persist a confirmed record to its scope-specific storage layer."""
 
         source = record if isinstance(record, dict) else record.to_dict()
         _reject_raw_conversation_fields(source)
-        normalized = ExperienceRecord.from_dict(source) if isinstance(record, dict) else record
+        normalized = (
+            ExperienceRecord.from_dict(source) if isinstance(record, dict) else record
+        )
         validate_confirmed_record(normalized)
 
         if normalized.scope == "general":
@@ -239,7 +260,9 @@ class ExperienceStore:
             **(metadata or {}),
         }
         _reject_raw_conversation_fields(payload)
-        if _contains_key(payload, _PROJECT_DETAIL_MARKERS) or _contains_marker_text(payload, _PROJECT_DETAIL_MARKERS):
+        if _contains_key(payload, _PROJECT_DETAIL_MARKERS) or _contains_marker_text(
+            payload, _PROJECT_DETAIL_MARKERS
+        ):
             scope: ExperienceScope = "workspace"
             reason = "Project-detail markers require workspace-local storage."
         else:
@@ -337,7 +360,9 @@ class ExperienceStore:
 
         return self._read_jsonl(self.workspace_confirmed_path(workspace_id))
 
-    def list_experiences(self, workspace_id: str, *, include_general: bool = False) -> list[ExperienceRecord]:
+    def list_experiences(
+        self, workspace_id: str, *, include_general: bool = False
+    ) -> list[ExperienceRecord]:
         """List records visible from the explicit workspace context."""
 
         self.workspace_manager.get_workspace(workspace_id)
@@ -380,7 +405,11 @@ class ExperienceStore:
         """Edit one record in its explicit scope while preserving privacy rules."""
 
         self.workspace_manager.get_workspace(workspace_id)
-        path = self.general_confirmed_path if scope == "general" else self.workspace_confirmed_path(workspace_id)
+        path = (
+            self.general_confirmed_path
+            if scope == "general"
+            else self.workspace_confirmed_path(workspace_id)
+        )
         records = self._read_jsonl(path)
         updated: ExperienceRecord | None = None
         rewritten: list[ExperienceRecord] = []
@@ -409,11 +438,17 @@ class ExperienceStore:
         self._write_jsonl(path, rewritten)
         return updated
 
-    def delete_experience(self, record_id: str, *, workspace_id: str, scope: ExperienceScope) -> ExperienceRecord:
+    def delete_experience(
+        self, record_id: str, *, workspace_id: str, scope: ExperienceScope
+    ) -> ExperienceRecord:
         """Delete one record from its explicit scope and return the deleted record."""
 
         self.workspace_manager.get_workspace(workspace_id)
-        path = self.general_confirmed_path if scope == "general" else self.workspace_confirmed_path(workspace_id)
+        path = (
+            self.general_confirmed_path
+            if scope == "general"
+            else self.workspace_confirmed_path(workspace_id)
+        )
         records = self._read_jsonl(path)
         deleted: ExperienceRecord | None = None
         remaining: list[ExperienceRecord] = []
@@ -439,7 +474,9 @@ class ExperienceStore:
 
         records = self.list_experiences(workspace_id, include_general=include_general)
         if format == "json":
-            rendered = json.dumps([record.to_dict() for record in records], ensure_ascii=False, indent=2)
+            rendered = json.dumps(
+                [record.to_dict() for record in records], ensure_ascii=False, indent=2
+            )
         elif format == "md":
             rendered = self._records_to_markdown(records)
         else:
@@ -451,14 +488,18 @@ class ExperienceStore:
     def _append_jsonl(self, path: Path, record: ExperienceRecord) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("a", encoding="utf-8", newline="\n") as handle:
-            handle.write(json.dumps(record.to_dict(), ensure_ascii=False, sort_keys=True))
+            handle.write(
+                json.dumps(record.to_dict(), ensure_ascii=False, sort_keys=True)
+            )
             handle.write("\n")
 
     def _write_jsonl(self, path: Path, records: list[ExperienceRecord]) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("w", encoding="utf-8", newline="\n") as handle:
             for record in records:
-                handle.write(json.dumps(record.to_dict(), ensure_ascii=False, sort_keys=True))
+                handle.write(
+                    json.dumps(record.to_dict(), ensure_ascii=False, sort_keys=True)
+                )
                 handle.write("\n")
 
     def _read_jsonl(self, path: Path) -> list[ExperienceRecord]:
@@ -472,7 +513,9 @@ class ExperienceStore:
                     continue
                 loaded = json.loads(stripped)
                 if not isinstance(loaded, dict):
-                    raise ExperienceValidationError("Experience JSONL rows must be objects")
+                    raise ExperienceValidationError(
+                        "Experience JSONL rows must be objects"
+                    )
                 records.append(ExperienceRecord.from_dict(loaded))
         return records
 

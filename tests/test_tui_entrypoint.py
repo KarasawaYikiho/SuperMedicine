@@ -66,7 +66,18 @@ def test_tui_startup_metadata_covers_all_primary_views_and_shortcuts():
     nav_items = SuperMedicineTUI.nav_items()
     binding_by_key = {binding.key: binding for binding in SuperMedicineTUI.BINDINGS}
 
-    assert [item.key for item in nav_items] == ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]
+    assert [item.key for item in nav_items] == [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "0",
+    ]
     assert [item.view_id for item in nav_items] == [
         "chat",
         "dashboard",
@@ -134,7 +145,9 @@ def test_tui_dry_run_prints_modern_status_without_secrets(capsys):
     assert "任务空闲" in status.status_center
 
 
-def test_tui_dry_run_status_and_output_use_chinese_copy_and_no_llm_secret(tmp_path, capsys):
+def test_tui_dry_run_status_and_output_use_chinese_copy_and_no_llm_secret(
+    tmp_path, capsys
+):
     secret = "sk-dryrun-copy-secret"
     config_dir = tmp_path / ".supermedicine"
     config_dir.mkdir()
@@ -237,7 +250,21 @@ def test_tui_view_title_and_status_text_are_test_friendly(tmp_path):
 def test_tui_help_text_documents_actual_bindings_and_state_meanings():
     binding_keys = {binding.key for binding in SuperMedicineTUI.BINDINGS}
 
-    for key in {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "q", "f", "question_mark"}:
+    for key in {
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "0",
+        "q",
+        "f",
+        "question_mark",
+    }:
         assert key in binding_keys
 
     help_text = "\n".join(
@@ -251,14 +278,46 @@ def test_tui_help_text_documents_actual_bindings_and_state_meanings():
         ]
     )
 
-    for expected in ["1-0", "Tab/Shift+Tab", "Enter", "刷新", "危险操作", "LLM", "任务", "Q", "F", "?"]:
+    for expected in [
+        "1-0",
+        "Tab/Shift+Tab",
+        "Enter",
+        "刷新",
+        "危险操作",
+        "LLM",
+        "任务",
+        "Q",
+        "F",
+        "?",
+    ]:
         assert expected in help_text
 
 
 def test_readme_tui_docs_match_bindings_and_preserve_boundaries():
-    readme = Path(__file__).resolve().parents[1].joinpath("README.md").read_text(encoding="utf-8")
+    readme = (
+        Path(__file__)
+        .resolve()
+        .parents[1]
+        .joinpath("README.md")
+        .read_text(encoding="utf-8")
+    )
 
-    for expected in ["`1`", "`2`", "`3`", "`4`", "`5`", "`6`", "`7`", "`8`", "`Tab`", "`Shift+Tab`", "`Enter`", "`f`", "`?`", "`q`"]:
+    for expected in [
+        "`1`",
+        "`2`",
+        "`3`",
+        "`4`",
+        "`5`",
+        "`6`",
+        "`7`",
+        "`8`",
+        "`Tab`",
+        "`Shift+Tab`",
+        "`Enter`",
+        "`f`",
+        "`?`",
+        "`q`",
+    ]:
         assert expected in readme
     assert "LLM 状态" in readme
     assert "任务运行状态" in readme
@@ -272,10 +331,17 @@ def test_tui_stylesheet_selectors_match_declared_widgets_and_classes():
     assert "@media" not in stylesheet
     tui_sources = "\n".join(
         path.read_text(encoding="utf-8")
-        for path in [root.joinpath("core", "tui", "app.py"), *root.joinpath("core", "tui", "screens").glob("*_screen.py")]
+        for path in [
+            root.joinpath("core", "tui", "app.py"),
+            *root.joinpath("core", "tui", "screens").glob("*_screen.py"),
+        ]
     )
-    tui_sources += root.joinpath("core", "tui", "screens", "chat_view.py").read_text(encoding="utf-8")
-    tui_sources += root.joinpath("core", "tui", "screens", "dashboard.py").read_text(encoding="utf-8")
+    tui_sources += root.joinpath("core", "tui", "screens", "chat_view.py").read_text(
+        encoding="utf-8"
+    )
+    tui_sources += root.joinpath("core", "tui", "screens", "dashboard.py").read_text(
+        encoding="utf-8"
+    )
 
     declared_ids = set(re.findall(r'id="([a-zA-Z0-9_-]+)"', tui_sources))
     declared_classes = {
@@ -284,7 +350,16 @@ def test_tui_stylesheet_selectors_match_declared_widgets_and_classes():
         for class_name in classes.split()
     }
     declared_classes.update(STATUS_STYLE_CLASSES)
-    declared_classes.update({"status-info", "status-success", "status-warning", "status-error", "-active", "-maximized"})
+    declared_classes.update(
+        {
+            "status-info",
+            "status-success",
+            "status-warning",
+            "status-error",
+            "-active",
+            "-maximized",
+        }
+    )
 
     selector_blocks = [block.rsplit("}", 1)[-1] for block in stylesheet.split("{")[:-1]]
     selectors = "\n".join(selector_blocks)

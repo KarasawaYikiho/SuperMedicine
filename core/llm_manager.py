@@ -1,4 +1,5 @@
 """集中式 LLM 配置管理服务。"""
+
 from __future__ import annotations
 
 import logging
@@ -30,7 +31,11 @@ class LLMConfigManager:
 
     def list_providers(self, *, redacted: bool = True) -> dict[str, Any]:
         """列出 provider 配置；默认脱敏。"""
-        logger.info("LLM manager list_providers: stage=config path=%s redacted=%s", self._config.config_path, redacted)
+        logger.info(
+            "LLM manager list_providers: stage=config path=%s redacted=%s",
+            self._config.config_path,
+            redacted,
+        )
         return self._config.get_llm_providers(redacted=redacted)
 
     def diagnostics(self) -> dict[str, Any]:
@@ -56,7 +61,11 @@ class LLMConfigManager:
         provider_name = self._normalize_provider(provider)
         if not provider_name:
             return self._error("missing_provider", "LLM provider name is required")
-        logger.info("LLM manager add_provider: stage=config provider=%s path=%s", provider_name, self._config.config_path)
+        logger.info(
+            "LLM manager add_provider: stage=config provider=%s path=%s",
+            provider_name,
+            self._config.config_path,
+        )
 
         config_values = dict(values)
         config_values.setdefault("api_format", self._default_api_format(provider_name))
@@ -75,10 +84,18 @@ class LLMConfigManager:
         provider_name = self._normalize_provider(provider)
         if not provider_name:
             return self._error("missing_provider", "LLM provider name is required")
-        logger.info("LLM manager switch_provider: stage=config provider=%s path=%s", provider_name, self._config.config_path)
+        logger.info(
+            "LLM manager switch_provider: stage=config provider=%s path=%s",
+            provider_name,
+            self._config.config_path,
+        )
         provider_config = self._config.get_llm_provider_config(provider_name)
         if not self._provider_exists(provider_name):
-            return self._error("provider_not_found", f"LLM provider not found: {provider_name}", provider=provider_name)
+            return self._error(
+                "provider_not_found",
+                f"LLM provider not found: {provider_name}",
+                provider=provider_name,
+            )
 
         validation_error = self.validate_provider(provider_name, provider_config)
         if validation_error is not None:
@@ -102,13 +119,21 @@ class LLMConfigManager:
             return {}
         return self._config.get_llm_provider_config(provider_name, redacted=redacted)
 
-    def save_exit_state(self, provider: str | None = None, *, save: bool = True) -> dict[str, Any]:
+    def save_exit_state(
+        self, provider: str | None = None, *, save: bool = True
+    ) -> dict[str, Any]:
         """保存退出时使用的 provider。"""
-        provider_name = self._normalize_provider(provider or self._config.get_llm_current_provider_name())
+        provider_name = self._normalize_provider(
+            provider or self._config.get_llm_current_provider_name()
+        )
         if not provider_name:
             return self._error("missing_provider", "No current LLM provider to save")
         if not self._provider_exists(provider_name):
-            return self._error("provider_not_found", f"LLM provider not found: {provider_name}", provider=provider_name)
+            return self._error(
+                "provider_not_found",
+                f"LLM provider not found: {provider_name}",
+                provider=provider_name,
+            )
         self._config.set_llm_last_provider(provider_name)
         if save:
             self._config.save()
@@ -116,21 +141,41 @@ class LLMConfigManager:
 
     def restore_startup_provider(self, *, save: bool = True) -> dict[str, Any]:
         """启动时优先恢复 last_provider，否则保留安装阶段写入的默认 provider。"""
-        last_provider = self._normalize_provider(self._config.get_llm_last_provider_name())
-        current_provider = self._normalize_provider(self._config.get_llm_current_provider_name())
-        provider_name = last_provider if last_provider and self._provider_exists(last_provider) else current_provider
+        last_provider = self._normalize_provider(
+            self._config.get_llm_last_provider_name()
+        )
+        current_provider = self._normalize_provider(
+            self._config.get_llm_current_provider_name()
+        )
+        provider_name = (
+            last_provider
+            if last_provider and self._provider_exists(last_provider)
+            else current_provider
+        )
         if not provider_name:
-            return self._error("missing_provider", f"No LLM provider configured. {self.SETUP_HINT}")
+            return self._error(
+                "missing_provider", f"No LLM provider configured. {self.SETUP_HINT}"
+            )
         if not self._provider_exists(provider_name):
-            return self._error("provider_not_found", f"LLM provider not found: {provider_name}. {self.SETUP_HINT}", provider=provider_name)
+            return self._error(
+                "provider_not_found",
+                f"LLM provider not found: {provider_name}. {self.SETUP_HINT}",
+                provider=provider_name,
+            )
 
         self._config.set_llm_current_provider(provider_name)
-        restored_last_provider = bool(last_provider and provider_name == last_provider and current_provider != provider_name)
+        restored_last_provider = bool(
+            last_provider
+            and provider_name == last_provider
+            and current_provider != provider_name
+        )
         if save or restored_last_provider:
             self._config.save()
         return {"ok": True, "provider": self.get_provider(provider_name, redacted=True)}
 
-    def validate_provider(self, provider: str, values: dict[str, Any] | None = None) -> dict[str, Any] | None:
+    def validate_provider(
+        self, provider: str, values: dict[str, Any] | None = None
+    ) -> dict[str, Any] | None:
         """校验 provider 是否具备 base_url/api_key/model。"""
         provider_name = self._normalize_provider(provider)
         raw_values = dict(values or self._config.get_llm_provider_config(provider_name))
@@ -155,19 +200,30 @@ class LLMConfigManager:
             + ". Check provider/model/base_url/api_key. "
             + self.SETUP_HINT,
             provider=provider_name,
-            details={"missing": missing, "config_path": str(self._config.config_path), "config": config.safe_dict()},
+            details={
+                "missing": missing,
+                "config_path": str(self._config.config_path),
+                "config": config.safe_dict(),
+            },
         )
 
     def create_client(self, provider: str | None = None) -> LLMClient | dict[str, Any]:
         """基于当前/恢复 provider 创建 LLMClient；配置异常时返回结构化错误。"""
         if provider is None:
-            logger.debug("LLM manager create_client: stage=restore path=%s", self._config.config_path)
+            logger.debug(
+                "LLM manager create_client: stage=restore path=%s",
+                self._config.config_path,
+            )
             restore_result = self.restore_startup_provider(save=False)
             if not restore_result["ok"]:
                 return restore_result
-        provider_name = self._normalize_provider(provider or self._config.get_llm_runtime_provider_name())
+        provider_name = self._normalize_provider(
+            provider or self._config.get_llm_runtime_provider_name()
+        )
         if not provider_name:
-            return self._error("missing_provider", f"No LLM provider configured. {self.SETUP_HINT}")
+            return self._error(
+                "missing_provider", f"No LLM provider configured. {self.SETUP_HINT}"
+            )
         if not self._provider_exists(provider_name):
             return self._error(
                 "provider_not_found",
@@ -179,7 +235,11 @@ class LLMConfigManager:
         if validation_error is not None:
             return validation_error
         try:
-            logger.debug("LLM manager create_client: stage=create provider=%s path=%s", provider_name, self._config.config_path)
+            logger.debug(
+                "LLM manager create_client: stage=create provider=%s path=%s",
+                provider_name,
+                self._config.config_path,
+            )
             client = create_llm_client(provider_name, config=provider_config)
         except Exception as exc:
             return self._error(
@@ -200,6 +260,7 @@ class LLMConfigManager:
     @staticmethod
     def _default_api_format(provider: str) -> str:
         from core.llm_providers.config import _infer_api_format
+
         return _infer_api_format(provider)
 
     @staticmethod

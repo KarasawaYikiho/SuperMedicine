@@ -40,7 +40,11 @@ def test_manager_adds_lists_and_redacts_providers(tmp_path):
 
     result = manager.add_provider(
         "openai",
-        {"base_url": "https://openai.test/v1", "api_key": "sk-new-secret", "model": "gpt-test"},
+        {
+            "base_url": "https://openai.test/v1",
+            "api_key": "sk-new-secret",
+            "model": "gpt-test",
+        },
         set_current=True,
     )
 
@@ -51,7 +55,9 @@ def test_manager_adds_lists_and_redacts_providers(tmp_path):
     assert ConfigCenter(config_path).get_llm_current_provider_name() == "openai"
 
 
-def test_cli_add_switch_and_list_are_secret_safe_and_persist_current(tmp_path, monkeypatch, caplog):
+def test_cli_add_switch_and_list_are_secret_safe_and_persist_current(
+    tmp_path, monkeypatch, caplog
+):
     from Cli import CLI
 
     secret = "sk-cli-manager-secret"
@@ -75,7 +81,10 @@ def test_cli_add_switch_and_list_are_secret_safe_and_persist_current(tmp_path, m
     assert list_result["current_provider"] == "cli-provider"
     assert list_result["last_provider"] == "cli-provider"
     assert list_result["providers"]["cli-provider"]["api_key"] == "[REDACTED]"
-    assert list_result["providers"]["cli-provider"]["headers"]["Authorization"] == "<redacted>"
+    assert (
+        list_result["providers"]["cli-provider"]["headers"]["Authorization"]
+        == "<redacted>"
+    )
     assert reloaded.get_llm_current_provider_name() == "cli-provider"
     assert reloaded.get_llm_last_provider_name() == "cli-provider"
     assert reloaded.get_llm_provider_config("cli-provider")["api_key"] == secret
@@ -126,7 +135,11 @@ def test_kernel_exposes_manager_and_restores_last_provider(tmp_path):
         policies_dir / PermissionEngine.DEFAULT_POLICY_FILENAME,
     )
 
-    kernel = Kernel(config_path=config_path, plugins_dir=tmp_path / "plugins", policies_dir=policies_dir)
+    kernel = Kernel(
+        config_path=config_path,
+        plugins_dir=tmp_path / "plugins",
+        policies_dir=policies_dir,
+    )
 
     assert kernel.llm_manager.get_current_provider()["provider"] == "anthropic"
 
@@ -157,7 +170,9 @@ def test_incomplete_provider_returns_structured_secret_safe_error(tmp_path):
     assert secret not in str(result)
 
 
-def test_list_style_providers_survive_startup_and_can_switch_and_create_client(tmp_path):
+def test_list_style_providers_survive_startup_and_can_switch_and_create_client(
+    tmp_path,
+):
     config_path = tmp_path / "config.yaml"
     config_path.write_text(
         yaml.safe_dump(
@@ -230,7 +245,9 @@ def test_create_client_after_switch_uses_new_current_provider(tmp_path):
     assert client.config.model == "gpt-test"
 
 
-def test_create_client_without_llm_config_returns_actionable_secret_safe_error(tmp_path):
+def test_create_client_without_llm_config_returns_actionable_secret_safe_error(
+    tmp_path,
+):
     config_path = tmp_path / "config.yaml"
     config_path.write_text(yaml.safe_dump({"project": "missing-llm"}), encoding="utf-8")
 

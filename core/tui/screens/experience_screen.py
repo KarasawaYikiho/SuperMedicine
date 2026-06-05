@@ -1,4 +1,4 @@
-﻿"""Experience management view for SuperMedicine TUI."""
+"""Experience management view for SuperMedicine TUI."""
 
 from __future__ import annotations
 
@@ -32,7 +32,9 @@ class ExperienceView(Vertical):
         yield DataTable(id="exp-table", cursor_type="row")
         with Horizontal(classes="form-row"):
             yield Input(placeholder=t("experience_title_label"), id="exp-title-input")
-            yield Input(placeholder=t("experience_summary_label"), id="exp-summary-input")
+            yield Input(
+                placeholder=t("experience_summary_label"), id="exp-summary-input"
+            )
         with Horizontal(classes="form-row"):
             yield Input(placeholder=t("experience_tags_label"), id="exp-tags-input")
             yield Select(
@@ -44,9 +46,13 @@ class ExperienceView(Vertical):
                 id="exp-scope-select",
             )
         with Horizontal(classes="form-row"):
-            yield Button(t("experience_suggest"), id="exp-suggest", classes="btn btn-secondary")
+            yield Button(
+                t("experience_suggest"), id="exp-suggest", classes="btn btn-secondary"
+            )
             yield Button(t("confirm"), id="exp-confirm", classes="btn btn-primary")
-            yield Button(t("experience_export"), id="exp-export", classes="btn btn-secondary")
+            yield Button(
+                t("experience_export"), id="exp-export", classes="btn btn-secondary"
+            )
             yield Button(t("refresh"), id="exp-refresh", classes="btn btn-secondary")
             yield Button(t("delete"), id="exp-delete", classes="btn btn-danger")
         yield Static("", id="exp-status")
@@ -95,14 +101,22 @@ class ExperienceView(Vertical):
             t("experience_tags_label"),
         )
         if not workspace_id:
-            self._set_status(f"{t('experience_refreshed')}：{t('paper_select_workspace')}" if refreshed else t("paper_select_workspace"))
+            self._set_status(
+                f"{t('experience_refreshed')}：{t('paper_select_workspace')}"
+                if refreshed
+                else t("paper_select_workspace")
+            )
             return
 
         controller = self._get_experience_controller()
         try:
             records = controller.list_experiences(workspace_id, include_general=True)
             if not records:
-                self._set_status(f"{t('experience_refreshed')}：{t('experience_no_records')}" if refreshed else t("experience_no_records"))
+                self._set_status(
+                    f"{t('experience_refreshed')}：{t('experience_no_records')}"
+                    if refreshed
+                    else t("experience_no_records")
+                )
                 return
             for record in records:
                 tags = ", ".join(record.get("tags", []))
@@ -114,7 +128,11 @@ class ExperienceView(Vertical):
                     tags,
                     key=record.get("id", ""),
                 )
-            self._set_status(f"{t('experience_refreshed')}: {len(records)}" if refreshed else f"{t('experience_list')}: {len(records)}")
+            self._set_status(
+                f"{t('experience_refreshed')}: {len(records)}"
+                if refreshed
+                else f"{t('experience_list')}: {len(records)}"
+            )
         except Exception as e:
             self._set_error(e)
 
@@ -125,7 +143,9 @@ class ExperienceView(Vertical):
         apply_status_style(status, safe_message)
 
     def _set_error(self, error: Exception) -> None:
-        message = f"{t('error')}: {redact_sensitive(str(error)) or t('safe_error_hint')}"
+        message = (
+            f"{t('error')}: {redact_sensitive(str(error)) or t('safe_error_hint')}"
+        )
         self._set_status(message)
         self.app.notify(message, severity="error")
 
@@ -194,7 +214,9 @@ class ExperienceView(Vertical):
         title = title_input.value.strip()
         summary = summary_input.value.strip()
         if not title or not summary:
-            self._set_status(f"{t('error')}: {t('experience_title_label')}, {t('experience_summary_label')}")
+            self._set_status(
+                f"{t('error')}: {t('experience_title_label')}, {t('experience_summary_label')}"
+            )
             return
 
         tags = (
@@ -202,7 +224,11 @@ class ExperienceView(Vertical):
             if tags_input.value.strip()
             else None
         )
-        scope = str(scope_select.value) if scope_select.value != Select.BLANK else "workspace"
+        scope = (
+            str(scope_select.value)
+            if scope_select.value != Select.BLANK
+            else "workspace"
+        )
 
         controller = self._get_experience_controller()
         try:
@@ -228,8 +254,17 @@ class ExperienceView(Vertical):
             return
 
         table = self.query_one("#exp-table", DataTable)
-        if table.cursor_row is None:
-            self._set_status(t("no_selection"))
+        if table.row_count == 0:
+            self._set_status(
+                f"{t('error')}: {t('experience_no_records')}，无法执行该操作"
+            )
+            return
+        if (
+            table.cursor_row is None
+            or table.cursor_row < 0
+            or table.cursor_row >= table.row_count
+        ):
+            self._set_status(f"{t('error')}: {t('no_selection')}，无法执行该操作")
             return
 
         row_data = table.get_row_at(table.cursor_row)
@@ -262,7 +297,9 @@ class ExperienceView(Vertical):
 
         controller = self._get_experience_controller()
         try:
-            result = controller.export_experiences(workspace_id=workspace_id, format="json", include_general=True)
+            result = controller.export_experiences(
+                workspace_id=workspace_id, format="json", include_general=True
+            )
             self._set_status(result.get("message", ""))
             self.app.notify(result.get("message", t("experience_export")))
         except Exception as e:
@@ -271,4 +308,3 @@ class ExperienceView(Vertical):
 
 # Backward-compatible alias
 ExperienceScreen = ExperienceView
-

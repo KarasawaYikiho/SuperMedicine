@@ -1,4 +1,5 @@
 """消息总线"""
+
 from __future__ import annotations
 
 import logging
@@ -8,11 +9,13 @@ from uuid import uuid4
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class Subscription:
     token: str
     topic: str
     handler: Callable[[dict[str, Any]], None]
+
 
 class EventBus:
     def __init__(self):

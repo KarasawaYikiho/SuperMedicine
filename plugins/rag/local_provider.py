@@ -1,4 +1,5 @@
 """RAG 本地实现 — 基于 TF-IDF 的检索和外部向量库契约后端。"""
+
 from __future__ import annotations
 
 import json
@@ -54,13 +55,20 @@ class LocalRAGProvider(RAGProvider):
         self._documents.append(doc)
         self._save_index()
 
-    def query(self, query: str, top_k: int = 5, scope: str = "literature") -> dict[str, Any]:
+    def query(
+        self, query: str, top_k: int = 5, scope: str = "literature"
+    ) -> dict[str, Any]:
         """查询"""
         if not self._documents:
             return make_rag_result(
                 [],
                 provider=self.provider_name,
-                metadata={"query": query, "top_k": top_k, "scope": scope, "resource": {"kind": "local_index"}},
+                metadata={
+                    "query": query,
+                    "top_k": top_k,
+                    "scope": scope,
+                    "resource": {"kind": "local_index"},
+                },
             )
 
         query_tokens = self._tokenize(query)
@@ -82,7 +90,9 @@ class LocalRAGProvider(RAGProvider):
             items.append(
                 {
                     "id": str(metadata.get("id", doc.get("id", ""))),
-                    "title": metadata.get("title") or metadata.get("source") or f"local:{doc.get('id', '')}",
+                    "title": metadata.get("title")
+                    or metadata.get("source")
+                    or f"local:{doc.get('id', '')}",
                     "source": metadata.get("source", "local"),
                     "score": round(score, 4),
                     "snippet": doc["text"],
@@ -93,7 +103,15 @@ class LocalRAGProvider(RAGProvider):
         return make_rag_result(
             items,
             provider=self.provider_name,
-            metadata={"query": query, "top_k": top_k, "scope": scope, "resource": {"kind": "local_index", "document_count": len(self._documents)}},
+            metadata={
+                "query": query,
+                "top_k": top_k,
+                "scope": scope,
+                "resource": {
+                    "kind": "local_index",
+                    "document_count": len(self._documents),
+                },
+            },
         )
 
     def store_context(self, key: str, value: Any) -> None:
@@ -121,12 +139,16 @@ class LocalRAGProvider(RAGProvider):
         if not isinstance(key, str) or not key:
             raise ValueError("context key must be a non-empty string")
         if key in {".", ".."} or not self._SAFE_CONTEXT_KEY.fullmatch(key):
-            raise ValueError("context key must contain only letters, numbers, underscore, dash, or dot")
+            raise ValueError(
+                "context key must contain only letters, numbers, underscore, dash, or dot"
+            )
 
         context_root = self._context_dir.resolve()
         context_file = (self._context_dir / f"{key}.json").resolve()
         if context_file.parent != context_root:
-            raise ValueError("context key resolves outside the local RAG context directory")
+            raise ValueError(
+                "context key resolves outside the local RAG context directory"
+            )
         return context_file
 
     def _tokenize(self, text: str) -> list[str]:
@@ -154,8 +176,8 @@ class LocalRAGProvider(RAGProvider):
         dot_product = sum(counter1.get(w, 0) * counter2.get(w, 0) for w in all_words)
 
         # 计算范数
-        norm1 = math.sqrt(sum(v ** 2 for v in counter1.values()))
-        norm2 = math.sqrt(sum(v ** 2 for v in counter2.values()))
+        norm1 = math.sqrt(sum(v**2 for v in counter1.values()))
+        norm2 = math.sqrt(sum(v**2 for v in counter2.values()))
 
         if norm1 == 0 or norm2 == 0:
             return 0
@@ -174,7 +196,9 @@ class MockExternalVectorStoreProvider(RAGProvider):
 
     provider_name = "mock-external-vector-store"
 
-    def __init__(self, config: RAGProviderConfig, records: list[dict[str, Any]] | None = None):
+    def __init__(
+        self, config: RAGProviderConfig, records: list[dict[str, Any]] | None = None
+    ):
         self.config = config
         self._records = records or []
         self._context: dict[str, Any] = {}
@@ -184,23 +208,44 @@ class MockExternalVectorStoreProvider(RAGProvider):
         try:
             self._validate_config()
         except RAGConfigurationError as exc:
-            return {"status": "error", "provider": self.provider_name, "errors": [exc.to_dict()], "metadata": {"resource": self.config.resource_metadata()}}
+            return {
+                "status": "error",
+                "provider": self.provider_name,
+                "errors": [exc.to_dict()],
+                "metadata": {"resource": self.config.resource_metadata()},
+            }
 
         if self.config.endpoint == "mock://connection-error":
             connection_error = RAGConnectionError(
                 "Mock vector store connection failed.",
                 retryable=True,
-                details={"endpoint": self.config.endpoint, "timeout_seconds": self.config.timeout_seconds},
+                details={
+                    "endpoint": self.config.endpoint,
+                    "timeout_seconds": self.config.timeout_seconds,
+                },
             )
-            return {"status": "error", "provider": self.provider_name, "errors": [connection_error.to_dict()], "metadata": {"resource": self.config.resource_metadata()}}
+            return {
+                "status": "error",
+                "provider": self.provider_name,
+                "errors": [connection_error.to_dict()],
+                "metadata": {"resource": self.config.resource_metadata()},
+            }
 
         if self.config.timeout_seconds > 120:
             resource_error = RAGResourceError(
                 "Mock vector store timeout exceeds resource policy.",
                 retryable=False,
-                details={"timeout_seconds": self.config.timeout_seconds, "max_timeout_seconds": 120},
+                details={
+                    "timeout_seconds": self.config.timeout_seconds,
+                    "max_timeout_seconds": 120,
+                },
             )
-            return {"status": "error", "provider": self.provider_name, "errors": [resource_error.to_dict()], "metadata": {"resource": self.config.resource_metadata()}}
+            return {
+                "status": "error",
+                "provider": self.provider_name,
+                "errors": [resource_error.to_dict()],
+                "metadata": {"resource": self.config.resource_metadata()},
+            }
 
         self._connected = True
         return {
@@ -208,7 +253,10 @@ class MockExternalVectorStoreProvider(RAGProvider):
             "provider": self.provider_name,
             "metadata": {
                 "resource": self.config.resource_metadata(),
-                "security": {"external_resource": True, "secret_source": "env" if self.config.api_key_env else "none"},
+                "security": {
+                    "external_resource": True,
+                    "secret_source": "env" if self.config.api_key_env else "none",
+                },
             },
         }
 
@@ -216,13 +264,19 @@ class MockExternalVectorStoreProvider(RAGProvider):
         connection = self.connect() if not self._connected else {"status": "connected"}
         if connection.get("status") != "connected":
             raw_errors = connection.get("errors")
-            errors: list[dict[str, Any]] | None = raw_errors if isinstance(raw_errors, list) else None
+            errors: list[dict[str, Any]] | None = (
+                raw_errors if isinstance(raw_errors, list) else None
+            )
             return make_rag_result(
                 [],
                 provider=self.provider_name,
                 status="error",
                 errors=errors,
-                metadata={"query": query_text, "top_k": top_k, "resource": self.config.resource_metadata()},
+                metadata={
+                    "query": query_text,
+                    "top_k": top_k,
+                    "resource": self.config.resource_metadata(),
+                },
             )
 
         if self.config.timeout_seconds <= 0:
@@ -236,7 +290,11 @@ class MockExternalVectorStoreProvider(RAGProvider):
                 provider=self.provider_name,
                 status="error",
                 errors=[exc.to_dict()],
-                metadata={"query": query_text, "top_k": top_k, "resource": self.config.resource_metadata()},
+                metadata={
+                    "query": query_text,
+                    "top_k": top_k,
+                    "resource": self.config.resource_metadata(),
+                },
             )
 
         tokens = set(self._tokenize(query_text))
@@ -244,12 +302,20 @@ class MockExternalVectorStoreProvider(RAGProvider):
         for record in self._records:
             text = str(record.get("text") or record.get("snippet") or "")
             record_tokens = set(self._tokenize(text))
-            score = len(tokens & record_tokens) / len(tokens | record_tokens) if tokens and record_tokens else 0.0
+            score = (
+                len(tokens & record_tokens) / len(tokens | record_tokens)
+                if tokens and record_tokens
+                else 0.0
+            )
             ranked.append(
                 {
                     "id": str(record.get("id", "")),
-                    "title": record.get("title") or record.get("source") or str(record.get("id", "")),
-                    "source": record.get("source", self.config.index_name or "external-vector-index"),
+                    "title": record.get("title")
+                    or record.get("source")
+                    or str(record.get("id", "")),
+                    "source": record.get(
+                        "source", self.config.index_name or "external-vector-index"
+                    ),
                     "score": round(float(record.get("score", score)), 4),
                     "snippet": text,
                     "metadata": record.get("metadata", {}),
@@ -264,7 +330,10 @@ class MockExternalVectorStoreProvider(RAGProvider):
                 "query": query_text,
                 "top_k": top_k,
                 "resource": self.config.resource_metadata(),
-                "security": {"external_resource": True, "secret_source": "env" if self.config.api_key_env else "none"},
+                "security": {
+                    "external_resource": True,
+                    "secret_source": "env" if self.config.api_key_env else "none",
+                },
             },
         )
 
@@ -287,4 +356,8 @@ class MockExternalVectorStoreProvider(RAGProvider):
             )
 
     def _tokenize(self, text: str) -> list[str]:
-        return [token for token in text.lower().replace("/", " ").replace(",", " ").split() if token]
+        return [
+            token
+            for token in text.lower().replace("/", " ").replace(",", " ").split()
+            if token
+        ]

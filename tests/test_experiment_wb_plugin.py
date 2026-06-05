@@ -51,13 +51,20 @@ def test_normalize_loading_returns_deterministic_wb_volumes():
     assert output["samples"][1]["diluent_volume"] == 0.0
     assert output["samples"][1]["within_limits"] is False
     assert output["samples"][1]["warnings"][0]["code"] == "sample_volume_exceeds_max"
-    assert result["metadata"]["contract"]["calculation_scope"] == "deterministic_arithmetic"
+    assert (
+        result["metadata"]["contract"]["calculation_scope"]
+        == "deterministic_arithmetic"
+    )
 
 
 def test_antibody_dilution_returns_deterministic_reagent_volumes():
     result = _plugin().execute(
         "experiment.wb.antibody_dilution",
-        {"total_volume": 10000, "dilution_ratio": "1:5000", "antibody_name": "anti-ACTB"},
+        {
+            "total_volume": 10000,
+            "dilution_ratio": "1:5000",
+            "antibody_name": "anti-ACTB",
+        },
     )
 
     assert result["status"] == "success"
@@ -84,7 +91,9 @@ def test_experiment_wb_invalid_input_is_structured_plugin_error():
 
 
 def test_experiment_wb_missing_input_is_structured_plugin_error():
-    result = _plugin().execute("experiment.wb.antibody_dilution", {"total_volume": 1000})
+    result = _plugin().execute(
+        "experiment.wb.antibody_dilution", {"total_volume": 1000}
+    )
 
     assert result["status"] == "plugin_error"
     assert result["output"] is None
@@ -102,4 +111,7 @@ def test_experiment_wb_unknown_action_is_rejected_without_calculation_output():
     assert result["action"] == "experiment.wb.external_lookup"
     assert result["output"] is None
     assert "Unsupported experiment-wb action" in result["error"]
-    assert result["metadata"]["contract"]["calculation_scope"] == "deterministic_arithmetic"
+    assert (
+        result["metadata"]["contract"]["calculation_scope"]
+        == "deterministic_arithmetic"
+    )

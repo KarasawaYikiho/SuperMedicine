@@ -1,4 +1,5 @@
 """AMA 引用格式"""
+
 from __future__ import annotations
 
 from .utils import Book, JournalArticle, format_book_base, format_journal_base

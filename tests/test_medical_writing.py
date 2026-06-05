@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from plugins.standards.medical_writing.checklists import get_consort_checklist, get_strobe_checklist
+from plugins.standards.medical_writing.checklists import (
+    get_consort_checklist,
+    get_strobe_checklist,
+)
 from plugins.standards.medical_writing.checklist_base import MedicalClaim
 from plugins.standards.medical_writing.main import execute
 from plugins.standards.medical_citation.utils import CitationSource, JournalArticle
@@ -60,7 +63,9 @@ class TestConsortChecklist:
     def test_invalid_source_returns_error(self):
         checklist = get_consort_checklist()
         claims = [MedicalClaim("诊断特异度为90%", "fact", "bad-src")]
-        sources = {"bad-src": CitationSource("bad-src", "Retracted record", valid=False)}
+        sources = {
+            "bad-src": CitationSource("bad-src", "Retracted record", valid=False)
+        }
 
         result = checklist.check("随机对照试验", claims=claims, sources=sources)
 
@@ -70,7 +75,9 @@ class TestConsortChecklist:
     def test_low_confidence_source_returns_observable_warning(self):
         checklist = get_consort_checklist()
         claims = [MedicalClaim("治疗有效", "fact", "low-src")]
-        sources = {"low-src": CitationSource("low-src", "Unverified source", confidence=0.4)}
+        sources = {
+            "low-src": CitationSource("low-src", "Unverified source", confidence=0.4)
+        }
 
         result = checklist.check("随机对照试验", claims=claims, sources=sources)
 

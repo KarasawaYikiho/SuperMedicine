@@ -28,7 +28,11 @@ def test_tui_controller_adds_switches_and_redacts_provider(tmp_path):
 
     assert add_result["ok"] is True
     assert switch_result["ok"] is True
-    assert readiness == {"ok": True, "provider": "tui-provider", "message": t("llm_ready")}
+    assert readiness == {
+        "ok": True,
+        "provider": "tui-provider",
+        "message": t("llm_ready"),
+    }
     assert providers["tui-provider"]["api_key"] == "[REDACTED]"
     assert secret not in str(add_result)
     assert secret not in str(switch_result)
@@ -48,8 +52,18 @@ def test_tui_controller_restores_previous_exit_provider_on_startup(tmp_path):
                     "provider": "openai",
                     "last_provider": "anthropic",
                     "providers": {
-                        "openai": {"api_format": "openai", "base_url": "https://openai.test/v1", "api_key": "sk-openai-tui", "model": "gpt-test"},
-                        "anthropic": {"api_format": "anthropic", "base_url": "https://anthropic.test/v1", "api_key": "sk-anthropic-tui", "model": "claude-test"},
+                        "openai": {
+                            "api_format": "openai",
+                            "base_url": "https://openai.test/v1",
+                            "api_key": "sk-openai-tui",
+                            "model": "gpt-test",
+                        },
+                        "anthropic": {
+                            "api_format": "anthropic",
+                            "base_url": "https://anthropic.test/v1",
+                            "api_key": "sk-anthropic-tui",
+                            "model": "claude-test",
+                        },
                     },
                 }
             },
@@ -61,7 +75,10 @@ def test_tui_controller_restores_previous_exit_provider_on_startup(tmp_path):
     controller = LLMScreenController(tmp_path)
 
     assert controller.current_provider()["provider"] == "anthropic"
-    assert ConfigCenter(config_dir / "config.yaml").get_llm_current_provider_name() == "anthropic"
+    assert (
+        ConfigCenter(config_dir / "config.yaml").get_llm_current_provider_name()
+        == "anthropic"
+    )
 
 
 def test_tui_controller_ignores_missing_last_provider_and_keeps_valid_current(tmp_path):
@@ -91,8 +108,15 @@ def test_tui_controller_ignores_missing_last_provider_and_keeps_valid_current(tm
     controller = LLMScreenController(tmp_path)
 
     assert controller.current_provider()["provider"] == "openai"
-    assert controller.readiness() == {"ok": True, "provider": "openai", "message": t("llm_ready")}
-    assert ConfigCenter(config_dir / "config.yaml").get_llm_current_provider_name() == "openai"
+    assert controller.readiness() == {
+        "ok": True,
+        "provider": "openai",
+        "message": t("llm_ready"),
+    }
+    assert (
+        ConfigCenter(config_dir / "config.yaml").get_llm_current_provider_name()
+        == "openai"
+    )
 
 
 def test_tui_controller_save_exit_state_persists_current_provider_for_restore(tmp_path):

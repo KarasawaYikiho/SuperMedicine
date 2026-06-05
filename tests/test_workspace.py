@@ -126,14 +126,18 @@ def test_no_implicit_cli_or_global_state_is_created(tmp_path):
     assert (tmp_path / "workspaces" / "explicit-study" / "workspace.yaml").is_file()
 
 
-def test_workspace_manager_create_is_direct_without_kernel_or_llm_import(tmp_path, monkeypatch):
+def test_workspace_manager_create_is_direct_without_kernel_or_llm_import(
+    tmp_path, monkeypatch
+):
     imported: list[str] = []
     original_import = __import__
 
     def guarded_import(name, globals=None, locals=None, fromlist=(), level=0):
         if name.startswith(("core.kernel", "core.llm_client", "core.llm_providers")):
             imported.append(name)
-            raise AssertionError(f"workspace creation must not import Kernel/LLM module: {name}")
+            raise AssertionError(
+                f"workspace creation must not import Kernel/LLM module: {name}"
+            )
         return original_import(name, globals, locals, fromlist, level)
 
     monkeypatch.setattr("builtins.__import__", guarded_import)

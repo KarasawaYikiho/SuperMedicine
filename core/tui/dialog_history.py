@@ -57,7 +57,9 @@ def _contains_prohibited_marker(value: Any) -> bool:
 
 def _reject_raw_conversation(payload: dict[str, Any]) -> None:
     if _contains_prohibited_key(payload) or _contains_prohibited_marker(payload):
-        raise DialogHistoryPrivacyError("TUI 对话历史只允许保存摘要/事件，不能保存原始对话")
+        raise DialogHistoryPrivacyError(
+            "TUI 对话历史只允许保存摘要/事件，不能保存原始对话"
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,7 +109,10 @@ class DialogHistoryStore:
         workspace = self.workspace_manager.get_workspace(workspace_id)
         safe_session_id = _safe_session_id(session_id)
         return validate_path_in_project_root(
-            workspace.path / ".supermedicine" / "sessions" / f"{safe_session_id}-{DIALOG_HISTORY_FILENAME}",
+            workspace.path
+            / ".supermedicine"
+            / "sessions"
+            / f"{safe_session_id}-{DIALOG_HISTORY_FILENAME}",
             self.workspace_manager.project_root,
         )
 
@@ -120,7 +125,9 @@ class DialogHistoryStore:
         metadata: dict[str, Any] | None = None,
         session_id: str = "default",
     ) -> DialogHistoryEvent:
-        history_event = DialogHistoryEvent(event=event, summary=summary, metadata=dict(metadata or {}))
+        history_event = DialogHistoryEvent(
+            event=event, summary=summary, metadata=dict(metadata or {})
+        )
         payload = history_event.to_dict()
         path = self.history_path(workspace_id, session_id)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -129,7 +136,9 @@ class DialogHistoryStore:
             handle.write("\n")
         return history_event
 
-    def load_events(self, workspace_id: str, *, session_id: str = "default") -> list[DialogHistoryEvent]:
+    def load_events(
+        self, workspace_id: str, *, session_id: str = "default"
+    ) -> list[DialogHistoryEvent]:
         path = self.history_path(workspace_id, session_id)
         if not path.is_file():
             return []

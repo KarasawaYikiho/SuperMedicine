@@ -25,7 +25,9 @@ def _llm_args() -> list[str]:
     ]
 
 
-def test_exe_desktop_release_uses_supplied_desktop_directory_and_dry_run(tmp_path, caplog):
+def test_exe_desktop_release_uses_supplied_desktop_directory_and_dry_run(
+    tmp_path, caplog
+):
     """Regression skeleton for future unified installer / Exe desktop release.
 
     The contract is intentionally test-friendly: callers must be able to inject a
@@ -106,7 +108,9 @@ def test_exe_desktop_release_skips_existing_target_by_default(tmp_path, caplog):
     assert str(target) in caplog.text
 
 
-def test_exe_desktop_release_overwrites_existing_target_when_requested(tmp_path, caplog):
+def test_exe_desktop_release_overwrites_existing_target_when_requested(
+    tmp_path, caplog
+):
     module = importlib.import_module("installer.exe_release")
     caplog.set_level(logging.INFO, logger="installer.exe_release")
     desktop_dir = tmp_path / "Desktop"
@@ -116,7 +120,9 @@ def test_exe_desktop_release_overwrites_existing_target_when_requested(tmp_path,
     target = desktop_dir / "SuperMedicine.exe"
     target.write_bytes(b"existing bytes")
 
-    result = module.release_exe_to_desktop(exe_path=source, desktop_dir=desktop_dir, overwrite=True)
+    result = module.release_exe_to_desktop(
+        exe_path=source, desktop_dir=desktop_dir, overwrite=True
+    )
 
     assert result["status"] == "copied"
     assert result["reason"] == "overwritten"
@@ -145,7 +151,10 @@ def test_exe_desktop_release_logs_copy_errors(tmp_path, caplog, monkeypatch):
     assert str(desktop_dir / "SuperMedicine.exe") in caplog.text
 
 
-@pytest.mark.parametrize("bad_name", ["../SuperMedicine.exe", "subdir/SuperMedicine.exe", "bad:name.exe", "CON.exe"])
+@pytest.mark.parametrize(
+    "bad_name",
+    ["../SuperMedicine.exe", "subdir/SuperMedicine.exe", "bad:name.exe", "CON.exe"],
+)
 def test_exe_desktop_release_rejects_unsafe_target_filename(tmp_path, bad_name):
     module = importlib.import_module("installer.exe_release")
     source = tmp_path / "SuperMedicine.exe"
@@ -185,7 +194,9 @@ def _supports_case_distinct_names(directory: Path) -> bool:
     try:
         upper.write_text("upper", encoding="utf-8")
         lower.write_text("lower", encoding="utf-8")
-        return _has_exact_child_name(directory, upper.name) and _has_exact_child_name(directory, lower.name)
+        return _has_exact_child_name(directory, upper.name) and _has_exact_child_name(
+            directory, lower.name
+        )
     finally:
         for path in (upper, lower):
             try:
@@ -205,9 +216,17 @@ def _make_release_payload(root: Path) -> Path:
         shutil.copy2(REPO_ROOT / "install.py", payload / "install.py")
     (payload / "core" / "__init__.py").write_text("", encoding="utf-8")
     (payload / "permission" / "__init__.py").write_text("", encoding="utf-8")
-    shutil.copy2(REPO_ROOT / "installer" / "__init__.py", payload / "installer" / "__init__.py")
-    shutil.copy2(REPO_ROOT / "installer" / "entrypoint.py", payload / "installer" / "entrypoint.py")
-    shutil.copy2(REPO_ROOT / "installer" / "exe_release.py", payload / "installer" / "exe_release.py")
+    shutil.copy2(
+        REPO_ROOT / "installer" / "__init__.py", payload / "installer" / "__init__.py"
+    )
+    shutil.copy2(
+        REPO_ROOT / "installer" / "entrypoint.py",
+        payload / "installer" / "entrypoint.py",
+    )
+    shutil.copy2(
+        REPO_ROOT / "installer" / "exe_release.py",
+        payload / "installer" / "exe_release.py",
+    )
     (payload / "dist" / "SuperMedicine.exe").write_bytes(b"app exe")
     (payload / "README.md").write_text("docs\n", encoding="utf-8")
     return payload
@@ -219,13 +238,17 @@ def test_release_payload_to_directory_copies_unified_layout(tmp_path, caplog):
     payload = _make_release_payload(tmp_path)
     target_dir = tmp_path / "Installed"
 
-    result = module.release_payload_to_directory(source_root=payload, target_dir=target_dir)
+    result = module.release_payload_to_directory(
+        source_root=payload, target_dir=target_dir
+    )
 
     assert result["status"] == "copied"
     assert result["reason"] == "created"
     assert (target_dir / "install.py").exists()
     assert (target_dir / "Install.py").exists()
-    assert (target_dir / "Install.py").read_text(encoding="utf-8") == (payload / "Install.py").read_text(encoding="utf-8")
+    assert (target_dir / "Install.py").read_text(encoding="utf-8") == (
+        payload / "Install.py"
+    ).read_text(encoding="utf-8")
     assert (target_dir / "installer" / "__init__.py").exists()
     assert (target_dir / "installer" / "entrypoint.py").exists()
     assert (target_dir / "installer" / "exe_release.py").exists()
@@ -254,7 +277,9 @@ def test_release_payload_to_directory_rejects_incomplete_layout(tmp_path):
     payload.mkdir()
 
     with pytest.raises(FileNotFoundError, match="Release payload is incomplete"):
-        module.release_payload_to_directory(source_root=payload, target_dir=tmp_path / "Installed")
+        module.release_payload_to_directory(
+            source_root=payload, target_dir=tmp_path / "Installed"
+        )
 
 
 def test_install_help_documents_unified_install_and_desktop_release(capsys):
@@ -273,7 +298,9 @@ def test_install_help_documents_unified_install_and_desktop_release(capsys):
     assert "统一安装" in output
 
 
-def test_unified_install_dry_run_initializes_project_without_real_desktop_write(tmp_path, monkeypatch, caplog):
+def test_unified_install_dry_run_initializes_project_without_real_desktop_write(
+    tmp_path, monkeypatch, caplog
+):
     install = importlib.import_module("installer.entrypoint")
     source = tmp_path / "dist" / "SuperMedicine.exe"
     source.parent.mkdir()
@@ -305,7 +332,9 @@ def test_unified_install_dry_run_initializes_project_without_real_desktop_write(
     assert str(desktop_dir / "SuperMedicine.exe") in caplog.text
 
 
-def test_init_with_release_exe_copies_to_injected_desktop_directory(tmp_path, monkeypatch, caplog):
+def test_init_with_release_exe_copies_to_injected_desktop_directory(
+    tmp_path, monkeypatch, caplog
+):
     install = importlib.import_module("installer.entrypoint")
     source = tmp_path / "SuperMedicine.exe"
     source.write_bytes(b"fake exe bytes")

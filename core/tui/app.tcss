@@ -219,10 +219,15 @@ Footer {
 #exp-table,
 #tool-table,
 #llm-table,
-#dialog-table {
+#dialog-table,
+#log-table {
     height: 1fr;
     min-height: 5;
     border: round $primary 30%;
+}
+
+#log-table {
+    min-height: 8;
 }
 
 DataTable:focus {
@@ -251,13 +256,22 @@ Select {
 #exp-status,
 #tool-status,
 #llm-status,
-#dialog-status {
+#dialog-status,
+#log-status,
+#log-detail {
     height: auto;
     min-height: 1;
     padding: 0 1;
     color: $text-muted;
     border-left: tall $primary 40%;
     background: $surface;
+}
+
+#log-detail {
+    max-height: 12;
+    overflow-y: auto;
+    border: round $primary 35%;
+    margin: 1 0 0 0;
 }
 
 .status-info {

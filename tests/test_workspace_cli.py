@@ -43,7 +43,9 @@ def test_workspace_init_does_not_enter_kernel_or_llm(tmp_path, monkeypatch):
     def guarded_import(name, globals=None, locals=None, fromlist=(), level=0):
         if name.startswith(("core.kernel", "core.llm_client", "core.llm_providers")):
             imported.append(name)
-            raise AssertionError(f"workspace init must not import Kernel/LLM module: {name}")
+            raise AssertionError(
+                f"workspace init must not import Kernel/LLM module: {name}"
+            )
         return original_import(name, globals, locals, fromlist, level)
 
     monkeypatch.setattr("builtins.__import__", guarded_import)
@@ -65,7 +67,9 @@ def test_workspace_subcommands_require_explicit_workspace(monkeypatch):
     assert excinfo.value.code == 2
 
 
-def test_workspace_delete_rejects_confirmation_mismatch_and_audits(tmp_path, monkeypatch):
+def test_workspace_delete_rejects_confirmation_mismatch_and_audits(
+    tmp_path, monkeypatch
+):
     monkeypatch.chdir(tmp_path)
     _copy_default_policy(tmp_path)
     WorkspaceManager(tmp_path).initialize_workspace("trial-1")
@@ -76,7 +80,9 @@ def test_workspace_delete_rejects_confirmation_mismatch_and_audits(tmp_path, mon
     assert (tmp_path / "workspaces" / "trial-1").is_dir()
     audit_entries = [
         json.loads(line)
-        for line in (tmp_path / ".supermedicine" / "policies" / "audit.jsonl").read_text(encoding="utf-8").splitlines()
+        for line in (tmp_path / ".supermedicine" / "policies" / "audit.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
     ]
     assert audit_entries[-1]["action"] == "workspace.delete"
     assert audit_entries[-1]["result"] == "cancelled"
@@ -96,12 +102,19 @@ def test_workspace_delete_hard_deletes_after_permission_approval(tmp_path, monke
     assert not workspace.path.exists()
     audit_entries = [
         json.loads(line)
-        for line in (tmp_path / ".supermedicine" / "policies" / "audit.jsonl").read_text(encoding="utf-8").splitlines()
+        for line in (tmp_path / ".supermedicine" / "policies" / "audit.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
     ]
-    assert any(entry["action"] == "workspace.delete" and entry["result"] == "allowed" for entry in audit_entries)
+    assert any(
+        entry["action"] == "workspace.delete" and entry["result"] == "allowed"
+        for entry in audit_entries
+    )
 
 
-def test_workspace_delete_denied_by_policy_keeps_workspace_and_audits(tmp_path, monkeypatch):
+def test_workspace_delete_denied_by_policy_keeps_workspace_and_audits(
+    tmp_path, monkeypatch
+):
     monkeypatch.chdir(tmp_path)
     policies = tmp_path / ".supermedicine" / "policies"
     policies.mkdir(parents=True)
@@ -127,9 +140,14 @@ def test_workspace_delete_denied_by_policy_keeps_workspace_and_audits(tmp_path, 
     assert workspace.path.is_dir()
     audit_entries = [
         json.loads(line)
-        for line in (tmp_path / ".supermedicine" / "policies" / "audit.jsonl").read_text(encoding="utf-8").splitlines()
+        for line in (tmp_path / ".supermedicine" / "policies" / "audit.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
     ]
-    assert any(entry["action"] == "workspace.delete" and entry["result"] == "denied" for entry in audit_entries)
+    assert any(
+        entry["action"] == "workspace.delete" and entry["result"] == "denied"
+        for entry in audit_entries
+    )
 
 
 def test_run_without_workspace_preserves_legacy_params(monkeypatch, tmp_path):
@@ -154,7 +172,13 @@ def test_run_without_workspace_preserves_legacy_params(monkeypatch, tmp_path):
 
         def execute_task(self, task, plugin_name=None, action=None, params=None):
             captured["params"] = params
-            return {"status": "success", "task": task, "plugin": plugin_name, "action": action, "output": {}}
+            return {
+                "status": "success",
+                "task": task,
+                "plugin": plugin_name,
+                "action": action,
+                "output": {},
+            }
 
     monkeypatch.setattr("core.kernel.Kernel", FakeKernel)
     params = {"source_id": "src-1"}
@@ -188,7 +212,13 @@ def test_run_with_workspace_adds_explicit_workspace_context(monkeypatch, tmp_pat
 
         def execute_task(self, task, plugin_name=None, action=None, params=None):
             captured["params"] = params
-            return {"status": "success", "task": task, "plugin": plugin_name, "action": action, "output": {}}
+            return {
+                "status": "success",
+                "task": task,
+                "plugin": plugin_name,
+                "action": action,
+                "output": {},
+            }
 
     monkeypatch.setattr("core.kernel.Kernel", FakeKernel)
     params = {"source_id": "src-1"}
@@ -198,4 +228,6 @@ def test_run_with_workspace_adds_explicit_workspace_context(monkeypatch, tmp_pat
     assert captured["params"] is not params
     assert captured["params"]["source_id"] == "src-1"
     assert captured["params"]["_workspace"]["id"] == "trial-1"
-    assert captured["params"]["_workspace"]["path"] == str((tmp_path / "workspaces" / "trial-1").resolve())
+    assert captured["params"]["_workspace"]["path"] == str(
+        (tmp_path / "workspaces" / "trial-1").resolve()
+    )

@@ -7,7 +7,14 @@ from datetime import datetime
 from pathlib import Path
 
 
-SUPPORTED_PAPER_EXTENSIONS: tuple[str, ...] = (".pdf", ".tex", ".bib", ".ris", ".txt", ".md")
+SUPPORTED_PAPER_EXTENSIONS: tuple[str, ...] = (
+    ".pdf",
+    ".tex",
+    ".bib",
+    ".ris",
+    ".txt",
+    ".md",
+)
 
 
 @dataclass(slots=True)

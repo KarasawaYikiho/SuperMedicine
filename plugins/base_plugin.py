@@ -7,6 +7,7 @@
 - 错误：插件加载、未知动作、非法输入、运行期异常均隔离为结构化 ``plugin_error``。
 - 边界：医疗/统计插件应在 ``metadata`` 或顶层结果携带当前阶段医疗/统计边界说明。
 """
+
 from __future__ import annotations
 from dataclasses import dataclass, field
 import inspect
@@ -38,8 +39,11 @@ def plugin_result(
         "action": action,
         "output": redact_sensitive(output),
         "error": redact_sensitive(error),
-        "metadata": redact_sensitive({"contract_version": PLUGIN_CONTRACT_VERSION, **(metadata or {})}),
+        "metadata": redact_sensitive(
+            {"contract_version": PLUGIN_CONTRACT_VERSION, **(metadata or {})}
+        ),
     }
+
 
 @dataclass
 class PluginMeta:
@@ -153,13 +157,21 @@ class BasePlugin:
     def health_check(self) -> bool:
         return True
 
-    def _direct_execution_denied(self, action: str, context: dict[str, Any]) -> dict[str, Any] | None:
+    def _direct_execution_denied(
+        self, action: str, context: dict[str, Any]
+    ) -> dict[str, Any] | None:
         security = context.get("security") if isinstance(context, dict) else None
-        if isinstance(security, dict) and security.get("permission_checked") is True and security.get("permission_entrypoint") == "kernel":
+        if (
+            isinstance(security, dict)
+            and security.get("permission_checked") is True
+            and security.get("permission_entrypoint") == "kernel"
+        ):
             return None
         if context.get("allow_direct_execution") is True:
             return None
-        if os.environ.get("SUPERMEDICINE_ALLOW_PLUGIN_DIRECT_EXECUTION", "").lower() in {"1", "true", "yes", "dev", "test"}:
+        if os.environ.get(
+            "SUPERMEDICINE_ALLOW_PLUGIN_DIRECT_EXECUTION", ""
+        ).lower() in {"1", "true", "yes", "dev", "test"}:
             return None
         if os.environ.get("PYTEST_CURRENT_TEST"):
             return None
@@ -204,12 +216,23 @@ class BasePlugin:
         status = result.get("status") or "success"
         output = result.get("output", result.get("result"))
         raw_metadata = result.get("metadata")
-        metadata: dict[str, Any] = raw_metadata if isinstance(raw_metadata, dict) else {}
-        for key in ("medical_boundary", "statistics_boundary", "audit", "resource", "security"):
+        metadata: dict[str, Any] = (
+            raw_metadata if isinstance(raw_metadata, dict) else {}
+        )
+        for key in (
+            "medical_boundary",
+            "statistics_boundary",
+            "audit",
+            "resource",
+            "security",
+        ):
             if key in result and key not in metadata:
                 metadata[key] = result[key]
         metadata.setdefault("resource", {"kind": "plugin", "plugin": self.name})
-        metadata.setdefault("security", {"permission_entrypoint": "kernel", "plugin_direct_execution": True})
+        metadata.setdefault(
+            "security",
+            {"permission_entrypoint": "kernel", "plugin_direct_execution": True},
+        )
         return plugin_result(
             status=status,
             plugin=str(result.get("plugin") or self.name),

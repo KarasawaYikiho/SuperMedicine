@@ -1,4 +1,5 @@
 """规范检查清单基类"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -16,14 +17,28 @@ HUMAN_REVIEW_MESSAGE = (
     "review only, not clinical advice or a substitute for professional judgment."
 )
 MEDICAL_FACT_KEYWORDS = (
-    "治疗", "诊断", "风险", "死亡", "有效", "敏感度", "特异度", "adverse",
-    "diagnosis", "treatment", "mortality", "risk", "effective", "sensitivity", "specificity",
+    "治疗",
+    "诊断",
+    "风险",
+    "死亡",
+    "有效",
+    "敏感度",
+    "特异度",
+    "adverse",
+    "diagnosis",
+    "treatment",
+    "mortality",
+    "risk",
+    "effective",
+    "sensitivity",
+    "specificity",
 )
 
 
 @dataclass
 class ChecklistItemBase:
     """检查条目基类"""
+
     id: int | str
     section: str
     item: str
@@ -43,11 +58,19 @@ class MedicalClaim:
 
 def _infer_claim_type(sentence: str) -> str:
     sentence_lower = sentence.lower()
-    if any(term in sentence_lower for term in ("局限", "limitation", "limited", "不足")):
+    if any(
+        term in sentence_lower for term in ("局限", "limitation", "limited", "不足")
+    ):
         return "limitation"
-    if any(term in sentence_lower for term in ("建议", "应考虑", "suggest", "recommend", "may consider")):
+    if any(
+        term in sentence_lower
+        for term in ("建议", "应考虑", "suggest", "recommend", "may consider")
+    ):
         return "suggestion"
-    if any(term in sentence_lower for term in ("可能", "提示", "推测", "inference", "may", "might", "suggests")):
+    if any(
+        term in sentence_lower
+        for term in ("可能", "提示", "推测", "inference", "may", "might", "suggests")
+    ):
         return "inference"
     return "fact"
 
@@ -60,10 +83,15 @@ def _split_claim_sentences(text: str) -> list[str]:
     return [part.strip() for part in normalized.split("|") if part.strip()]
 
 
-def annotate_medical_claims(claims: list[MedicalClaim] | None = None, text: str = "") -> list[dict[str, Any]]:
+def annotate_medical_claims(
+    claims: list[MedicalClaim] | None = None, text: str = ""
+) -> list[dict[str, Any]]:
     """标注医学写作声明的 fact/inference/suggestion/limitation 类型。"""
     if claims is None:
-        claims = [MedicalClaim(text=sentence, claim_type=_infer_claim_type(sentence)) for sentence in _split_claim_sentences(text)]
+        claims = [
+            MedicalClaim(text=sentence, claim_type=_infer_claim_type(sentence))
+            for sentence in _split_claim_sentences(text)
+        ]
 
     return [
         {
@@ -84,7 +112,10 @@ def enforce_medical_accuracy(
 ) -> dict[str, Any]:
     """对需引用医学事实施加来源 ID 与置信度约束。"""
     if claims is None:
-        claims = [MedicalClaim(text=sentence, claim_type=_infer_claim_type(sentence)) for sentence in _split_claim_sentences(text)]
+        claims = [
+            MedicalClaim(text=sentence, claim_type=_infer_claim_type(sentence))
+            for sentence in _split_claim_sentences(text)
+        ]
 
     annotations = annotate_medical_claims(claims)
     warnings: list[dict[str, Any]] = []
@@ -94,7 +125,9 @@ def enforce_medical_accuracy(
     for annotation in annotations:
         claim_text = str(annotation["text"])
         claim_type = str(annotation["claim_type"])
-        requires_citation = claim_type == "fact" and any(keyword in claim_text.lower() for keyword in MEDICAL_FACT_KEYWORDS)
+        requires_citation = claim_type == "fact" and any(
+            keyword in claim_text.lower() for keyword in MEDICAL_FACT_KEYWORDS
+        )
         annotation["requires_citation"] = requires_citation
 
         if not requires_citation:
@@ -140,12 +173,14 @@ class ChecklistBase:
 
         for item in self.items:
             found = any(kw.lower() in text_lower for kw in item.keywords)
-            results.append({
-                "item_id": item.id,
-                "section": item.section,
-                "item": item.item,
-                "found": found,
-            })
+            results.append(
+                {
+                    "item_id": item.id,
+                    "section": item.section,
+                    "item": item.item,
+                    "found": found,
+                }
+            )
 
         total = len(results)
         found_items = sum(1 for r in results if r["found"])

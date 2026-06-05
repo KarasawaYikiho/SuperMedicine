@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from plugins.standards.medical_citation.ama_format import AMAFormatter, JournalArticle, Book
+from plugins.standards.medical_citation.ama_format import (
+    AMAFormatter,
+    JournalArticle,
+    Book,
+)
 from plugins.standards.medical_citation.main import execute
 from plugins.standards.medical_citation.vancouver_format import VancouverFormatter
 from plugins.standards.medical_citation.utils import CitationSource, validate_source_id
@@ -128,13 +132,22 @@ class TestMedicalCitationPluginEntry:
 
         assert result["status"] == "plugin_error"
         assert result["output"] is None
-        assert "citation was not generated" in result["error"] or "sources must be" in result["error"]
+        assert (
+            "citation was not generated" in result["error"]
+            or "sources must be" in result["error"]
+        )
 
     def test_skill_doc_formatter_example_uses_journal_article_model(self):
-        doc_path = __import__("pathlib").Path(__file__).parent.parent / "adapters" / "opencode" / "skills" / "medical-citation.md"
+        doc_path = (
+            __import__("pathlib").Path(__file__).parent.parent
+            / "adapters"
+            / "opencode"
+            / "skills"
+            / "medical-citation.md"
+        )
         content = doc_path.read_text(encoding="utf-8")
 
         assert "JournalArticle" in content
         assert "formatter.format_journal(JournalArticle(" in content
-        assert "volume=\"331\"" in content
+        assert 'volume="331"' in content
         assert "source_id" in content

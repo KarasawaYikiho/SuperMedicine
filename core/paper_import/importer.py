@@ -9,7 +9,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from core.paper_import.errors import MissingPaperSourceError, UnsupportedPaperFormatError
+from core.paper_import.errors import (
+    MissingPaperSourceError,
+    UnsupportedPaperFormatError,
+)
 from core.paper_import.models import (
     SUPPORTED_PAPER_EXTENSIONS,
     PaperImportResult,
@@ -71,7 +74,9 @@ def _normalize_pmid(value: Any) -> str | None:
 class PaperImporter:
     """Import local paper files by copying bytes into an existing workspace."""
 
-    def __init__(self, project_root: str | Path | WorkspaceManager | None = None) -> None:
+    def __init__(
+        self, project_root: str | Path | WorkspaceManager | None = None
+    ) -> None:
         if isinstance(project_root, WorkspaceManager):
             self.workspace_manager = project_root
         else:
@@ -89,11 +94,15 @@ class PaperImporter:
         workspace = self.workspace_manager.get_workspace(workspace_id)
         source = Path(source_path).expanduser()
         if not source.exists() or not source.is_file():
-            raise MissingPaperSourceError(f"Paper source must exist and be a file: {source}")
+            raise MissingPaperSourceError(
+                f"Paper source must exist and be a file: {source}"
+            )
 
         extension = source.suffix.lower()
         if extension not in SUPPORTED_PAPER_EXTENSIONS:
-            raise UnsupportedPaperFormatError(f"Unsupported paper format: {extension or '<none>'}")
+            raise UnsupportedPaperFormatError(
+                f"Unsupported paper format: {extension or '<none>'}"
+            )
 
         source_bytes = source.read_bytes()
         sha256 = hashlib.sha256(source_bytes).hexdigest()
@@ -106,7 +115,9 @@ class PaperImporter:
         metadata_dir.mkdir(parents=True, exist_ok=True)
         imports_dir.mkdir(parents=True, exist_ok=True)
 
-        stored_path = self._workspace_child(workspace, "papers", "originals", f"{sha256}{extension}")
+        stored_path = self._workspace_child(
+            workspace, "papers", "originals", f"{sha256}{extension}"
+        )
         metadata_path = self._workspace_child(
             workspace,
             "papers",
@@ -142,7 +153,9 @@ class PaperImporter:
 
         metadata_duplicate = self._find_metadata_duplicate(metadata_dir, metadata)
         if metadata_duplicate is not None:
-            existing_metadata_path, existing_metadata, duplicate_reason = metadata_duplicate
+            existing_metadata_path, existing_metadata, duplicate_reason = (
+                metadata_duplicate
+            )
             self._log_duplicate_import(
                 import_log_path=import_log_path,
                 imported_at=now,
@@ -173,7 +186,9 @@ class PaperImporter:
         self._apply_editable_metadata(paper_metadata, metadata)
 
         metadata_path.write_text(
-            json.dumps(json_ready(paper_metadata), ensure_ascii=False, sort_keys=True, indent=2)
+            json.dumps(
+                json_ready(paper_metadata), ensure_ascii=False, sort_keys=True, indent=2
+            )
             + "\n",
             encoding="utf-8",
         )
@@ -188,7 +203,10 @@ class PaperImporter:
             "metadata_path": metadata_path,
         }
         with import_log_path.open("a", encoding="utf-8") as log_file:
-            log_file.write(json.dumps(json_ready(log_record), ensure_ascii=False, sort_keys=True) + "\n")
+            log_file.write(
+                json.dumps(json_ready(log_record), ensure_ascii=False, sort_keys=True)
+                + "\n"
+            )
 
         return PaperImportResult(metadata=paper_metadata, source_path=source)
 
@@ -201,7 +219,9 @@ class PaperImporter:
         metadata_dir = self._workspace_child(workspace, "papers", "metadata")
         if not metadata_dir.exists():
             return []
-        return [self._load_metadata(path) for path in sorted(metadata_dir.glob("*.json"))]
+        return [
+            self._load_metadata(path) for path in sorted(metadata_dir.glob("*.json"))
+        ]
 
     def get_paper(self, workspace_id: str, paper_id: str) -> PaperMetadata:
         """Return one paper metadata record from an existing workspace."""
@@ -228,7 +248,9 @@ class PaperImporter:
         self._write_metadata(path, current)
         return current
 
-    def save_paper_metadata(self, workspace_id: str, metadata: PaperMetadata) -> PaperMetadata:
+    def save_paper_metadata(
+        self, workspace_id: str, metadata: PaperMetadata
+    ) -> PaperMetadata:
         """Persist a complete metadata object for an existing paper."""
 
         if not metadata.id:
@@ -242,13 +264,21 @@ class PaperImporter:
 
     def _metadata_path_for_paper(self, workspace_id: str, paper_id: str) -> Path:
         workspace = self.workspace_manager.get_workspace(workspace_id)
-        return self._workspace_child(workspace, "papers", "metadata", f"{paper_id}.json")
+        return self._workspace_child(
+            workspace, "papers", "metadata", f"{paper_id}.json"
+        )
 
     def _workspace_child(self, workspace: WorkspaceInfo, *parts: str) -> Path:
-        path = validate_path_in_project_root(workspace.path.joinpath(*parts), self.project_root)
-        workspace_root = validate_path_in_project_root(workspace.path, self.project_root)
+        path = validate_path_in_project_root(
+            workspace.path.joinpath(*parts), self.project_root
+        )
+        workspace_root = validate_path_in_project_root(
+            workspace.path, self.project_root
+        )
         if not _is_relative_to(path, workspace_root):
-            raise MissingPaperSourceError(f"Import destination escapes workspace: {path}")
+            raise MissingPaperSourceError(
+                f"Import destination escapes workspace: {path}"
+            )
         return path
 
     def _apply_editable_metadata(
@@ -273,9 +303,15 @@ class PaperImporter:
 
         for candidate_path in sorted(metadata_dir.glob("*.json")):
             candidate_metadata = self._load_metadata(candidate_path)
-            if new_doi is not None and _normalize_doi(candidate_metadata.doi) == new_doi:
+            if (
+                new_doi is not None
+                and _normalize_doi(candidate_metadata.doi) == new_doi
+            ):
                 return candidate_path, candidate_metadata, "doi_already_imported"
-            if new_pmid is not None and _normalize_pmid(candidate_metadata.pmid) == new_pmid:
+            if (
+                new_pmid is not None
+                and _normalize_pmid(candidate_metadata.pmid) == new_pmid
+            ):
                 return candidate_path, candidate_metadata, "pmid_already_imported"
         return None
 
@@ -303,7 +339,10 @@ class PaperImporter:
             "duplicate_reason": duplicate_reason,
         }
         with import_log_path.open("a", encoding="utf-8") as log_file:
-            log_file.write(json.dumps(json_ready(log_record), ensure_ascii=False, sort_keys=True) + "\n")
+            log_file.write(
+                json.dumps(json_ready(log_record), ensure_ascii=False, sort_keys=True)
+                + "\n"
+            )
 
     def _load_metadata(self, metadata_path: Path) -> PaperMetadata:
         data = json.loads(metadata_path.read_text(encoding="utf-8"))
@@ -325,6 +364,9 @@ class PaperImporter:
 
     def _write_metadata(self, metadata_path: Path, metadata: PaperMetadata) -> None:
         metadata_path.write_text(
-            json.dumps(json_ready(metadata), ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+            json.dumps(
+                json_ready(metadata), ensure_ascii=False, sort_keys=True, indent=2
+            )
+            + "\n",
             encoding="utf-8",
         )

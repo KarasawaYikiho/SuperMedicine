@@ -1,4 +1,5 @@
 """Vancouver 引用格式"""
+
 from __future__ import annotations
 
 

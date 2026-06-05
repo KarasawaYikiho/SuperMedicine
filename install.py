@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Compatibility wrapper for the stable lowercase installer entrypoint."""
+
 from __future__ import annotations
 
 from installer import entrypoint as _entrypoint
@@ -12,7 +13,9 @@ globals().update(
     }
 )
 
-__all__ = [name for name in globals() if not (name.startswith("__") and name.endswith("__"))]
+__all__ = [
+    name for name in globals() if not (name.startswith("__") and name.endswith("__"))
+]
 
 if __name__ == "__main__":
     try:

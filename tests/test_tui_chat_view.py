@@ -76,20 +76,33 @@ def test_chat_empty_success_and_error_copy_stays_localized_and_secret_safe():
 
 
 def test_kernel_result_format_handles_success_error_empty_and_non_dict_outputs():
-    assert SuperMedicineTUI._format_kernel_result({"status": "success", "output": {"b": 2, "a": [1]}}) == {
+    assert SuperMedicineTUI._format_kernel_result(
+        {"status": "success", "output": {"b": 2, "a": [1]}}
+    ) == {
         "kind": "assistant",
-        "message": f"{t('chat_result_status')}: success\n{t('chat_result_output')}:\n{{\n  \"a\": [\n    1\n  ],\n  \"b\": 2\n}}",
+        "message": f'{t("chat_result_status")}: success\n{t("chat_result_output")}:\n{{\n  "a": [\n    1\n  ],\n  "b": 2\n}}',
     }
-    assert SuperMedicineTUI._format_kernel_result({"status": "failure", "error": "bad [red]"}) == {
+    assert SuperMedicineTUI._format_kernel_result(
+        {"status": "failure", "error": "bad [red]"}
+    ) == {
         "kind": "error",
         "message": f"{t('chat_result_status')}: failure\nbad [red]",
     }
-    assert "sk-secret" not in SuperMedicineTUI._format_kernel_result({"status": "success", "output": {"api_key": "sk-secret123456789"}})["message"]
-    assert SuperMedicineTUI._format_kernel_result({"status": "success", "output": ""}) == {
+    assert (
+        "sk-secret"
+        not in SuperMedicineTUI._format_kernel_result(
+            {"status": "success", "output": {"api_key": "sk-secret123456789"}}
+        )["message"]
+    )
+    assert SuperMedicineTUI._format_kernel_result(
+        {"status": "success", "output": ""}
+    ) == {
         "kind": "assistant",
         "message": f"{t('chat_result_status')}: success\n{t('chat_result_output')}:\n{t('chat_no_output')}",
     }
-    assert SuperMedicineTUI._format_kernel_result(["one", "two"])["message"].endswith('[\n  "one",\n  "two"\n]')
+    assert SuperMedicineTUI._format_kernel_result(["one", "two"])["message"].endswith(
+        '[\n  "one",\n  "two"\n]'
+    )
 
 
 def test_kernel_result_format_redacts_secret_strings_and_keeps_stable_chinese_headings():
@@ -100,12 +113,16 @@ def test_kernel_result_format_redacts_secret_strings_and_keeps_stable_chinese_he
     )
 
     assert formatted["kind"] == "assistant"
-    assert formatted["message"].startswith(f"{t('chat_result_status')}: success\n{t('chat_result_output')}:\n")
+    assert formatted["message"].startswith(
+        f"{t('chat_result_status')}: success\n{t('chat_result_output')}:\n"
+    )
     assert secret not in formatted["message"]
     assert "[已隐藏]" in formatted["message"]
 
 
-def test_run_kernel_task_emits_running_completion_and_formatted_messages(monkeypatch, tmp_path):
+def test_run_kernel_task_emits_running_completion_and_formatted_messages(
+    monkeypatch, tmp_path
+):
     events: list[tuple[str, str]] = []
 
     class FakeChat:
@@ -138,7 +155,10 @@ def test_run_kernel_task_emits_running_completion_and_formatted_messages(monkeyp
 
     assert events[0] == ("system", t("thinking"))
     assert ("status", t("chat_running")) in events
-    assert any(kind == "assistant" and t("chat_result_status") in message and "ok" in message for kind, message in events)
+    assert any(
+        kind == "assistant" and t("chat_result_status") in message and "ok" in message
+        for kind, message in events
+    )
     assert events[-1] == ("status", t("chat_completed"))
     assert app._task_running is False
 
