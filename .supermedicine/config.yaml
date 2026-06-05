@@ -1,7 +1,9 @@
+# SuperMedicine 配置
+# LLM provider template. 支持任意 provider 名称。
+# api_format 决定 HTTP 请求格式: openai (兼容 DeepSeek/智谱/Ollama 等) 或 anthropic
+# 根据 provider 名称自动推断 api_format，也可手动指定。
 llm:
   provider: ''
   providers: {}
 project_name: supermedicine
-runtime_state:
-  selected_experiment_protocol: western_blot_basic
 version: Beta0.4.1
