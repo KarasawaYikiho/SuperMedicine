@@ -39,6 +39,10 @@ class CitationSource:
     confidence: float = 1.0
     valid: bool = True
     note: str = ""
+    source_type: str = "provided_source"
+    location: str = ""
+    authority: str = "unspecified"
+    verification_status: str = "provided_not_rechecked"
 
 
 @dataclass
@@ -109,6 +113,35 @@ def citation_state_from_validation(
         "status": result.status,
         "message": result.message,
         "confidence": result.confidence,
+    }
+
+
+def citation_provenance_from_source(source: CitationSource | None) -> dict[str, object]:
+    """Return a small, stable provenance record for audit reports.
+
+    The record intentionally describes user-provided source metadata only. It does
+    not perform network lookup, source retrieval, DOI resolution, or medical
+    evidence grading, so existing citation behavior remains deterministic and
+    local to the caller-supplied source map.
+    """
+    if source is None:
+        return {
+            "source_id": None,
+            "source_type": None,
+            "location": None,
+            "authority": None,
+            "verification_status": "source_not_available",
+            "confidence": None,
+            "valid": False,
+        }
+    return {
+        "source_id": source.source_id,
+        "source_type": source.source_type,
+        "location": source.location,
+        "authority": source.authority,
+        "verification_status": source.verification_status,
+        "confidence": source.confidence,
+        "valid": source.valid,
     }
 
 

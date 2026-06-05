@@ -113,7 +113,7 @@ Artifacts eligible for removal when accessible:
 | Branch | `master...origin/master` |
 | Remote | `origin https://github.com/KarasawaYikiho/SuperMedicine.git` |
 | Last baseline commit | `d9a69c5 docs: rewrite markdown docs and document no-safe-rename audit` |
-| Version | `0.3.6b0` |
+| Version | `0.4.1b0` |
 | Python | `>=3.10` |
 | Build backend | `setuptools>=68.0`, `wheel` |
 | Runtime deps | `pyyaml>=6.0`, `rich>=13.7,<15`, `textual>=0.79,<2` |

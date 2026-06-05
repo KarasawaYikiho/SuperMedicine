@@ -6,11 +6,12 @@ folders are intentionally not referenced here.
 
 ## Overview
 
-SuperMedicine uses a microkernel plus multi-agent orchestration architecture for
+SuperMedicine uses a microkernel plus multi-role orchestration architecture for
 an independent Python medical research assistant framework. The Kernel wires
 configuration, events, plugin discovery, sessions, workspace state, LLM provider
 management, and runtime permission enforcement. Optional OpenCode and Claude Code
-adapters wrap the core; they are not initialization requirements.
+adapters wrap the core; they are not initialization requirements and must not be
+described as native platform runtimes unless that functionality exists.
 
 ```text
 CLI / TUI / Optional Adapters
@@ -177,12 +178,33 @@ core independence.
 - Workspace deletion is exact-confirmation guarded and auditable.
 - Paper enrichment is explicit, permission-checked external-resource behavior.
 
+## Function Relationship Inventory
+
+The visible callable inventory is [FUNCTION_MAP.md](FUNCTION_MAP.md). It is kept
+at the repository root because `.gitignore` excludes `docs/`. The map is generated
+from Python AST static analysis and is useful for navigation, review, and impact
+assessment, but it is not a complete runtime trace. Dynamic CLI dispatch, Textual
+callbacks, decorators, plugin registries, tests, and reflection can add runtime
+relationships that are not statically visible. The inventory must remain
+secret-free and should not be edited to include environment values, API keys,
+private endpoints, raw tracebacks, or audit-log payloads.
+
+## External Reference Integration Boundary
+
+External projects may inform UI, workflow, or adapter design only after their
+license, implementation status, and security boundary are reviewed. For the
+current codebase, OpenCode-style interaction ideas are documented as optional
+experience references, not copied source and not core dependencies. Any future
+native platform bridge must be implemented, tested, and permission-gated before
+documentation claims native support.
+
 ## Repository Hygiene
 
-Git uploads should contain only necessary project files. Do not upload excluded
-engineering documentation folders such as `Docs/`, `docs/`, or `Architecture/`,
-generated build artifacts, caches, runtime checkpoint directories, or local
-configuration containing secrets/private endpoints.
+Git uploads should contain only necessary project files. `Docs/`, `docs/`, and
+`Architecture/` are ignored by default; tracked files in those locations are
+historical or explicitly force-added and must be reviewed before release. Do not
+upload generated build artifacts, caches, runtime checkpoint directories, raw
+logs, or local configuration containing secrets/private endpoints.
 
 Before release, exclude generated `build/`, `dist/`, `*.egg-info`, `__pycache__`,
 `.pytest_cache`, `.pytest-tmp`, runtime data, and private configuration files.

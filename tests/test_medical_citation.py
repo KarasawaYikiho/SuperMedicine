@@ -7,7 +7,11 @@ from plugins.standards.medical_citation.ama_format import (
 )
 from plugins.standards.medical_citation.main import execute
 from plugins.standards.medical_citation.vancouver_format import VancouverFormatter
-from plugins.standards.medical_citation.utils import CitationSource, validate_source_id
+from plugins.standards.medical_citation.utils import (
+    CitationSource,
+    citation_provenance_from_source,
+    validate_source_id,
+)
 
 
 class TestAMAFormatter:
@@ -93,6 +97,50 @@ class TestCitationAccuracy:
 
         assert result.status == "warning"
         assert result.confidence == 0.5
+
+    def test_citation_source_provenance_defaults_are_stable(self):
+        source = CitationSource("src-1", "Reference")
+
+        provenance = citation_provenance_from_source(source)
+
+        assert provenance == {
+            "source_id": "src-1",
+            "source_type": "provided_source",
+            "location": "",
+            "authority": "unspecified",
+            "verification_status": "provided_not_rechecked",
+            "confidence": 1.0,
+            "valid": True,
+        }
+
+    def test_citation_source_provenance_uses_supplied_metadata(self):
+        source = CitationSource(
+            source_id="src-1",
+            reference="Reference",
+            confidence=0.8,
+            valid=True,
+            source_type="uploaded_pdf",
+            location="p. 12",
+            authority="systematic_review",
+            verification_status="human_checked",
+        )
+
+        provenance = citation_provenance_from_source(source)
+
+        assert provenance["source_id"] == "src-1"
+        assert provenance["source_type"] == "uploaded_pdf"
+        assert provenance["location"] == "p. 12"
+        assert provenance["authority"] == "systematic_review"
+        assert provenance["verification_status"] == "human_checked"
+        assert provenance["confidence"] == 0.8
+        assert provenance["valid"] is True
+
+    def test_missing_source_provenance_is_explicitly_unavailable(self):
+        provenance = citation_provenance_from_source(None)
+
+        assert provenance["source_id"] is None
+        assert provenance["verification_status"] == "source_not_available"
+        assert provenance["valid"] is False
 
 
 class TestMedicalCitationPluginEntry:

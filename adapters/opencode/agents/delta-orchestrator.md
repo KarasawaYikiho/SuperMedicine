@@ -31,10 +31,11 @@ intentionally self-contained and should be read alongside the user-facing
 ## OpenCode Provider Boundary
 OpenCode AI provider configuration is supplied by installer flags, `SM_LLM_*`
 environment variables, provider key environment variables, or `.supermedicine/config.yaml`.
-OpenAI-compatible and Anthropic-compatible formats are declared, custom BaseURL is
-allowed, secrets are redacted as `<redacted>`, and this internal role context is
-not user-facing. Without an injected orchestrator/runtime bridge, dispatch remains
-degraded local context loading only.
+OpenAI-compatible, Anthropic-compatible, and OpenRouter gateway formats are
+declared. Custom compatible BaseURLs are allowed, secrets are redacted as
+`<redacted>`, and this internal role context is not user-facing. Without an
+injected orchestrator/runtime bridge, dispatch remains degraded local context
+loading only.
 
 ## Allowed Actions
 - Dispatch tasks to α, β, γ internal role contexts
@@ -49,6 +50,12 @@ degraded local context loading only.
 - Bypass state machine transitions
 - Execute role tasks directly (must dispatch)
 - Modify completed checkpoint data
+
+## Safety Notes
+- Coordination must preserve PermissionEngine decisions and adapter degraded
+  states; do not reinterpret local metadata fallback as native OpenCode dispatch.
+- Do not include plaintext credentials, raw logs, private endpoints, or patient
+  identifiers in orchestration summaries.
 
 ## State Machine
 ```

@@ -3,6 +3,8 @@
 This guide documents the user-facing workspace/TUI/RAG-adjacent workflows added
 for the current phase. It is documentation only: no tag, release, publish,
 package upload, paper upload, or external artifact upload is part of this work.
+It is tracked even though `Architecture/` is ignored by default; release-critical
+usage should also be reflected in root Markdown.
 
 For installation and command setup, see [../INSTALL.md](../INSTALL.md). For the
 broader architecture model, see [../ARCHITECTURE.md](../ARCHITECTURE.md). This
@@ -50,10 +52,11 @@ Current implementation map:
   persistent `Header`, left `ListView` sidebar, `#main-area`, bottom input bar,
   three-column status bar, and `Footer`. `launch_tui()` supports a non-interactive
   `--dry-run` status path for tests and CLI smoke checks.
-- Sidebar navigation uses `NavItem` entries and numeric bindings `1` through `8`
-  for `chat`, `dashboard`, `workspace`, `paper`, `experience`, `tool`, `dialog`,
-  and `llm`. `action_switch_view()` swaps pre-mounted views by toggling
-  `display`, updates `#view-title`, and synchronizes the sidebar index.
+- Sidebar navigation uses `NavItem` entries. Direct numeric view switching is no
+  longer documented as active behavior; users open the menu with `m`, use the
+  view-selection submenu, or move focus through the sidebar. `action_switch_view()`
+  swaps pre-mounted views by toggling `display`, updates `#view-title`, and
+  synchronizes the sidebar index.
 - The status bar is updated from workspace count, plugin count, LLM readiness,
   UTC time, and package version. LLM readiness uses `ConfigCenter` and
   `LLMConfigManager`; exit state is saved from `on_unmount()`.
@@ -136,9 +139,10 @@ Migrated principles for the SuperMedicine Textual workbench:
 - **Visible session and context state** — surface current workspace, LLM readiness,
   provider, session/recent-selection status, plugin count, and task activity in
   stable places so users do not need to infer hidden context.
-- **Discoverable shortcuts** — keep numeric navigation, `?`, `f`, `Esc`, and `q`
+- **Discoverable shortcuts** — keep `m`, `p`, `?`, `f`, `Esc`, and `q`
   discoverable through footer/help copy, and make screen-local actions visible in
-  nearby labels or button text.
+  nearby labels or button text. Numeric keys should remain ordinary input when the
+  prompt field has focus.
 - **Actionable errors** — error messages should identify what failed, what the
   user can do next, and whether a permission, configuration, missing dependency,
   workspace, or external-resource boundary caused the failure.
@@ -225,26 +229,23 @@ Tool ids use the same safe slug style as workspace ids. Supported languages are
 
 ```bash
 supermedicine tool init --workspace hypertension-review
-supermedicine tool add --workspace hypertension-review --language python --tool heatmap
-supermedicine tool add --workspace hypertension-review --language r --tool umap
+supermedicine tool scan --language python
+supermedicine tool add --workspace hypertension-review --select 1
 supermedicine tool list --workspace hypertension-review
-supermedicine tool show --workspace hypertension-review --language python --tool heatmap
-supermedicine tool run --workspace hypertension-review --language python --tool heatmap --dry-run --input data/matrix.csv --output outputs/heatmap.png
 ```
 
-Built-in templates are available for Python heatmap, Python UMAP, R heatmap, and
-R UMAP. They are scaffolds: heavyweight visualization dependencies such as
-`matplotlib`, `seaborn`, `umap-learn`, `ggplot2`, `pheatmap`, and R `umap` remain
-optional and are reported by the runner scripts with friendly messages instead
-of becoming global SuperMedicine dependencies.
+Built-in scanned tool catalogs include Python and R mainstream data-analysis
+examples under `plugins/tools/python_data_analysis/` and
+`plugins/tools/r_data_analysis/`. They are scaffolds: heavyweight optional
+dependencies remain optional and are reported by runner scripts with friendly
+messages instead of becoming global SuperMedicine dependencies.
 
-`tool run` currently prepares a guarded command foundation rather than executing
-workspace scripts directly. Preparation validates the workspace, language, tool
-slug, manifest, entrypoint, and optional input/output paths; paths must remain
-inside the selected workspace/tool folder as appropriate. The operation is
-checked through PermissionEngine using `tool.run` and audit events are written
-for allowed or denied decisions. CLI tool commands require explicit
-`--workspace` and do not read TUI recent selection.
+Tool import validates scanned manifests, workspace, language, safe slug,
+entrypoint, and optional input/output path rules. Paths must remain inside the
+selected workspace/tool folder as appropriate. High-risk tool operations are
+checked through PermissionEngine and audit events are written for allowed or
+denied decisions. CLI tool commands require explicit `--workspace` and do not
+read TUI recent selection.
 
 ## Paper Import and Metadata
 

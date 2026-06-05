@@ -547,6 +547,27 @@ def test_repository_docs_and_manifests_do_not_contain_realistic_plaintext_secret
     assert offenders == []
 
 
+def test_root_visible_markdown_docs_do_not_contain_plaintext_example_secrets():
+    checked_paths = sorted(REPO_ROOT.glob("*.md"))
+    forbidden_secret_patterns = [
+        re.compile(r"sk-[A-Za-z0-9_-]{12,}"),
+        re.compile(r"sk-ant-[A-Za-z0-9_-]{12,}"),
+        re.compile(r"AKIA[0-9A-Z]{16}"),
+        re.compile(
+            r"(?:api[_-]?key|authorization|token|secret)\s*[:=]\s*['\"][^'\"<{][^'\"]{8,}['\"]",
+            re.IGNORECASE,
+        ),
+    ]
+
+    offenders = []
+    for path in checked_paths:
+        content = path.read_text(encoding="utf-8")
+        if any(pattern.search(content) for pattern in forbidden_secret_patterns):
+            offenders.append(str(path.relative_to(REPO_ROOT)))
+
+    assert offenders == []
+
+
 def test_platform_adapter_docs_do_not_use_legacy_platform_agent_names():
     """Platform adapter surfaces should use SuperMedicine role positioning names."""
     forbidden_agent_names = re.compile(r"\b(?:Brain|Planner|Coder|Tester)\b")

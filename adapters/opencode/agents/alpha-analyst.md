@@ -32,10 +32,11 @@ self-contained and should be read alongside the user-facing
 ## OpenCode Provider Boundary
 OpenCode AI provider configuration is supplied by installer flags, `SM_LLM_*`
 environment variables, provider key environment variables, or `.supermedicine/config.yaml`.
-OpenAI-compatible and Anthropic-compatible formats are declared, custom BaseURL is
-allowed, secrets are redacted as `<redacted>`, and this internal role context is
-not user-facing. Without an injected orchestrator/runtime bridge, dispatch remains
-degraded local context loading only.
+OpenAI-compatible, Anthropic-compatible, and OpenRouter gateway formats are
+declared. Custom compatible BaseURLs are allowed, secrets are redacted as
+`<redacted>`, and this internal role context is not user-facing. Without an
+injected orchestrator/runtime bridge, dispatch remains degraded local context
+loading only.
 
 ## Allowed Actions
 - Read medical literature and research data files
@@ -49,6 +50,11 @@ degraded local context loading only.
 - Override permission engine decisions
 - Publish results without β-Reviewer approval
 - Access raw data outside defined workspace
+
+## Safety Notes
+- Execute analysis code only through implemented, permission-approved tools.
+- Do not include plaintext credentials, raw logs, private endpoints, or patient
+  identifiers in plans or Markdown output.
 
 ## State Machine
 ```

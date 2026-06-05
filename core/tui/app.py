@@ -26,6 +26,7 @@ from textual.widgets import Footer, Header, Input, ListItem, ListView, Static
 
 from core.config_center import ConfigCenter
 from core.llm_manager import LLMConfigManager
+from core.redaction import redact_sensitive
 from core.tui.i18n import LABELS, t
 
 
@@ -124,17 +125,7 @@ _DISPLAY_SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (
 def _redact_display_secrets(value: str) -> str:
     """Redact common secret shapes before handing text to chat rendering."""
 
-    text = value
-    for pattern in _DISPLAY_SECRET_PATTERNS:
-        if "Bearer" in pattern.pattern:
-            text = pattern.sub("Bearer [已隐藏]", text)
-        elif "sk-" in pattern.pattern:
-            text = pattern.sub("[已隐藏密钥]", text)
-        else:
-            text = pattern.sub(
-                lambda match: f"{match.group(1)}{match.group(2)}[已隐藏]", text
-            )
-    return text
+    return str(redact_sensitive(value)).replace("[REDACTED]", "[已隐藏]")
 
 
 _KERNEL_OUTPUT_ASSISTANT_KEYS = (

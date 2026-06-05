@@ -4,7 +4,8 @@ STARD (Standards for Reporting Diagnostic Accuracy Studies) provides guidance fo
 
 This reference preserves checklist item wording for implementation and manual
 review. Do not treat checklist completion as clinical, regulatory, or evidence
-quality validation.
+quality validation. The reference contains no credentials, raw logs, private
+endpoints, or patient data; preserve that property when editing.
 
 ## Checklist Items
 

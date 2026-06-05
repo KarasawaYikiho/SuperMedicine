@@ -1,6 +1,6 @@
 # Execution Roadmap
 
-This document records the current SuperMedicine architecture and the completed execution roadmap state requested by the user. The implementation roadmap is complete at Step 13/13 with final verification passed; Steps 1-13 are historical completion markers, not pending work.
+This document records the current SuperMedicine architecture and the completed execution-roadmap state requested by the user. Steps 1-13 are historical completion markers, not pending work. This artifact is tracked even though `Architecture/` is ignored by default; root documentation remains the release source of truth.
 
 For current user commands, use [../README.md](../README.md) and
 [../INSTALL.md](../INSTALL.md). For detailed component responsibilities, use
@@ -120,14 +120,15 @@ flowchart TD
 
 ## Release-Candidate State
 
-- Release-ready label: `Beta0.3.6`.
-- Python package metadata: `0.3.6b0` is the selected PEP 440 fallback because
-  packaging validation rejects `Beta0.3.6` as `project.version`.
+- Release-ready label: `Beta0.4.1`.
+- Python package metadata fallback: `0.4.1b0` is the selected PEP 440-compatible
+  value for package metadata.
 - R/rpy2 backend: formal support is represented through the optional `r` extra
   and the local `plugins.tools.r_survival` adapter path; it requires a local R
   installation with the R `survival` package available.
-- OpencodeR: read-only reference only. No external OpencodeR data or source has
-  been copied into this repository, and `D:\GIT\2025\OpencodeR` is not modified.
+- External OpenCode-style references are read-only design references only. No
+  external source, data, runtime configuration, or local project path is copied
+  into this repository.
 - CI release gate: Windows, macOS, and Linux must pass before release.
 - Release gate checks: `ruff`, `pytest`, wheel/sdist smoke, and repository
   hygiene. The gate intentionally excludes mypy, pyright, and coverage

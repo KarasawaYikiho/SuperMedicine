@@ -19,6 +19,9 @@ Python package fallback version: **0.4.1b0**.
 
 ### Changed
 
+- Rewrote release-scope Markdown to align terminology around standalone core,
+  optional adapters, permission modes, log redaction, static function mapping,
+  and external project reference boundaries.
 - Updated public/release display label to `Beta0.4.1`.
 - Python package metadata uses fallback version `0.4.1b0`.
 - Reworked root user-facing Markdown for release upload scope, including a

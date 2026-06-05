@@ -15,9 +15,10 @@ and safety context so it can be consumed without opening the full project README
 
 OpenCode AI provider metadata is supplied by installer flags, `SM_LLM_*`
 environment variables, provider key environment variables, or `.supermedicine/config.yaml`.
-The add-on declares OpenAI-compatible and Anthropic-compatible formats, supports
-custom BaseURL values, redacts secrets as `<redacted>`, and degrades without an
-injected orchestrator/runtime bridge. Do not include plaintext API keys in skill docs.
+The add-on declares OpenAI-compatible, Anthropic-compatible, and OpenRouter
+gateway formats, supports custom compatible BaseURL values, redacts secrets as
+`<redacted>`, and degrades without an injected orchestrator/runtime bridge. Do not
+include plaintext API keys, private endpoints, or raw logs in skill docs.
 
 ## Capabilities
 
@@ -38,7 +39,7 @@ from plugins.harness.main import execute
 
 result = execute(
     "harness.monitor.permission_audit",
-    {"audit_log_path": ".supermedicine/audit.jsonl"},
+    {"audit_log_path": ".supermedicine/policies/audit.jsonl"},
 )
 entries = result["output"]["entries"]
 ```

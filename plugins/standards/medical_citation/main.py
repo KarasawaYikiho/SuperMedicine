@@ -186,6 +186,12 @@ def _source_from_dict(source_id: str, item: dict[str, Any]) -> CitationSource:
     note = item.get("note", "")
     if not isinstance(note, str):
         raise ValueError("source note must be a string when provided")
+    source_type = _optional_metadata_str(item.get("source_type"), "provided_source")
+    location = _optional_metadata_str(item.get("location"), "")
+    authority = _optional_metadata_str(item.get("authority"), "unspecified")
+    verification_status = _optional_metadata_str(
+        item.get("verification_status"), "provided_not_rechecked"
+    )
 
     return CitationSource(
         source_id=source_id,
@@ -193,6 +199,10 @@ def _source_from_dict(source_id: str, item: dict[str, Any]) -> CitationSource:
         confidence=float(confidence),
         valid=valid,
         note=note,
+        source_type=source_type,
+        location=location,
+        authority=authority,
+        verification_status=verification_status,
     )
 
 
@@ -261,6 +271,14 @@ def _optional_str(value: Any) -> str:
         return ""
     if not isinstance(value, str):
         raise ValueError("optional citation fields must be strings when provided")
+    return value
+
+
+def _optional_metadata_str(value: Any, default: str) -> str:
+    if value is None:
+        return default
+    if not isinstance(value, str):
+        raise ValueError("optional source provenance fields must be strings when provided")
     return value
 
 

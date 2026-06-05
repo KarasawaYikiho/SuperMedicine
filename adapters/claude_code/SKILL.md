@@ -1,6 +1,6 @@
 ---
 name: supermedicine
-description: SuperMedicine is the single user-facing Claude Code skill/agent surface for the modular medical research assistant framework with RAG, Harness, statistical analysis tools, medical writing standards (CONSORT/STROBE/PRISMA/STARD), citation formatting (AMA/Vancouver), internal role-context orchestration, and P0 dual-layer permission engine.
+description: SuperMedicine is the single user-facing Claude Code optional-adapter surface for the modular medical research assistant framework with RAG, Harness, statistical analysis tools, medical writing standards (CONSORT/STROBE/PRISMA/STARD), citation formatting (AMA/Vancouver), internal role-context orchestration, and runtime permission enforcement.
 ---
 
 # SuperMedicine Claude Code Optional Adapter Skill
@@ -35,11 +35,12 @@ local so this optional skill remains self-contained.
 - User-facing Agent/surface: exactly one, `SuperMedicine`
 - Internal role contexts: `alpha`, `beta`, `gamma`, and `delta` as
   non-user-facing workflow context only
-- AI provider formats: OpenAI-compatible and Anthropic-compatible
+- AI provider formats: OpenAI-compatible and Anthropic-compatible, plus
+  OpenRouter gateway configuration
 - Provider configuration source: installer/runtime/project configuration only,
-  including `Install.py --provider openai|anthropic --base-url <url>
-  --api-key <placeholder-or-secret> --model <model>`, `SM_LLM_*` variables,
-  `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`, and `.supermedicine/config.yaml`
+  including `install.py --provider openai|anthropic|openrouter --base-url <url>
+  --api-key-env <ENV_NAME> --model <model>`, `SM_LLM_*` variables,
+  provider-specific key variables, and `.supermedicine/config.yaml`
 - Secret handling: API keys must be redacted from logs, manifests, adapter
   responses, and documentation; this skill document intentionally contains no
   real plaintext API key examples
@@ -82,7 +83,7 @@ non-user-facing workflow role contexts/capabilities, not separate platform Agent
   `claude.runtime_status`, and `claude.invoke`
 - `claude.invoke` requires the local `claude` command and a successful
   SuperMedicine PermissionEngine decision before subprocess execution
-- OpenAI/Anthropic provider configuration discovery through the same
+- OpenAI/Anthropic/OpenRouter provider configuration discovery through the same
   installer-injected SuperMedicine configuration model used by other optional
   platform surfaces
 - Custom provider BaseURL metadata for OpenAI-compatible and
@@ -96,24 +97,25 @@ metadata, it must use configuration supplied during SuperMedicine installation
 or runtime setup rather than embedding credentials in adapter files. Supported
 sources are:
 
-- `Install.py --provider openai|anthropic --base-url <url> --api-key <placeholder-or-secret>
-  --model <model>`
+- `install.py --provider openai|anthropic|openrouter --base-url <url>
+  --api-key-env <ENV_NAME> --model <model>`
 - `SM_LLM_PROVIDER`, `SM_LLM_BASE_URL`, `SM_LLM_API_KEY`, and `SM_LLM_MODEL`
-- `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`
+- `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `OPENROUTER_API_KEY`
 - `.supermedicine/config.yaml` entries under `llm.provider` and
   `llm.providers.*`
 
-Supported API formats are OpenAI-compatible and Anthropic-compatible. Custom
-BaseURL values are allowed for compatible endpoints. Adapter capability/status
-metadata may report that these formats and configuration sources are supported,
-but it must not echo plaintext API keys.
+Supported API formats are OpenAI-compatible and Anthropic-compatible, plus
+OpenRouter gateway configuration. Custom compatible BaseURL values are allowed.
+Adapter capability/status metadata may report supported formats and configuration
+sources, but it must not echo plaintext API keys, private endpoints, raw logs, or
+patient identifiers.
 
 Example placeholders, not real credentials:
 
 ```bash
-python Install.py --init --provider openai \
+python install.py --init --provider openai \
   --base-url https://api.openai.com/v1 \
-  --api-key <OPENAI_API_KEY_PLACEHOLDER> \
+  --api-key-env OPENAI_API_KEY \
   --model gpt-4o-mini
 ```
 
@@ -173,7 +175,7 @@ user-facing platform Agents. The only user-facing Agent/surface is
 git clone https://github.com/KarasawaYikiho/SuperMedicine.git
 cd SuperMedicine
 pip install -e ".[dev]"
-python Install.py --init
+python install.py
 python Cli.py status
 ```
 
@@ -223,11 +225,10 @@ citation = AMAFormatter().format_journal(JournalArticle(
 
 ## Permissions
 
-SuperMedicine enforces a P0 dual-layer permission system. All role actions are checked against:
-1. Code-layer policy rules (fnmatch-based deny-override-allow)
-2. Prompt-layer constraint templates (injected into SuperMedicine execution context)
-
-Both layers must approve; any single denial blocks the action. All decisions are logged to JSONL audit files with UTC timestamps.
+SuperMedicine enforces runtime permission checks through policy rules
+(fnmatch-based deny-overrides-allow) and JSONL audit logging. Prompt-layer safety
+templates are advisory context and do not replace runtime enforcement. High-risk
+adapter actions must pass the runtime permission path before execution.
 
 ## License
 

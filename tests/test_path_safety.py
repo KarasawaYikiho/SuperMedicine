@@ -7,6 +7,7 @@ import pytest
 from core.path_safety import (
     PathOutsideProjectRootError,
     ProtectedPathError,
+    UnsafePathValueError,
     is_protected_path,
     resolve_project_root,
     validate_destructive_path,
@@ -78,3 +79,8 @@ def test_protected_directories_are_rejected_for_destructive_operations(tmp_path)
 def test_project_root_is_rejected_for_destructive_operations(tmp_path):
     with pytest.raises(ProtectedPathError):
         validate_destructive_path(tmp_path, tmp_path)
+
+
+def test_control_character_path_value_is_rejected_before_resolution(tmp_path):
+    with pytest.raises(UnsafePathValueError):
+        validate_path_in_project_root("safe\x00truncated.txt", tmp_path)

@@ -1,6 +1,8 @@
 # CI Failure Inventory and Root-Cause Mapping
 
-This file summarizes the zip-log findings and maps each category to repository code or CI configuration. It intentionally omits raw log dumps.
+This file summarizes zip-log findings and maps each category to repository code
+or CI configuration. It intentionally omits raw log dumps, credentials, private
+endpoints, local user paths, and environment values.
 
 ## 1. Real CI failure: standalone installer PyInstaller payload path
 

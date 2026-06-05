@@ -7,6 +7,7 @@ from typing import Any
 
 from plugins.standards.medical_citation.utils import (
     CitationSource,
+    citation_provenance_from_source,
     citation_state_from_validation,
     validate_source_id,
 )
@@ -54,6 +55,10 @@ class MedicalClaim:
     claim_type: str = "fact"
     source_id: str | None = None
     confidence: float | None = None
+    claim_id: str | None = None
+    location: str = ""
+    verification_status: str = "not_checked"
+    suggested_fix: str = ""
 
 
 def _infer_claim_type(sentence: str) -> str:
@@ -93,15 +98,58 @@ def annotate_medical_claims(
             for sentence in _split_claim_sentences(text)
         ]
 
-    return [
-        {
-            "text": claim.text,
-            "claim_type": claim.claim_type,
-            "source_id": claim.source_id,
-            "confidence": claim.confidence,
-        }
-        for claim in claims
+    annotations: list[dict[str, Any]] = []
+    for index, claim in enumerate(claims, start=1):
+        annotations.append(
+            {
+                "claim_id": claim.claim_id or f"C{index:03d}",
+                "text": claim.text,
+                "claim_type": claim.claim_type,
+                "source_id": claim.source_id,
+                "confidence": claim.confidence,
+                "location": claim.location,
+                "verification_status": claim.verification_status,
+                "suggested_fix": claim.suggested_fix,
+            }
+        )
+    return annotations
+
+
+def _citation_issue_type(validation_status: str, source_id: object) -> str | None:
+    if validation_status == "ok":
+        return None
+    if validation_status == "warning":
+        return "low_confidence_source"
+    if not source_id:
+        return "missing_source_id"
+    return "source_unavailable_or_invalid"
+
+
+def _claim_audit_summary(annotations: list[dict[str, Any]]) -> dict[str, Any]:
+    required = [annotation for annotation in annotations if annotation["requires_citation"]]
+    blocked = [
+        annotation
+        for annotation in required
+        if annotation.get("citation_status") == "error"
     ]
+    needs_review = [
+        annotation
+        for annotation in required
+        if annotation.get("citation_status") == "warning"
+    ]
+    linked = [
+        annotation for annotation in required if annotation.get("citation_status") == "ok"
+    ]
+    return {
+        "audit_mode": "provided_sources_only",
+        "network_lookup_performed": False,
+        "total_claims": len(annotations),
+        "citation_required_claims": len(required),
+        "linked_claims": len(linked),
+        "needs_human_review_claims": len(needs_review),
+        "blocked_claims": len(blocked),
+        "gate_status": "blocked" if blocked else "review_required" if needs_review else "pass",
+    }
 
 
 def enforce_medical_accuracy(
@@ -137,8 +185,21 @@ def enforce_medical_accuracy(
         state = citation_state_from_validation(validation)
         source_states.append(state)
         annotation["citation_status"] = validation.status
+        annotation["citation_issue_type"] = _citation_issue_type(
+            validation.status, annotation.get("source_id")
+        )
+        annotation["source_provenance"] = citation_provenance_from_source(
+            (sources or {}).get(str(annotation.get("source_id")))
+            if annotation.get("source_id")
+            else None
+        )
 
-        issue = {"claim": claim_text, **state}
+        issue = {
+            "claim_id": annotation["claim_id"],
+            "claim": claim_text,
+            "citation_issue_type": annotation["citation_issue_type"],
+            **state,
+        }
         if validation.status == "error":
             errors.append(issue)
         elif validation.status == "warning":
@@ -149,6 +210,7 @@ def enforce_medical_accuracy(
         "citation_warnings": warnings,
         "citation_errors": errors,
         "source_states": source_states,
+        "claim_audit_summary": _claim_audit_summary(annotations),
         "human_review_message": HUMAN_REVIEW_MESSAGE,
     }
 

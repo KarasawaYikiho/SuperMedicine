@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, overload
 
 from plugins.base_plugin import plugin_result
 from plugins.standards.medical_citation.utils import CitationSource
@@ -207,9 +207,31 @@ def _claims_from_params(value: Any) -> list[MedicalClaim] | None:
                 claim_type=claim_type,
                 source_id=source_id,
                 confidence=confidence,
+                claim_id=_optional_claim_str(item.get("claim_id"), None),
+                location=_optional_claim_str(item.get("location"), ""),
+                verification_status=_optional_claim_str(
+                    item.get("verification_status"), "not_checked"
+                ),
+                suggested_fix=_optional_claim_str(item.get("suggested_fix"), ""),
             )
         )
     return claims
+
+
+@overload
+def _optional_claim_str(value: Any, default: str) -> str: ...
+
+
+@overload
+def _optional_claim_str(value: Any, default: None) -> str | None: ...
+
+
+def _optional_claim_str(value: Any, default: str | None) -> str | None:
+    if value is None:
+        return default
+    if not isinstance(value, str):
+        raise ValueError("optional claim audit fields must be strings when provided")
+    return value
 
 
 def _sources_from_params(value: Any) -> dict[str, CitationSource] | None:
@@ -246,11 +268,21 @@ def _sources_from_params(value: Any) -> dict[str, CitationSource] | None:
         note = item.get("note", "")
         if not isinstance(note, str):
             raise ValueError("source note must be a string when provided")
+        source_type = _optional_claim_str(item.get("source_type"), "provided_source")
+        location = _optional_claim_str(item.get("location"), "")
+        authority = _optional_claim_str(item.get("authority"), "unspecified")
+        verification_status = _optional_claim_str(
+            item.get("verification_status"), "provided_not_rechecked"
+        )
         sources[source_id] = CitationSource(
             source_id=source_id,
             reference=reference,
             confidence=float(confidence),
             valid=valid,
             note=note,
+            source_type=str(source_type),
+            location=str(location),
+            authority=str(authority),
+            verification_status=str(verification_status),
         )
     return sources

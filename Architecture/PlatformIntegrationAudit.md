@@ -1,7 +1,7 @@
 # Platform Integration Audit
 
-Step 1 audit artifact for separating SuperMedicine standalone core capability
-from optional OpenCode / Claude Code platform integrations. Step 6 documentation
+Audit artifact for separating SuperMedicine standalone core capability
+from optional OpenCode / Claude Code platform integrations. Documentation
 updates preserve this model as **core independent + platform add-ons**. Current
 user-facing summaries live in [../README.md](../README.md), [../INSTALL.md](../INSTALL.md),
 and [../ARCHITECTURE.md](../ARCHITECTURE.md); this file preserves audit evidence
@@ -264,9 +264,9 @@ secrets were added to source, tests, or documentation.
   assistant-platform directories. Platform probing is isolated behind explicit
   `--detect`, which checks for `~/.claude` and `~/.config/opencode` and returns a
   platform label only.
-- `.supermedicine/config.yaml` currently contains only bootstrap metadata:
-  project name and `Beta0.3.6` version. It contains no LLM endpoint, BaseURL,
-  OpenAI/Anthropic/OpenRouter key, or private platform configuration.
+- `.supermedicine/config.yaml` is local runtime configuration. Tracked examples or
+  bootstrap copies must not contain real LLM endpoints, BaseURLs, API keys, or
+  private platform configuration.
 - Tracked `.supermedicine/**` is intentionally limited by
   `tests/test_repo_hygiene.py` to `.supermedicine/config.yaml` and
   `.supermedicine/policies/default.yaml`; runtime audit logs and checkpoints are
@@ -390,6 +390,15 @@ secrets were added to source, tests, or documentation.
   value written into the inspected source, docs, manifests, config, or tests.
   Existing test strings such as `test-key`, `secret-key`, and redaction payloads
   are dummy fixtures used to exercise missing-key and redaction behavior.
+
+### 8.7 Current Documentation Hygiene Addendum
+
+- Public release label is `Beta0.4.1`; package metadata fallback is `0.4.1b0`.
+- `FUNCTION_MAP.md` is the visible callable inventory because `docs/` is ignored.
+- OpenCode-style experience references are design-analysis input only; no external
+  source, logs, prompts, or private configuration are copied into SuperMedicine.
+- Optional adapter documents must continue to distinguish local/orchestrator
+  fallback from native platform runtime dispatch.
 
 ### 8.6 Current Implementation Boundary and Follow-Up Risks
 

@@ -44,6 +44,76 @@ def test_session_writes_append_to_one_redacted_log(tmp_path):
     assert "second-token" not in json.dumps(shown, ensure_ascii=False)
 
 
+def test_log_report_redacts_request_headers_body_url_query_and_private_key(tmp_path):
+    store = LogReportStore(tmp_path)
+    secret = "sk-log-report-request-secret"
+    private_material = "MIIEvlogreportprivatekeymaterial"
+    message = json.dumps(
+        {
+            "headers": {
+                "Authorization": f"Bearer {secret}",
+                "Cookie": "sid=log-report-cookie-secret",
+            },
+            "url": f"https://example.test/v1?api_key={secret}&ok=1",
+            "body": {
+                "password": "log-report-password-secret",
+                "private_key": (
+                    "-----BEGIN PRIVATE KEY-----\n"
+                    f"{private_material}\n"
+                    "-----END PRIVATE KEY-----"
+                ),
+            },
+        }
+    )
+
+    written = store.write(message, session_id="request-redaction")
+    log_path = tmp_path / ".supermedicine" / "logs" / written["file"]
+    persisted = log_path.read_text(encoding="utf-8")
+    returned = json.dumps(store.show(written["file"]), ensure_ascii=False)
+
+    for text in (persisted, returned):
+        assert secret not in text
+        assert "log-report-cookie-secret" not in text
+        assert "log-report-password-secret" not in text
+        assert private_material not in text
+        assert "[REDACTED]" in text
+
+
+def test_log_report_keeps_business_fields_while_redacting_error_payload(tmp_path):
+    store = LogReportStore(tmp_path)
+    secret = "sk-business-error-secret"
+    payload = {
+        "event": "paper_import",
+        "status": "failed",
+        "workspace_id": "study-visible",
+        "paper_count": 2,
+        "error": {
+            "message": f"provider rejected Authorization: Bearer {secret}",
+            "request": {
+                "headers": {
+                    "Authorization": f"Bearer {secret}",
+                    "X-Api-Key": secret,
+                },
+                "url": f"https://example.test/v1?api_key={secret}&page=1",
+            },
+        },
+    }
+
+    written = store.write(json.dumps(payload), session_id="business-regression")
+    shown = store.show(written["file"])
+    persisted = (
+        tmp_path / ".supermedicine" / "logs" / written["file"]
+    ).read_text(encoding="utf-8")
+    combined = json.dumps({"shown": shown, "persisted": persisted}, ensure_ascii=False)
+
+    assert secret not in combined
+    assert "[REDACTED]" in combined
+    assert "paper_import" in combined
+    assert "study-visible" in combined
+    assert "paper_count" in combined
+    assert "page=1" in combined
+
+
 def test_list_show_and_summary_return_redacted_records(tmp_path):
     store = LogReportStore(tmp_path)
     session_log = store.write("password=hunter2", session_id="session-a")
@@ -283,6 +353,32 @@ def test_tui_stream_output_is_routed_by_stream_severity_and_session(tmp_path):
     assert all(entry["session_id"] == "tui-application" for entry in entries)
     assert entries[0]["raw_message"] == "captured stdout: normal output"
     assert entries[1]["raw_message"] == "captured stderr: problem output"
+
+
+def test_tui_stream_output_redacts_sensitive_stdout_and_stderr_before_persisting(tmp_path):
+    secret = "sk-tui-stream-secret"
+
+    append_tui_stream_output(
+        tmp_path,
+        "stdout",
+        f"Authorization: Bearer {secret} url=https://example.test?token={secret}",
+    )
+    append_tui_stream_output(tmp_path, "stderr", "password=tui-stream-password")
+
+    log_text = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in (tmp_path / ".supermedicine" / "logs").glob("*.json")
+    )
+    entries_text = json.dumps(
+        LogReportStore(tmp_path).list_entries(session_id="tui-application"),
+        ensure_ascii=False,
+    )
+
+    assert secret not in log_text
+    assert secret not in entries_text
+    assert "tui-stream-password" not in log_text
+    assert "tui-stream-password" not in entries_text
+    assert "[REDACTED]" in log_text
 
 
 def test_configure_tui_log_storage_replaces_console_routing_with_log_handler(

@@ -15,6 +15,7 @@ from core.llm_client import (
     create_llm_client,
 )
 from core.llm_providers.base import AnthropicClient, OpenAIClient
+from core.llm_providers import base as provider_base
 from core.llm_providers.config import LLMProviderConfig
 from core.llm_providers.openrouter import OpenRouterClient
 
@@ -312,6 +313,50 @@ class TestUnifiedProviderConfig:
         assert client.config.api_key == secret
         assert client.config.safe_dict()["api_key"] == "<redacted>"
         assert secret not in str(client.config.safe_dict())
+
+    def test_provider_url_rejects_credentials_before_network(self, monkeypatch):
+        def fail_urlopen(*args, **kwargs):
+            raise AssertionError("unsafe provider URL must not reach network")
+
+        monkeypatch.setattr("urllib.request.urlopen", fail_urlopen)
+        client = create_llm_client(
+            "openai",
+            api_key="sk-test-secret",
+            base_url="https://user:password@example.test/v1",
+            model="gpt-fake",
+        )
+
+        result = client.chat([{"role": "user", "content": "hello"}])
+
+        assert result["error"]["code"] == "invalid_base_url"
+        assert "credentials" in result["error"]["message"]
+        assert "sk-test-secret" not in str(result)
+
+    def test_provider_response_size_limit_returns_structured_error(self, monkeypatch):
+        class OversizedResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def read(self, size=None):
+                return b"{" + (b"a" * provider_base.MAX_PROVIDER_RESPONSE_BYTES) + b"}"
+
+        monkeypatch.setattr(
+            "urllib.request.urlopen", lambda request, timeout: OversizedResponse()
+        )
+        client = create_llm_client(
+            "openai",
+            api_key="sk-test-secret",
+            base_url="https://example.test/v1",
+            model="gpt-fake",
+        )
+
+        result = client.chat([{"role": "user", "content": "hello"}])
+
+        assert result["error"]["code"] == "invalid_response"
+        assert "maximum supported size" in result["error"]["message"]
 
     def test_configured_factory_uses_config_center_runtime_provider(self, tmp_path):
         config_path = tmp_path / "config.yaml"

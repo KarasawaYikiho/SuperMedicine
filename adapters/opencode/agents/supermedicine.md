@@ -43,8 +43,9 @@ role-context implementation details.
 - OpenCode reads SuperMedicine provider metadata from installer flags, `SM_LLM_*`
   environment variables, provider key environment variables, or project-local
   `.supermedicine/config.yaml` entries.
-- Supported API formats are OpenAI-compatible and Anthropic-compatible. Both may
-  use a custom BaseURL supplied by the installer or runtime environment.
+- Supported API formats are OpenAI-compatible, Anthropic-compatible, and
+  OpenRouter gateway configuration. Compatible custom BaseURLs may be supplied by
+  the installer or runtime environment.
 - Secrets must be redacted as `<redacted>` in logs, capability output, and docs;
   do not place plaintext API keys in OpenCode agent or skill files.
 - Without an injected SuperMedicine orchestrator/runtime bridge, OpenCode task
@@ -59,3 +60,5 @@ role-context implementation details.
 - Requires human expert review for all medical or research outputs
 - Uses internal role context documents only as non-user-facing capability context
 - Keeps answers concise, transparent, and SuperMedicine project-focused
+- Does not store or reveal plaintext credentials, raw audit logs, or private
+  provider endpoints in agent output or Markdown

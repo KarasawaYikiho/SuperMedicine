@@ -1,6 +1,6 @@
 # Optimization Audit Report — Step 1
 
-This documentation-only artifact records the Step 1 optimization audit so it can be reviewed and verified from the repository workspace.
+This documentation-only artifact records optimization-audit history so it can be reviewed and verified from the repository workspace. It is tracked even though `Architecture/` is ignored by default; do not treat ignored local docs as release dependencies unless they are intentionally tracked.
 
 This file is an evidence record. Current user-facing installation, architecture,
 and security guidance lives in [../README.md](../README.md),
@@ -10,7 +10,7 @@ brief here unless needed for audit traceability.
 
 ## Branch / Remote / Status Summary
 
-- Working directory: `D:\GIT\SuperMedicine`
+- Working directory: repository root (local absolute paths are intentionally not repeated)
 - Branch summary from `git status --short --branch` before creating this report artifact: `master...origin/master`
 - The workspace already contained modified and untracked files before this report was created.
 - No staging area, commit, push, tag, release, publish, or upload action was performed as part of this audit step.
@@ -172,3 +172,13 @@ platform add-ons**:
 - Safety boundaries remain unchanged: runtime PermissionEngine checks are the
   enforcement path, prompt constraints are advisory, and medical outputs require
   qualified human review.
+
+## Current Documentation Hygiene Addendum
+
+- Public release label is `Beta0.4.1`; package fallback version is `0.4.1b0`.
+- Security-sensitive Markdown must use placeholders and must not include real
+  credentials, private endpoints, raw audit logs, or local user paths.
+- Function relationship documentation belongs in the visible root
+  `FUNCTION_MAP.md` because `docs/` is ignored.
+- External project references remain design-analysis input only unless code is
+  license-reviewed, implemented, and verified in this repository.

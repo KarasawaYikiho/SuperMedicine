@@ -5,6 +5,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 import yaml
 
 from permission.engine import PermissionEngine
@@ -231,6 +232,26 @@ class TestPubmedRAGProvider:
         assert result["status"] == "denied"
         assert result["errors"][0]["code"] == "agent_identity_required"
         assert result["metadata"]["security"]["permission_checked"] is False
+
+    def test_pubmed_url_validation_rejects_non_ncbi_endpoint(self):
+        provider = PubmedRAGProvider(
+            permission_engine=_pubmed_engine_for("alpha", True), agent_id="alpha"
+        )
+
+        with pytest.raises(OSError, match="outside the configured HTTPS endpoint"):
+            provider._validate_pubmed_url("http://169.254.169.254/latest/meta-data")
+
+    def test_pubmed_response_size_is_bounded(self):
+        provider = PubmedRAGProvider(
+            permission_engine=_pubmed_engine_for("alpha", True), agent_id="alpha"
+        )
+
+        class OversizedResponse:
+            def read(self, size=None):
+                return b"x" * (provider.MAX_RESPONSE_BYTES + 1)
+
+        with pytest.raises(OSError, match="exceeded maximum supported size"):
+            provider._read_limited_response(OversizedResponse())
 
 
 class TestMockExternalVectorStoreProvider:

@@ -156,6 +156,25 @@ def test_manifest_schema_requires_expected_fields_and_validates_identity():
         ToolManifest.from_dict({**data, "entrypoint": "../runner.py"})
 
 
+def test_workspace_tool_manifest_size_is_bounded(tmp_path):
+    service = WorkspaceToolService(tmp_path)
+    service.initialize_tools("trial-1")
+    service.add_builtin_tool("trial-1", "python", "heatmap")
+    manifest_path = (
+        tmp_path
+        / "workspaces"
+        / "trial-1"
+        / "tools"
+        / "python"
+        / "heatmap"
+        / "tool.yaml"
+    )
+    manifest_path.write_text("a" * (256 * 1024 + 1), encoding="utf-8")
+
+    with pytest.raises(ToolManifestError, match="too large"):
+        service.load_manifest("trial-1", "python", "heatmap")
+
+
 def test_tool_authoring_context_matches_manifest_and_scanner_contract():
     context = build_tool_authoring_llm_context()
     fields = context["manifest_fields"]

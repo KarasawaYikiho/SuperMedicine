@@ -2,7 +2,7 @@
 
 ## Purpose and Scope
 
-This document is the verifiable repository artifact for the phase implementation baseline. It maps the current SuperMedicine repository structure and compatibility boundaries before follow-on phase work.
+This document is a verifiable repository artifact for the phase implementation baseline. It maps the current SuperMedicine repository structure and compatibility boundaries before follow-on phase work. It is tracked despite the default `Architecture/` ignore rule; root Markdown remains the release-facing source of truth.
 
 This baseline avoids repeating full user guidance. Use [../README.md](../README.md)
 for quick-start commands, [../INSTALL.md](../INSTALL.md) for installation detail,
@@ -246,3 +246,5 @@ Future phase work should preserve these compatibility boundaries unless a phase 
 - Keep RAG external provider access permission-gated before network/API calls.
 - Keep pytest discovery compatible with `tests/` and `test_*.py`.
 - Do not introduce generated artifacts, build outputs, tags, releases, publishes, or uploads as part of phase implementation unless explicitly requested.
+- Do not add secrets, private endpoints, raw logs, or local user paths to Markdown
+  evidence; summarize sensitive diagnostics instead.

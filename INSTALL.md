@@ -6,7 +6,9 @@ SuperMedicine **Beta0.4.1**. The Python package fallback version is **0.4.1b0**.
 
 For a shorter overview, start with [README.md](README.md). For design and
 security boundaries, see [ARCHITECTURE.md](ARCHITECTURE.md) and
-[SECURITY.md](SECURITY.md).
+[SECURITY.md](SECURITY.md). For release documentation hardening and optional
+external-reference boundaries, see [SECURITY_HARDENING_CHECKLIST.md](SECURITY_HARDENING_CHECKLIST.md)
+and [EXTERNAL_PROJECT_ANALYSIS.md](EXTERNAL_PROJECT_ANALYSIS.md).
 
 ## Prerequisites
 
@@ -168,7 +170,7 @@ python install.py --init \
   --provider openai \
   --base-url https://api.openai.com/v1 \
   --model gpt-4o-mini \
-  --api-key <OPENAI_API_KEY>
+  --api-key-env OPENAI_API_KEY
 
 python install.py --release-exe dist/SuperMedicine.exe \
   --desktop-dir .pytest-tmp/Desktop \
@@ -246,7 +248,7 @@ SuperMedicineInstaller.exe --extract-release-to C:\SuperMedicine \
   --provider openai \
   --base-url https://api.openai.com/v1 \
   --model gpt-4o-mini \
-  --api-key <OPENAI_API_KEY>
+  --api-key-env OPENAI_API_KEY
 ```
 
 Use `--extract-overwrite` only when you intentionally want to replace existing
@@ -347,6 +349,11 @@ Expected status output includes the SuperMedicine version, configuration state,
 plugin discovery status, and test-module count. Diagnostic output redacts API
 keys, authorization headers, key-like URL tokens, and secret-looking fields while
 preserving information needed for repair.
+
+Do not paste unredacted diagnostics, installer tracebacks, private BaseURLs,
+absolute local paths, or audit JSONL records into public documentation or issues.
+When sharing a failure, summarize the command, platform, redacted error category,
+and next repair step.
 
 For development environments, run the Local Quality Gate described in
 [README.md](README.md#local-quality-gate).

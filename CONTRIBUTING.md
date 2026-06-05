@@ -53,9 +53,13 @@ that purpose.
   upload.
 - Do not add final-upload dependencies on excluded engineering folders such as
   `Docs/`, `docs/`, or `Architecture/`.
+- If a Markdown file in an ignored directory must be published, either force-track
+  it intentionally with review or provide a visible root-level alternative.
 - Keep documented versions aligned: public/release label `Beta0.4.1`, Python
   package fallback version `0.4.1b0`.
 - Use placeholders such as `<OPENAI_API_KEY>` in examples; never use real secrets.
+- Keep external project references as design analysis unless code has been
+  license-reviewed, implemented, and tested in this repository.
 
 ## File Naming
 

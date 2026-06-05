@@ -28,6 +28,7 @@ class PubmedRAGProvider(RAGProvider):
     """
 
     BASE_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
+    MAX_RESPONSE_BYTES = 5 * 1024 * 1024
     provider_name = "pubmed"
 
     def __init__(
@@ -275,15 +276,33 @@ class PubmedRAGProvider(RAGProvider):
 
     def _get_json(self, url: str) -> dict[str, Any]:
         """HTTP GET 并解析 JSON"""
+        self._validate_pubmed_url(url)
         req = urllib.request.Request(url)
         with urllib.request.urlopen(req, timeout=self._timeout_seconds) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+            raw = self._read_limited_response(resp)
+            parsed = json.loads(raw.decode("utf-8"))
+            return parsed if isinstance(parsed, dict) else {}
 
     def _get_text(self, url: str) -> str:
         """HTTP GET 返回文本"""
+        self._validate_pubmed_url(url)
         req = urllib.request.Request(url)
         with urllib.request.urlopen(req, timeout=self._timeout_seconds) as resp:
-            return resp.read().decode("utf-8")
+            return self._read_limited_response(resp).decode("utf-8")
+
+    def _read_limited_response(self, response: Any) -> bytes:
+        raw = response.read(self.MAX_RESPONSE_BYTES + 1)
+        if len(raw) > self.MAX_RESPONSE_BYTES:
+            raise OSError("PubMed response exceeded maximum supported size")
+        return raw
+
+    def _validate_pubmed_url(self, url: str) -> None:
+        parsed = urllib.parse.urlsplit(url)
+        expected = urllib.parse.urlsplit(self.BASE_URL)
+        if parsed.scheme != "https" or parsed.netloc != expected.netloc:
+            raise OSError("PubMed request URL is outside the configured HTTPS endpoint")
+        if any(ord(character) < 32 for character in url):
+            raise OSError("PubMed request URL contains unsafe characters")
 
     def _permission_denied(self) -> dict[str, Any] | None:
         """Check optional policy gate before PubMed external HTTP access."""

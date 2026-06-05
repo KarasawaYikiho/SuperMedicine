@@ -84,6 +84,37 @@ class TestAuditLogger:
         assert "[REDACTED]" in entry["resource"]
         assert "[REDACTED]" in entry["reason"]
 
+    def test_audit_log_redacts_headers_cookies_password_and_private_key(self, tmp_path):
+        log_file = tmp_path / "audit.log"
+        secret = "sk-audit-header-secret"
+        private_material = "MIIEvauditprivatekeymaterial"
+        logger = AuditLogger(log_file)
+
+        logger.log(
+            agent_id="agent-cookie=session-cookie-secret",
+            action="http.request",
+            resource=f"https://example.test/cb?code={secret}&state=ok",
+            result="DENIED",
+            reason=(
+                f"headers Authorization: Bearer {secret}; Cookie=sid=audit-cookie-secret; "
+                "password=audit-password; private_key=-----BEGIN PRIVATE KEY-----\n"
+                f"{private_material}\n-----END PRIVATE KEY-----"
+            ),
+        )
+
+        text = log_file.read_text(encoding="utf-8")
+        entry = json.loads(text)
+        assert entry["resource"].endswith("state=ok")
+        for secret_value in (
+            secret,
+            "session-cookie-secret",
+            "audit-cookie-secret",
+            "audit-password",
+            private_material,
+        ):
+            assert secret_value not in text
+        assert text.count("[REDACTED]") >= 5
+
     def test_new_audit_log_is_owner_only_when_platform_supports_modes(self, tmp_path):
         log_file = tmp_path / "audit.log"
 

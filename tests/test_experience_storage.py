@@ -162,6 +162,68 @@ def test_general_layer_can_be_listed_from_different_workspaces(tmp_path):
         assert store_b.list_general_experiences() == [record]
 
 
+def test_external_method_suggestion_stays_non_persisted_until_confirmed(tmp_path):
+    temp_path = tmp_path / "temp"
+    WorkspaceManager(tmp_path).initialize_workspace("study-a")
+    store = _store(tmp_path, temp_path)
+
+    with patch("core.experience.tempfile.gettempdir", return_value=str(temp_path)):
+        suggestion = store.suggest_classification(
+            workspace_id="study-a",
+            title="External review cadence",
+            summary=(
+                "Borrow a general external project idea: separate implementation "
+                "and verification handoff."
+            ),
+            tags=["external-method"],
+        )
+
+        assert suggestion.suggested_scope == "general"
+        assert suggestion.confirmed is False
+        assert store.list_general_experiences() == []
+        assert store.list_workspace_experiences("study-a") == []
+
+        confirmed = store.confirm_classification(
+            workspace_id="study-a",
+            scope=suggestion.suggested_scope,
+            title=suggestion.title,
+            summary=suggestion.summary,
+            tags=suggestion.tags,
+        )
+
+        assert confirmed.scope == "general"
+        assert confirmed.raw_conversation_stored is False
+        assert store.list_general_experiences() == [confirmed]
+        assert store.list_workspace_experiences("study-a") == []
+
+
+def test_external_project_detail_suggestion_remains_workspace_local(tmp_path):
+    temp_path = tmp_path / "temp"
+    WorkspaceManager(tmp_path).initialize_workspace("study-a")
+    store = _store(tmp_path, temp_path)
+
+    with patch("core.experience.tempfile.gettempdir", return_value=str(temp_path)):
+        suggestion = store.suggest_classification(
+            workspace_id="study-a",
+            title="External workflow adapted for study A",
+            summary="Use the imported-paper normalization sequence for this project.",
+            metadata={"paper_ids": ["pmid-123"], "contains_project_details": True},
+        )
+        confirmed = store.confirm_classification(
+            workspace_id="study-a",
+            scope=suggestion.suggested_scope,
+            title=suggestion.title,
+            summary=suggestion.summary,
+            source={"paper_ids": ["pmid-123"]},
+        )
+
+        assert suggestion.suggested_scope == "workspace"
+        assert confirmed.scope == "workspace"
+        assert confirmed.workspace_id == "study-a"
+        assert store.list_general_experiences() == []
+        assert store.list_workspace_experiences("study-a") == [confirmed]
+
+
 @pytest.mark.parametrize(
     "payload",
     [

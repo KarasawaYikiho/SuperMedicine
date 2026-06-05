@@ -6,6 +6,7 @@ import json
 import logging
 import socket
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Any, Iterable
 
@@ -19,6 +20,12 @@ from core.redaction import redact_sensitive
 
 
 logger = logging.getLogger(__name__)
+
+MAX_PROVIDER_RESPONSE_BYTES = 10 * 1024 * 1024
+
+
+class UnsafeProviderURL(ValueError):
+    """Raised when a configured provider URL is unsafe before network access."""
 
 
 class ConfiguredLLMClient(LLMClient):
@@ -203,7 +210,16 @@ class ConfiguredLLMClient(LLMClient):
     def _post_json(
         self, path: str, payload: dict[str, Any], headers: dict[str, str]
     ) -> dict[str, Any]:
-        url = self.config.base_url.rstrip("/") + path
+        try:
+            url = self._provider_url(path)
+        except UnsafeProviderURL as exc:
+            message = sanitize_error_message(str(exc), [self.config.api_key])
+            logger.error(
+                "LLM provider URL rejected: provider=%s reason=%s",
+                self.config.provider,
+                message,
+            )
+            return self.config.error("invalid_base_url", message)
         safe_url = redact_sensitive(url)
         logger.info(
             "Sending LLM request: provider=%s format=%s model=%s url=%s timeout=%s headers=%s message_count=%s",
@@ -219,7 +235,13 @@ class ConfiguredLLMClient(LLMClient):
             data = json.dumps(payload).encode("utf-8")
             req = urllib.request.Request(url, data=data, headers=headers, method="POST")
             with urllib.request.urlopen(req, timeout=self.config.timeout) as resp:
-                raw = resp.read().decode("utf-8")
+                raw_bytes = self._read_limited_response(resp)
+                if raw_bytes is None:
+                    return self.config.error(
+                        "invalid_response",
+                        "LLM provider response exceeded maximum supported size",
+                    )
+                raw = raw_bytes.decode("utf-8")
                 parsed = json.loads(raw)
                 if not isinstance(parsed, dict):
                     logger.error(
@@ -302,6 +324,37 @@ class ConfiguredLLMClient(LLMClient):
             message,
         )
         return self.config.error(code, message)
+
+    def _provider_url(self, path: str) -> str:
+        if not path.startswith("/") or any(ord(character) < 32 for character in path):
+            raise UnsafeProviderURL("LLM provider request path is invalid")
+        base_url = self.config.base_url.strip()
+        if any(ord(character) < 32 for character in base_url):
+            raise UnsafeProviderURL("LLM provider base_url contains unsafe characters")
+        parsed = urllib.parse.urlsplit(base_url)
+        if parsed.scheme not in {"http", "https"}:
+            raise UnsafeProviderURL("LLM provider base_url must use http or https")
+        if not parsed.hostname:
+            raise UnsafeProviderURL("LLM provider base_url must include a host")
+        if parsed.username or parsed.password:
+            raise UnsafeProviderURL("LLM provider base_url must not include credentials")
+        if parsed.fragment:
+            raise UnsafeProviderURL("LLM provider base_url must not include a fragment")
+        return urllib.parse.urljoin(base_url.rstrip("/") + "/", path.lstrip("/"))
+
+    def _read_limited_response(self, response: Any) -> bytes | None:
+        try:
+            raw = response.read(MAX_PROVIDER_RESPONSE_BYTES + 1)
+        except TypeError:
+            raw = response.read()
+        if len(raw) > MAX_PROVIDER_RESPONSE_BYTES:
+            logger.error(
+                "LLM provider response exceeded size limit: provider=%s limit=%s",
+                self.config.provider,
+                MAX_PROVIDER_RESPONSE_BYTES,
+            )
+            return None
+        return raw
 
     def _invalid_response(
         self, message: str, response: dict[str, Any]

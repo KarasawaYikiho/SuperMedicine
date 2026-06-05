@@ -53,6 +53,12 @@ Shareable outputs may still include agent ids, actions, resource paths, provider
 names, model names, BaseURLs, missing-field names, timestamps, and structured
 error categories needed for repair.
 
+Redaction is a safety layer, not permission to share raw logs. Before copying any
+diagnostic output into an issue, README, changelog, function map, prompt, or
+external ticket, remove private paths, project-specific patient/research data,
+authorization values, API keys, tokens, session identifiers, and private gateway
+URLs. Prefer summarized error categories over full traces.
+
 On Windows, POSIX file mode bits are not treated as proof of owner-only ACL
 protection. Windows permission checks are platform-capability-aware.
 
@@ -120,6 +126,27 @@ decision-support advice.
 The standalone Python core is the default supported path. OpenCode and Claude
 Code add-ons are optional. Missing platform runtimes should degrade to explicit
 unavailable/degraded states rather than bypassing the core permission model.
+
+External project references must stay source-clean and license-aware. Do not copy
+third-party code, prompts, screenshots, logs, or configuration into this repository
+unless the license and disclosure boundary have been reviewed. Optional adapter
+documentation must not claim native OpenCode or Claude Code capabilities that are
+not implemented and tested.
+
+## Release Documentation Safety Checklist
+
+Before publishing Markdown, verify that it:
+
+- uses placeholders such as `<OPENAI_API_KEY>` rather than real credentials;
+- avoids user-specific absolute paths except generic examples such as
+  `C:\Users\<you>\...`;
+- describes full-access mode as using only current OS/user privileges and never
+  as silent privilege escalation;
+- preserves medical-use limits and human-review requirements;
+- links to visible/trackable release documents or clearly labels ignored local
+  docs as non-release references;
+- keeps function maps and audit inventories free of raw logs, private endpoints,
+  and environment values.
 
 ## Reporting a Vulnerability
 

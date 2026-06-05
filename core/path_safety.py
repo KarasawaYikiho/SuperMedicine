@@ -32,6 +32,32 @@ class ProtectedPathError(PathSafetyError):
     """Raised when a destructive operation targets a protected path."""
 
 
+class UnsafePathValueError(PathSafetyError):
+    """Raised when a path contains unsafe control characters."""
+
+
+def _path_text(path: str | Path) -> str:
+    return str(path)
+
+
+def _contains_unsafe_path_character(value: str) -> bool:
+    return any(ord(character) < 32 for character in value)
+
+
+def validate_path_value(path: str | Path) -> None:
+    """Reject path values that cannot safely cross filesystem boundaries.
+
+    The helper is intentionally conservative and additive: it does not reinterpret
+    valid paths, but it rejects NUL/control characters before resolution so error
+    handling, logging, and downstream filesystem calls cannot observe truncated or
+    ambiguous path values.
+    """
+
+    value = _path_text(path)
+    if _contains_unsafe_path_character(value):
+        raise UnsafePathValueError("Path contains unsafe control characters")
+
+
 def resolve_project_root(project_root: str | Path | None = None) -> Path:
     """Return the canonical project root path.
 
@@ -41,11 +67,14 @@ def resolve_project_root(project_root: str | Path | None = None) -> Path:
     available.
     """
 
+    if project_root is not None:
+        validate_path_value(project_root)
     root = Path.cwd() if project_root is None else Path(project_root)
     return root.expanduser().resolve()
 
 
 def _resolve_candidate(path: str | Path, project_root: Path) -> Path:
+    validate_path_value(path)
     candidate = Path(path).expanduser()
     if not candidate.is_absolute():
         candidate = project_root / candidate

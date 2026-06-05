@@ -38,6 +38,7 @@ PYTHON_TOOL_STORAGE = "workspaces/<workspace-id>/tools/python/<tool-id>/"
 R_TOOL_STORAGE = "workspaces/<workspace-id>/tools/r/<tool-id>/"
 
 _TOOL_ID_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")
+MAX_TOOL_MANIFEST_BYTES = 256 * 1024
 
 
 class WorkspaceToolError(ValueError):
@@ -62,6 +63,28 @@ class ToolManifestError(WorkspaceToolError):
 
 class ToolCandidateError(WorkspaceToolError):
     """Raised when an import candidate cannot become a workspace tool."""
+
+
+def _read_limited_text(path: Path, *, max_bytes: int = MAX_TOOL_MANIFEST_BYTES) -> str:
+    raw = path.read_bytes()
+    if len(raw) > max_bytes:
+        raise ToolManifestError(f"Tool manifest is too large: {path}")
+    return raw.decode("utf-8")
+
+
+def _safe_load_manifest(path: Path) -> dict[str, Any]:
+    data = yaml.safe_load(_read_limited_text(path)) or {}
+    if not isinstance(data, dict):
+        raise ToolManifestError("Tool manifest must be a mapping")
+    return data
+
+
+def _load_candidate_metadata(path: Path, warnings: list[str]) -> dict[str, Any]:
+    try:
+        return _safe_load_manifest(path)
+    except ToolManifestError as exc:
+        warnings.append(str(exc))
+        return {}
 
 
 TOOL_AUTHORING_SPEC: dict[str, Any] = {
@@ -709,7 +732,7 @@ class WorkspaceToolService:
         )
         if not manifest_path.is_file():
             raise ToolManifestError(f"Tool manifest not found: {manifest_path}")
-        data = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
+        data = _safe_load_manifest(manifest_path)
         manifest = ToolManifest.from_dict(
             data, expected_id=slug, expected_language=lang
         )
@@ -727,9 +750,9 @@ class WorkspaceToolService:
         data: dict[str, Any] = {}
         warnings: list[str] = []
         if workspace_manifest.is_file():
-            data = yaml.safe_load(workspace_manifest.read_text(encoding="utf-8")) or {}
+            data = _load_candidate_metadata(workspace_manifest, warnings)
         elif plugin_manifest.is_file():
-            data = yaml.safe_load(plugin_manifest.read_text(encoding="utf-8")) or {}
+            data = _load_candidate_metadata(plugin_manifest, warnings)
             warnings.append("workspace tool.yaml missing; displaying plugin metadata")
         else:
             warnings.append("metadata missing; displaying directory name only")
