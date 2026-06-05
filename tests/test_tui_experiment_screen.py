@@ -12,13 +12,13 @@ def _static_text(widget: Static) -> str:
     return str(widget.renderable)
 
 
-def test_tui_numeric_shortcut_9_opens_experiment_screen_and_preserves_prompt_focus(
+def test_tui_explicit_switch_opens_experiment_screen_and_preserves_prompt_focus(
     tmp_path,
 ):
     async def scenario() -> None:
         app = SuperMedicineTUI(project_root=tmp_path)
         async with app.run_test(size=(140, 45)) as pilot:
-            await pilot.press("9")
+            app.action_switch_view("experiment")
             await pilot.pause()
 
             assert app._current_view == "experiment"
@@ -35,7 +35,7 @@ def test_tui_numeric_shortcut_9_opens_experiment_screen_and_preserves_prompt_foc
             )
             assert app.query_one("#experiment-data-input", TextArea) is not None
 
-            await pilot.press("1")
+            app.action_switch_view("chat")
             await pilot.pause()
 
             assert app._current_view == "chat"
@@ -52,7 +52,7 @@ def test_experiment_screen_accepts_input_calculates_advances_and_saves_redacted_
     async def scenario() -> None:
         app = SuperMedicineTUI(project_root=tmp_path)
         async with app.run_test(size=(140, 45)) as pilot:
-            await pilot.press("9")
+            app.action_switch_view("experiment")
             await pilot.pause()
 
             data_input = app.query_one("#experiment-data-input", TextArea)
@@ -106,7 +106,7 @@ def test_experiment_screen_reports_missing_required_input(tmp_path):
     async def scenario() -> None:
         app = SuperMedicineTUI(project_root=tmp_path)
         async with app.run_test(size=(140, 45)) as pilot:
-            await pilot.press("9")
+            app.action_switch_view("experiment")
             await pilot.pause()
 
             app.query_one("#experiment-data-input", TextArea).load_text(
@@ -127,7 +127,7 @@ def test_experiment_screen_initial_empty_copy_and_safe_layout_are_visible(tmp_pa
     async def scenario() -> None:
         app = SuperMedicineTUI(project_root=tmp_path)
         async with app.run_test(size=(140, 45)) as pilot:
-            await pilot.press("9")
+            app.action_switch_view("experiment")
             await pilot.pause()
 
             assert t("experiment_protocol") in _static_text(

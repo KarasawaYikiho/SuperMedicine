@@ -121,7 +121,20 @@ class TestKernel:
         )
         assert "runtime wiring" in captured["messages"][0]["content"]
         assert captured["messages"][0]["content"] == SUPERMEDICINE_SYSTEM_PROMPT
-        assert captured["messages"][1] == {"role": "user", "content": "你是谁？"}
+        assert captured["messages"][1]["role"] == "system"
+        assert (
+            "Experiment context and authoring rules"
+            in captured["messages"][1]["content"]
+        )
+        assert captured["messages"][2]["role"] == "system"
+        assert "Unified runtime configuration state" in captured["messages"][2]["content"]
+        assert captured["messages"][3]["role"] == "system"
+        assert "Python/R workspace tool authoring rules" in captured["messages"][3]["content"]
+        assert "plugins/tools/<tool-directory>/" in captured["messages"][3]["content"]
+        assert "tool.yaml" in captured["messages"][3]["content"]
+        assert "workspaces/<workspace-id>/tools/python/<tool-id>/" in captured["messages"][3]["content"]
+        assert "workspaces/<workspace-id>/tools/r/<tool-id>/" in captured["messages"][3]["content"]
+        assert captured["messages"][4] == {"role": "user", "content": "你是谁？"}
 
     def test_llm_chat_system_prompt_preserves_permission_generator_boundary(
         self, tmp_path
@@ -136,4 +149,67 @@ class TestKernel:
         )
         assert "PromptGenerator" not in messages[0]["content"]
         assert "PermissionEngine" not in messages[0]["content"]
-        assert messages[1] == {"role": "user", "content": "你的职责是什么？"}
+        assert messages[1]["role"] == "system"
+        assert "Experiment context and authoring rules" in messages[1]["content"]
+        assert messages[2]["role"] == "system"
+        assert "Unified runtime configuration state" in messages[2]["content"]
+        assert messages[3]["role"] == "system"
+        assert "Python/R workspace tool authoring rules" in messages[3]["content"]
+        assert "scan_validate_import_flow" in messages[3]["content"]
+        assert messages[4] == {"role": "user", "content": "你的职责是什么？"}
+
+    def test_llm_chat_context_injects_selected_experiment_permission_and_tools(
+        self, tmp_path
+    ):
+        config_path = tmp_path / "config.yaml"
+        config_path.write_text(
+            yaml.safe_dump(
+                {
+                    "project": "test",
+                    "file_access": {"mode": "full", "full_mode_confirmed": True},
+                    "runtime_state": {
+                        "current_view": "permission",
+                        "selected_experiment_protocol": "cell_culture_basic",
+                        "last_workspace_id": "trial-1",
+                        "last_tool_import": {
+                            "workspace_id": "trial-1",
+                            "tools": [
+                                {
+                                    "language": "python",
+                                    "id": "python-stats",
+                                    "name": "Python stats",
+                                }
+                            ],
+                        },
+                    },
+                },
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
+        (tmp_path / "plugins").mkdir()
+        (tmp_path / "policies").mkdir()
+        shutil.copyfile(
+            PermissionEngine.default_policy_path(),
+            tmp_path / "policies" / PermissionEngine.DEFAULT_POLICY_FILENAME,
+        )
+        kernel = Kernel(
+            config_path=config_path,
+            plugins_dir=tmp_path / "plugins",
+            policies_dir=tmp_path / "policies",
+        )
+
+        messages = kernel._llm_chat_messages("根据当前配置说明下一步")
+        experiment_context = messages[1]["content"]
+        runtime_context = messages[2]["content"]
+        tool_context = messages[3]["content"]
+
+        assert "cell_culture_basic" in experiment_context
+        assert "western_blot_basic" in experiment_context
+        assert "full" in runtime_context
+        assert "完全访问" in runtime_context
+        assert "permission" in runtime_context
+        assert "trial-1" in runtime_context
+        assert "python-stats" in runtime_context
+        assert "python-stats" in tool_context
+        assert messages[4] == {"role": "user", "content": "根据当前配置说明下一步"}

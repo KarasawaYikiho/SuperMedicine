@@ -164,7 +164,7 @@ def test_tui_input_submission_clears_input_without_raw_terminal_echo_or_screen_c
         def add_user_message(self, message: str) -> None:
             rendered_user_messages.append(message)
 
-    def fake_process_message(self, message: str) -> None:
+    def fake_process_message(self, message: str, *, turn_id: int | None = None) -> None:
         processed.append(message)
 
     forbidden_terminal_calls: list[tuple[object, ...]] = []
@@ -207,25 +207,9 @@ def test_tui_interactive_launch_does_not_print_status_before_alternate_screen(
     assert capsys.readouterr().out == ""
 
 
-@pytest.mark.parametrize(
-    ("shortcut", "expected_view"),
-    [
-        ("1", "chat"),
-        ("2", "dashboard"),
-        ("3", "workspace"),
-        ("4", "paper"),
-        ("5", "experience"),
-        ("6", "tool"),
-        ("7", "dialog"),
-        ("8", "llm"),
-        ("9", "experiment"),
-        ("0", "log"),
-    ],
-)
-def test_tui_prompt_starts_clean_and_numeric_shortcuts_do_not_enter_prompt(
-    tmp_path, shortcut, expected_view
-):
-    """Regression baseline: startup focus/nav keys must not seed prompt text with shortcut digits."""
+@pytest.mark.parametrize("digit", ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"])
+def test_tui_prompt_digits_are_plain_input_and_do_not_switch_views(tmp_path, digit):
+    """REQ-TUI-004: digits are ordinary prompt input, not direct view shortcuts."""
 
     import asyncio
 
@@ -235,15 +219,12 @@ def test_tui_prompt_starts_clean_and_numeric_shortcuts_do_not_enter_prompt(
             prompt = app.query_one("#prompt-input", PromptInput)
             assert prompt.value == ""
 
-            await pilot.press(shortcut)
+            await pilot.press(digit)
             await pilot.pause()
 
-            assert app._current_view == expected_view
-            assert prompt.value == ""
-            if expected_view == "workspace":
-                assert not prompt.has_focus
-            else:
-                assert prompt.has_focus
+            assert app._current_view == "chat"
+            assert prompt.value == digit
+            assert prompt.has_focus
 
     asyncio.run(scenario())
 
@@ -309,6 +290,77 @@ def test_tui_prompt_key_filter_uses_textual_character_attribute_shape():
 
     assert prompt._is_terminal_control_key(cast(events.Key, EscapeKey())) is True
     assert prompt._is_terminal_control_key(cast(events.Key, DigitKey())) is False
+
+
+@pytest.mark.parametrize(
+    ("initial", "cursor", "expected"),
+    [
+        ("普通Unicode文本", len("普通Unicode文本"), "普通Unicode文"),
+        ("first line\n第二行", len("first line\n第"), "first line\n二行"),
+        ("abcdef", 3, "abdef"),
+        ("行首", 0, "行首"),
+    ],
+)
+def test_tui_prompt_backspace_keeps_text_editing_behavior(initial, cursor, expected):
+    """REQ-TUI-001: Backspace edits prompt text and is not swallowed as terminal control."""
+
+    import asyncio
+
+    async def scenario() -> None:
+        app = SuperMedicineTUI()
+        async with app.run_test(size=(140, 45)) as pilot:
+            prompt = app.query_one("#prompt-input", PromptInput)
+            prompt.value = initial
+            prompt.cursor_position = cursor
+
+            await pilot.press("backspace")
+            await pilot.pause()
+
+            assert prompt.value == expected
+            assert app._current_view == "chat"
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("digit", ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"])
+def test_tui_digits_do_not_open_or_navigate_view_menu(tmp_path, digit):
+    """REQ-TUI-004/005: digits remain ordinary input even after menu navigation exists."""
+
+    import asyncio
+
+    async def scenario() -> None:
+        app = SuperMedicineTUI(project_root=tmp_path)
+        async with app.run_test(size=(140, 45)) as pilot:
+            prompt = app.query_one("#prompt-input", PromptInput)
+
+            await pilot.press(digit)
+            await pilot.pause()
+
+            assert app._current_view == "chat"
+            assert prompt.value == digit
+            assert not app.screen.query("#tui-main-menu-list")
+            assert not app.screen.query("#tui-view-menu-list")
+
+    asyncio.run(scenario())
+
+
+def test_tui_prompt_backspace_control_bytes_are_not_classified_as_shortcuts():
+    """REQ-TUI-001: terminal Backspace bytes must reach Textual Input deletion logic."""
+
+    prompt = PromptInput()
+
+    class BackspaceKey:
+        key = "backspace"
+        character = "\x7f"
+
+    class CtrlHKey:
+        key = "ctrl+h"
+        character = "\b"
+
+    assert prompt._is_backspace_key(cast(events.Key, BackspaceKey())) is True
+    assert prompt._is_backspace_key(cast(events.Key, CtrlHKey())) is True
+    assert prompt._is_terminal_control_key(cast(events.Key, BackspaceKey())) is False
+    assert prompt._is_terminal_control_key(cast(events.Key, CtrlHKey())) is False
 
 
 def test_tui_status_bar_skips_unchanged_widget_updates(tmp_path):
@@ -389,7 +441,7 @@ def test_experiment_and_log_tui_views_are_additive_to_existing_navigation():
     assert nav_by_key["9"].label == "实验指导器"
     assert nav_by_key["0"].view_id == "log"
     assert nav_by_key["0"].label == "Log 报告"
-    assert {"9", "0"}.issubset(binding_keys)
+    assert not ({"1", "2", "3", "4", "5", "6", "7", "8", "9", "0"} & binding_keys)
 
 
 def test_install_requires_llm_and_does_not_leave_partial_install_artifacts(tmp_path):

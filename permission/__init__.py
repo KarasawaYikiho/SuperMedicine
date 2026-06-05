@@ -6,6 +6,15 @@ from permission.engine import PermissionEngine
 from permission.policy import PermissionPolicy, PermissionResult
 from permission.audit import AuditLogger
 from permission.prompt_generator import PromptGenerator
+from permission.access_mode import (
+    AccessDecision,
+    AccessDecisionStatus,
+    AccessMode,
+    AccessModePolicy,
+    FileAccessOperation,
+    FullAccessConfirmationRequired,
+    insufficient_permission_helper,
+)
 
 __all__ = [
     "PermissionEngine",
@@ -13,4 +22,11 @@ __all__ = [
     "PermissionResult",
     "AuditLogger",
     "PromptGenerator",
+    "AccessDecision",
+    "AccessDecisionStatus",
+    "AccessMode",
+    "AccessModePolicy",
+    "FileAccessOperation",
+    "FullAccessConfirmationRequired",
+    "insufficient_permission_helper",
 ]

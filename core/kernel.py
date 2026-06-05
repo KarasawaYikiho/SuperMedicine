@@ -2,17 +2,20 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Callable, cast
 
 from agents.checkpoint import CheckpointManager
 from core.config_center import ConfigCenter
+from core.experiment_protocols import build_experiment_llm_context
 from core.event_bus import EventBus
 from core.llm_client import LLMClient
 from core.llm_manager import LLMConfigManager
 from core.plugin_registry import PluginRegistry
 from core.redaction import redact_sensitive
 from core.session_manager import SessionManager
+from core.workspace_tools import WorkspaceToolService, build_tool_authoring_llm_context
 from permission.engine import PermissionEngine
 from permission.policy import DEFAULT_POLICY_RELATIVE_PATH, PermissionResult
 
@@ -39,7 +42,19 @@ Operating boundaries:
 Answer style:
 - Be concise, transparent, and project-focused.
 - Prefer practical research-assistant wording over generic model self-description.
-- If a request is outside SuperMedicine's scope, state the boundary and offer safe project-relevant alternatives."""
+- If a request is outside SuperMedicine's scope, state the boundary and offer safe project-relevant alternatives.
+
+Experiment configuration support:
+- The runtime injects the currently selected experiment protocol summary, available experiment configs, and authoring rules in a separate system context message.
+- Use that context to understand the current experiment guide configuration, steps, limits, parameters, input fields, calculation requests, and editable fields.
+- When helping add an experiment config, produce a draft that follows the injected schema/rules, ask for explicit confirmation before overwriting existing configs, and surface invalid format, unwritable directory, and naming conflict errors clearly.
+- Preserve multi-experiment discovery from plugins/experiments/ and Western Blot compatibility.
+
+Python/R workspace tool authoring support:
+- The runtime injects canonical Python/R tool authoring rules in a separate system context message.
+- When helping create a Python or R tool, follow those injected file-format, metadata, storage, dependency, input/output, security, scanner, validator, and import-flow rules exactly.
+- Save new source tools under plugins/tools/<tool-directory>/ with tool.yaml and a matching runner.py or runner.R, unless the user is explicitly importing into an initialized workspace through the tool service.
+- Surface scanner/validator/import failure reasons clearly instead of inventing alternate formats or locations."""
 
 
 class Kernel:
@@ -153,6 +168,7 @@ class Kernel:
         action: str | None = None,
         params: dict[str, Any] | None = None,
         agent_id: str = "alpha",
+        progress_callback: Callable[[dict[str, Any]], None] | None = None,
     ) -> dict[str, Any]:
         """执行用户任务或医疗插件，返回结构化结果。
 
@@ -161,6 +177,12 @@ class Kernel:
         ``status/task/agent/plugin/action/output/error/metadata`` 形状。
         """
         self._plugin_registry.discover()
+
+        def emit(kind: str, message: str = "", **payload: Any) -> None:
+            if progress_callback is None:
+                return
+            progress_callback({"kind": kind, "message": message, **payload})
+
         task_id = (
             f"kernel-{abs(hash((task, plugin_name, action, agent_id))) & 0xFFFFFFFF:x}"
         )
@@ -176,12 +198,18 @@ class Kernel:
             action=selected_action,
             recoverable=True,
         )
+        emit("status", "Kernel 已接收任务，正在选择执行路径。")
 
         if selected_plugin is None or selected_action is None:
             selected_plugin, selected_action = self._select_plugin_action(task)
 
         if selected_plugin is None or selected_action is None:
-            result = self._execute_llm_chat(task, task_id=task_id, agent_id=agent_id)
+            result = self._execute_llm_chat(
+                task,
+                task_id=task_id,
+                agent_id=agent_id,
+                progress_callback=progress_callback,
+            )
             return result
 
         self._checkpoint_task(
@@ -193,6 +221,7 @@ class Kernel:
             action=selected_action,
             recoverable=True,
         )
+        emit("status", f"已选择插件 {selected_plugin} / {selected_action}，正在进行权限检查。")
 
         execution_context = {
             "task": task,
@@ -231,6 +260,7 @@ class Kernel:
             context=execution_context,
         )
         if permission == PermissionResult.DENIED:
+            emit("status", "权限检查未通过，已停止执行。")
             result = {
                 "status": "denied",
                 "task": task,
@@ -259,6 +289,7 @@ class Kernel:
                 not_recoverable_reason="Permission denied by canonical policy chain.",
             )
             return result
+        emit("status", "权限检查通过，插件正在执行。")
 
         plugin = self._plugin_registry.get(selected_plugin)
         if plugin is None:
@@ -384,6 +415,7 @@ class Kernel:
             output=result,
             recoverable=False,
         )
+        emit("status", "插件执行完成，正在整理输出。")
         return result
 
     def _llm_runtime_context(self) -> dict[str, Any]:
@@ -422,9 +454,20 @@ class Kernel:
         }
 
     def _execute_llm_chat(
-        self, task: str, *, task_id: str, agent_id: str
+        self,
+        task: str,
+        *,
+        task_id: str,
+        agent_id: str,
+        progress_callback: Callable[[dict[str, Any]], None] | None = None,
     ) -> dict[str, Any]:
         """Execute an unmatched natural-language task through the configured LLM."""
+        def emit(kind: str, message: str = "", **payload: Any) -> None:
+            if progress_callback is None:
+                return
+            progress_callback({"kind": kind, "message": message, **payload})
+
+        emit("reasoning", "模型正在处理请求；当前 Provider 未暴露完整思考内容，仅显示合规处理进度。")
         client_or_error = self._llm_manager.create_client()
         if not isinstance(client_or_error, LLMClient):
             error = (
@@ -459,7 +502,39 @@ class Kernel:
             return result
 
         try:
-            response = client_or_error.chat(self._llm_chat_messages(task))
+            messages = self._llm_chat_messages(task)
+            emit("status", "已发送请求，等待模型返回。")
+            stream_method = getattr(client_or_error, "chat_stream", None)
+            if callable(stream_method):
+                emit("assistant_start", "")
+                emit("status", "模型正在返回内容，界面会增量显示。")
+                parts: list[str] = []
+                response_metadata: dict[str, Any] = {}
+                for chunk in stream_method(messages):
+                    if isinstance(chunk, dict):
+                        if chunk.get("error"):
+                            response_metadata = chunk
+                            break
+                        delta = str(
+                            chunk.get("delta")
+                            or chunk.get("content")
+                            or chunk.get("text")
+                            or ""
+                        )
+                        response_metadata.update(
+                            {k: v for k, v in chunk.items() if k not in {"delta", "content", "text"}}
+                        )
+                    else:
+                        delta = str(chunk or "")
+                    if delta:
+                        parts.append(delta)
+                        emit("assistant_delta", delta, content=delta)
+                if response_metadata.get("error"):
+                    response = response_metadata
+                else:
+                    response = {"content": "".join(parts), **response_metadata}
+            else:
+                response = client_or_error.chat(messages)
         except Exception as exc:
             error = {
                 "code": "provider_chat_exception",
@@ -615,10 +690,65 @@ class Kernel:
 
     def _llm_chat_messages(self, task: str) -> list[dict[str, str]]:
         """Build the canonical LLM chat message list for standalone Kernel chat."""
+        selected_protocol = self._config.get_selected_experiment_protocol()
+        experiment_context = build_experiment_llm_context(selected_protocol or None)
+        tool_authoring_context = build_tool_authoring_llm_context()
+        runtime_state = self._config.get_runtime_state()
+        tool_authoring_context["runtime_tools"] = self._workspace_tool_runtime_context(
+            str(runtime_state.get("last_workspace_id") or "")
+        )
+        last_tool_import = runtime_state.get("last_tool_import", {})
+        tool_authoring_context["imported_tools"] = (
+            last_tool_import.get("tools", [])
+            if isinstance(last_tool_import, dict)
+            else []
+        )
+        runtime_context = {
+            "config_path": str(self._config.config_path),
+            "config_load_error": self._config.diagnostics().get("load_error", ""),
+            "current_view": runtime_state.get("current_view"),
+            "selected_experiment_protocol": selected_protocol,
+            "permission_mode": self._config.get_file_access_config().get("mode"),
+            "permission_mode_label": self._config.get_permission_mode_label(),
+            "authorized_external_roots": self._config.get_file_access_config().get(
+                "authorized_external_roots", []
+            ),
+            "last_tool_import": last_tool_import,
+        }
         return [
             {"role": "system", "content": SUPERMEDICINE_SYSTEM_PROMPT},
+            {
+                "role": "system",
+                "content": "Experiment context and authoring rules:\n"
+                + json.dumps(experiment_context, ensure_ascii=False, sort_keys=True),
+            },
+            {
+                "role": "system",
+                "content": "Unified runtime configuration state:\n"
+                + json.dumps(runtime_context, ensure_ascii=False, sort_keys=True),
+            },
+            {
+                "role": "system",
+                "content": "Python/R workspace tool authoring rules:\n"
+                + json.dumps(tool_authoring_context, ensure_ascii=False, sort_keys=True),
+            },
             {"role": "user", "content": task},
         ]
+
+    def _workspace_tool_runtime_context(self, workspace_id: str) -> dict[str, Any]:
+        """Return currently imported workspace tools for LLM context when available."""
+
+        if not workspace_id:
+            return {"workspace_id": "", "tools": {}, "error": "no_workspace_selected"}
+        try:
+            return {
+                "workspace_id": workspace_id,
+                "tools": WorkspaceToolService(self._config_path.parent.parent).list_tools(
+                    workspace_id
+                ),
+            }
+        except Exception as exc:
+            return {"workspace_id": workspace_id, "tools": {}, "error": str(exc)}
 
     def _select_plugin_action(self, task: str) -> tuple[str | None, str | None]:
         """基于任务文本选择当前阶段可控的真实插件路径。"""

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import contextlib
 import json
 import logging
@@ -12,7 +13,7 @@ import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from textual import events
 from rich.console import Console
@@ -20,6 +21,7 @@ from textual.app import App, ComposeResult
 from textual.theme import Theme
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
+from textual.screen import ModalScreen
 from textual.widgets import Footer, Header, Input, ListItem, ListView, Static
 
 from core.config_center import ConfigCenter
@@ -307,8 +309,92 @@ class NavItem(ListItem):
         yield Static(self._label)
 
 
+class MenuOption(ListItem):
+    """A selectable entry in the TUI menu overlay."""
+
+    def __init__(self, label: str, option_id: str, view_id: str | None = None) -> None:
+        super().__init__()
+        self.option_id = option_id
+        self.view_id = view_id
+        self._label = label
+
+    def compose(self) -> ComposeResult:
+        yield Static(self._label)
+
+
+class ViewSelectMenuScreen(ModalScreen[str | None]):
+    """Submenu that lists all available TUI views."""
+
+    BINDINGS = [Binding("escape", "dismiss", t("menu_back"), show=False)]
+
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="tui-menu-panel"):
+            yield Static(t("menu_select_view"), id="tui-menu-title", classes="shell-title")
+            yield ListView(
+                *(
+                    MenuOption(f"{item.icon} {item.label}", "view", item.view_id)
+                    for item in SuperMedicineTUI.nav_items()
+                ),
+                MenuOption(f"← {t('menu_back')}", "back"),
+                id="tui-view-menu-list",
+                classes="tui-menu-list",
+            )
+
+    def on_mount(self) -> None:
+        self.query_one("#tui-view-menu-list", ListView).focus()
+
+    def on_list_view_selected(self, event: ListView.Selected) -> None:
+        if not isinstance(event.item, MenuOption):
+            return
+        if event.item.option_id == "back":
+            self.dismiss(None)
+            return
+        if event.item.view_id:
+            self.dismiss(event.item.view_id)
+
+
+class MainMenuScreen(ModalScreen[None]):
+    """Main menu opened by a single key, matching Textual theme-menu access."""
+
+    BINDINGS = [Binding("escape", "dismiss", t("menu_close"), show=False)]
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="tui-menu-panel"):
+            yield Static(t("menu_title"), id="tui-menu-title", classes="shell-title")
+            yield ListView(
+                MenuOption(f"▸ {t('menu_select_view')}", "select-view"),
+                MenuOption(f"◐ {t('menu_change_theme')}", "change-theme"),
+                MenuOption(f"← {t('menu_close')}", "close"),
+                id="tui-main-menu-list",
+                classes="tui-menu-list",
+            )
+
+    def on_mount(self) -> None:
+        self.query_one("#tui-main-menu-list", ListView).focus()
+
+    def on_list_view_selected(self, event: ListView.Selected) -> None:
+        if not isinstance(event.item, MenuOption):
+            return
+        if event.item.option_id == "select-view":
+            self.app.push_screen(ViewSelectMenuScreen(), self._handle_view_menu_result)
+        elif event.item.option_id == "change-theme":
+            self.dismiss(None)
+            self.app.action_change_theme()
+        elif event.item.option_id == "close":
+            self.dismiss(None)
+
+    def _handle_view_menu_result(self, result: str | None) -> None:
+        if result is None:
+            return
+        app = cast("SuperMedicineTUI", self.app)
+        view_id = result
+        self.dismiss(None)
+        app.call_after_refresh(lambda: app.action_switch_view(view_id))
+
+
 class PromptInput(Input):
-    """Prompt input that preserves app-level numeric navigation shortcuts."""
+    """Prompt input that filters terminal controls while preserving normal text."""
 
     ANSI_CONTROL_SEQUENCE_PATTERN = re.compile(
         r"(?:\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-Z\\-_])"
@@ -321,42 +407,32 @@ class PromptInput(Input):
     CONTROL_SEQUENCE_FINAL_CHARS = frozenset(
         "@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
     )
-
-    NUMERIC_NAVIGATION: dict[str, str] = {
-        "1": "chat",
-        "2": "dashboard",
-        "3": "workspace",
-        "4": "paper",
-        "5": "experience",
-        "6": "tool",
-        "7": "dialog",
-        "8": "llm",
-        "9": "experiment",
-        "0": "log",
-    }
+    BACKSPACE_KEYS = frozenset({"backspace", "ctrl+h", "ctrl+?"})
+    BACKSPACE_CHARACTERS = frozenset({"\b", "\x7f"})
 
     def on_key(self, event: events.Key) -> None:
-        """Route numeric navigation before the focused input consumes digits."""
+        """Filter terminal control bytes without consuming ordinary input."""
+
+        if self._is_menu_key(event):
+            self._consume_key_event(event)
+            event.stop()
+            app = cast("SuperMedicineTUI", self.app)
+            app.action_open_menu()
+            return
+
+        if self._is_backspace_key(event):
+            return
 
         if self._is_terminal_control_key(event):
             self._consume_key_event(event)
             event.stop()
             return
 
-        view_id = self.NUMERIC_NAVIGATION.get(event.key)
-        if view_id is None:
-            return
         if self._value_has_incomplete_terminal_sequence():
             self._consume_key_event(event)
             event.stop()
             self.value = self._clean_terminal_control_text(self.value)
-            return
-        self._consume_key_event(event)
-        event.stop()
-        self._discard_shortcut_digit_residue(event.key)
-        if hasattr(self.app, "action_switch_view"):
-            self.app.action_switch_view(view_id)
-        self._discard_shortcut_digit_residue(event.key)
+        return
 
     def on_input_changed(self, event: Input.Changed) -> None:
         """Drop terminal/mouse control bytes if they reach the prompt value."""
@@ -370,6 +446,8 @@ class PromptInput(Input):
     def _is_terminal_control_key(self, event: events.Key) -> bool:
         """Return True when a key event is part of a terminal control sequence."""
 
+        if self._is_backspace_key(event):
+            return False
         key = event.key
         char = getattr(event, "character", None) or getattr(event, "char", "") or ""
         if key in {"escape", "ctrl+["} or char == "\x1b":
@@ -380,6 +458,20 @@ class PromptInput(Input):
             return True
         return False
 
+    def _is_menu_key(self, event: events.Key) -> bool:
+        """Return True when the prompt should delegate to the TUI menu action."""
+
+        key = str(getattr(event, "key", "") or "").lower()
+        char = getattr(event, "character", None) or getattr(event, "char", "") or ""
+        return key in {"m", "shift+m"} or char in {"m", "M"}
+
+    def _is_backspace_key(self, event: events.Key) -> bool:
+        """Return True for terminal/Textual backspace events that should edit text."""
+
+        key = str(getattr(event, "key", "") or "").lower()
+        char = getattr(event, "character", None) or getattr(event, "char", "") or ""
+        return key in self.BACKSPACE_KEYS or char in self.BACKSPACE_CHARACTERS
+
     def _consume_key_event(self, event: events.Key) -> None:
         """Prevent Textual's Input default handler from inserting consumed keys."""
 
@@ -387,14 +479,8 @@ class PromptInput(Input):
         if callable(prevent_default):
             prevent_default()
 
-    def _discard_shortcut_digit_residue(self, key: str) -> None:
-        """Clear a shortcut digit if Textual inserted it before shortcut routing."""
-
-        if self.value == key:
-            self.value = ""
-
     def _value_has_incomplete_terminal_sequence(self) -> bool:
-        """Detect orphan CSI/mouse prefixes before numeric navigation handles digits."""
+        """Detect orphan CSI/mouse prefixes before digits become prompt text."""
 
         value = self.value
         if not value:
@@ -435,44 +521,10 @@ class SuperMedicineTUI(App[Any]):
 
     BINDINGS = [
         Binding("q", "quit", t("nav_quit")),
+        Binding("m", "open_menu", t("menu_open"), show=True),
         Binding("f", "toggle_maximize", t("nav_maximize"), show=True),
+        Binding("p", "switch_view('permission')", "权限模式", show=True),
         Binding("question_mark", "show_help", t("help_title"), show=True),
-        Binding("1", "switch_view('chat')", t("nav_chat"), show=False, priority=True),
-        Binding(
-            "2",
-            "switch_view('dashboard')",
-            t("nav_dashboard"),
-            show=False,
-            priority=True,
-        ),
-        Binding(
-            "3",
-            "switch_view('workspace')",
-            t("nav_workspace"),
-            show=False,
-            priority=True,
-        ),
-        Binding("4", "switch_view('paper')", t("nav_paper"), show=False, priority=True),
-        Binding(
-            "5",
-            "switch_view('experience')",
-            t("nav_experience"),
-            show=False,
-            priority=True,
-        ),
-        Binding("6", "switch_view('tool')", t("nav_tool"), show=False, priority=True),
-        Binding(
-            "7", "switch_view('dialog')", t("nav_dialog"), show=False, priority=True
-        ),
-        Binding("8", "switch_view('llm')", t("nav_llm"), show=False, priority=True),
-        Binding(
-            "9",
-            "switch_view('experiment')",
-            t("nav_experiment"),
-            show=False,
-            priority=True,
-        ),
-        Binding("0", "switch_view('log')", t("nav_log"), show=False, priority=True),
     ]
 
     NAV_ITEMS = (
@@ -510,7 +562,8 @@ class SuperMedicineTUI(App[Any]):
         self.register_theme(custom_theme)
         self.theme = "supermedicine"
         self.project_root = Path(project_root) if project_root else Path.cwd()
-        self._current_view = "chat"
+        self._config_path = self.project_root / ".supermedicine" / "config.yaml"
+        self._current_view = ConfigCenter(self._config_path).get_current_view()
         self._views: dict[str, Any] = {}
         self._task_running = False
         self._status_cache: dict[str, str] = {}
@@ -539,6 +592,11 @@ class SuperMedicineTUI(App[Any]):
                     id="sidebar-shortcuts",
                     classes="shortcut-hint",
                 )
+                yield Static(
+                    "P 🛡️ 权限模式：查看/切换访问模式与外部授权目录",
+                    id="sidebar-permission-entry",
+                    classes="shortcut-hint",
+                )
             with Vertical(id="main-area"):
                 yield Static(t("nav_chat"), id="view-title", classes="view-heading")
                 yield Vertical(id="content-pane")
@@ -564,6 +622,7 @@ class SuperMedicineTUI(App[Any]):
         from core.tui.screens.llm_screen import LLMView
         from core.tui.screens.log_screen import LogReportView
         from core.tui.screens.paper_screen import PaperView
+        from core.tui.screens.permission_screen import PermissionView
         from core.tui.screens.tool_screen import ToolView
         from core.tui.screens.workspace_screen import WorkspaceView
 
@@ -578,16 +637,20 @@ class SuperMedicineTUI(App[Any]):
             "llm": LLMView(self.project_root),
             "experiment": ExperimentGuideView(self.project_root),
             "log": LogReportView(self.project_root),
+            "permission": PermissionView(self.project_root),
         }
-        # Add all views to content pane, hide all except chat
+        if self._current_view not in self._views:
+            self._current_view = "chat"
+
+        # Add all views to content pane, hide all except the persisted current view
         content_pane = self.query_one("#content-pane")
         for name, view in self._views.items():
             content_pane.mount(view)
-            if name != "chat":
+            if name != self._current_view:
                 view.display = False
 
         self._update_status_bar()
-        self._update_view_title("chat")
+        self._update_view_title(self._current_view)
         # Focus the input
         self.query_one("#prompt-input", Input).focus()
 
@@ -604,6 +667,7 @@ class SuperMedicineTUI(App[Any]):
         if view_id in self._views:
             self._views[view_id].display = True
             self._current_view = view_id
+            self._persist_current_view(view_id)
             self._refresh_visible_workspace_state(view_id)
             self._update_view_title(view_id)
             self._update_status_bar()
@@ -670,6 +734,7 @@ class SuperMedicineTUI(App[Any]):
         """Return the human-readable title for a view."""
 
         title_map = {item.view_id: item.label for item in cls.nav_items()}
+        title_map["permission"] = "权限模式"
         return title_map.get(view_id, view_id)
 
     @staticmethod
@@ -687,7 +752,7 @@ class SuperMedicineTUI(App[Any]):
         )
         layout_state = self._layout_status_label()
         left = f"📁 {self._workspace_count()} {t('status_workspaces')}"
-        center = f"🔌 {self._plugin_count()} {t('status_plugins')}  |  {self._llm_status_label()}  |  {task_state}"
+        center = f"🔌 {self._plugin_count()} {t('status_plugins')}  |  {self._llm_status_label()}  |  {self._permission_status_label()}  |  {task_state}"
         right = f"{t('layout_current_view')}：{self.view_title_text(current_view)}  |  {t('layout_mode')}：{layout_state}  |  SuperMedicine {self._package_version()}"
         focus = f"{t('layout_focus')}：{t('status_focus_input')}"
         return ShellStatusText(
@@ -764,6 +829,10 @@ class SuperMedicineTUI(App[Any]):
             title=t("help_title"),
             timeout=10,
         )
+
+    def action_open_menu(self) -> None:
+        """Open the main TUI menu."""
+        self.push_screen(MainMenuScreen())
 
     def _update_view_title(self, view_id: str) -> None:
         """Update the view title bar."""
@@ -853,13 +922,16 @@ class SuperMedicineTUI(App[Any]):
         event.input.value = ""
         # Send to chat view
         chat_view = self._views.get("chat")
+        turn_id: int | None = None
         if chat_view and hasattr(chat_view, "add_user_message"):
-            chat_view.add_user_message(message)
+            added_turn = chat_view.add_user_message(message)
+            if isinstance(added_turn, int):
+                turn_id = added_turn
         # Process the message
-        self._process_message(message)
+        self._process_message(message, turn_id=turn_id)
         self._focus_prompt_input()
 
-    def _process_message(self, message: str) -> None:
+    def _process_message(self, message: str, *, turn_id: int | None = None) -> None:
         """Process a user message through the Kernel asynchronously."""
         chat_view = self._views.get("chat")
         if not chat_view:
@@ -867,9 +939,13 @@ class SuperMedicineTUI(App[Any]):
         # Run in background worker to avoid blocking UI
         self._task_running = True
         self._update_status_bar()
-        self.run_worker(self._run_kernel_task(message, chat_view), exclusive=True)
+        self.run_worker(
+            self._run_kernel_task(message, chat_view, turn_id=turn_id), exclusive=True
+        )
 
-    async def _run_kernel_task(self, message: str, chat_view: Any) -> None:
+    async def _run_kernel_task(
+        self, message: str, chat_view: Any, *, turn_id: int | None = None
+    ) -> None:
         """Execute kernel task in background worker."""
         try:
             from core.kernel import Kernel
@@ -888,14 +964,51 @@ class SuperMedicineTUI(App[Any]):
             )
             if hasattr(chat_view, "add_status_message"):
                 chat_view.add_status_message(t("chat_running"))
-            with _capture_current_thread_tui_streams(self.project_root):
-                result = kernel.execute_task(message)
+            assistant_started = False
+
+            def render_progress(event: dict[str, Any]) -> None:
+                nonlocal assistant_started
+                kind = str(event.get("kind") or "")
+                text = str(event.get("message") or event.get("content") or "")
+                if kind == "reasoning" and hasattr(chat_view, "add_reasoning_status"):
+                    chat_view.add_reasoning_status(
+                        text
+                        or "模型正在处理请求；当前 Provider 未暴露完整思考内容，仅显示合规处理进度。"
+                    )
+                elif kind == "status" and hasattr(chat_view, "add_status_message"):
+                    chat_view.add_status_message(text)
+                elif kind == "assistant_start" and hasattr(
+                    chat_view, "begin_assistant_message"
+                ):
+                    chat_view.begin_assistant_message(turn_id)
+                    assistant_started = True
+                elif kind == "assistant_delta" and hasattr(
+                    chat_view, "append_assistant_delta"
+                ):
+                    if not assistant_started and hasattr(
+                        chat_view, "begin_assistant_message"
+                    ):
+                        chat_view.begin_assistant_message(turn_id)
+                        assistant_started = True
+                    chat_view.append_assistant_delta(text)
+
+            def progress_callback(event: dict[str, Any]) -> None:
+                try:
+                    self.call_from_thread(render_progress, event)
+                except RuntimeError:
+                    render_progress(event)
+
+            def execute_in_thread() -> Any:
+                with _capture_current_thread_tui_streams(self.project_root):
+                    return kernel.execute_task(message, progress_callback=progress_callback)
+
+            result = await asyncio.to_thread(execute_in_thread)
             formatted = self._format_kernel_result(result)
 
             if formatted["kind"] == "error":
                 chat_view.add_error_message(formatted["message"])
-            else:
-                chat_view.add_assistant_message(formatted["message"])
+            elif not assistant_started:
+                chat_view.add_assistant_message(formatted["message"], turn_id=turn_id)
             if hasattr(chat_view, "add_status_message"):
                 chat_view.add_status_message(t("chat_completed"))
         except Exception as e:
@@ -984,6 +1097,24 @@ class SuperMedicineTUI(App[Any]):
         except Exception:
             return f"🤖 {t('llm_not_ready')}"
 
+    def _permission_status_label(self) -> str:
+        try:
+            config = ConfigCenter(
+                self.project_root / ".supermedicine" / "config.yaml"
+            )
+            return f"🛡️ 权限：{config.get_permission_mode_label()}"
+        except Exception:
+            return "🛡️ 权限：保守"
+
+    def _persist_current_view(self, view_id: str) -> None:
+        try:
+            ConfigCenter(self._config_path).set_current_view(view_id, save=True)
+        except Exception:
+            logger.warning(
+                "TUI runtime state sync failed: stage=current_view view=%s",
+                view_id,
+            )
+
     def _save_llm_exit_state(self) -> None:
         try:
             self._llm_manager().save_exit_state()
@@ -1011,15 +1142,22 @@ def launch_tui(
         configure_tui_log_storage(root)
     llm_ready, llm_provider = _describe_llm_status(root)
     shell = SuperMedicineTUI(project_root=root)
-    shell_status = shell.status_text("chat")
-    view_title = shell.view_title_text("chat")
+    valid_views = {item.view_id for item in shell.nav_items()} | {"permission"}
+    restored_view = shell._current_view if shell._current_view in valid_views else "chat"
+    shell_status = shell.status_text(restored_view)
+    view_title = shell.view_title_text(restored_view)
     shortcut_hint = shell.shortcut_hint_text()
     status_message = t("dry_run_status") if dry_run else t("welcome")
+    config_load_error = ConfigCenter(root / ".supermedicine" / "config.yaml").diagnostics().get(
+        "load_error", ""
+    )
     if dry_run:
         llm_text = (
             f"{t('llm_ready')}: {llm_provider}" if llm_ready else t("llm_not_ready")
         )
         status_message = f"{status_message}；{llm_text}"
+        if config_load_error:
+            status_message = f"{status_message}；配置读取异常，已使用安全默认值：{config_load_error}"
     logger.info(
         "TUI launch: stage=start dry_run=%s project_root=%s llm_ready=%s provider=%s",
         dry_run,
@@ -1035,7 +1173,7 @@ def launch_tui(
         interactive=not dry_run,
         llm_ready=llm_ready,
         llm_provider=llm_provider,
-        current_view="chat",
+        current_view=restored_view,
         view_title=view_title,
         shortcut_hint=shortcut_hint,
         status_left=shell_status.left,

@@ -11,6 +11,7 @@ import yaml
 
 from core.redaction import redact_sensitive
 from core.llm_providers.config import LLMProviderConfig, sanitized_headers
+from permission.access_mode import AccessMode, AccessModePolicy, normalize_access_mode
 
 
 logger = logging.getLogger(__name__)
@@ -40,6 +41,21 @@ DEFAULT_LOG_REPORT_CONFIG: dict[str, Any] = {
     "max_records_per_session": 1000,
     "max_file_bytes": 1024 * 1024,
     "redact": True,
+}
+
+
+DEFAULT_FILE_ACCESS_CONFIG: dict[str, Any] = {
+    "mode": AccessMode.CONSERVATIVE.value,
+    "authorized_external_roots": [],
+    "full_mode_confirmed": False,
+}
+
+
+DEFAULT_RUNTIME_STATE_CONFIG: dict[str, Any] = {
+    "current_view": "chat",
+    "selected_experiment_protocol": "",
+    "last_workspace_id": "",
+    "last_tool_import": {},
 }
 
 
@@ -181,6 +197,194 @@ class ConfigCenter:
         """获取日志报告配置，缺失用户配置时返回安全默认值。"""
         return self._merged_default_section("log_report", DEFAULT_LOG_REPORT_CONFIG)
 
+    def get_file_access_config(self) -> dict[str, Any]:
+        """Return persisted file access-mode config with conservative defaults."""
+
+        config = self._merged_default_section("file_access", DEFAULT_FILE_ACCESS_CONFIG)
+        raw_mode = config.get("mode", AccessMode.CONSERVATIVE.value)
+        mode_value: str | AccessMode = (
+            raw_mode if isinstance(raw_mode, AccessMode) else str(raw_mode or AccessMode.CONSERVATIVE.value)
+        )
+        config["mode"] = normalize_access_mode(mode_value).value
+        roots = config.get("authorized_external_roots", [])
+        config["authorized_external_roots"] = (
+            [str(root) for root in roots] if isinstance(roots, list) else []
+        )
+        config["full_mode_confirmed"] = bool(config.get("full_mode_confirmed"))
+        if config["mode"] != AccessMode.FULL.value:
+            config["full_mode_confirmed"] = False
+        return config
+
+    def get_file_access_policy(self, project_root: str | Path) -> AccessModePolicy:
+        """Return the unified runtime file-access policy from current config.
+
+        The policy mirrors the persisted mode and authorized external roots.  It
+        never elevates privileges; full mode only records explicit user consent
+        and still relies on the current process/user permissions enforced by the
+        operating system.
+        """
+
+        config = self.get_file_access_config()
+        return AccessModePolicy(
+            project_root=project_root,
+            mode=str(config.get("mode") or AccessMode.CONSERVATIVE.value),
+            authorized_external_roots=config.get("authorized_external_roots", []),
+            full_mode_confirmed=bool(config.get("full_mode_confirmed")),
+        )
+
+    def get_permission_mode_label(self) -> str:
+        """Return the canonical user-facing permission mode label for CLI/TUI."""
+
+        mode = str(self.get_file_access_config().get("mode") or AccessMode.CONSERVATIVE.value)
+        return "完全访问" if mode == AccessMode.FULL.value else "保守"
+
+    def get_runtime_state(self) -> dict[str, Any]:
+        """Return persisted runtime UI/LLM synchronization state with safe defaults."""
+
+        state = self._merged_default_section("runtime_state", DEFAULT_RUNTIME_STATE_CONFIG)
+        state["current_view"] = _safe_runtime_slug(state.get("current_view"), "chat")
+        state["selected_experiment_protocol"] = _safe_runtime_slug(
+            state.get("selected_experiment_protocol"), ""
+        )
+        state["last_workspace_id"] = _safe_runtime_slug(state.get("last_workspace_id"), "")
+        if not isinstance(state.get("last_tool_import"), dict):
+            state["last_tool_import"] = {}
+        return state
+
+    def set_runtime_state_value(self, key: str, value: Any, *, save: bool = False) -> dict[str, Any]:
+        """Update one runtime-state key in the unified config service."""
+
+        state = self._config.setdefault("runtime_state", {})
+        if not isinstance(state, dict):
+            state = {}
+            self._config["runtime_state"] = state
+        state[key] = value
+        if save:
+            self.save()
+        return self.get_runtime_state()
+
+    def get_selected_experiment_protocol(self) -> str:
+        """Return the persisted experiment protocol selected for LLM context."""
+
+        return str(self.get_runtime_state().get("selected_experiment_protocol") or "")
+
+    def set_selected_experiment_protocol(self, protocol_id: str, *, save: bool = False) -> dict[str, Any]:
+        """Persist the experiment protocol selected for subsequent LLM context."""
+
+        return self.set_runtime_state_value(
+            "selected_experiment_protocol",
+            _safe_runtime_slug(protocol_id, ""),
+            save=save,
+        )
+
+    def get_current_view(self) -> str:
+        """Return the persisted TUI view, falling back to chat on corrupt values."""
+
+        return str(self.get_runtime_state().get("current_view") or "chat")
+
+    def set_current_view(self, view_id: str, *, save: bool = False) -> dict[str, Any]:
+        """Persist the current TUI view through the shared runtime-state service."""
+
+        return self.set_runtime_state_value(
+            "current_view",
+            _safe_runtime_slug(view_id, "chat"),
+            save=save,
+        )
+
+    def record_tool_import_state(
+        self,
+        *,
+        workspace_id: str,
+        imported: list[dict[str, Any]],
+        save: bool = False,
+    ) -> dict[str, Any]:
+        """Persist the latest workspace tool import summary for LLM/runtime sync."""
+
+        tool_ids: list[dict[str, str]] = []
+        for item in imported:
+            tool = item.get("tool") if isinstance(item, dict) else None
+            if isinstance(tool, dict):
+                tool_ids.append(
+                    {
+                        "language": str(tool.get("language") or ""),
+                        "id": str(tool.get("id") or ""),
+                        "name": str(tool.get("name") or ""),
+                    }
+                )
+        return self.set_runtime_state_value(
+            "last_tool_import",
+            {
+                "workspace_id": _safe_runtime_slug(workspace_id, ""),
+                "tools": tool_ids,
+            },
+            save=save,
+        )
+
+    def set_file_access_mode(
+        self,
+        mode: str | AccessMode,
+        *,
+        explicit_confirmation: bool = False,
+    ) -> dict[str, Any]:
+        """Persist a runtime file access mode selection in memory.
+
+        Full access mode must be requested through an explicit confirmation flag
+        or API.  This method only records intent; it does not elevate process
+        privileges or bypass system permissions.
+        """
+
+        normalized = normalize_access_mode(mode)
+        if normalized == AccessMode.FULL and not explicit_confirmation:
+            from permission.access_mode import FullAccessConfirmationRequired
+
+            raise FullAccessConfirmationRequired(
+                "Full file access mode requires explicit user confirmation."
+            )
+        config = self._config.setdefault("file_access", {})
+        if not isinstance(config, dict):
+            config = {}
+            self._config["file_access"] = config
+        config["mode"] = normalized.value
+        config["full_mode_confirmed"] = normalized == AccessMode.FULL
+        return self.get_file_access_config()
+
+    def authorize_external_file_access_directory(self, path: str | Path) -> dict[str, Any]:
+        """Persist an explicitly authorized external directory in memory."""
+
+        root = Path(path).expanduser().resolve()
+        if not root.is_dir():
+            raise ValueError(f"Authorized external path must be a directory: {root}")
+        config = self._config.setdefault("file_access", {})
+        if not isinstance(config, dict):
+            config = {}
+            self._config["file_access"] = config
+        roots = config.setdefault("authorized_external_roots", [])
+        if not isinstance(roots, list):
+            roots = []
+            config["authorized_external_roots"] = roots
+        root_text = str(root)
+        if root_text not in roots:
+            roots.append(root_text)
+        return self.get_file_access_config()
+
+    def revoke_external_file_access_directory(self, path: str | Path) -> dict[str, Any]:
+        """Remove an explicitly authorized external directory from memory."""
+
+        root = Path(path).expanduser().resolve()
+        config = self._config.setdefault("file_access", {})
+        if not isinstance(config, dict):
+            config = {}
+            self._config["file_access"] = config
+        roots = config.setdefault("authorized_external_roots", [])
+        if not isinstance(roots, list):
+            roots = []
+            config["authorized_external_roots"] = roots
+        root_text = str(root)
+        config["authorized_external_roots"] = [
+            str(item) for item in roots if str(item) != root_text
+        ]
+        return self.get_file_access_config()
+
     def _merged_default_section(
         self, key: str, defaults: dict[str, Any]
     ) -> dict[str, Any]:
@@ -320,3 +524,15 @@ def _redact_llm_provider(config: Any) -> Any:
     if isinstance(headers, dict):
         safe["headers"] = sanitized_headers(headers)
     return safe
+
+
+def _safe_runtime_slug(value: Any, default: str) -> str:
+    """Normalize persisted runtime-state strings without trusting damaged config."""
+
+    text = str(value or "").strip()
+    if not text:
+        return default
+    allowed = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-.")
+    if any(char not in allowed for char in text) or len(text) > 128:
+        return default
+    return text

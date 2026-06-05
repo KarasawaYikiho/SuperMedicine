@@ -149,7 +149,7 @@ def test_workspace_view_manual_create_is_visible_and_usable_in_running_tui(tmp_p
     async def scenario() -> None:
         app = SuperMedicineTUI(project_root=tmp_path)
         async with app.run_test(size=(140, 45)) as pilot:
-            await pilot.press("3")
+            app.action_switch_view("workspace")
             await pilot.pause()
 
             view = app._views["workspace"]
@@ -181,14 +181,14 @@ def test_workspace_manual_create_is_visible_to_already_mounted_dialog_page(tmp_p
     async def scenario() -> None:
         app = SuperMedicineTUI(project_root=tmp_path)
         async with app.run_test(size=(140, 45)) as pilot:
-            await pilot.press("3")
+            app.action_switch_view("workspace")
             await pilot.pause()
 
             workspace_view = app._views["workspace"]
             workspace_view._create_workspace("manual-cross-page")
             await pilot.pause()
 
-            await pilot.press("7")
+            app.action_switch_view("dialog")
             await pilot.pause()
 
             dialog_view = app._views["dialog"]

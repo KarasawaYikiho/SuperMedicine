@@ -1,0 +1,25 @@
+id: "r-data-analysis"
+language: "r"
+name: "R mainstream data analysis algorithms"
+description: "Base-R data-analysis toolkit covering descriptive statistics, missing-value summaries, scaling, correlation, regression, PCA, clustering, optional tree/boosting wrappers, time-series basics, and hypothesis tests without requiring non-base packages for scanning or basic execution."
+entrypoint: "runner.R"
+dependencies: []
+inputs:
+  - name: "input"
+    description: "Optional CSV/TSV data table. If omitted, the runner uses a small built-in data frame for smoke execution."
+    type: "path:csv_or_tsv"
+    required: false
+  - name: "tool-kind"
+    description: "Algorithm action: descriptive, missing, scale, correlation, linear-regression, logistic-regression, pca, kmeans, hierarchical-clustering, random-forest, gradient-boosting, time-series, t-test, chi-square, anova, or all-light."
+    type: "string"
+    required: false
+  - name: "columns"
+    description: "Comma-separated numeric columns to analyze; defaults to detected numeric columns."
+    type: "string"
+    required: false
+outputs:
+  - name: "output"
+    description: "JSON-like text result path. If omitted, result is printed to stdout."
+    type: "path:text"
+    required: false
+version: "1.0.0"

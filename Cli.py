@@ -21,6 +21,12 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+PERMISSION_RISK_NOTICE = (
+    "风险提示：默认保守模式只允许项目内访问；完全访问模式仅使用当前进程/当前用户"
+    "已经拥有的系统权限，不会静默提权、不会绕过系统权限。若系统权限不足，请通过"
+    "管理员身份运行或操作系统 UAC/安全提示进行显式授权。"
+)
+
 
 def _configure_stdio_errors() -> None:
     """Keep argparse/help output writable on narrow Windows stdio encodings."""
@@ -128,7 +134,20 @@ class CLI:
         # 检查配置
         config_dir = Path.cwd() / ".supermedicine"
         if config_dir.exists():
+            from core.config_center import ConfigCenter
+
             logger.info("[OK] 项目配置已初始化")
+            config = ConfigCenter(config_dir / "config.yaml")
+            logger.info(
+                "[OK] 权限模式: %s (%s)",
+                config.get_permission_mode_label(),
+                config.get_file_access_config().get("mode"),
+            )
+            if config.diagnostics().get("load_error"):
+                logger.info(
+                    "[WARN] 配置读取异常，已使用安全默认值: %s",
+                    config.diagnostics().get("load_error"),
+                )
         else:
             logger.info("[FAIL] 项目配置未初始化 (运行 'supermedicine init')")
 
@@ -353,13 +372,52 @@ class CLI:
         _log_json(result)
         return result
 
-    def tool_add(self, workspace_id: str, language: str, tool_id: str) -> dict:
-        """Scaffold a built-in workspace-local tool."""
+    def tool_scan(self, language: str | None = None) -> dict:
+        """Scan Python/R source tool directories for selectable import candidates."""
         from core.workspace_tools import WorkspaceToolService
 
-        result = WorkspaceToolService(Path.cwd()).add_builtin_tool(
-            workspace_id, language, tool_id
-        )
+        result = WorkspaceToolService(Path.cwd()).scan_import_candidates(language)
+        _log_json(result)
+        return result
+
+    def tool_add(
+        self,
+        workspace_id: str,
+        selections: list[str] | None = None,
+        *,
+        language: str | None = None,
+        overwrite: bool = False,
+    ) -> dict:
+        """Import scanned Python/R tools selected from the candidate list."""
+        from core.workspace_tools import WorkspaceToolService
+
+        service = WorkspaceToolService(Path.cwd())
+        if not selections:
+            result = {
+                "status": "select_required",
+                "message": "Select tools from this scanned list with --select; no tool ID knowledge is required.",
+                "candidates": service.scan_import_candidates(language),
+            }
+        else:
+            result = service.import_scanned_tools(
+                workspace_id, selections, language=language, overwrite=overwrite
+            )
+            imported_raw: object = result.get("imported")
+            imported_items: list[dict[str, Any]] = (
+                [cast(dict[str, Any], item) for item in imported_raw if isinstance(item, dict)]
+                if isinstance(imported_raw, list)
+                else []
+            )
+            if imported_items:
+                from core.config_center import ConfigCenter
+
+                config = ConfigCenter(Path.cwd() / ".supermedicine" / "config.yaml")
+                config.set_runtime_state_value("last_workspace_id", workspace_id)
+                config.record_tool_import_state(
+                    workspace_id=workspace_id,
+                    imported=imported_items,
+                    save=True,
+                )
         _log_json(result)
         return result
 
@@ -480,6 +538,76 @@ class CLI:
             restore_on_startup=False,
         )
         result = manager.switch_provider(provider, save=True)
+        _log_json(result)
+        return result
+
+    def permission_status(self) -> dict[str, Any]:
+        """Show current CLI file access mode and authorized external roots."""
+        from core.config_center import ConfigCenter
+
+        config = ConfigCenter(Path.cwd() / ".supermedicine" / "config.yaml")
+        file_access = config.get_file_access_config()
+        result = _permission_result(file_access, changed=False)
+        result["config_load_error"] = config.diagnostics().get("load_error", "")
+        _log_json(result)
+        return result
+
+    def permission_set_mode(
+        self,
+        mode: str,
+        *,
+        confirm_full: bool = False,
+        interactive: bool = True,
+    ) -> dict[str, Any]:
+        """Persistently switch CLI file access mode without privilege escalation."""
+        from core.config_center import ConfigCenter
+        from permission.access_mode import AccessMode, normalize_access_mode
+
+        normalized = normalize_access_mode(mode)
+        explicit_confirmation = confirm_full
+        if normalized == AccessMode.FULL and not explicit_confirmation and interactive:
+            explicit_confirmation = _confirm_full_access_interactively()
+        config = ConfigCenter(Path.cwd() / ".supermedicine" / "config.yaml")
+        file_access = config.set_file_access_mode(
+            normalized,
+            explicit_confirmation=explicit_confirmation,
+        )
+        config.save()
+        result = _permission_result(
+            file_access,
+            changed=True,
+            message="权限模式已切换；后续策略读取会立即使用新的配置。",
+        )
+        _log_json(result)
+        return result
+
+    def permission_authorize(self, path: str | Path) -> dict[str, Any]:
+        """Persistently authorize an external directory for conservative mode."""
+        from core.config_center import ConfigCenter
+
+        config = ConfigCenter(Path.cwd() / ".supermedicine" / "config.yaml")
+        file_access = config.authorize_external_file_access_directory(path)
+        config.save()
+        result = _permission_result(
+            file_access,
+            changed=True,
+            message="外部授权目录已添加；后续策略读取会立即使用新的配置。",
+        )
+        _log_json(result)
+        return result
+
+    def permission_revoke(self, path: str | Path) -> dict[str, Any]:
+        """Persistently remove an external directory authorization."""
+        from core.config_center import ConfigCenter
+
+        config = ConfigCenter(Path.cwd() / ".supermedicine" / "config.yaml")
+        file_access = config.revoke_external_file_access_directory(path)
+        config.save()
+        result = _permission_result(
+            file_access,
+            changed=True,
+            message="外部授权目录已移除；后续策略读取会立即使用新的配置。",
+        )
         _log_json(result)
         return result
 
@@ -764,6 +892,7 @@ class CLI:
 
     def experiment_start(self, protocol: str, session_id: str | None = None) -> dict:
         """Start a standalone experiment guide session and persist it as JSON."""
+        from core.config_center import ConfigCenter
         from core.experiment_guide import (
             ExperimentGuide,
             MEDICAL_BOUNDARY,
@@ -772,6 +901,10 @@ class CLI:
         from core.log_report import LogReportStore
 
         session = ExperimentGuide().create_session(protocol, session_id=session_id)
+        ConfigCenter(Path.cwd() / ".supermedicine" / "config.yaml").set_selected_experiment_protocol(
+            session.protocol.protocol_id,
+            save=True,
+        )
         session_file = (
             Path.cwd() / ".supermedicine" / "experiments" / f"{session.session_id}.json"
         )
@@ -785,6 +918,87 @@ class CLI:
         result = _experiment_response(
             session, session_file=session_file, medical_boundary=MEDICAL_BOUNDARY
         )
+        _log_json(result)
+        return result
+
+    def experiment_list(self) -> list[dict]:
+        """List configured experiment protocols discovered from plugins/experiments."""
+        from core.experiment_protocols import list_protocols
+
+        result = [
+            {
+                "protocol_id": protocol.protocol_id,
+                "title": protocol.title,
+                "description": protocol.description,
+                "version": protocol.version,
+                "metadata": protocol.metadata,
+                "step_count": len(protocol.steps),
+            }
+            for protocol in list_protocols()
+        ]
+        _log_json(result)
+        return result
+
+    def experiment_context(self, protocol: str | None = None) -> dict:
+        """Show the experiment context and authoring rules injected into LLM chat."""
+        from core.config_center import ConfigCenter
+        from core.experiment_protocols import build_experiment_llm_context
+
+        result = build_experiment_llm_context(protocol)
+        selected = result.get("selected_protocol") if isinstance(result, dict) else None
+        if protocol and isinstance(selected, dict) and selected.get("protocol_id"):
+            ConfigCenter(Path.cwd() / ".supermedicine" / "config.yaml").set_selected_experiment_protocol(
+                str(selected["protocol_id"]),
+                save=True,
+            )
+            result["runtime_sync"] = {
+                "selected_experiment_protocol": selected["protocol_id"],
+                "message": "实验配置选择已同步到统一配置；后续 LLM 上下文会读取该协议。",
+            }
+        _log_json(result)
+        return result
+
+    def experiment_add_config(
+        self,
+        *,
+        instruction: str | None = None,
+        config_json: str | None = None,
+        filename: str | None = None,
+        overwrite: bool = False,
+    ) -> dict:
+        """Draft/validate and save a new experiment config in plugins/experiments."""
+        from core.experiment_protocols import (
+            create_experiment_config_from_instruction,
+            save_experiment_config,
+        )
+
+        if bool(instruction and instruction.strip()) == bool(config_json and config_json.strip()):
+            raise ValueError("provide exactly one of --instruction or --config-json")
+        if config_json and config_json.strip():
+            payload = _load_input_json(config_json)
+            result = save_experiment_config(
+                payload,
+                filename=filename,
+                overwrite=overwrite,
+            )
+        else:
+            result = create_experiment_config_from_instruction(
+                instruction or "",
+                filename=filename,
+                overwrite=overwrite,
+            )
+        protocol = result.get("protocol") if isinstance(result, dict) else None
+        if isinstance(protocol, dict) and protocol.get("protocol_id"):
+            from core.config_center import ConfigCenter
+
+            ConfigCenter(Path.cwd() / ".supermedicine" / "config.yaml").set_selected_experiment_protocol(
+                str(protocol["protocol_id"]),
+                save=True,
+            )
+            result["runtime_sync"] = {
+                "selected_experiment_protocol": protocol["protocol_id"],
+                "message": "新增实验配置已同步为后续 LLM 上下文的当前实验。",
+            }
         _log_json(result)
         return result
 
@@ -808,7 +1022,7 @@ class CLI:
         *,
         calculate: bool = False,
     ) -> dict:
-        """Submit data for the current experiment step, optionally running WB calculation."""
+        """Submit data for the current experiment step, optionally running a configured calculation."""
         from core.experiment_guide import (
             CalculationResult,
             ExperimentGuide,
@@ -837,10 +1051,19 @@ class CLI:
                 step_id, calculation_params=calculation_params
             )
             if not requests:
+                if session.protocol.protocol_id == "western_blot_basic":
+                    raise ValueError(
+                        f"step {step_id} has no supported WB calculation request"
+                    )
                 raise ValueError(
-                    f"step {step_id} has no supported WB calculation request"
+                    f"step {step_id} has no supported experiment calculation request"
                 )
             plugin_request = requests[0]
+            if plugin_request.get("plugin_name") != "experiment-wb":
+                raise ValueError(
+                    "CLI --calculate currently supports experiment-wb plugin requests only; "
+                    f"got {plugin_request.get('plugin_name')}"
+                )
             kernel_result = wb_plugin.execute(
                 plugin_request["action"],
                 plugin_request["params"],
@@ -1115,6 +1338,38 @@ def _resolve_run_params(
     return None
 
 
+def _permission_result(
+    file_access: dict[str, Any],
+    *,
+    changed: bool,
+    message: str | None = None,
+) -> dict[str, Any]:
+    return {
+        "mode": file_access.get("mode", "conservative"),
+        "mode_label": "完全访问" if file_access.get("mode") == "full" else "保守",
+        "full_mode_confirmed": bool(file_access.get("full_mode_confirmed")),
+        "authorized_external_roots": list(
+            file_access.get("authorized_external_roots", [])
+        ),
+        "changed": changed,
+        "runtime_effect": "后续策略读取即时生效；已创建的独立策略对象需重新读取配置。",
+        "risk_notice": PERMISSION_RISK_NOTICE,
+        "message": message or "当前权限模式配置。",
+    }
+
+
+def _confirm_full_access_interactively() -> bool:
+    if not sys.stdin.isatty():
+        return False
+    logger.warning(PERMISSION_RISK_NOTICE)
+    logger.warning("请输入 FULL 确认切换到完全访问模式：")
+    try:
+        answer = input().strip()
+    except EOFError:
+        return False
+    return answer == "FULL"
+
+
 def _parse_llm_headers(
     header_items: list[str] | None, headers_json: str | None
 ) -> dict[str, str]:
@@ -1230,6 +1485,40 @@ def main(argv: list[str] | None = None) -> None:
 
     subparsers.add_parser("diagnose", help="输出可安全分享的配置/LLM/审计诊断信息")
 
+    permission_parser = subparsers.add_parser(
+        "permission",
+        help="查看/切换 CLI 文件访问权限模式",
+        description="查看或切换文件访问权限模式；默认保守，完全访问模式必须显式确认。",
+        epilog=PERMISSION_RISK_NOTICE,
+    )
+    permission_subparsers = permission_parser.add_subparsers(dest="permission_command")
+    permission_subparsers.add_parser("status", help="查看当前权限模式与授权目录")
+    permission_mode_parser = permission_subparsers.add_parser(
+        "mode", help="切换权限模式：conservative 或 full"
+    )
+    permission_mode_parser.add_argument(
+        "mode", choices=["conservative", "sandbox", "safe", "full"], help="目标权限模式"
+    )
+    permission_mode_parser.add_argument(
+        "--confirm-full",
+        action="store_true",
+        help="显式确认切换到完全访问模式；仅使用当前用户/进程已有权限",
+    )
+    permission_mode_parser.add_argument(
+        "--no-interactive",
+        action="store_true",
+        help="禁止交互确认；切换 full 时必须提供 --confirm-full",
+    )
+    permission_authorize_parser = permission_subparsers.add_parser(
+        "authorize", help="添加外部授权目录"
+    )
+    permission_authorize_parser.add_argument("path", type=str, help="要授权的目录路径")
+    permission_revoke_parser = permission_subparsers.add_parser(
+        "revoke", help="移除外部授权目录"
+    )
+    permission_revoke_parser.add_argument("path", type=str, help="要移除授权的目录路径")
+    permission_subparsers.add_parser("roots", help="列出当前外部授权目录")
+
     # Test 命令
     subparsers.add_parser("test", help="运行测试")
 
@@ -1237,7 +1526,7 @@ def main(argv: list[str] | None = None) -> None:
     tui_parser = subparsers.add_parser(
         "tui",
         help="启动中文 TUI 工作台",
-        description="启动中文 TUI 工作台；数字键 1-0 切换模块，Tab/Shift+Tab 移动焦点，Enter 提交或激活，? 帮助，F 最大化，Q 退出。",
+        description="启动中文 TUI 工作台；M 打开菜单/选择视图，P 权限模式，Tab/Shift+Tab 移动焦点，Enter 提交或激活，? 帮助，F 最大化，Q 退出。数字 1-0 是普通输入，不直接切换视图。",
     )
     tui_parser.add_argument(
         "--dry-run", action="store_true", help="输出中文 TUI 就绪状态，不启动交互界面"
@@ -1265,11 +1554,36 @@ def main(argv: list[str] | None = None) -> None:
     experiment_parser = subparsers.add_parser("experiment", help="实验指导器命令")
     experiment_subparsers = experiment_parser.add_subparsers(dest="experiment_command")
 
+    experiment_subparsers.add_parser("list", help="列出可用实验配置")
+
+    experiment_context_parser = experiment_subparsers.add_parser(
+        "context", help="显示注入 LLM 的实验配置上下文与编写规范"
+    )
+    experiment_context_parser.add_argument(
+        "--protocol", type=str, default=None, help="可选实验协议 ID 或别名"
+    )
+
+    experiment_add_config_parser = experiment_subparsers.add_parser(
+        "add-config", help="根据自然语言草稿或 JSON 新增实验配置"
+    )
+    experiment_add_config_parser.add_argument(
+        "--instruction", type=str, default=None, help="用户自然语言实验配置需求"
+    )
+    experiment_add_config_parser.add_argument(
+        "--config-json", type=str, default=None, help="已生成的实验配置 JSON 对象"
+    )
+    experiment_add_config_parser.add_argument(
+        "--filename", type=str, default=None, help="保存到 plugins/experiments/ 的文件名"
+    )
+    experiment_add_config_parser.add_argument(
+        "--overwrite", action="store_true", help="显式确认允许覆盖同名配置文件"
+    )
+
     experiment_start_parser = experiment_subparsers.add_parser(
         "start", help="启动实验指导会话"
     )
     experiment_start_parser.add_argument(
-        "--protocol", required=True, choices=["wb"], help="实验协议"
+        "--protocol", required=True, help="实验协议 ID 或别名"
     )
     experiment_start_parser.add_argument(
         "--session-id", type=str, default=None, help="可选会话 ID"
@@ -1363,15 +1677,32 @@ def main(argv: list[str] | None = None) -> None:
         "--language", choices=["python", "r"], default=None, help="可选语言过滤"
     )
 
-    tool_add_parser = tool_subparsers.add_parser("add", help="添加内置工具模板")
+    tool_scan_parser = tool_subparsers.add_parser(
+        "scan", help="自动扫描可导入的 Python/R 工具候选列表"
+    )
+    tool_scan_parser.add_argument(
+        "--language", choices=["python", "r"], default=None, help="可选语言过滤"
+    )
+
+    tool_add_parser = tool_subparsers.add_parser(
+        "add",
+        help="从自动扫描候选列表选择导入工具",
+        description="先扫描 plugins/tools 下 Python/R 工具目录并展示候选；使用 --select 选择编号或显示的 language/id 导入，不需要输入未知工具 ID。",
+    )
     tool_add_parser.add_argument(
         "--workspace", required=True, type=str, help="工作区 ID"
     )
     tool_add_parser.add_argument(
-        "--language", required=True, choices=["python", "r"], help="工具语言"
+        "--language", choices=["python", "r"], default=None, help="可选语言过滤"
     )
     tool_add_parser.add_argument(
-        "--tool", required=True, choices=["heatmap", "umap"], help="内置工具 ID"
+        "--select",
+        action="append",
+        default=None,
+        help="从扫描候选列表选择编号或 language/id；可重复选择多个工具",
+    )
+    tool_add_parser.add_argument(
+        "--overwrite", action="store_true", help="覆盖工作区中同名已导入工具"
     )
 
     tool_show_parser = tool_subparsers.add_parser("show", help="显示工具清单")
@@ -1681,6 +2012,26 @@ def main(argv: list[str] | None = None) -> None:
         cli.status()
     elif args.command == "diagnose":
         cli.diagnose()
+    elif args.command == "permission":
+        try:
+            if args.permission_command == "status":
+                cli.permission_status()
+            elif args.permission_command == "mode":
+                cli.permission_set_mode(
+                    args.mode,
+                    confirm_full=args.confirm_full,
+                    interactive=not args.no_interactive,
+                )
+            elif args.permission_command == "authorize":
+                cli.permission_authorize(args.path)
+            elif args.permission_command == "revoke":
+                cli.permission_revoke(args.path)
+            elif args.permission_command == "roots":
+                cli.permission_status()
+            else:
+                permission_parser.print_help()
+        except (ValueError, PermissionError) as exc:
+            permission_parser.error(str(exc))
     elif args.command == "test":
         cli.test()
     elif args.command == "tui":
@@ -1703,6 +2054,17 @@ def main(argv: list[str] | None = None) -> None:
         try:
             if args.experiment_command == "start":
                 cli.experiment_start(args.protocol, session_id=args.session_id)
+            elif args.experiment_command == "list":
+                cli.experiment_list()
+            elif args.experiment_command == "context":
+                cli.experiment_context(args.protocol)
+            elif args.experiment_command == "add-config":
+                cli.experiment_add_config(
+                    instruction=args.instruction,
+                    config_json=args.config_json,
+                    filename=args.filename,
+                    overwrite=args.overwrite,
+                )
             elif args.experiment_command == "show":
                 cli.experiment_show(args.session_file)
             elif args.experiment_command == "submit":
@@ -1747,8 +2109,18 @@ def main(argv: list[str] | None = None) -> None:
             cli.tool_init(args.workspace)
         elif args.tool_command == "list":
             cli.tool_list(args.workspace, language=args.language)
+        elif args.tool_command == "scan":
+            cli.tool_scan(language=args.language)
         elif args.tool_command == "add":
-            cli.tool_add(args.workspace, args.language, args.tool)
+            try:
+                cli.tool_add(
+                    args.workspace,
+                    selections=args.select,
+                    language=args.language,
+                    overwrite=args.overwrite,
+                )
+            except ValueError as exc:
+                tool_add_parser.error(str(exc))
         elif args.tool_command == "show":
             cli.tool_show(args.workspace, args.language, args.tool)
         elif args.tool_command == "run":

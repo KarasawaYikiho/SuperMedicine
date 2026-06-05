@@ -83,6 +83,39 @@ Footer {
     color: $foreground;
 }
 
+#tui-menu-panel {
+    width: 42;
+    height: auto;
+    max-height: 85%;
+    margin: 1 0 0 1;
+    padding: 1 1;
+    background: $surface;
+    border: round $primary;
+}
+
+#tui-menu-title {
+    height: 3;
+    padding: 0 1;
+    content-align: left middle;
+}
+
+.tui-menu-list {
+    height: auto;
+    max-height: 18;
+    background: $surface;
+}
+
+.tui-menu-list > MenuOption {
+    height: 2;
+    padding: 0 1;
+}
+
+.tui-menu-list > MenuOption:hover,
+.tui-menu-list > MenuOption.-active {
+    background: $primary 35%;
+    text-style: bold;
+}
+
 #sidebar-shortcuts {
     height: 4;
     padding: 0 1;

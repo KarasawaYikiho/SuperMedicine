@@ -53,6 +53,10 @@ if __name__ == "__main__":
         raise SystemExit(f"error: {exc}") from exc
 '''
 
+STALE_DISTRIBUTION_MEMBERS = frozenset(
+    {"plugins/tools/r_template/plugin.yaml"}
+)
+
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parent
@@ -113,6 +117,16 @@ def _write_case_distinct_installs(target_dir: str | Path) -> None:
         (root / name).write_bytes(payload)
 
 
+def _remove_stale_distribution_members(target_dir: str | Path) -> None:
+    root = Path(target_dir)
+    for relative_name in STALE_DISTRIBUTION_MEMBERS:
+        stale_path = root / relative_name
+        try:
+            stale_path.unlink()
+        except FileNotFoundError:
+            pass
+
+
 def _supports_case_distinct_names(directory: str | Path) -> bool:
     root = Path(directory)
     root.mkdir(parents=True, exist_ok=True)
@@ -135,17 +149,25 @@ class build_py(_build_py):
     """Ensure build dirs get exact installer wrappers when case-distinct names work."""
 
     def run(self) -> None:
+        _remove_stale_distribution_members(self.build_lib)
         super().run()
+        _remove_stale_distribution_members(self.build_lib)
         if _supports_case_distinct_names(self.build_lib):
             _write_case_distinct_installs(self.build_lib)
 
 
-def _ensure_zip_members(archive_path: Path, payloads: dict[str, bytes]) -> None:
+def _ensure_zip_members(
+    archive_path: Path,
+    payloads: dict[str, bytes],
+    *,
+    remove_members: set[str] | frozenset[str] | None = None,
+) -> None:
+    remove_members = remove_members or frozenset()
     rewritten: dict[str, bytes] = {}
     if archive_path.exists():
         with zipfile.ZipFile(archive_path, "r") as archive:
             for name in archive.namelist():
-                if name not in payloads:
+                if name not in payloads and name not in remove_members:
                     rewritten[name] = archive.read(name)
     rewritten.update(payloads)
     with zipfile.ZipFile(
@@ -171,13 +193,19 @@ def _record_line(path: str, payload: bytes) -> str:
     return f"{path},sha256={digest},{len(payload)}"
 
 
-def _ensure_wheel_members(archive_path: Path, payloads: dict[str, bytes]) -> None:
+def _ensure_wheel_members(
+    archive_path: Path,
+    payloads: dict[str, bytes],
+    *,
+    remove_members: set[str] | frozenset[str] | None = None,
+) -> None:
+    remove_members = remove_members or frozenset()
     rewritten: dict[str, bytes] = {}
     with zipfile.ZipFile(archive_path, "r") as archive:
         names = archive.namelist()
         record_name = _wheel_record_name(names)
         for name in names:
-            if name not in {*payloads, record_name}:
+            if name not in {*payloads, record_name} and name not in remove_members:
                 rewritten[name] = archive.read(name)
 
         if record_name is not None:
@@ -189,6 +217,9 @@ def _ensure_wheel_members(archive_path: Path, payloads: dict[str, bytes]) -> Non
                     line.startswith(f"{member_name},") for member_name in payloads
                 )
                 and not line.startswith(f"{record_name},")
+                and not any(
+                    line.startswith(f"{member_name},") for member_name in remove_members
+                )
             ]
             for member_name, payload in payloads.items():
                 kept_records.append(_record_line(member_name, payload))
@@ -216,9 +247,12 @@ def _ensure_tar_gz_members(archive_path: Path, payloads: dict[str, bytes]) -> No
         members = archive.getmembers()
         root = _sdist_root_member(archive)
         wanted_names = {f"{root}/{relative_name}" for relative_name in payloads}
+        stale_names = {
+            f"{root}/{relative_name}" for relative_name in STALE_DISTRIBUTION_MEMBERS
+        }
         kept: list[tuple[tarfile.TarInfo, bytes | None]] = []
         for member in members:
-            if member.name in wanted_names:
+            if member.name in wanted_names or member.name in stale_names:
                 continue
             if member.isfile():
                 extracted = archive.extractfile(member)
@@ -255,6 +289,9 @@ class sdist(_sdist):
                 _ensure_zip_members(
                     archive_path,
                     {f"{root}/{name}": payload for name, payload in payloads.items()},
+                    remove_members={
+                        f"{root}/{name}" for name in STALE_DISTRIBUTION_MEMBERS
+                    },
                 )
             elif archive_path.name.endswith(".tar.gz"):
                 _ensure_tar_gz_members(archive_path, payloads)
@@ -272,7 +309,11 @@ if _bdist_wheel is not None:
             payloads = _install_payloads()
             for wheel_path in Path(self.dist_dir).glob("*.whl"):
                 if wheel_path.is_file():
-                    _ensure_wheel_members(wheel_path, payloads)
+                    _ensure_wheel_members(
+                        wheel_path,
+                        payloads,
+                        remove_members=STALE_DISTRIBUTION_MEMBERS,
+                    )
 
     cmdclass["bdist_wheel"] = bdist_wheel
 

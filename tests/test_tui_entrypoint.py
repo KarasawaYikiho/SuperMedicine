@@ -4,6 +4,9 @@ import pytest
 import yaml
 import re
 from pathlib import Path
+from typing import cast
+
+from textual.widgets import ListView, Static
 
 from Cli import CLI, main
 from core.tui.app import STATUS_STYLE_CLASSES, SuperMedicineTUI, launch_tui
@@ -41,6 +44,9 @@ def test_chinese_labels_available():
     assert LABELS["status_task_idle"] == "任务空闲"
     assert LABELS["status_focus_input"] == "输入栏"
     assert "Tab/Shift+Tab" in LABELS["status_shortcuts_hint"]
+    assert "M 菜单" in LABELS["status_shortcuts_hint"]
+    assert "选择视图" in LABELS["menu_select_view"]
+    assert LABELS["menu_change_theme"] == "Change Theme"
     assert "Enter" in LABELS["help_submission"]
     assert "危险操作" in LABELS["help_danger"]
     assert "LLM" in LABELS["help_status"]
@@ -56,7 +62,8 @@ def test_tui_dry_run_returns_chinese_status(capsys):
     assert status.current_view == "chat"
     assert status.view_title == "对话"
     assert "任务空闲" in status.status_center
-    assert "1-0 切换视图" in status.shortcut_hint
+    assert "1-0" not in status.shortcut_hint
+    assert "M 菜单" in status.shortcut_hint
     assert "Tab/Shift+Tab" in status.shortcut_hint
     assert status.focus_target == "prompt-input"
     assert "SuperMedicine 终端工作台" in capsys.readouterr().out
@@ -103,11 +110,16 @@ def test_tui_startup_metadata_covers_all_primary_views_and_shortcuts():
         "Log 报告",
     ]
     assert all(item.icon for item in nav_items)
-    assert {item.key for item in nav_items} <= set(binding_by_key)
-    assert all("switch_view" in binding_by_key[item.key].action for item in nav_items)
-    assert "1-0 切换视图" in SuperMedicineTUI.shortcut_hint_text()
+    assert not ({item.key for item in nav_items} & set(binding_by_key))
+    assert not any(
+        binding.key.isdigit() and "switch_view" in binding.action
+        for binding in SuperMedicineTUI.BINDINGS
+    )
+    assert "1-0" not in SuperMedicineTUI.shortcut_hint_text()
+    assert "切换视图" not in SuperMedicineTUI.shortcut_hint_text()
     assert "Enter 提交" in SuperMedicineTUI.shortcut_hint_text()
     assert "? 帮助" in SuperMedicineTUI.shortcut_hint_text()
+    assert "M 菜单" in SuperMedicineTUI.shortcut_hint_text()
 
 
 def test_tui_theme_layout_and_status_text_are_testable_without_terminal(tmp_path):
@@ -137,7 +149,8 @@ def test_tui_dry_run_prints_modern_status_without_secrets(capsys):
     output = capsys.readouterr().out
 
     assert "当前视图：对话" in output
-    assert "快捷键：1-0 切换视图" in output
+    assert "快捷键：1-0 切换视图" not in output
+    assert "1-0" not in output
     assert "Enter 提交" in output
     assert "焦点：输入栏" in output
     assert status.status_left.startswith("📁")
@@ -243,26 +256,19 @@ def test_tui_view_title_and_status_text_are_test_friendly(tmp_path):
     assert app.view_title_text("log") == "Log 报告"
     assert app.status_text("workspace").focus == "焦点：输入栏"
     assert "当前视图：工作区管理" in app.status_text("workspace").right
-    assert "1-0 切换视图" in app.shortcut_hint_text()
+    assert "1-0" not in app.shortcut_hint_text()
+    assert "切换视图" not in app.shortcut_hint_text()
     assert "Tab/Shift+Tab" in app.shortcut_hint_text()
+    assert "M 菜单" in app.shortcut_hint_text()
 
 
 def test_tui_help_text_documents_actual_bindings_and_state_meanings():
     binding_keys = {binding.key for binding in SuperMedicineTUI.BINDINGS}
 
     for key in {
-        "1",
-        "2",
-        "3",
-        "4",
-        "5",
-        "6",
-        "7",
-        "8",
-        "9",
-        "0",
         "q",
         "f",
+        "m",
         "question_mark",
     }:
         assert key in binding_keys
@@ -279,7 +285,6 @@ def test_tui_help_text_documents_actual_bindings_and_state_meanings():
     )
 
     for expected in [
-        "1-0",
         "Tab/Shift+Tab",
         "Enter",
         "刷新",
@@ -289,8 +294,13 @@ def test_tui_help_text_documents_actual_bindings_and_state_meanings():
         "Q",
         "F",
         "?",
+        "M",
+        "选择视图",
     ]:
         assert expected in help_text
+
+    assert "1-0" not in help_text
+    assert "数字键直接切换视图" not in help_text
 
 
 def test_readme_tui_docs_match_bindings_and_preserve_boundaries():
@@ -303,22 +313,18 @@ def test_readme_tui_docs_match_bindings_and_preserve_boundaries():
     )
 
     for expected in [
-        "`1`",
-        "`2`",
-        "`3`",
-        "`4`",
-        "`5`",
-        "`6`",
-        "`7`",
-        "`8`",
         "`Tab`",
         "`Shift+Tab`",
         "`Enter`",
+        "`m`",
         "`f`",
         "`?`",
         "`q`",
     ]:
         assert expected in readme
+    assert "数字键 `1-0` 不作为直接切换视图快捷键" in readme
+    assert "选择视图" in readme
+    assert "Change Theme" in readme
     assert "LLM 状态" in readme
     assert "任务运行状态" in readme
     assert "CLI commands always require explicit `--workspace`" in readme
@@ -358,6 +364,7 @@ def test_tui_stylesheet_selectors_match_declared_widgets_and_classes():
             "status-error",
             "-active",
             "-maximized",
+            "tui-menu-list",
         }
     )
 
@@ -368,3 +375,39 @@ def test_tui_stylesheet_selectors_match_declared_widgets_and_classes():
 
     assert css_ids <= declared_ids
     assert css_classes <= declared_classes
+
+
+@pytest.mark.parametrize("menu_key", ["m", "M"])
+def test_tui_menu_binding_opens_view_submenu_and_theme_entry(tmp_path, menu_key):
+    import asyncio
+
+    async def scenario() -> None:
+        app = SuperMedicineTUI(project_root=tmp_path)
+        async with app.run_test(size=(140, 45)) as pilot:
+            assert app.query_one("#prompt-input").has_focus
+
+            await pilot.press(menu_key)
+            await pilot.pause()
+
+            assert app.screen.query_one("#tui-main-menu-list", ListView)
+            menu_text = "\n".join(
+                str(cast(Static, static).renderable)
+                for static in app.screen.query("#tui-main-menu-list Static")
+            )
+            assert "选择视图" in menu_text
+            assert "Change Theme" in menu_text
+
+            await pilot.press("enter")
+            await pilot.pause()
+            view_text = "\n".join(
+                str(cast(Static, static).renderable)
+                for static in app.screen.query("#tui-view-menu-list Static")
+            )
+            assert "对话" in view_text
+            assert "Log 报告" in view_text
+
+            await pilot.press("down", "enter")
+            await pilot.pause()
+            assert app._current_view == "dashboard"
+
+    asyncio.run(scenario())

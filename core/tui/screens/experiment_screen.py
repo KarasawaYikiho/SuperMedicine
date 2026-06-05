@@ -10,6 +10,7 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Input, Static, TextArea
 
+from core.config_center import ConfigCenter
 from core.experiment_guide import (
     ExperimentGuide,
     ExperimentGuideError,
@@ -32,9 +33,22 @@ class ExperimentGuideView(Vertical):
         super().__init__(**kwargs)
         self._project_root = Path(project_root) if project_root else Path.cwd()
         self._guide = ExperimentGuide()
-        self._session: ExperimentSession = self._guide.create_session(
-            "wb", metadata={"source": "tui"}
-        )
+        self._protocols = self._guide.list_protocols()
+        if not self._protocols:
+            raise ValueError("no experiment protocols are configured")
+        self._config = ConfigCenter(self._project_root / ".supermedicine" / "config.yaml")
+        selected_protocol = self._config.get_selected_experiment_protocol() or "wb"
+        self._sessions_by_protocol: dict[str, ExperimentSession] = {}
+        try:
+            self._session: ExperimentSession = self._guide.create_session(
+                selected_protocol, metadata={"source": "tui"}
+            )
+        except Exception:
+            self._session = self._guide.create_session(
+                self._protocols[0].protocol_id, metadata={"source": "tui"}
+            )
+        self._sync_selected_protocol()
+        self._sessions_by_protocol[self._session.protocol.protocol_id] = self._session
         self._last_calculation: dict[str, Any] | None = None
         self._started_logged = False
 
@@ -44,6 +58,8 @@ class ExperimentGuideView(Vertical):
         yield Static(
             t("experiment_action_hint"), id="experiment-action-hint", classes="hint"
         )
+        yield DataTable(id="experiment-protocol-table", cursor_type="row")
+        yield Button("切换到下一个实验配置", id="experiment-switch", classes="btn btn-secondary")
         yield Static("", id="experiment-session")
         yield Static("", id="experiment-step")
         yield Static("", id="experiment-instructions")
@@ -82,6 +98,7 @@ class ExperimentGuideView(Vertical):
             self._started_logged = True
 
     def refresh_session_view(self, status_message: str | None = None) -> None:
+        self._refresh_protocol_table()
         self.query_one("#experiment-session", Static).update(self._session_summary())
         current_step = self._session.current_step
         table = self.query_one("#experiment-input-table", DataTable)
@@ -114,6 +131,62 @@ class ExperimentGuideView(Vertical):
             self._submit_current_step()
         elif event.button.id == "experiment-save-log":
             self._save_log()
+        elif event.button.id == "experiment-switch":
+            self._switch_to_next_protocol()
+
+    def _refresh_protocol_table(self) -> None:
+        table = self.query_one("#experiment-protocol-table", DataTable)
+        table.clear(columns=True)
+        table.add_columns("当前", "实验 ID", "实验名称", "步骤数")
+        current_protocol_id = self._session.protocol.protocol_id
+        for protocol in self._protocols:
+            table.add_row(
+                "*" if protocol.protocol_id == current_protocol_id else "",
+                protocol.protocol_id,
+                protocol.title,
+                str(len(protocol.steps)),
+                key=protocol.protocol_id,
+            )
+
+    def _switch_to_next_protocol(self) -> None:
+        current_protocol_id = self._session.protocol.protocol_id
+        protocol_ids = [protocol.protocol_id for protocol in self._protocols]
+        current_index = protocol_ids.index(current_protocol_id)
+        next_protocol = self._protocols[(current_index + 1) % len(self._protocols)]
+        next_session = self._sessions_by_protocol.get(next_protocol.protocol_id)
+        if next_session is None:
+            next_session = self._guide.create_session(
+                next_protocol.protocol_id,
+                metadata={"source": "tui"},
+            )
+            self._sessions_by_protocol[next_protocol.protocol_id] = next_session
+            self._session = next_session
+            self._append_log_event(
+                "experiment_started",
+                message="experiment guide session started after protocol switch",
+            )
+        else:
+            self._session = next_session
+        self._last_calculation = None
+        self.query_one("#experiment-data-input", TextArea).load_text("")
+        self.query_one("#experiment-output-input", Input).value = ""
+        self.query_one("#experiment-reagent-result", Static).update("")
+        self.refresh_session_view(f"已切换实验配置：{next_protocol.title}")
+        self._sync_selected_protocol()
+
+    def _sync_selected_protocol(self) -> None:
+        """Persist selected experiment protocol so LLM context follows TUI state."""
+
+        try:
+            self._config.set_selected_experiment_protocol(
+                self._session.protocol.protocol_id,
+                save=True,
+            )
+        except Exception as exc:
+            try:
+                self._set_status(f"实验配置同步失败：{redact_sensitive(str(exc))}")
+            except Exception:
+                pass
 
     def _calculate_current_step(self) -> None:
         current_step = self._session.current_step

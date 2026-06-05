@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import re
 import shutil
-from typing import Any, Literal
+from typing import Any, Literal, Sequence
 
 import yaml
 
@@ -33,6 +33,9 @@ TOOLS_DIR = "tools"
 MANIFEST_FILE = "tool.yaml"
 SUPPORTED_LANGUAGES: tuple[ToolLanguage, ...] = ("python", "r")
 BUILTIN_TOOLS: tuple[str, ...] = ("heatmap", "umap")
+TOOL_SOURCE_ROOT = "plugins/tools"
+PYTHON_TOOL_STORAGE = "workspaces/<workspace-id>/tools/python/<tool-id>/"
+R_TOOL_STORAGE = "workspaces/<workspace-id>/tools/r/<tool-id>/"
 
 _TOOL_ID_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")
 
@@ -55,6 +58,72 @@ class ToolNotFoundError(WorkspaceToolError):
 
 class ToolManifestError(WorkspaceToolError):
     """Raised when a manifest is missing or invalid."""
+
+
+class ToolCandidateError(WorkspaceToolError):
+    """Raised when an import candidate cannot become a workspace tool."""
+
+
+TOOL_AUTHORING_SPEC: dict[str, Any] = {
+    "purpose": "Author Python/R workspace tools that SuperMedicine can scan, validate, import, and prepare for guarded execution.",
+    "source_directory": TOOL_SOURCE_ROOT,
+    "storage": {
+        "python": PYTHON_TOOL_STORAGE,
+        "r": R_TOOL_STORAGE,
+    },
+    "tool_folder_format": {
+        "source": "plugins/tools/<tool-directory>/",
+        "required_manifest": MANIFEST_FILE,
+        "required_entrypoint": "A relative script path inside the tool folder; .py for python, .R for r.",
+        "recommended_files": [MANIFEST_FILE, "README.md", "runner.py or runner.R"],
+    },
+    "manifest_fields": {
+        "id": "Required lowercase slug matching ^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$.",
+        "language": "Required; one of: python, r.",
+        "name": "Required human-readable name.",
+        "description": "Required concise research-use description.",
+        "entrypoint": "Required relative path inside the folder; no absolute paths and no '..'.",
+        "dependencies": "Required list of package names as strings. Python uses pip/import package names; R uses CRAN/Bioconductor package names.",
+        "inputs": "Required list of mappings. Each mapping should describe name, description, type/path expectation, and whether required.",
+        "outputs": "Required list of mappings. Each mapping should describe name, description, type/path expectation, and whether required.",
+        "version": "Required semantic or project version string.",
+    },
+    "input_output_conventions": {
+        "cli_flags": ["--input <workspace-relative-path>", "--output <workspace-relative-path>", "--check-deps optional"],
+        "paths": "Runtime input/output paths must stay inside the selected workspace; entrypoints must stay inside the tool folder.",
+        "stdout": "Print concise progress and dependency/error messages; avoid secrets and raw sensitive data.",
+        "exit_codes": "Return 0 for success, 2 for missing optional dependencies or invalid user input, non-zero for execution failures.",
+    },
+    "dependency_declaration": "Declare every non-stdlib Python package or R package in tool.yaml dependencies as a list of strings; scripts should check availability before heavy imports when practical.",
+    "error_handling": [
+        "Validate required input files and report the missing path/package/field explicitly.",
+        "Fail with a clear non-zero exit status instead of silently producing partial outputs.",
+        "Do not hide scanner/validator reasons; import errors surface candidate warnings and error text.",
+    ],
+    "security_limits": [
+        "Do not use absolute entrypoint paths or '..' traversal.",
+        "Do not read or write outside the workspace-provided input/output paths.",
+        "Do not embed secrets, API keys, credentials, or unapproved network access.",
+        "Do not execute shell commands unless the permission policy and user explicitly allow it.",
+        "Treat prompt text as advisory only; runtime permission checks still gate execution.",
+    ],
+    "scan_validate_import_flow": [
+        "Scanner reads plugins/tools/* directories and ignores non-directories/__pycache__.",
+        "Scanner prefers tool.yaml; plugin.yaml is only fallback metadata and produces a warning.",
+        "Language is validated as python/r or inferred from an r_ directory prefix when metadata is missing.",
+        "Entrypoint is checked to be relative, inside the source folder, present on disk, and language-matched by suffix.",
+        "Manifest dependencies/inputs/outputs must be lists; invalid candidate metadata is surfaced as warnings or import errors.",
+        "Import copies a ready candidate into workspaces/<id>/tools/<language>/<tool-id>/ and rewrites a normalized tool.yaml.",
+        "Workspace load requires the normalized manifest fields and an existing entrypoint before invocation can be prepared.",
+    ],
+    "llm_authoring_rule": "When asked to create a tool, generate the folder under plugins/tools/<tool-directory>/ with tool.yaml plus the matching runner.py/runner.R; never save Python/R tools outside the documented source directory or workspace import directories.",
+}
+
+
+def build_tool_authoring_llm_context() -> dict[str, Any]:
+    """Return the canonical Python/R tool authoring rules injected into LLM chat."""
+
+    return dict(TOOL_AUTHORING_SPEC)
 
 
 def validate_tool_id(tool_id: str) -> str:
@@ -214,6 +283,64 @@ class ToolInvocationPlan:
         }
 
 
+@dataclass(frozen=True)
+class ToolImportCandidate:
+    """A Python/R tool discovered from the project tool source directory."""
+
+    index: int
+    id: str
+    language: ToolLanguage
+    name: str
+    description: str
+    source_path: Path
+    entrypoint: str | None
+    version: str
+    dependencies: list[str]
+    inputs: list[dict[str, Any]]
+    outputs: list[dict[str, Any]]
+    status: str
+    warnings: list[str]
+
+    @property
+    def importable(self) -> bool:
+        return self.status == "ready"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "index": self.index,
+            "id": self.id,
+            "language": self.language,
+            "name": self.name,
+            "description": self.description,
+            "source_path": str(self.source_path),
+            "entrypoint": self.entrypoint,
+            "version": self.version,
+            "dependencies": list(self.dependencies),
+            "inputs": list(self.inputs),
+            "outputs": list(self.outputs),
+            "status": self.status,
+            "warnings": list(self.warnings),
+            "importable": self.importable,
+        }
+
+    def to_manifest(self) -> ToolManifest:
+        if not self.importable or not self.entrypoint:
+            raise ToolCandidateError(
+                f"Tool candidate is not importable: {self.language}/{self.id}"
+            )
+        return ToolManifest(
+            id=self.id,
+            language=self.language,
+            name=self.name,
+            description=self.description,
+            entrypoint=self.entrypoint,
+            dependencies=list(self.dependencies),
+            inputs=list(self.inputs),
+            outputs=list(self.outputs),
+            version=self.version,
+        )
+
+
 def _manifest_text(
     tool_id: str,
     language: ToolLanguage,
@@ -371,6 +498,12 @@ BUILTIN_TEMPLATES: dict[tuple[ToolLanguage, str], dict[str, str]] = {
 }
 
 
+def _slug_from_name(value: str) -> str:
+    slug = re.sub(r"[^a-z0-9-]+", "-", value.lower()).strip("-")
+    slug = re.sub(r"-+", "-", slug)
+    return validate_tool_id(slug or "tool")
+
+
 class WorkspaceToolService:
     """Manage modular tools inside explicit workspace directories."""
 
@@ -381,6 +514,13 @@ class WorkspaceToolService:
             else Path(project_root).resolve()
         )
         self.workspace_manager = WorkspaceManager(self.project_root)
+
+    def tool_source_root(self) -> Path:
+        """Return the project directory scanned for importable Python/R tools."""
+
+        return validate_path_in_project_root(
+            self.project_root / "plugins" / TOOLS_DIR, self.project_root
+        )
 
     def initialize_tools(self, workspace_id: str) -> dict[str, Any]:
         info = self.workspace_manager.initialize_workspace(workspace_id)
@@ -469,6 +609,96 @@ class WorkspaceToolService:
         manifest = self.load_manifest(workspace_id, lang, slug)
         return {"status": "added", "tool": manifest.to_dict(), "path": str(destination)}
 
+    def scan_import_candidates(
+        self, language: str | None = None
+    ) -> dict[str, list[dict[str, Any]]]:
+        """Scan Python/R source tool directories and return user-selectable candidates."""
+
+        languages = (
+            [validate_language(language)] if language else list(SUPPORTED_LANGUAGES)
+        )
+        result: dict[str, list[dict[str, Any]]] = {lang: [] for lang in languages}
+        root = self.tool_source_root()
+        if not root.is_dir():
+            return result
+
+        candidates: list[ToolImportCandidate] = []
+        for entry in sorted(root.iterdir(), key=lambda item: item.name):
+            if not entry.is_dir() or entry.name == "__pycache__":
+                continue
+            candidate = self._candidate_from_source(entry)
+            if candidate and candidate.language in languages:
+                candidates.append(candidate)
+
+        for index, candidate in enumerate(candidates, start=1):
+            indexed = ToolImportCandidate(
+                index=index,
+                id=candidate.id,
+                language=candidate.language,
+                name=candidate.name,
+                description=candidate.description,
+                source_path=candidate.source_path,
+                entrypoint=candidate.entrypoint,
+                version=candidate.version,
+                dependencies=candidate.dependencies,
+                inputs=candidate.inputs,
+                outputs=candidate.outputs,
+                status=candidate.status,
+                warnings=candidate.warnings,
+            )
+            result[indexed.language].append(indexed.to_dict())
+        return result
+
+    def import_scanned_tools(
+        self,
+        workspace_id: str,
+        selections: Sequence[str | int],
+        *,
+        language: str | None = None,
+        overwrite: bool = False,
+    ) -> dict[str, Any]:
+        """Import one or more scanned candidates by list index or displayed slug."""
+
+        self.initialize_tools(workspace_id)
+        grouped = self.scan_import_candidates(language)
+        candidates = [item for items in grouped.values() for item in items]
+        if not candidates:
+            return {
+                "status": "no_candidates",
+                "message": "No Python/R tool directories were found to import.",
+                "candidates": grouped,
+                "imported": [],
+                "errors": [],
+            }
+        selected = self._resolve_candidate_selections(candidates, selections)
+        imported: list[dict[str, Any]] = []
+        errors: list[dict[str, Any]] = []
+        for item in selected:
+            try:
+                candidate = self._candidate_from_source(Path(item["source_path"]))
+                if candidate is None or not candidate.importable:
+                    reason = "; ".join(item.get("warnings") or []) or item.get(
+                        "status", "invalid"
+                    )
+                    raise ToolCandidateError(f"Tool candidate is not importable: {reason}")
+                imported.append(
+                    self._import_candidate(workspace_id, candidate, overwrite=overwrite)
+                )
+            except WorkspaceToolError as exc:
+                errors.append(
+                    {
+                        "id": item.get("id"),
+                        "language": item.get("language"),
+                        "error": str(exc),
+                    }
+                )
+        return {
+            "status": "imported" if imported and not errors else "partial" if imported else "failed",
+            "imported": imported,
+            "errors": errors,
+            "candidates": grouped,
+        }
+
     def load_manifest(
         self, workspace_id: str, language: str, tool_id: str
     ) -> ToolManifest:
@@ -489,6 +719,146 @@ class WorkspaceToolService:
         if not entrypoint.is_file():
             raise ToolManifestError(f"Tool entrypoint not found: {entrypoint}")
         return manifest
+
+    def _candidate_from_source(self, source_path: Path) -> ToolImportCandidate | None:
+        source_path = validate_path_in_project_root(source_path, self.project_root)
+        plugin_manifest = source_path / "plugin.yaml"
+        workspace_manifest = source_path / MANIFEST_FILE
+        data: dict[str, Any] = {}
+        warnings: list[str] = []
+        if workspace_manifest.is_file():
+            data = yaml.safe_load(workspace_manifest.read_text(encoding="utf-8")) or {}
+        elif plugin_manifest.is_file():
+            data = yaml.safe_load(plugin_manifest.read_text(encoding="utf-8")) or {}
+            warnings.append("workspace tool.yaml missing; displaying plugin metadata")
+        else:
+            warnings.append("metadata missing; displaying directory name only")
+
+        if not isinstance(data, dict):
+            data = {}
+            warnings.append("metadata is not a mapping")
+
+        raw_name = str(data.get("name") or source_path.name)
+        try:
+            tool_id = _slug_from_name(str(data.get("id") or raw_name or source_path.name))
+        except InvalidToolId:
+            tool_id = _slug_from_name(source_path.name)
+            warnings.append("metadata id is invalid; using directory slug")
+
+        language_value = str(data.get("language") or "").lower()
+        if source_path.name.lower().startswith("r_") and language_value != "r":
+            language_value = "r"
+            warnings.append("source directory is under R naming convention; inferred r")
+        elif language_value not in SUPPORTED_LANGUAGES:
+            language_value = "r" if source_path.name.lower().startswith("r_") else "python"
+            warnings.append(f"metadata language missing/unsupported; inferred {language_value}")
+        lang = validate_language(language_value)
+
+        entrypoint = str(data.get("entrypoint") or data.get("entry") or "")
+        if not entrypoint:
+            fallback_names = (
+                ("runner.R", "main.R", "main.py")
+                if lang == "r"
+                else ("main.py", "runner.py")
+            )
+            entrypoint = next(
+                (name for name in fallback_names if (source_path / name).is_file()),
+                fallback_names[0],
+            )
+            warnings.append("entrypoint missing; using fallback")
+        status = "ready"
+        try:
+            if Path(entrypoint).is_absolute() or ".." in Path(entrypoint).parts:
+                raise ToolManifestError("entrypoint must stay inside source folder")
+            entrypoint_path = validate_path_in_project_root(
+                source_path / entrypoint, self.project_root
+            )
+            entrypoint_path.relative_to(source_path)
+            if not entrypoint_path.is_file():
+                raise ToolManifestError(f"entrypoint not found: {entrypoint}")
+            if lang == "python" and entrypoint_path.suffix != ".py":
+                raise ToolManifestError("python tool entrypoint must be a .py file")
+            if lang == "r" and entrypoint_path.suffix.lower() != ".r":
+                raise ToolManifestError("r tool entrypoint must be an .R file")
+        except (ValueError, WorkspaceToolError) as exc:
+            status = "invalid"
+            warnings.append(str(exc))
+
+        dependencies = data.get("dependencies", [])
+        if not isinstance(dependencies, list) or not all(
+            isinstance(item, str) for item in dependencies
+        ):
+            dependencies = []
+            warnings.append("dependencies metadata invalid; using empty list")
+        inputs = data.get("inputs", [])
+        outputs = data.get("outputs", [])
+        if not isinstance(inputs, list) or not all(isinstance(item, dict) for item in inputs):
+            inputs = []
+            warnings.append("inputs metadata invalid; using empty list")
+        if not isinstance(outputs, list) or not all(isinstance(item, dict) for item in outputs):
+            outputs = []
+            warnings.append("outputs metadata invalid; using empty list")
+
+        return ToolImportCandidate(
+            index=0,
+            id=tool_id,
+            language=lang,
+            name=raw_name,
+            description=str(data.get("description") or "No description metadata provided"),
+            source_path=source_path,
+            entrypoint=entrypoint if status == "ready" else None,
+            version=str(data.get("version") or "0.0.0"),
+            dependencies=list(dependencies),
+            inputs=list(inputs),
+            outputs=list(outputs),
+            status=status,
+            warnings=warnings,
+        )
+
+    def _resolve_candidate_selections(
+        self, candidates: list[dict[str, Any]], selections: Sequence[str | int]
+    ) -> list[dict[str, Any]]:
+        if not selections:
+            raise ToolCandidateError(
+                "Select one or more tools from the scanned candidate list; tool ID entry is not required."
+            )
+        by_index = {str(item["index"]): item for item in candidates}
+        by_slug = {f"{item['language']}/{item['id']}": item for item in candidates}
+        by_slug.update({str(item["id"]): item for item in candidates})
+        selected: list[dict[str, Any]] = []
+        seen: set[tuple[str, str]] = set()
+        for selection in selections:
+            key = str(selection).strip()
+            item = by_index.get(key) or by_slug.get(key)
+            if item is None:
+                raise ToolCandidateError(f"Unknown scanned tool selection: {selection}")
+            identity = (str(item["language"]), str(item["id"]))
+            if identity not in seen:
+                selected.append(item)
+                seen.add(identity)
+        return selected
+
+    def _import_candidate(
+        self, workspace_id: str, candidate: ToolImportCandidate, *, overwrite: bool
+    ) -> dict[str, Any]:
+        manifest = candidate.to_manifest()
+        destination = self.tool_path(workspace_id, manifest.language, manifest.id)
+        if destination.exists() and any(destination.iterdir()) and not overwrite:
+            existing = self.load_manifest(workspace_id, manifest.language, manifest.id)
+            return {"status": "exists", "tool": existing.to_dict(), "path": str(destination)}
+        if destination.exists():
+            shutil.rmtree(destination)
+        shutil.copytree(
+            candidate.source_path,
+            destination,
+            ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+        )
+        (destination / MANIFEST_FILE).write_text(
+            yaml.safe_dump(manifest.to_dict(), sort_keys=False, allow_unicode=True),
+            encoding="utf-8",
+        )
+        loaded = self.load_manifest(workspace_id, manifest.language, manifest.id)
+        return {"status": "imported", "tool": loaded.to_dict(), "path": str(destination)}
 
     def list_tools(
         self, workspace_id: str, language: str | None = None

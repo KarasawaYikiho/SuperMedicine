@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from core.tui.permissions import TUI_TOOL_ACTION, prepare_tool_action
+from core.tui.screens.permission_screen import PermissionScreenController
+from permission.access_mode import AccessDecisionStatus, FullAccessConfirmationRequired
 from permission.policy import PermissionResult
 
 
@@ -72,3 +76,30 @@ def test_low_risk_action_still_uses_permission_engine_but_not_confirmation_gate(
     assert request.context["sandbox_required"] is True
     assert request.context["audit_required"] is True
     assert engine.calls[0]["context"]["screen"] == "工具管理"
+
+
+def test_permission_screen_controller_requires_full_confirmation_and_updates_policy(
+    tmp_path,
+):
+    project_root = tmp_path / "project"
+    external_root = tmp_path / "external"
+    project_root.mkdir()
+    external_root.mkdir()
+    controller = PermissionScreenController(project_root)
+
+    conservative_write = controller.access_decision(external_root / "out.csv", "write")
+
+    assert conservative_write["status"] == AccessDecisionStatus.DENIED.value
+    with pytest.raises(FullAccessConfirmationRequired):
+        controller.set_mode("full", confirmation_text="")
+
+    full_config = controller.set_mode("full", confirmation_text="FULL")
+    full_write = controller.access_decision(external_root / "out.csv", "write")
+    conservative_config = controller.set_mode("conservative")
+
+    assert full_config["mode"] == "full"
+    assert full_config["full_mode_confirmed"] is True
+    assert full_write["status"] == AccessDecisionStatus.ALLOWED.value
+    assert "will not silently" in full_write["helper"]
+    assert conservative_config["mode"] == "conservative"
+    assert conservative_config["full_mode_confirmed"] is False

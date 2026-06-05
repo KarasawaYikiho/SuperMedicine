@@ -14,7 +14,12 @@ from enum import Enum
 from typing import Any, Protocol
 from uuid import uuid4
 
-from core.experiment_protocols import ExperimentProtocol, get_protocol
+from core.experiment_protocols import (
+    ExperimentProtocol,
+    build_experiment_llm_context,
+    get_protocol,
+    list_protocols,
+)
 from core.redaction import redact_sensitive
 
 
@@ -372,12 +377,16 @@ class ExperimentSession:
         params_by_request = calculation_params or {}
         requests: list[dict[str, Any]] = []
         for calculation_request in current_step.calculation_requests:
-            plugin_action = EXPERIMENT_WB_ACTIONS.get(
-                (current_step.step_id, calculation_request.kind)
-            )
-            if plugin_action is None:
+            plugin_name = calculation_request.plugin_name
+            action = calculation_request.action
+            if not plugin_name or not action:
+                plugin_action = EXPERIMENT_WB_ACTIONS.get(
+                    (current_step.step_id, calculation_request.kind)
+                )
+                if plugin_action is not None:
+                    plugin_name, action = plugin_action
+            if not plugin_name or not action:
                 continue
-            plugin_name, action = plugin_action
             params = dict(calculation_request.parameters)
             params.update(params_by_request.get(calculation_request.request_id, {}))
             requests.append(
@@ -512,6 +521,14 @@ class ExperimentSession:
 
 class ExperimentGuide:
     """Small facade for creating and restoring experiment sessions."""
+
+    def list_protocols(self) -> list[ExperimentProtocol]:
+        return list_protocols()
+
+    def build_llm_context(self, protocol_id: str | None = None) -> dict[str, Any]:
+        """Return LLM context for the selected experiment protocol."""
+
+        return build_experiment_llm_context(protocol_id)
 
     def create_session(
         self,

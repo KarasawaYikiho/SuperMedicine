@@ -1,0 +1,17 @@
+id: "r-template"
+name: "r-template"
+version: "0.1.0"
+language: "r"
+description: "R 数据分析工具模板"
+entrypoint: "runner.R"
+dependencies:
+  - "readr"
+  - "dplyr"
+inputs:
+  - name: "input"
+    description: "CSV 或 TSV 数据表路径"
+    required: false
+outputs:
+  - name: "output"
+    description: "分析结果输出路径"
+    required: false

@@ -1,0 +1,49 @@
+protocol_id: cell_culture_basic
+title: 细胞培养基础流程
+description: 细胞复苏、传代、处理与观察记录的基础实验指导配置示例。
+version: "1.0"
+metadata:
+  category: cell_culture
+  aliases:
+    - cell_culture
+steps:
+  - step_id: thaw_or_seed
+    title: 复苏或接种
+    instructions: 记录细胞系、批次、接种密度和培养基信息。
+    input_fields:
+      - name: cell_line
+        label: 细胞系
+        required: true
+      - name: passage_number
+        label: 传代号
+      - name: seeding_density
+        label: 接种密度
+      - name: medium
+        label: 培养基
+    expected_outputs:
+      - seeding_record
+  - step_id: treatment
+    title: 处理设置
+    instructions: 记录处理分组、药物/刺激条件、时间点和重复数。
+    input_fields:
+      - name: treatment_groups
+        label: 处理分组
+        required: true
+      - name: treatment_duration
+        label: 处理时长
+      - name: replicates
+        label: 重复数
+    expected_outputs:
+      - treatment_record
+  - step_id: observation_and_collection
+    title: 观察与收样
+    instructions: 记录细胞状态、显微观察、污染检查和收样去向。
+    input_fields:
+      - name: morphology_notes
+        label: 形态观察
+      - name: contamination_check
+        label: 污染检查
+      - name: collection_plan
+        label: 收样计划
+    expected_outputs:
+      - observation_record

@@ -14,11 +14,11 @@ def _static_text(widget: Static) -> str:
     return str(widget.renderable)
 
 
-def test_tui_numeric_shortcut_0_opens_log_screen_and_global_shortcuts_remain(tmp_path):
+def test_tui_explicit_switch_opens_log_screen_and_global_shortcuts_remain(tmp_path):
     async def scenario() -> None:
         app = SuperMedicineTUI(project_root=tmp_path)
         async with app.run_test(size=(140, 45)) as pilot:
-            await pilot.press("0")
+            app.action_switch_view("log")
             await pilot.pause()
 
             assert app._current_view == "log"
@@ -31,7 +31,7 @@ def test_tui_numeric_shortcut_0_opens_log_screen_and_global_shortcuts_remain(tmp
             assert app.query_one("#log-message-input", TextArea) is not None
             assert app.query_one("#log-table", DataTable) is not None
 
-            await pilot.press("9")
+            app.action_switch_view("experiment")
             await pilot.pause()
 
             assert app._current_view == "experiment"
@@ -46,7 +46,7 @@ def test_log_screen_writes_lists_and_shows_redacted_report(tmp_path):
     async def scenario() -> None:
         app = SuperMedicineTUI(project_root=tmp_path)
         async with app.run_test(size=(140, 45)) as pilot:
-            await pilot.press("0")
+            app.action_switch_view("log")
             await pilot.pause()
 
             app.query_one("#log-session-id-input", Input).value = "session-1"
@@ -84,7 +84,7 @@ def test_log_screen_empty_message_sets_status_without_creating_report(tmp_path):
     async def scenario() -> None:
         app = SuperMedicineTUI(project_root=tmp_path)
         async with app.run_test(size=(140, 45)) as pilot:
-            await pilot.press("0")
+            app.action_switch_view("log")
             await pilot.pause()
 
             app.query_one("#log-message-input", TextArea).load_text("")
@@ -103,7 +103,7 @@ def test_log_screen_initial_empty_copy_and_safe_layout_are_visible(tmp_path):
     async def scenario() -> None:
         app = SuperMedicineTUI(project_root=tmp_path)
         async with app.run_test(size=(140, 45)) as pilot:
-            await pilot.press("0")
+            app.action_switch_view("log")
             await pilot.pause()
 
             assert t("log_redaction_hint") in _static_text(
@@ -141,7 +141,7 @@ def test_log_screen_empty_and_refreshed_status_include_zero_statistics(tmp_path)
     async def scenario() -> None:
         app = SuperMedicineTUI(project_root=tmp_path)
         async with app.run_test(size=(140, 45)) as pilot:
-            await pilot.press("0")
+            app.action_switch_view("log")
             await pilot.pause()
 
             initial_status = _static_text(app.query_one("#log-status", Static))
@@ -175,7 +175,7 @@ def test_log_screen_populated_table_and_detail_statistics_match_selected_entry(
     async def scenario() -> None:
         app = SuperMedicineTUI(project_root=tmp_path)
         async with app.run_test(size=(140, 45)) as pilot:
-            await pilot.press("0")
+            app.action_switch_view("log")
             await pilot.pause()
 
             table = app.query_one("#log-table", DataTable)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
+import yaml
 from textual.widgets import DataTable, Input, Select, Static
 
 from core.tui.app import SuperMedicineTUI
@@ -31,7 +32,7 @@ def test_tool_run_on_empty_table_shows_red_error_without_exiting_tui(tmp_path):
     async def scenario() -> None:
         app = SuperMedicineTUI(project_root=tmp_path)
         async with app.run_test(size=(140, 45)) as pilot:
-            await pilot.press("6")
+            app.action_switch_view("tool")
             await pilot.pause()
 
             view = app._views["tool"]
@@ -53,13 +54,45 @@ def test_tool_run_on_empty_table_shows_red_error_without_exiting_tui(tmp_path):
     asyncio.run(scenario())
 
 
+def test_tool_screen_scans_candidates_without_tool_id_input(tmp_path):
+    WorkspaceManager(tmp_path).initialize_workspace("study-a")
+    source = tmp_path / "plugins" / "tools" / "python_stats"
+    source.mkdir(parents=True)
+    (source / "plugin.yaml").write_text(
+        yaml.safe_dump(
+            {"name": "python-stats", "language": "python", "entry": "main.py"},
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    (source / "main.py").write_text("print('ok')\n", encoding="utf-8")
+
+    async def scenario() -> None:
+        app = SuperMedicineTUI(project_root=tmp_path)
+        async with app.run_test(size=(140, 45)) as pilot:
+            app.action_switch_view("tool")
+            await pilot.pause()
+
+            view = app._views["tool"]
+            assert list(view.query("#tool-id-input")) == []
+            view.query_one("#tool-workspace-select", Select).value = "study-a"
+            await pilot.click("#tool-scan")
+            await pilot.pause()
+
+            table = view.query_one("#tool-table", DataTable)
+            assert table.row_count == 1
+            assert table.get_row_at(0)[2] == "python-stats"
+
+    asyncio.run(scenario())
+
+
 def test_paper_enrich_on_empty_table_shows_red_error_without_exiting_tui(tmp_path):
     WorkspaceManager(tmp_path).initialize_workspace("study-a")
 
     async def scenario() -> None:
         app = SuperMedicineTUI(project_root=tmp_path)
         async with app.run_test(size=(140, 45)) as pilot:
-            await pilot.press("4")
+            app.action_switch_view("paper")
             await pilot.pause()
 
             view = app._views["paper"]
@@ -85,7 +118,7 @@ def test_log_show_on_empty_table_shows_red_error_without_exiting_tui(tmp_path):
     async def scenario() -> None:
         app = SuperMedicineTUI(project_root=tmp_path)
         async with app.run_test(size=(140, 45)) as pilot:
-            await pilot.press("0")
+            app.action_switch_view("log")
             await pilot.pause()
 
             table = app.query_one("#log-table", DataTable)
@@ -110,7 +143,7 @@ def test_experience_delete_on_empty_table_shows_red_error_without_exiting_tui(tm
     async def scenario() -> None:
         app = SuperMedicineTUI(project_root=tmp_path)
         async with app.run_test(size=(140, 45)) as pilot:
-            await pilot.press("5")
+            app.action_switch_view("experience")
             await pilot.pause()
 
             view = app._views["experience"]

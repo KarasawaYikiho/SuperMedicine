@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from permission.audit import AuditLogger
+from permission.access_mode import AccessModePolicy, FileAccessOperation
 from permission.engine import PermissionEngine
 from permission.policy import PermissionResult
 
@@ -63,6 +64,8 @@ def authorize_dangerous_operation(
     context: dict[str, Any] | None = None,
     destructive: bool = False,
     audit_logger: AuditLogger | None = None,
+    access_policy: AccessModePolicy | None = None,
+    file_operation: FileAccessOperation | str | None = None,
     operation: str = "dangerous_operation",
     trace_id: str | None = None,
 ) -> OperationAuthorization:
@@ -76,11 +79,26 @@ def authorize_dangerous_operation(
     logging performed internally by PermissionEngine.
     """
 
-    resolved_path = (
-        validate_destructive_path(path, project_root)
-        if destructive
-        else validate_path_in_project_root(path, project_root)
-    )
+    if access_policy is None:
+        resolved_path = (
+            validate_destructive_path(path, project_root)
+            if destructive
+            else validate_path_in_project_root(path, project_root)
+        )
+    else:
+        access_decision = access_policy.require_allowed(
+            path,
+            file_operation
+            or (FileAccessOperation.DELETE if destructive else FileAccessOperation.WRITE),
+        )
+        resolved_path = access_decision.path
+        if destructive:
+            try:
+                resolved_path.relative_to(access_policy.project_root)
+            except ValueError:
+                pass
+            else:
+                validate_destructive_path(resolved_path, access_policy.project_root)
     resource = str(resolved_path)
     permission_context = dict(context or {})
     permission_context.setdefault("operation", operation)

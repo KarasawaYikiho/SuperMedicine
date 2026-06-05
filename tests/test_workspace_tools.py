@@ -5,18 +5,22 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 
 from Cli import CLI, main
 from core.operation_guard import DangerousOperationDenied
 from core.workspace import WorkspaceManager
 from core.workspace_tools import (
     BUILTIN_TEMPLATES,
+    MANIFEST_FILE,
+    TOOL_AUTHORING_SPEC,
     InvalidToolId,
     InvalidToolLanguage,
     ToolManifest,
     ToolManifestError,
     WorkspaceToolError,
     WorkspaceToolService,
+    build_tool_authoring_llm_context,
     validate_language,
     validate_tool_id,
 )
@@ -152,6 +156,32 @@ def test_manifest_schema_requires_expected_fields_and_validates_identity():
         ToolManifest.from_dict({**data, "entrypoint": "../runner.py"})
 
 
+def test_tool_authoring_context_matches_manifest_and_scanner_contract():
+    context = build_tool_authoring_llm_context()
+    fields = context["manifest_fields"]
+
+    assert context["source_directory"] == "plugins/tools"
+    assert context["storage"]["python"] == "workspaces/<workspace-id>/tools/python/<tool-id>/"
+    assert context["storage"]["r"] == "workspaces/<workspace-id>/tools/r/<tool-id>/"
+    assert context["tool_folder_format"]["required_manifest"] == MANIFEST_FILE
+    assert set(fields) == {
+        "id",
+        "language",
+        "name",
+        "description",
+        "entrypoint",
+        "dependencies",
+        "inputs",
+        "outputs",
+        "version",
+    }
+    assert "python" in fields["language"]
+    assert "r" in fields["language"]
+    assert "relative" in fields["entrypoint"]
+    assert "plugins/tools/<tool-directory>/" in context["llm_authoring_rule"]
+    assert TOOL_AUTHORING_SPEC["scan_validate_import_flow"] == context["scan_validate_import_flow"]
+
+
 def test_list_discovers_tools_grouped_by_language(tmp_path):
     service = WorkspaceToolService(tmp_path)
     service.initialize_tools("trial-1")
@@ -165,6 +195,141 @@ def test_list_discovers_tools_grouped_by_language(tmp_path):
     assert [tool["id"] for tool in grouped["r"]] == ["umap"]
     assert set(python_only) == {"python"}
     assert python_only["python"][0]["language"] == "python"
+
+
+def test_scan_import_candidates_lists_python_and_r_with_metadata_fallback(tmp_path):
+    source_root = tmp_path / "plugins" / "tools"
+    python_tool = source_root / "python_stats"
+    python_tool.mkdir(parents=True)
+    (python_tool / "plugin.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "name": "python-stats",
+                "version": "0.1.0",
+                "type": "tool",
+                "language": "python",
+                "description": "Python stats",
+                "entry": "main.py",
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    (python_tool / "main.py").write_text("print('ok')\n", encoding="utf-8")
+    r_tool = source_root / "r_survival"
+    r_tool.mkdir()
+    (r_tool / "runner.R").write_text("cat('ok')\n", encoding="utf-8")
+
+    grouped = WorkspaceToolService(tmp_path).scan_import_candidates()
+
+    assert [item["id"] for item in grouped["python"]] == ["python-stats"]
+    assert grouped["python"][0]["importable"] is True
+    assert grouped["python"][0]["warnings"]
+    assert [item["id"] for item in grouped["r"]] == ["r-survival"]
+    assert grouped["r"][0]["description"] == "No description metadata provided"
+
+
+def test_import_scanned_tools_by_selection_rejects_invalid_candidate(tmp_path):
+    source_root = tmp_path / "plugins" / "tools"
+    valid = source_root / "python_stats"
+    valid.mkdir(parents=True)
+    (valid / "plugin.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "name": "python-stats",
+                "version": "0.1.0",
+                "language": "python",
+                "description": "Python stats",
+                "entry": "main.py",
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    (valid / "main.py").write_text("print('ok')\n", encoding="utf-8")
+    invalid = source_root / "r_bad"
+    invalid.mkdir()
+    (invalid / "plugin.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "name": "r-bad",
+                "language": "r",
+                "description": "Bad R tool",
+                "entry": "missing.R",
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    service = WorkspaceToolService(tmp_path)
+    result = service.import_scanned_tools("trial-1", ["1", "2"])
+
+    assert result["status"] == "partial"
+    assert result["imported"][0]["tool"]["id"] == "python-stats"
+    assert result["errors"][0]["id"] == "r-bad"
+    assert not (
+        tmp_path / "workspaces" / "trial-1" / "tools" / "r" / "r-bad"
+    ).exists()
+
+
+def test_cli_tool_add_without_selection_returns_scanned_candidates(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    source = tmp_path / "plugins" / "tools" / "python_stats"
+    source.mkdir(parents=True)
+    (source / "plugin.yaml").write_text(
+        yaml.safe_dump(
+            {"name": "python-stats", "language": "python", "entry": "main.py"},
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    (source / "main.py").write_text("print('ok')\n", encoding="utf-8")
+
+    result = CLI().tool_add("trial-1")
+
+    assert result["status"] == "select_required"
+    assert result["candidates"]["python"][0]["id"] == "python-stats"
+
+
+def test_cli_tool_add_selection_imports_scanned_tool_and_records_runtime_state(
+    tmp_path, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    source = tmp_path / "plugins" / "tools" / "python_stats"
+    source.mkdir(parents=True)
+    (source / "plugin.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "name": "python-stats",
+                "version": "0.1.0",
+                "language": "python",
+                "description": "Python stats",
+                "entry": "main.py",
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    (source / "main.py").write_text("print('ok')\n", encoding="utf-8")
+
+    result = CLI().tool_add("trial-1", selections=["1"])
+
+    assert result["status"] == "imported"
+    assert result["imported"][0]["tool"]["id"] == "python-stats"
+    assert (
+        tmp_path / "workspaces" / "trial-1" / "tools" / "python" / "python-stats"
+    ).is_dir()
+    state = yaml.safe_load(
+        (tmp_path / ".supermedicine" / "config.yaml").read_text(encoding="utf-8")
+    )["runtime_state"]
+    assert state["last_workspace_id"] == "trial-1"
+    assert state["last_tool_import"] == {
+        "workspace_id": "trial-1",
+        "tools": [
+            {"language": "python", "id": "python-stats", "name": "python-stats"}
+        ],
+    }
 
 
 def test_show_returns_manifest_details_and_entrypoint_path(tmp_path):
@@ -323,7 +488,7 @@ def test_cli_tool_run_uses_default_policy_and_writes_audit(tmp_path, monkeypatch
     _copy_default_policy(tmp_path)
     cli = CLI()
     cli.tool_init("trial-1")
-    cli.tool_add("trial-1", "python", "heatmap")
+    WorkspaceToolService(tmp_path).add_builtin_tool("trial-1", "python", "heatmap")
 
     result = cli.tool_run("trial-1", "python", "heatmap", dry_run=True)
 

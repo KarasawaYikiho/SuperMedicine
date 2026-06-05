@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import pytest
 import shutil
 import yaml
@@ -12,7 +13,12 @@ from core.experiment_guide import (
     ExperimentStatus,
     build_experiment_log_event,
 )
-from core.experiment_protocols import get_protocol, list_protocols
+from core.experiment_protocols import (
+    build_experiment_llm_context,
+    get_protocol,
+    list_protocols,
+    load_protocols,
+)
 from core.kernel import Kernel
 from permission.engine import PermissionEngine
 
@@ -39,6 +45,83 @@ def test_builtin_wb_protocol_is_available():
     protocol = get_protocol("wb")
     assert protocol.steps[0].step_id == "sample_preparation"
     assert protocol.steps[0].calculation_requests[0].kind == "normalization"
+
+
+def test_experiment_config_loader_scans_unified_directory_and_alias_switches(tmp_path):
+    config_dir = tmp_path / "plugins" / "experiments"
+    config_dir.mkdir(parents=True)
+    (config_dir / "cell_assay.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "protocol_id": "cell_assay",
+                "title": "Cell Assay",
+                "description": "Custom cell assay protocol",
+                "metadata": {"aliases": ["cell", "viability"]},
+                "steps": [
+                    {
+                        "step_id": "seed_cells",
+                        "title": "Seed cells",
+                        "instructions": "Record density and plate layout.",
+                        "input_fields": [
+                            {"name": "density", "label": "Density", "required": True}
+                        ],
+                        "expected_outputs": ["plate_map"],
+                    }
+                ],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    (config_dir / "qpcr.json").write_text(
+        json.dumps(
+            {
+                "protocol_id": "qpcr_basic",
+                "title": "qPCR Basic",
+                "description": "qPCR protocol",
+                "metadata": {"aliases": ["qpcr"]},
+                "steps": [
+                    {
+                        "step_id": "prepare_plate",
+                        "title": "Prepare plate",
+                        "instructions": "Record primers and template amount.",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    protocols, sources = load_protocols(config_dir)
+
+    assert sorted({protocol.protocol_id for protocol in protocols.values()}) == [
+        "cell_assay",
+        "qpcr_basic",
+    ]
+    assert protocols["cell"].protocol_id == "cell_assay"
+    assert protocols["viability"].steps[0].input_fields[0].name == "density"
+    assert protocols["qpcr"].protocol_id == "qpcr_basic"
+    assert sources["cell"] == config_dir / "cell_assay.yaml"
+
+
+def test_experiment_llm_context_reflects_selected_protocol_switch():
+    available = {protocol.protocol_id: protocol for protocol in list_protocols()}
+    assert "western_blot_basic" in available
+    assert "cell_culture_basic" in available
+
+    context = build_experiment_llm_context("cell_culture_basic")
+
+    assert context["selected_protocol"]["protocol_id"] == "cell_culture_basic"
+    assert context["selected_protocol"]["protocol_id"] != "western_blot_basic"
+    assert any(
+        item["protocol_id"] == "western_blot_basic"
+        for item in context["available_protocols"]
+    )
+    assert any(
+        item["protocol_id"] == "cell_culture_basic"
+        for item in context["available_protocols"]
+    )
+    assert "plugins/experiments/" in context["authoring_rules"]
 
 
 def test_create_experiment_session_and_read_current_step():

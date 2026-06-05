@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import pytest
 
 from core.config_center import (
     ConfigCenter,
     DEFAULT_EXPERIMENT_GUIDE_CONFIG,
     DEFAULT_LOG_REPORT_CONFIG,
 )
+from permission.access_mode import AccessDecisionStatus, FullAccessConfirmationRequired
 
 
 class TestConfigCenter:
@@ -340,3 +342,39 @@ class TestConfigCenter:
         )
         assert secret not in str(diagnostic)
         assert diagnostic["providers"]["openai"]["api_key"] == "[REDACTED]"
+
+    def test_file_access_policy_switches_runtime_without_restart_and_requires_full_confirmation(
+        self, tmp_path
+    ):
+        config_path = tmp_path / "config.yaml"
+        project_root = tmp_path / "project"
+        external_root = tmp_path / "external"
+        project_root.mkdir()
+        external_root.mkdir()
+        cc = ConfigCenter(config_path)
+
+        conservative = cc.get_file_access_policy(project_root)
+        project_decision = conservative.decide(project_root / "notes.md", "write")
+        external_read = conservative.decide(external_root / "data.csv", "read")
+        external_write = conservative.decide(external_root / "out.csv", "write")
+
+        assert project_decision.status == AccessDecisionStatus.ALLOWED
+        assert external_read.status == AccessDecisionStatus.PROMPT_REQUIRED
+        assert external_write.status == AccessDecisionStatus.DENIED
+        with pytest.raises(FullAccessConfirmationRequired):
+            cc.set_file_access_mode("full")
+
+        cc.authorize_external_file_access_directory(external_root)
+        authorized = cc.get_file_access_policy(project_root).decide(
+            external_root / "out.csv", "write"
+        )
+        cc.set_file_access_mode("full", explicit_confirmation=True)
+        full = cc.get_file_access_policy(project_root).decide(
+            tmp_path / "elsewhere" / "system.txt", "delete"
+        )
+
+        assert authorized.status == AccessDecisionStatus.ALLOWED
+        assert authorized.reason == "external_directory_explicitly_authorized"
+        assert full.status == AccessDecisionStatus.ALLOWED
+        assert "administrator" in full.helper.lower()
+        assert "will not silently" in full.helper

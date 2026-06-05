@@ -207,6 +207,84 @@ supermedicine llm list
 Workspace-scoped CLI commands do not silently reuse the TUI's recent workspace.
 CLI commands always require explicit `--workspace`.
 
+### 实验配置与 LLM 新增流程
+
+实验指导器配置统一保存在项目插件目录 `plugins/experiments/`，文件格式可为
+`.yaml`、`.yml` 或 `.json`。每个配置至少包含 `protocol_id`、`title`、
+`description` 和非空 `steps`；每个步骤至少包含唯一 `step_id` 与 `title`。
+可选字段包括 `version`、`metadata.aliases`、步骤 `instructions`、
+`input_fields`、`calculation_requests` 和 `expected_outputs`。启动或列出实验时，
+系统会扫描该目录内的 YAML/JSON 配置并按协议 ID/别名选择。
+
+让 LLM 新增实验配置时，不需要手写完整文件路径。先用
+`supermedicine experiment context --protocol <id-or-alias>` 查看当前会注入 LLM 的实验
+上下文和编写规则，然后把自然语言需求交给规范化写入入口：
+
+```bash
+supermedicine experiment add-config --instruction "细胞迁移实验：记录划痕、培养条件、拍照时间点和复核结果"
+```
+
+如果 LLM 已生成 JSON 对象，也可使用 `--config-json` 保存。保存前会校验 schema、
+协议 ID/别名冲突、安全文件名和目录可写性；默认不会覆盖同名配置，只有显式使用
+`--overwrite` 才允许覆盖。新增成功后，该实验会同步为后续 LLM 上下文的当前实验。
+详细格式见 [docs/experiment_config_authoring.md](docs/experiment_config_authoring.md)。
+
+### Python/R 工具编写、扫描与导入
+
+可被自动扫描的 Python/R 工具源码统一放在 `plugins/tools/<tool-directory>/`。
+每个工具目录需要 `tool.yaml` 清单和匹配语言的入口脚本 `runner.py` 或 `runner.R`
+（也可在 `tool.yaml` 的 `entrypoint` 指向同目录内其他相对脚本）。清单字段包括：
+`id`、`language`（`python` 或 `r`）、`name`、`description`、`entrypoint`、
+`dependencies`、`inputs`、`outputs` 和 `version`。导入到某个工作区后，工具会复制到
+`workspaces/<id>/tools/python/<tool-id>/` 或 `workspaces/<id>/tools/r/<tool-id>/`，并写入
+规范化后的 `tool.yaml`。
+
+让 LLM 编写工具时，请直接要求它“在 `plugins/tools/<tool-directory>/` 下生成
+`tool.yaml` 与 `runner.py`/`runner.R`，输入输出路径保持在工作区内，依赖写入
+`dependencies`，不要嵌入密钥或未授权网络访问”。Kernel 会向 LLM 注入与扫描器一致的
+工具编写规范。更完整的字段、错误处理和安全边界见
+[docs/tool_authoring.md](docs/tool_authoring.md)。
+
+用户导入工具不需要事先知道工具 ID：
+
+```bash
+supermedicine tool scan --language python
+supermedicine tool add --workspace demo --select 1
+```
+
+`tool scan` 会自动扫描 `plugins/tools/*`，读取 `tool.yaml`（仅在缺失时回退读取
+`plugin.yaml` 并给出警告），校验语言、入口脚本、依赖/输入/输出列表等格式，然后显示
+带编号的候选列表。`tool add` 可用候选编号或扫描结果显示的 `language/id` 选择导入；
+不提供 `--select` 时会返回可选候选列表。TUI“工具管理”页同样先点“扫描候选”，在表格中
+选择候选行后点“添加工具”，无需输入或记忆工具 ID。真实工具运行仍只准备受保护调用，
+并受权限策略、沙箱与审计约束。
+
+### 权限模式、风险与切换入口
+
+文件访问权限模式保存在 `.supermedicine/config.yaml` 的统一配置中，CLI、TUI 与后续
+权限策略读取同一状态；切换后后续策略读取即时生效。
+
+| 模式 | 行为 | 风险/限制 |
+|------|------|-----------|
+| 保守模式（`conservative`，也接受 `sandbox`/`safe` 别名） | 默认模式。允许项目内路径；项目外只读通常需要提示；项目外写入、删除、执行默认拒绝。可用外部授权目录放行特定目录。 | 最适合日常使用，能降低误删、越界读取和未授权执行风险。 |
+| 完全访问（`full`） | 放宽 SuperMedicine 自身的文件访问限制，但仍只使用当前进程/当前用户已经拥有的系统权限。 | 高风险：可能访问或修改更大范围文件。它不会静默提权、不会绕过操作系统权限；系统权限不足时仍需管理员身份、UAC 或操作系统安全提示显式授权。切换必须显式确认。 |
+
+CLI 入口：
+
+```bash
+supermedicine permission status
+supermedicine permission roots
+supermedicine permission authorize C:\path\to\allowed-dir
+supermedicine permission revoke C:\path\to\allowed-dir
+supermedicine permission mode conservative
+supermedicine permission mode full --confirm-full
+```
+
+交互终端中未提供 `--confirm-full` 时，切换到 full 会要求输入 `FULL`；自动化场景可加
+`--no-interactive`，此时切换 full 必须同时提供 `--confirm-full`。TUI 入口为侧边栏
+“P 🛡️ 权限模式”或全局快捷键 `p`：可查看当前模式、风险提示、外部授权目录，切换 full
+同样必须在确认输入框输入 `FULL`。
+
 ## TUI（中文终端工作台）
 
 启动方式：
@@ -221,20 +299,16 @@ supermedicine tui --dry-run
 TUI 读取当前项目目录下的 `.supermedicine`、`workspaces/`、`plugins/` 等本地状态；CLI
 仍然不会隐式复用 TUI 最近工作区，脚本命令需要显式传入 `--workspace`。
 
+按 `m` 可呼出左上角主菜单，在“选择视图”子菜单中列出并切换可用视图；同一菜单保留 `Change Theme` 主题切换入口。视图也可在侧边栏通过方向键选择并按 `Enter` 激活。数字键 `1-0` 不作为直接切换视图快捷键，焦点在输入栏时会作为普通输入处理。按 `p` 可直接进入“权限模式”视图。
+
+对话输入栏中 `Backspace`、`Ctrl+H` 和常见 DEL/退格控制字节会交给输入组件执行删除，不再被终端控制序列过滤或全局快捷键吞掉；数字、普通文本和中文输入也会保留为普通输入。按 `m` 时仍会打开菜单，不会插入到输入框。
+
 全局快捷键：
 
-| Key | Screen |
+| Key | Action |
 |-----|--------|
-| `1` | Chat / 对话 |
-| `2` | Dashboard / 仪表盘 |
-| `3` | Workspace / 工作区管理 |
-| `4` | Paper / 论文管理 |
-| `5` | Experience / 经验学习 |
-| `6` | Tool / 工具管理 |
-| `7` | Dialog / 对话历史 |
-| `8` | LLM / LLM 管理 |
-| `9` | Experiment Guide / 实验指导器 |
-| `0` | Log Report / Log 报告 |
+| `m` | 打开主菜单，可进入“选择视图”子菜单或 `Change Theme` |
+| `p` | 打开权限模式视图，查看/切换访问模式与外部授权目录 |
 | `f` | 最大化/还原当前焦点组件 |
 | `Esc` | 退出最大化 |
 | `?` | 打开快捷键帮助 |
@@ -255,7 +329,7 @@ TUI 读取当前项目目录下的 `.supermedicine`、`workspaces/`、`plugins/`
 | 工具管理 | 初始化工作区 Python/R 工具目录，添加或查看工具模板 | 真实工具运行仍受权限、沙箱与审计边界约束。 |
 | 对话历史 | 查看审计友好的对话事件摘要 | 展示前会隐藏敏感内容。 |
 | LLM 管理 | 添加/更新、切换、查看 Provider | 状态栏和通知不会显示 API Key。 |
-| 实验指导器 | 按步骤记录 WB 实验辅助信息并可计算试剂用量 | 仅供科研记录与实验辅助，保存日志前会脱敏。 |
+| 实验指导器 | 按已选择的实验配置逐步记录实验辅助信息；WB 只是普通配置示例之一，支持切换到其他实验配置 | 仅供科研记录与实验辅助，保存日志前会脱敏。 |
 | Log 报告 | 保存、列出和查看脱敏日志报告 | 敏感信息会在保存和展示前自动脱敏。 |
 
 Status Cues include workspace count and current focus on the left, plugin count,

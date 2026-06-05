@@ -28,9 +28,9 @@ class CapturingChatView(ChatView):
 def test_chat_messages_are_escaped_redacted_and_stably_prefixed():
     view = CapturingChatView()
 
-    view.add_user_message("<ask> [bold] api_key=sk-secret123456789")
+    turn_id = view.add_user_message("<ask> [bold] api_key=sk-secret123456789")
     view.add_system_message("系统 [red] <notice>")
-    view.add_assistant_message("结果 [green] <ok> Bearer abc.def.ghi")
+    view.add_assistant_message("结果 [green] <ok> Bearer abc.def.ghi", turn_id=turn_id)
     view.add_error_message("失败 password=p@ssword [blink]")
     rendered = "\n".join(view.output.lines)
 
@@ -46,6 +46,8 @@ def test_chat_messages_are_escaped_redacted_and_stably_prefixed():
     assert "p@ssword" not in rendered
     assert "Bearer abc" not in rendered
     assert t("chat_error_action") in rendered
+    assert f"{t('chat_user_label')} #1" in rendered
+    assert f"{t('chat_assistant_label')} #1" in rendered
 
 
 def test_chat_status_message_uses_status_prefix_and_escaping():
@@ -132,7 +134,7 @@ def test_run_kernel_task_emits_running_completion_and_formatted_messages(
         def add_status_message(self, message: str) -> None:
             events.append(("status", message))
 
-        def add_assistant_message(self, message: str) -> None:
+        def add_assistant_message(self, message: str, turn_id: int | None = None) -> None:
             events.append(("assistant", message))
 
         def add_error_message(self, message: str) -> None:
@@ -142,7 +144,14 @@ def test_run_kernel_task_emits_running_completion_and_formatted_messages(
         def __init__(self, *args, **kwargs):
             pass
 
-        def execute_task(self, message: str):
+        def execute_task(self, message: str, progress_callback=None):
+            if progress_callback:
+                progress_callback(
+                    {
+                        "kind": "reasoning",
+                        "message": "模型正在处理请求；当前 Provider 未暴露完整思考内容，仅显示合规处理进度。",
+                    }
+                )
             return {"status": "success", "output": ["ok"]}
 
     monkeypatch.setattr("core.kernel.Kernel", FakeKernel)
@@ -151,7 +160,7 @@ def test_run_kernel_task_emits_running_completion_and_formatted_messages(
 
     import asyncio
 
-    asyncio.run(app._run_kernel_task("hello", FakeChat()))
+    asyncio.run(app._run_kernel_task("hello", FakeChat(), turn_id=1))
 
     assert events[0] == ("system", t("thinking"))
     assert ("status", t("chat_running")) in events
@@ -161,6 +170,24 @@ def test_run_kernel_task_emits_running_completion_and_formatted_messages(
     )
     assert events[-1] == ("status", t("chat_completed"))
     assert app._task_running is False
+
+
+def test_chat_streaming_methods_keep_assistant_turn_and_append_safe_deltas():
+    view = CapturingChatView()
+    turn_id = view.add_user_message("hello")
+
+    view.begin_assistant_message(turn_id)
+    view.append_assistant_delta("delta [bold] <x> token=secret")
+    view.add_reasoning_status("模型正在处理请求；当前 Provider 未暴露完整思考内容，仅显示合规处理进度。")
+    rendered = "\n".join(view.output.lines)
+
+    assert f"{t('chat_user_label')} #1" in rendered
+    assert f"{t('chat_assistant_label')} #1" in rendered
+    assert "delta" in rendered
+    assert "\\[bold]" in rendered
+    assert "&lt;x&gt;" in rendered
+    assert "secret" not in rendered
+    assert "推理状态" in rendered
 
 
 def test_safe_display_text_escapes_markup_and_redacts_secrets():

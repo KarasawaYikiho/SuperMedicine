@@ -1,0 +1,84 @@
+protocol_id: western_blot_basic
+title: Western Blot 基础流程
+description: Western Blot 实验指导骨架，用于逐步记录样本、转膜、封闭、孵育、显影与分析信息。
+version: "1.0"
+metadata:
+  category: WB
+  aliases:
+    - wb
+steps:
+  - step_id: sample_preparation
+    title: 样本准备
+    instructions: 记录样本来源、目标蛋白和上样相关信息。
+    input_fields:
+      - name: sample_id
+        label: 样本编号
+        required: true
+      - name: target_protein
+        label: 目标蛋白
+        required: true
+      - name: notes
+        label: 样本备注
+    calculation_requests:
+      - request_id: protein_loading_normalization
+        kind: normalization
+        description: 预留蛋白上样量归一化计算请求。
+        plugin_name: experiment-wb
+        action: experiment.wb.normalize_loading
+    expected_outputs:
+      - sample_record
+  - step_id: gel_electrophoresis
+    title: 凝胶电泳
+    instructions: 记录凝胶类型、电泳条件和观察到的迁移情况。
+    input_fields:
+      - name: gel_percentage
+        label: 凝胶浓度
+      - name: run_condition
+        label: 电泳条件
+    expected_outputs:
+      - electrophoresis_record
+  - step_id: transfer
+    title: 转膜
+    instructions: 记录膜类型、转膜条件以及转膜质量观察。
+    input_fields:
+      - name: membrane_type
+        label: 膜类型
+      - name: transfer_condition
+        label: 转膜条件
+    expected_outputs:
+      - transfer_record
+  - step_id: blocking_and_antibody
+    title: 封闭与抗体孵育
+    instructions: 记录封闭条件、一抗/二抗信息和孵育条件。
+    input_fields:
+      - name: blocking_buffer
+        label: 封闭液
+      - name: primary_antibody
+        label: 一抗信息
+        required: true
+      - name: secondary_antibody
+        label: 二抗信息
+    calculation_requests:
+      - request_id: antibody_dilution
+        kind: dilution
+        description: 预留抗体稀释计算请求。
+        plugin_name: experiment-wb
+        action: experiment.wb.antibody_dilution
+    expected_outputs:
+      - antibody_incubation_record
+  - step_id: detection_and_analysis
+    title: 显影与分析
+    instructions: 记录显影方式、图像文件、条带观察和定量分析输出。
+    input_fields:
+      - name: detection_method
+        label: 显影方式
+      - name: image_reference
+        label: 图像或文件引用
+      - name: analysis_notes
+        label: 分析备注
+    calculation_requests:
+      - request_id: band_intensity_analysis
+        kind: analysis
+        description: 预留条带灰度/强度分析请求。
+    expected_outputs:
+      - analysis_record
