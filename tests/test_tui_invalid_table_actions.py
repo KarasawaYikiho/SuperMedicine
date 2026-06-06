@@ -65,7 +65,13 @@ def test_tool_run_on_empty_table_shows_red_error_without_exiting_tui(tmp_path):
             assert table.row_count == 0
 
             await pilot.click("#tool-run")
-            await pilot.pause()
+            await _wait_for_tui_condition(
+                pilot,
+                lambda: t("error")
+                in _static_text(view.query_one("#tool-status", Static))
+                and t("tool_no_tools")
+                in _static_text(view.query_one("#tool-status", Static)),
+            )
 
             assert app._current_view == "tool"
             assert app._views["tool"].display is True
