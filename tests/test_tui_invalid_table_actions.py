@@ -26,6 +26,18 @@ def _assert_red_error_with_reason(status: Static, reason: str) -> None:
     )
 
 
+def _assert_tool_empty_run_error(status: Static) -> None:
+    rendered = _static_text(status)
+    has_class = getattr(status, "has_class", None)
+    classes = {str(class_name) for class_name in getattr(status, "classes", set())}
+
+    assert t("error") in rendered
+    assert t("tool_no_tools") in rendered
+    assert "status-error" in classes or (
+        callable(has_class) and has_class("status-error")
+    )
+
+
 def test_tool_run_on_empty_table_shows_red_error_without_exiting_tui(tmp_path):
     WorkspaceManager(tmp_path).initialize_workspace("study-a")
 
@@ -47,9 +59,11 @@ def test_tool_run_on_empty_table_shows_red_error_without_exiting_tui(tmp_path):
             assert app._current_view == "tool"
             assert app._views["tool"].display is True
             assert app.query_one("#prompt-input", Input) is not None
-            _assert_red_error_with_reason(
-                view.query_one("#tool-status", Static), t("tool_no_tools")
-            )
+            _assert_tool_empty_run_error(view.query_one("#tool-status", Static))
+
+            view._load_tools()
+            await pilot.pause()
+            _assert_tool_empty_run_error(view.query_one("#tool-status", Static))
 
     asyncio.run(scenario())
 
