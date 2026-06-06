@@ -345,7 +345,7 @@ class ViewSelectMenuScreen(ModalScreen[str | None]):
             self.dismiss(event.item.view_id)
 
 
-class MainMenuScreen(ModalScreen[None]):
+class MainMenuScreen(ModalScreen[str | None]):
     """Main menu opened by a single key, matching Textual theme-menu access."""
 
     BINDINGS = [Binding("escape", "dismiss", t("menu_close"), show=False)]
@@ -378,10 +378,7 @@ class MainMenuScreen(ModalScreen[None]):
     def _handle_view_menu_result(self, result: str | None) -> None:
         if result is None:
             return
-        app = cast("SuperMedicineTUI", self.app)
-        view_id = result
-        self.dismiss(None)
-        app.call_after_refresh(lambda: app.action_switch_view(view_id))
+        self.dismiss(result)
 
 
 class PromptInput(Input):
@@ -823,7 +820,14 @@ class SuperMedicineTUI(App[Any]):
 
     def action_open_menu(self) -> None:
         """Open the main TUI menu."""
-        self.push_screen(MainMenuScreen())
+        self.push_screen(MainMenuScreen(), self._handle_main_menu_result)
+
+    def _handle_main_menu_result(self, result: str | None) -> None:
+        """Apply a completed main-menu selection after modal dismissal."""
+
+        if result is None:
+            return
+        self.action_switch_view(result)
 
     def _update_view_title(self, view_id: str) -> None:
         """Update the view title bar."""

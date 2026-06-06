@@ -152,6 +152,8 @@ class ToolView(Vertical):
         return None
 
     def _load_tools(self, *, refreshed: bool = False) -> None:
+        if self._table_mode == "candidates" and not refreshed:
+            return
         self._table_mode = "workspace"
         workspace_id = self._get_selected_workspace()
         table = self.query_one("#tool-table", DataTable)

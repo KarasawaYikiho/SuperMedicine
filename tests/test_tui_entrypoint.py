@@ -6,10 +6,10 @@ import re
 from pathlib import Path
 from typing import cast
 
-from textual.widgets import ListView, Static
+from textual.widgets import Input, ListView, Static
 
 from Cli import CLI, main
-from core.tui.app import STATUS_STYLE_CLASSES, SuperMedicineTUI, launch_tui
+from core.tui.app import PromptInput, STATUS_STYLE_CLASSES, SuperMedicineTUI, launch_tui
 from core.tui.i18n import LABELS, t
 
 
@@ -384,11 +384,13 @@ def test_tui_menu_binding_opens_view_submenu_and_theme_entry(tmp_path, menu_key)
     async def scenario() -> None:
         app = SuperMedicineTUI(project_root=tmp_path)
         async with app.run_test(size=(140, 45)) as pilot:
-            assert app.query_one("#prompt-input").has_focus
+            prompt = app.query_one("#prompt-input", Input)
+            assert prompt.has_focus
 
             await pilot.press(menu_key)
             await pilot.pause()
 
+            assert prompt.value == ""
             assert app.screen.query_one("#tui-main-menu-list", ListView)
             menu_text = "\n".join(
                 str(cast(Static, static).renderable)
@@ -409,5 +411,23 @@ def test_tui_menu_binding_opens_view_submenu_and_theme_entry(tmp_path, menu_key)
             await pilot.press("down", "enter")
             await pilot.pause()
             assert app._current_view == "dashboard"
+            assert app.view_title_text(app._current_view) == "仪表盘"
 
     asyncio.run(scenario())
+
+
+@pytest.mark.parametrize(
+    ("key", "char"),
+    [
+        ("m", "m"),
+        ("shift+m", "M"),
+        ("M", "M"),
+    ],
+)
+def test_prompt_input_treats_m_and_shift_m_as_menu_key(key, char):
+    class KeyEvent:
+        def __init__(self, key: str, character: str) -> None:
+            self.key = key
+            self.character = character
+
+    assert PromptInput()._is_menu_key(KeyEvent(key, char))
