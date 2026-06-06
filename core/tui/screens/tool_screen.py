@@ -22,6 +22,7 @@ class ToolView(Vertical):
         self._project_root = Path(project_root) if project_root else Path.cwd()
         self._table_mode = "workspace"
         self._tool_run_empty_error_active = False
+        self._tool_run_empty_error_workspace_id: str | None = None
         self._self_evolution_last_request: dict[str, Any] | None = None
         self._self_evolution_last_result: dict[str, Any] | None = None
 
@@ -161,6 +162,8 @@ class ToolView(Vertical):
         table.clear(columns=True)
         table.add_columns(t("tool_language"), "ID", "名称", t("dashboard_status"))
         if not workspace_id:
+            self._tool_run_empty_error_active = False
+            self._tool_run_empty_error_workspace_id = None
             self._set_status(
                 f"{t('tool_refreshed')}：{t('paper_select_workspace')}"
                 if refreshed
@@ -185,17 +188,24 @@ class ToolView(Vertical):
         if tool_count == 0:
             if refreshed:
                 self._tool_run_empty_error_active = False
+                self._tool_run_empty_error_workspace_id = None
                 self._set_status(
                     f"{t('tool_refreshed')}：{t('tool_no_tools')}"
                 )
                 return
-            if self._tool_run_empty_error_active:
+            if (
+                self._tool_run_empty_error_active
+                and self._tool_run_empty_error_workspace_id == workspace_id
+            ):
                 return
+            self._tool_run_empty_error_active = False
+            self._tool_run_empty_error_workspace_id = None
             self._set_status(
                 t("tool_no_tools")
             )
             return
         self._tool_run_empty_error_active = False
+        self._tool_run_empty_error_workspace_id = None
         self._set_status(
             f"{t('tool_refreshed')}: {tool_count}"
             if refreshed
@@ -259,7 +269,13 @@ class ToolView(Vertical):
         if event.select.id == "tool-workspace-select":
             if self._table_mode == "candidates":
                 return
-            self._tool_run_empty_error_active = False
+            workspace_id = self._get_selected_workspace()
+            if not (
+                self._tool_run_empty_error_active
+                and self._tool_run_empty_error_workspace_id == workspace_id
+            ):
+                self._tool_run_empty_error_active = False
+                self._tool_run_empty_error_workspace_id = None
             self._load_tools()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -273,6 +289,7 @@ class ToolView(Vertical):
             self._run_tool()
         elif event.button.id == "tool-refresh":
             self._tool_run_empty_error_active = False
+            self._tool_run_empty_error_workspace_id = None
             self._load_tools(refreshed=True)
         elif event.button.id == "self-evolution-use-current-permission":
             self._sync_self_evolution_permission_mode(show_status=True)
@@ -294,6 +311,7 @@ class ToolView(Vertical):
         (tools_dir / "python").mkdir(exist_ok=True)
         (tools_dir / "r").mkdir(exist_ok=True)
         self._tool_run_empty_error_active = False
+        self._tool_run_empty_error_workspace_id = None
         self._set_status(t("tool_initialized"))
         self.app.notify(t("tool_initialized"))
         self._load_tools()
@@ -366,6 +384,7 @@ class ToolView(Vertical):
             return
         if table.row_count == 0:
             self._tool_run_empty_error_active = True
+            self._tool_run_empty_error_workspace_id = self._get_selected_workspace()
             self._set_status(f"{t('error')}: {t('tool_no_tools')}")
             return
         if (

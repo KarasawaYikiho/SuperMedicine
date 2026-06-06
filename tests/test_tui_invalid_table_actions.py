@@ -72,6 +72,16 @@ def test_tool_run_on_empty_table_shows_red_error_without_exiting_tui(tmp_path):
             assert app.query_one("#prompt-input", Input) is not None
             _assert_tool_empty_run_error(view.query_one("#tool-status", Static))
 
+            select = view.query_one("#tool-workspace-select", Select)
+            stale_same_workspace_event = type(
+                "StaleSelectChangedEvent",
+                (),
+                {"select": select},
+            )()
+            view.on_select_changed(stale_same_workspace_event)
+            await pilot.pause()
+            _assert_tool_empty_run_error(view.query_one("#tool-status", Static))
+
             view._load_tools()
             await pilot.pause()
             _assert_tool_empty_run_error(view.query_one("#tool-status", Static))
