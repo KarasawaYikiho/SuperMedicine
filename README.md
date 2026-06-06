@@ -45,6 +45,9 @@ CLI、Kernel、插件系统和中文 TUI 运行，不依赖 OpenCode、Claude Co
   OpenRouter plus custom compatible providers by API format.
 - **Research Workspaces** — explicit workspace ids, copy-only paper import,
   user-confirmed experience records, and local tool templates.
+- **Self-Evolution Preview and Safe Artifact Generation** — CLI/TUI entry points
+  can draft Markdown, Python-tool, or R-tool artifacts, then write only after
+  explicit confirmation and permission/path checks.
 - **Chinese TUI** — Textual-based terminal interface for chat, dashboard,
   workspace, paper, experience, tool, dialog history, LLM, experiment guide, and
   log report screens.
@@ -202,11 +205,47 @@ supermedicine experience suggest --workspace demo --summary "Keep prompts short"
 supermedicine tool init --workspace demo
 supermedicine experiment start --protocol wb --session-id wb-demo
 supermedicine log list
+supermedicine log location
+supermedicine log follow --session-id wb-demo --interval 1 --max-entries 20
 supermedicine llm list
 ```
 
 Workspace-scoped CLI commands do not silently reuse the TUI's recent workspace.
 CLI commands always require explicit `--workspace`.
+
+### 自进化：预览、确认写入与安全边界
+
+`self-evolve`（别名 `self-evolution`）用于根据用户指令生成受限的自进化产物。
+默认行为是 **预览**，不会写入文件；只有同时关闭预览并显式确认写入时才会创建或修改
+允许范围内的文件。支持产物类型包括 Markdown 计划、Python 工具和 R 工具。
+
+```bash
+# 仅预览，不写文件
+supermedicine self-evolve \
+  --instruction "生成一个数据清洗工具说明" \
+  --target-type markdown \
+  --output generated/self-evolution.md
+
+# 确认写入项目内安全生成目录
+supermedicine self-evolve \
+  --instruction "生成一个 CSV 列名检查 Python 工具" \
+  --target-type python_tool \
+  --output tools/generated/csv-column-checker \
+  --no-preview \
+  --confirm-write
+```
+
+自进化的默认 `sandbox` 模式只允许项目内 `self_evolution/`、`generated/` 和
+`tools/generated/` 等安全生成根目录；`conservative` 会继续遵守项目内/外部授权目录
+规则；`full` 必须同时提供 `--confirm-full-access` 与 `--acknowledge-risk`，并且只使用
+当前用户/进程已经拥有的操作系统权限，不会静默提权或绕过 UAC/管理员限制。
+目标路径不得写入 `Docs/`、`docs/`、`REQUIREMENTS_TRACEABILITY.md` 等工程专用文档位置。
+覆盖已有文件需要额外传入 `--overwrite`。
+
+TUI 入口在“工具管理”页的“自进化入口”区域：先填写指令、选择产物类型和访问模式，点击
+“生成预览”；确认无误后，普通写入在确认框输入 `WRITE`，full 模式输入 `FULL WRITE`。
+普通对话框、日志内容和自进化指令都不是密钥输入位置，请不要粘贴真实 API Key、token、
+患者标识或其他敏感资料。
 
 ### 实验配置与 LLM 新增流程
 
@@ -289,6 +328,9 @@ supermedicine permission mode full --confirm-full
 “P 🛡️ 权限模式”或全局快捷键 `p`：可查看当前模式、风险提示、外部授权目录，切换 full
 同样必须在确认输入框输入 `FULL`。
 
+自进化命令的 `--access-mode` 与这里的权限语义一致，但自进化写入还会额外执行产物类型、
+输出根目录、覆盖和禁止工程文档路径检查。full 模式不会获得超过当前 OS 用户/进程的能力。
+
 ## TUI（中文终端工作台）
 
 启动方式：
@@ -335,6 +377,11 @@ TUI 读取当前项目目录下的 `.supermedicine`、`workspaces/`、`plugins/`
 | LLM 管理 | 添加/更新、切换、查看 Provider | 状态栏和通知不会显示 API Key。 |
 | 实验指导器 | 按已选择的实验配置逐步记录实验辅助信息；WB 只是普通配置示例之一，支持切换到其他实验配置 | 仅供科研记录与实验辅助，保存日志前会脱敏。 |
 | Log 报告 | 保存、列出和查看脱敏日志报告 | 敏感信息会在保存和展示前自动脱敏。 |
+
+“工具管理”页还包含自进化入口，可在同一界面预览并确认写入 Markdown/Python/R 产物。
+“Log 报告”页会显示当前日志存储位置，并定时刷新列表；默认开启“自动跟随”，新日志出现时
+列表会滚动到最新记录。手动选择历史行会关闭自动跟随，点击“自动跟随”按钮可重新开启；
+“刷新”按钮会立即重新读取日志列表。
 
 Status Cues include workspace count and current focus on the left, plugin count,
 LLM status, and task running state in the center, and current view/version on the
@@ -397,13 +444,31 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the root architecture reference.
   source code, does not require external assistant runtimes for the standalone
   core, and documents any optional adapter boundary before claiming support.
 - Additional release-scope safety notes are in
-  [SECURITY_HARDENING_CHECKLIST.md](SECURITY_HARDENING_CHECKLIST.md) and external
-  reference boundaries are in [EXTERNAL_PROJECT_ANALYSIS.md](EXTERNAL_PROJECT_ANALYSIS.md).
+  [SECURITY_HARDENING_CHECKLIST.md](SECURITY_HARDENING_CHECKLIST.md), and
+  maintainer-facing repository reading boundaries are in
+  [Architecture/MaintainerRepositoryReading.md](Architecture/MaintainerRepositoryReading.md).
 
 ## Diagnostics and Troubleshooting
 
 Use `supermedicine diagnose` for secret-safe status, provider readiness, audit log
 path checks, and repair suggestions.
+
+Log reports are stored project-locally under `.supermedicine/logs/` by default;
+permission audit records are stored under `.supermedicine/policies/audit.jsonl`.
+Use these commands to display redacted storage paths or follow recent redacted log
+content from the terminal:
+
+```bash
+supermedicine log location
+supermedicine log location --session-id wb-demo
+supermedicine log follow --session-id wb-demo --interval 1 --max-entries 20
+supermedicine log follow --file session-wb-demo.json --once
+```
+
+`log follow` prints the current storage file/directory, refresh interval, line
+limits, and redacted log lines. It runs until `Ctrl+C` unless you pass `--once` or
+an iteration limit for automation. The TUI Log page provides equivalent refresh and
+auto-follow behavior for interactive use.
 
 Common Fixes:
 
@@ -416,6 +481,8 @@ Common Fixes:
 | LLM call fails | Treat it as a real provider/configuration error; run diagnostics and inspect redacted fields. |
 | TUI launch issue | Run `supermedicine tui --dry-run`, then restart the terminal if needed. |
 | TUI 操作无响应 | 确认焦点位置，先用 `Tab`/`Shift+Tab` 移动焦点；管理页按钮和列表需要 `Enter` 激活。 |
+| 自进化没有写文件 | 默认是预览；写入需要 `--no-preview --confirm-write`，目标路径必须在允许生成目录内，full 模式还需要 `--confirm-full-access --acknowledge-risk`。 |
+| Log 页面不滚动到最新 | 检查“自动跟随”是否为开；手动浏览历史行会关闭自动跟随，可点击按钮重新开启或按“刷新”重新读取列表。 |
 | 论文在线补全失败 | 检查是否选择工作区、输入论文 ID 并显式确认；该操作可能受网络/API/权限策略限制。 |
 | 桌面 Exe 未出现 | 确认已提供 `--release-exe`，源 Exe 存在，目标未因已存在而跳过；必要时加 `--exe-overwrite` 或先用 `--exe-dry-run` 查看目标路径。 |
 | Exe 释放失败 | 检查发布包是否包含 `dist/SuperMedicine.exe`（或本地 `Dist/SuperMedicine.exe`/根目录 `SuperMedicine.exe`）、`--desktop-dir` 是否可写、`--exe-target-name` 是否为安全文件名，以及杀毒/权限策略是否阻止复制。 |

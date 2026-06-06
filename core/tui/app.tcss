@@ -251,6 +251,7 @@ Footer {
 #paper-table,
 #exp-table,
 #tool-table,
+#self-evolution-files-table,
 #llm-table,
 #dialog-table,
 #log-table {
@@ -261,6 +262,10 @@ Footer {
 
 #log-table {
     min-height: 8;
+}
+
+#log-auto-follow {
+    min-width: 14;
 }
 
 DataTable:focus {
@@ -288,6 +293,9 @@ Select {
 #paper-status,
 #exp-status,
 #tool-status,
+#self-evolution-status,
+#self-evolution-preview-content,
+#self-evolution-audit-result,
 #llm-status,
 #dialog-status,
 #log-status,
@@ -305,6 +313,17 @@ Select {
     overflow-y: auto;
     border: round $primary 35%;
     margin: 1 0 0 0;
+}
+
+#self-evolution-preview-content {
+    max-height: 16;
+    overflow-y: auto;
+    border: round $primary 35%;
+    margin: 1 0 0 0;
+}
+
+#self-evolution-audit-result {
+    color: $accent;
 }
 
 .status-info {

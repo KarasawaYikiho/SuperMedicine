@@ -8,6 +8,7 @@ import json
 import logging
 import shutil
 import sys
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -637,15 +638,68 @@ class CLI:
         _log_json(result)
         return result
 
+    def self_evolve(
+        self,
+        *,
+        instruction: str,
+        artifact_type: str,
+        output: str | Path,
+        access_mode: str = "sandbox",
+        experience_source: str | None = None,
+        workspace: str | None = None,
+        preview: bool = True,
+        confirm_write: bool = False,
+        overwrite: bool = False,
+        confirm_full_access: bool = False,
+        acknowledge_risk: bool = False,
+    ) -> dict[str, Any]:
+        """Generate a self-evolution preview or confirmed artifact write."""
+        from core.self_evolution import SelfEvolutionService
+        from permission.audit import AuditLogger
+
+        project_dir = Path.cwd()
+        confirmed = bool(confirm_write and not preview)
+        audit_log = project_dir / ".supermedicine" / "policies" / "audit.jsonl"
+        audit_logger = AuditLogger(audit_log) if confirmed else None
+
+        result = SelfEvolutionService(project_dir).generate(
+            user_intent=instruction,
+            artifact_type=artifact_type,
+            output_path=output,
+            access_mode=access_mode,
+            experience_source=experience_source,
+            workspace_id=workspace,
+            confirmed=confirmed,
+            overwrite=overwrite,
+            audit_logger=audit_logger,
+            full_access_confirmed=confirm_full_access,
+            risk_notice_acknowledged=acknowledge_risk,
+            metadata={"cli_command": "self-evolve"},
+        )
+        cli_result = _self_evolution_cli_result(
+            result,
+            requested_access_mode=access_mode,
+            requested_output=output,
+            audit_log=audit_log,
+            preview=not confirmed,
+            confirm_write=confirm_write,
+            confirm_full_access=confirm_full_access,
+            acknowledge_risk=acknowledge_risk,
+        )
+        _log_json(cli_result)
+        return cli_result
+
     def diagnose(self) -> dict:
         """Print secret-safe diagnostics for config, LLM, install artifacts, and audit log."""
         from core.config_center import ConfigCenter
         from core.llm_manager import LLMConfigManager
+        from core.log_report import resolve_log_storage_locations
 
         project_dir = Path.cwd()
         config = ConfigCenter(project_dir / ".supermedicine" / "config.yaml")
         manager = LLMConfigManager(config, restore_on_startup=False)
-        audit_log = project_dir / ".supermedicine" / "policies" / "audit.jsonl"
+        storage_locations = resolve_log_storage_locations(project_dir)
+        audit_log = storage_locations.audit_file
         config_diag: dict[str, Any] = config.diagnostics()
         llm_diag: dict[str, Any] = manager.diagnostics()
         result: dict[str, Any] = {
@@ -659,6 +713,7 @@ class CLI:
                 "exists": audit_log.exists(),
                 "writable_parent": audit_log.parent.exists(),
             },
+            "log_storage": storage_locations.to_dict(),
             "commands": {
                 "init": "set provider API key env var first, then run: supermedicine init --provider <name> --base-url <url> --model <model>",
                 "llm_list": "supermedicine llm list",
@@ -1178,6 +1233,89 @@ class CLI:
         _log_json(result)
         return result
 
+    def log_location(
+        self, *, file_name: str | None = None, session_id: str | None = None
+    ) -> dict:
+        """Show redacted log/report/audit storage locations."""
+        from core.log_report import LogReportStore
+
+        result = LogReportStore(Path.cwd()).storage_info(
+            file_name=file_name, session_id=session_id
+        )
+        _log_json(result)
+        return result
+
+    def log_follow(
+        self,
+        *,
+        file_name: str | None = None,
+        session_id: str | None = None,
+        interval: float = 1.0,
+        max_entries: int = 50,
+        max_lines: int | None = None,
+        iterations: int | None = None,
+        once: bool = False,
+        no_clear: bool = False,
+    ) -> dict:
+        """Show a realtime/tail-style redacted log view with test-safe exit controls."""
+        from core.log_report import LogReportError, LogReportStore
+
+        if file_name and session_id:
+            raise ValueError("log follow accepts either --file or --session-id, not both")
+        try:
+            refresh_interval = float(interval)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("--interval must be a non-negative number") from exc
+        if refresh_interval < 0:
+            raise ValueError("--interval must be a non-negative number")
+        if once:
+            iterations = 1
+        if iterations is not None:
+            try:
+                iterations = int(iterations)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("--iterations must be a positive integer") from exc
+            if iterations <= 0:
+                raise ValueError("--iterations must be a positive integer")
+
+        store = LogReportStore(Path.cwd())
+        rendered_snapshots = 0
+        latest: dict[str, Any] | None = None
+        while iterations is None or rendered_snapshots < iterations:
+            try:
+                latest = store.follow_snapshot(
+                    file_name=file_name,
+                    session_id=session_id,
+                    max_entries=max_entries,
+                    max_lines=max_lines,
+                )
+            except LogReportError:
+                raise
+            if rendered_snapshots and not no_clear:
+                logger.info("-" * 40)
+            logger.info(
+                "Log storage: %s",
+                latest.get("storage", {}).get("current_log_file")
+                or latest.get("storage", {}).get("log_dir"),
+            )
+            logger.info(
+                "Follow: interval=%ss max_entries=%s max_lines=%s exit=Ctrl+C",
+                refresh_interval,
+                latest.get("max_entries"),
+                latest.get("max_lines") or "unlimited",
+            )
+            for line in latest.get("lines", []):
+                logger.info("%s", redact_sensitive(str(line)))
+            rendered_snapshots += 1
+            if iterations is not None and rendered_snapshots >= iterations:
+                break
+            time.sleep(refresh_interval)
+        result = dict(latest or {})
+        result["refresh_interval"] = refresh_interval
+        result["iterations"] = rendered_snapshots
+        result["exit_mode"] = "iterations" if iterations is not None else "keyboard_interrupt"
+        return result
+
     def tui(self, dry_run: bool = False):
         """启动中文 TUI 工作台；不会改变 CLI 默认工作区行为。"""
         from core.tui.app import launch_tui
@@ -1232,6 +1370,91 @@ def _as_export_format(format: str) -> ExportFormat:
 
 def _paper_metadata_to_dict(metadata) -> dict:
     return json_ready(metadata)
+
+
+def _self_evolution_cli_result(
+    result: dict[str, Any],
+    *,
+    requested_access_mode: str,
+    requested_output: str | Path,
+    audit_log: Path,
+    preview: bool,
+    confirm_write: bool,
+    confirm_full_access: bool,
+    acknowledge_risk: bool,
+) -> dict[str, Any]:
+    raw_plan = result.get("plan")
+    plan: dict[str, Any] = (
+        cast(dict[str, Any], raw_plan) if isinstance(raw_plan, dict) else {}
+    )
+    raw_artifacts = result.get("artifacts")
+    artifacts: list[Any] = (
+        cast(list[Any], raw_artifacts) if isinstance(raw_artifacts, list) else []
+    )
+    files: list[dict[str, Any]] = []
+    for artifact in artifacts:
+        if isinstance(artifact, dict):
+            files.append(
+                {
+                    "path": artifact.get("path"),
+                    "description": artifact.get("description", ""),
+                    "exists": bool(artifact.get("exists", False)),
+                    "operation": "modify" if artifact.get("exists") else "create",
+                }
+            )
+    errors = [str(error) for error in result.get("errors", [])]
+    status = str(result.get("status", "failed"))
+    full_access_requested = str(requested_access_mode).strip().lower() == "full"
+    next_steps = []
+    if preview:
+        next_steps.append(
+            "Review the listed file changes; no files were written in preview mode."
+        )
+        next_steps.append(
+            "Run again with --confirm-write and without --preview to write approved files."
+        )
+    if status == "failed":
+        next_steps.append(
+            "Fix the failure reason, choose an allowed target path, or reduce access scope."
+        )
+    if full_access_requested and not (confirm_full_access and acknowledge_risk):
+        next_steps.append(
+            "For full access writes, pass both --confirm-full-access and --acknowledge-risk after explicit authorization."
+        )
+    if status == "success":
+        next_steps.append("Inspect generated artifacts before adopting them into the workflow.")
+    return cast(
+        dict[str, Any],
+        redact_sensitive(
+            {
+                "status": status,
+                "permission_mode": requested_access_mode,
+                "target_path": plan.get("target", str(requested_output)),
+                "preview": preview,
+                "confirm_write": confirm_write,
+                "files_to_create_or_modify": files,
+                "audit_log": {
+                    "path": str(audit_log),
+                    "available": audit_log.exists() or not preview,
+                    "note": "Audit log is written for confirmed permission-gated writes when available.",
+                },
+                "failure_reason": "; ".join(errors) if errors else "",
+                "message": result.get("message", ""),
+                "full_access_notice": {
+                    "full_access_requested": full_access_requested,
+                    "explicit_full_access_confirmed": confirm_full_access,
+                    "risk_notice_acknowledged": acknowledge_risk,
+                    "semantics": (
+                        "Full access uses only current user/process permissions and never "
+                        "silently elevates, bypasses UAC, or bypasses operating-system "
+                        "security controls."
+                    ),
+                },
+                "next_steps": next_steps,
+                "service_result": result,
+            }
+        ),
+    )
 
 
 def _paper_import_result_to_dict(
@@ -1370,9 +1593,16 @@ def _permission_result(
     changed: bool,
     message: str | None = None,
 ) -> dict[str, Any]:
+    mode = str(file_access.get("mode", "conservative"))
+    mode_labels = {
+        "sandbox": "沙箱",
+        "safe": "沙箱",
+        "conservative": "保守",
+        "full": "完全访问",
+    }
     return {
-        "mode": file_access.get("mode", "conservative"),
-        "mode_label": "完全访问" if file_access.get("mode") == "full" else "保守",
+        "mode": mode,
+        "mode_label": mode_labels.get(mode, "保守"),
         "full_mode_confirmed": bool(file_access.get("full_mode_confirmed")),
         "authorized_external_roots": list(
             file_access.get("authorized_external_roots", [])
@@ -1520,7 +1750,7 @@ def main(argv: list[str] | None = None) -> None:
     permission_subparsers = permission_parser.add_subparsers(dest="permission_command")
     permission_subparsers.add_parser("status", help="查看当前权限模式与授权目录")
     permission_mode_parser = permission_subparsers.add_parser(
-        "mode", help="切换权限模式：conservative 或 full"
+        "mode", help="切换权限模式：sandbox、conservative 或 full"
     )
     permission_mode_parser.add_argument(
         "mode", choices=["conservative", "sandbox", "safe", "full"], help="目标权限模式"
@@ -1544,6 +1774,20 @@ def main(argv: list[str] | None = None) -> None:
     )
     permission_revoke_parser.add_argument("path", type=str, help="要移除授权的目录路径")
     permission_subparsers.add_parser("roots", help="列出当前外部授权目录")
+
+    sandbox_parser = subparsers.add_parser(
+        "sandbox",
+        help="说明 sandbox 权限模式与自进化安全写入入口",
+        description=(
+            "Sandbox 是 SuperMedicine 的受限文件访问模式：读取限于项目内，写入限于 "
+            "self_evolution/generated/tools/generated 等受控生成目录，并限制文件类型。"
+        ),
+        epilog=(
+            "切换权限模式：supermedicine permission mode sandbox；"
+            "生成自进化预览/产物：supermedicine self-evolve --access-mode sandbox "
+            "--instruction <目标> --output generated/example.md。"
+        ),
+    )
 
     # Test 命令
     subparsers.add_parser("test", help="运行测试")
@@ -1575,6 +1819,78 @@ def main(argv: list[str] | None = None) -> None:
         type=str,
         default=None,
         help="显式工作区 slug ID（workspaces/<id>；不会读取 TUI 最近状态）",
+    )
+
+    self_evolve_parser = subparsers.add_parser(
+        "self-evolve",
+        aliases=["self-evolution"],
+        help="生成自进化预览或在显式确认后写入安全产物",
+        description=(
+            "自进化入口：根据用户指令生成 Markdown/Python/R 产物。默认 --preview，"
+            "不会写文件；写入必须显式 --confirm-write 且目标通过权限/路径检查。"
+        ),
+        epilog=(
+            "sandbox 仅允许项目内 self_evolution/generated/tools/generated 等安全目录；"
+            "full 模式必须同时提供 --confirm-full-access 与 --acknowledge-risk，"
+            "且只使用当前用户/进程已有权限，不静默提权。"
+        ),
+    )
+    self_evolve_parser.add_argument(
+        "--instruction", required=True, type=str, help="用户自进化指令/目标"
+    )
+    self_evolve_parser.add_argument(
+        "--experience-source",
+        type=str,
+        default=None,
+        help="可选经验记录 ID；使用记录 ID 时需同时指定 --workspace",
+    )
+    self_evolve_parser.add_argument(
+        "--target-type",
+        choices=["markdown", "python_tool", "r_tool"],
+        default="markdown",
+        help="目标产物类型",
+    )
+    self_evolve_parser.add_argument(
+        "--output", required=True, type=str, help="输出文件或目录路径"
+    )
+    self_evolve_parser.add_argument(
+        "--access-mode",
+        choices=["sandbox", "conservative", "full"],
+        default="sandbox",
+        help="权限/访问模式",
+    )
+    self_evolve_parser.add_argument(
+        "--workspace", type=str, default=None, help="经验来源所需的显式工作区 ID"
+    )
+    self_evolve_parser.add_argument(
+        "--preview",
+        action="store_true",
+        default=True,
+        help="仅预览，不写入文件（默认）",
+    )
+    self_evolve_parser.add_argument(
+        "--confirm-write",
+        action="store_true",
+        help="显式确认写入；必须与 --no-preview 一起使用才会写文件",
+    )
+    self_evolve_parser.add_argument(
+        "--no-preview",
+        dest="preview",
+        action="store_false",
+        help="关闭预览；只有同时提供 --confirm-write 才会写入",
+    )
+    self_evolve_parser.add_argument(
+        "--overwrite", action="store_true", help="显式允许覆盖已存在的目标文件"
+    )
+    self_evolve_parser.add_argument(
+        "--confirm-full-access",
+        action="store_true",
+        help="显式确认 full 访问模式；仅使用当前用户/进程已有权限",
+    )
+    self_evolve_parser.add_argument(
+        "--acknowledge-risk",
+        action="store_true",
+        help="确认已理解 full 模式风险、OS 权限/UAC 语义与不静默提权限制",
     )
 
     experiment_parser = subparsers.add_parser("experiment", help="实验指导器命令")
@@ -1650,6 +1966,47 @@ def main(argv: list[str] | None = None) -> None:
     log_show_parser = log_subparsers.add_parser("show", help="查看指定日志报告")
     log_show_parser.add_argument(
         "--file", required=True, type=str, help="日志报告文件名"
+    )
+    log_location_parser = log_subparsers.add_parser(
+        "location", help="显示当前日志/报告/审计文件存储位置"
+    )
+    log_location_group = log_location_parser.add_mutually_exclusive_group()
+    log_location_group.add_argument(
+        "--file", type=str, default=None, help="解析指定日志报告文件位置"
+    )
+    log_location_group.add_argument(
+        "--session-id", type=str, default=None, help="解析指定会话日志报告位置"
+    )
+    log_follow_parser = log_subparsers.add_parser(
+        "follow", help="实时刷新并滚动显示最近日志内容"
+    )
+    log_follow_group = log_follow_parser.add_mutually_exclusive_group()
+    log_follow_group.add_argument(
+        "--file", type=str, default=None, help="跟随指定日志报告文件"
+    )
+    log_follow_group.add_argument(
+        "--session-id", type=str, default=None, help="跟随指定会话日志报告"
+    )
+    log_follow_parser.add_argument(
+        "--interval", type=float, default=1.0, help="刷新间隔秒数；测试可设为 0"
+    )
+    log_follow_parser.add_argument(
+        "--max-entries", type=int, default=50, help="每次显示的最大最近日志条目数"
+    )
+    log_follow_parser.add_argument(
+        "--max-lines", type=int, default=None, help="每次显示的最大最近文本行数"
+    )
+    log_follow_parser.add_argument(
+        "--iterations",
+        type=int,
+        default=None,
+        help="刷新次数；用于非交互/测试安全退出",
+    )
+    log_follow_parser.add_argument(
+        "--once", action="store_true", help="只刷新一次后退出（等同 --iterations 1）"
+    )
+    log_follow_parser.add_argument(
+        "--no-clear", action="store_true", help="刷新间不清屏/分隔，便于测试捕获"
     )
 
     # Workspace 命令
@@ -2058,6 +2415,8 @@ def main(argv: list[str] | None = None) -> None:
                 permission_parser.print_help()
         except (ValueError, PermissionError) as exc:
             permission_parser.error(str(exc))
+    elif args.command == "sandbox":
+        sandbox_parser.print_help()
     elif args.command == "test":
         cli.test()
     elif args.command == "tui":
@@ -2075,6 +2434,20 @@ def main(argv: list[str] | None = None) -> None:
             action=args.action,
             params=params,
             workspace=args.workspace,
+        )
+    elif args.command in {"self-evolve", "self-evolution"}:
+        cli.self_evolve(
+            instruction=args.instruction,
+            artifact_type=args.target_type,
+            output=args.output,
+            access_mode=args.access_mode,
+            experience_source=args.experience_source,
+            workspace=args.workspace,
+            preview=args.preview,
+            confirm_write=args.confirm_write,
+            overwrite=args.overwrite,
+            confirm_full_access=args.confirm_full_access,
+            acknowledge_risk=args.acknowledge_risk,
         )
     elif args.command == "experiment":
         try:
@@ -2112,6 +2485,19 @@ def main(argv: list[str] | None = None) -> None:
                 cli.log_list()
             elif args.log_command == "show":
                 cli.log_show(args.file)
+            elif args.log_command == "location":
+                cli.log_location(file_name=args.file, session_id=args.session_id)
+            elif args.log_command == "follow":
+                cli.log_follow(
+                    file_name=args.file,
+                    session_id=args.session_id,
+                    interval=args.interval,
+                    max_entries=args.max_entries,
+                    max_lines=args.max_lines,
+                    iterations=args.iterations,
+                    once=args.once,
+                    no_clear=args.no_clear,
+                )
             else:
                 log_parser.print_help()
         except ValueError as exc:

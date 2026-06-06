@@ -158,3 +158,22 @@ class TestAuditLogger:
 
         assert "audit_log_permission_restriction_failed" in caplog.text
         assert secret not in caplog.text
+
+    def test_audit_context_is_redacted_for_permission_boundaries(self, tmp_path):
+        log_file = tmp_path / "audit.log"
+        logger = AuditLogger(log_file)
+
+        logger.log(
+            agent_id="self-evolution",
+            action="self_evolution.generate",
+            resource="generated/tool.py",
+            result="DENIED",
+            reason="sandbox_rejected",
+            context={"api_key": "sk-context-secret", "access_mode": "sandbox"},
+        )
+
+        text = log_file.read_text(encoding="utf-8")
+        entry = json.loads(text)
+        assert "sk-context-secret" not in text
+        assert entry["context"]["api_key"] == "[REDACTED]"
+        assert entry["context"]["access_mode"] == "sandbox"

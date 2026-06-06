@@ -95,7 +95,7 @@ _SENSITIVE_VALUE_PATTERNS: tuple[re.Pattern[str], ...] = (
         r"(?i)([\"'](?:api[_-]?key|x-api-key|access[_-]?key|access[_-]?token|auth[_-]?token|auth|refresh[_-]?token|id[_-]?token|token|secret|client[_-]?secret|password|passwd|pwd|credential|credentials|authorization|cookie|set-cookie|private[_-]?key|ssh[_-]?key|session[_-]?key|signature|sig|sas)[\"']\s*:\s*[\"'])([^\"']*)([\"'])"
     ),
     re.compile(
-        r"(?i)(api[_-]?key|x-api-key|access[_-]?key|access[_-]?token|auth[_-]?token|auth|refresh[_-]?token|id[_-]?token|token|secret|client[_-]?secret|password|passwd|pwd|credential|credentials|authorization|cookie|set-cookie|private[_-]?key|ssh[_-]?key|session[_-]?key|signature|sig|sas)\s*[:=]\s*([^\s,;&\"'{}\[\]]+)"
+        r"(?i)(api[_-]?key|x-api-key|access[_-]?key|access[_-]?token|auth[_-]?token|auth|refresh[_-]?token|id[_-]?token|token|secret|client[_-]?secret|password|passwd|pwd|credential|credentials|authorization|cookie|set-cookie|private[_-]?key|ssh[_-]?key|session[_-]?key|signature|sig|sas)\s*[:=]\s*([^\s,;&\"'{}\[\]/\\]+)"
     ),
     re.compile(
         r"(?i)([?&](?:api[_-]?key|apikey|key|access[_-]?token|auth[_-]?token|auth|refresh[_-]?token|id[_-]?token|token|secret|client[_-]?secret|password|passwd|pwd|credential|credentials|authorization|cookie|signature|sig|x-amz-signature|x-amz-credential|x-amz-security-token|x-goog-signature|x-goog-credential|code|sas|sp|se|sr)=)([^\s&#\"']+)"
@@ -161,6 +161,20 @@ def _redact_url_query(text: str) -> str:
         for key, value in query_items
     ]
     return urlunsplit(parts._replace(query=urlencode(redacted_items, doseq=True)))
+
+
+def redact_path_for_display(path: str) -> str:
+    """Redact secret-looking path segments while preserving path structure/suffixes."""
+
+    text = str(path)
+    parts = re.split(r"([/\\]+)", text)
+    redacted_parts: list[str] = []
+    for part in parts:
+        if not part or re.fullmatch(r"[/\\]+", part):
+            redacted_parts.append(part)
+            continue
+        redacted_parts.append(str(redact_sensitive(part)))
+    return "".join(redacted_parts)
 
 
 def redact_sensitive(value: Any) -> Any:

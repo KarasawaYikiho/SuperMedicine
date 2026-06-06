@@ -6,9 +6,9 @@ SuperMedicine **Beta0.4.1**. The Python package fallback version is **0.4.1b0**.
 
 For a shorter overview, start with [README.md](README.md). For design and
 security boundaries, see [ARCHITECTURE.md](ARCHITECTURE.md) and
-[SECURITY.md](SECURITY.md). For release documentation hardening and optional
-external-reference boundaries, see [SECURITY_HARDENING_CHECKLIST.md](SECURITY_HARDENING_CHECKLIST.md)
-and [EXTERNAL_PROJECT_ANALYSIS.md](EXTERNAL_PROJECT_ANALYSIS.md).
+[SECURITY.md](SECURITY.md). For release documentation hardening and maintainer
+reading boundaries, see [SECURITY_HARDENING_CHECKLIST.md](SECURITY_HARDENING_CHECKLIST.md)
+and [Architecture/MaintainerRepositoryReading.md](Architecture/MaintainerRepositoryReading.md).
 
 ## Prerequisites
 
@@ -343,12 +343,16 @@ Use the status and diagnostic commands:
 python Cli.py status
 supermedicine diagnose
 supermedicine llm list
+supermedicine log location
 ```
 
 Expected status output includes the SuperMedicine version, configuration state,
 plugin discovery status, and test-module count. Diagnostic output redacts API
 keys, authorization headers, key-like URL tokens, and secret-looking fields while
 preserving information needed for repair.
+`supermedicine diagnose` also reports redacted log storage locations. By default,
+log reports are under `.supermedicine/logs/` and permission audit records are under
+`.supermedicine/policies/audit.jsonl`.
 
 Do not paste unredacted diagnostics, installer tracebacks, private BaseURLs,
 absolute local paths, or audit JSONL records into public documentation or issues.
@@ -357,6 +361,33 @@ and next repair step.
 
 For development environments, run the Local Quality Gate described in
 [README.md](README.md#local-quality-gate).
+
+## First CLI/TUI Usage After Install
+
+All CLI commands can be run as `supermedicine <command>` or `python Cli.py <command>`.
+Useful first checks and user-facing feature entry points are:
+
+```bash
+supermedicine permission status
+supermedicine permission mode conservative
+supermedicine tui
+supermedicine self-evolve \
+  --instruction "生成一个数据清洗工具说明" \
+  --target-type markdown \
+  --output generated/self-evolution.md
+```
+
+The self-evolution command above is preview-only by default and does not write
+files. To write a generated artifact, add `--no-preview --confirm-write` and keep
+the target inside an allowed generated directory such as `generated/`,
+`self_evolution/`, or `tools/generated/`. The `full` access mode is intentionally
+high risk and requires both `--confirm-full-access` and `--acknowledge-risk`; it
+still uses only the current OS user/process privileges and does not silently
+elevate.
+
+In the Chinese TUI, use the sidebar or menu to open “工具管理” for the self-evolution
+preview/confirm workflow, “P 🛡️ 权限模式” for access-mode changes, and “Log 报告” for
+log storage display, manual refresh, and auto-follow of newly written log records.
 
 ## Global CLI Access
 
@@ -474,6 +505,23 @@ supermedicine tui
 
 Use dry-run before launching on new terminals or after a crash. Normal exit is
 `q`; if the terminal is interrupted, reopen the shell before relaunching.
+
+### Log storage or realtime log follow
+
+Use `log location` to show redacted storage paths and `log follow` for a terminal
+tail-style view:
+
+```bash
+supermedicine log location
+supermedicine log location --session-id wb-demo
+supermedicine log follow --session-id wb-demo --interval 1 --max-entries 20
+supermedicine log follow --file session-wb-demo.json --once
+```
+
+`log follow` refreshes repeatedly until `Ctrl+C` unless `--once` or an iteration
+limit is supplied. The TUI Log page refreshes on a timer, has a manual “刷新”
+button, and defaults to auto-following the newest row; selecting an older row turns
+auto-follow off until you enable it again.
 
 ## Uninstall
 

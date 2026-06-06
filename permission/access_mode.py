@@ -17,6 +17,7 @@ class AccessMode(str, Enum):
     """User-selectable file access modes."""
 
     CONSERVATIVE = "conservative"
+    SANDBOX = "sandbox"
     FULL = "full"
 
 
@@ -88,6 +89,8 @@ class AccessModePolicy:
     project_root: Path
     mode: AccessMode
     authorized_external_roots: tuple[Path, ...]
+    sandbox_writable_roots: tuple[Path, ...]
+    sandbox_allowed_extensions: tuple[str, ...]
     full_mode_confirmed: bool = False
 
     def __init__(
@@ -95,6 +98,8 @@ class AccessModePolicy:
         project_root: Path | str,
         mode: AccessMode | str = AccessMode.CONSERVATIVE,
         authorized_external_roots: Iterable[Path | str] = (),
+        sandbox_writable_roots: Iterable[Path | str] = (),
+        sandbox_allowed_extensions: Iterable[str] = (".md", ".py", ".txt"),
         full_mode_confirmed: bool = False,
     ) -> None:
         self.project_root = Path(project_root).expanduser().resolve()
@@ -107,6 +112,23 @@ class AccessModePolicy:
         self.authorized_external_roots = tuple(
             Path(root).expanduser().resolve()
             for root in authorized_external_roots
+        )
+        configured_sandbox_roots = tuple(sandbox_writable_roots) or (
+            "self_evolution",
+            "generated",
+            "tools/generated",
+        )
+        self.sandbox_writable_roots = tuple(
+            (self.project_root / root).expanduser().resolve()
+            if not Path(root).expanduser().is_absolute()
+            else Path(root).expanduser().resolve()
+            for root in configured_sandbox_roots
+        )
+        self.sandbox_allowed_extensions = tuple(
+            str(extension).lower()
+            if str(extension).startswith(".")
+            else f".{str(extension).lower()}"
+            for extension in sandbox_allowed_extensions
         )
 
     @classmethod
@@ -122,6 +144,23 @@ class AccessModePolicy:
             project_root=project_root,
             mode=AccessMode.CONSERVATIVE,
             authorized_external_roots=authorized_external_roots,
+        )
+
+    @classmethod
+    def sandbox(
+        cls,
+        project_root: Path | str,
+        *,
+        sandbox_writable_roots: Iterable[Path | str] = (),
+        sandbox_allowed_extensions: Iterable[str] = (".md", ".py", ".txt"),
+    ) -> "AccessModePolicy":
+        """Create a sandbox access policy for self-evolution style writes."""
+
+        return cls(
+            project_root=project_root,
+            mode=AccessMode.SANDBOX,
+            sandbox_writable_roots=sandbox_writable_roots,
+            sandbox_allowed_extensions=sandbox_allowed_extensions,
         )
 
     @classmethod
@@ -187,6 +226,62 @@ class AccessModePolicy:
                 mode=self.mode,
                 reason="full_mode_explicitly_confirmed_current_user_access",
                 helper=insufficient_permission_helper(resolved_path),
+            )
+
+        if self.mode == AccessMode.SANDBOX:
+            if not self._is_relative_to(resolved_path, self.project_root):
+                return AccessDecision(
+                    status=AccessDecisionStatus.DENIED,
+                    path=resolved_path,
+                    operation=op,
+                    mode=self.mode,
+                    reason="sandbox_path_must_remain_inside_project_root",
+                    prompt="Sandbox mode blocks paths outside the project root.",
+                )
+            if op == FileAccessOperation.READ:
+                return AccessDecision(
+                    status=AccessDecisionStatus.ALLOWED,
+                    path=resolved_path,
+                    operation=op,
+                    mode=self.mode,
+                    reason="sandbox_project_read_allowed",
+                )
+            if op in {FileAccessOperation.DELETE, FileAccessOperation.EXECUTE}:
+                return AccessDecision(
+                    status=AccessDecisionStatus.DENIED,
+                    path=resolved_path,
+                    operation=op,
+                    mode=self.mode,
+                    reason="sandbox_blocks_delete_and_execute_operations",
+                    prompt="Sandbox mode permits only controlled file generation writes.",
+                )
+            if resolved_path.suffix.lower() not in self.sandbox_allowed_extensions:
+                return AccessDecision(
+                    status=AccessDecisionStatus.DENIED,
+                    path=resolved_path,
+                    operation=op,
+                    mode=self.mode,
+                    reason="sandbox_file_type_not_allowed",
+                    prompt="Sandbox mode only writes approved Markdown/text/tool source files.",
+                )
+            if not any(
+                self._is_relative_to(resolved_path, root)
+                for root in self.sandbox_writable_roots
+            ):
+                return AccessDecision(
+                    status=AccessDecisionStatus.DENIED,
+                    path=resolved_path,
+                    operation=op,
+                    mode=self.mode,
+                    reason="sandbox_write_scope_not_allowed",
+                    prompt="Sandbox writes must target an explicitly allowed generation directory.",
+                )
+            return AccessDecision(
+                status=AccessDecisionStatus.ALLOWED,
+                path=resolved_path,
+                operation=op,
+                mode=self.mode,
+                reason="sandbox_write_scope_and_file_type_allowed",
             )
 
         if self._is_relative_to(resolved_path, self.project_root):
@@ -265,8 +360,8 @@ def normalize_access_mode(mode: AccessMode | str) -> AccessMode:
     value = str(mode or "").strip().lower().replace("-", "_")
     aliases = {
         "conservative": AccessMode.CONSERVATIVE,
-        "sandbox": AccessMode.CONSERVATIVE,
-        "safe": AccessMode.CONSERVATIVE,
+        "sandbox": AccessMode.SANDBOX,
+        "safe": AccessMode.SANDBOX,
         "full": AccessMode.FULL,
         "complete": AccessMode.FULL,
     }

@@ -109,9 +109,35 @@ Relevant environment variables:
   conversations.
 - Experiment guide and Log report surfaces write local JSON records under
   `.supermedicine/logs/` by default and use redaction for sensitive fields.
+- `supermedicine log location` and `supermedicine diagnose` display redacted log
+  storage locations. `supermedicine log follow` and the TUI Log page show redacted
+  realtime/refresh views; these are convenience views, not approval to publish raw
+  logs.
 - The built-in `experiment-wb` actions perform deterministic arithmetic and input
   validation only. They do not perform network requests, call external APIs, or
   validate laboratory SOPs.
+
+## Self-Evolution Safety Boundary
+
+The self-evolution feature generates previews and, only after explicit
+confirmation, writes limited Markdown/Python/R artifacts. It is intended for local
+research-workflow scaffolding, not autonomous repository maintenance.
+
+- Preview mode is the default and does not write files.
+- Confirmed writes require the CLI confirmation flags or the TUI confirmation text.
+- Sandbox writes are restricted to project-local generated roots such as
+  `self_evolution/`, `generated/`, and `tools/generated/`.
+- Conservative mode still follows the configured project/external-root permission
+  model.
+- Full access mode requires explicit risk acknowledgement and uses only the current
+  OS user/process permissions; it does not silently elevate privileges, bypass UAC,
+  or bypass operating-system ACLs.
+- Self-evolution output is blocked from engineering-only documentation paths such
+  as `Docs/`, `docs/`, and `REQUIREMENTS_TRACEABILITY.md`.
+- Generated content and logs are redacted on display where supported, but users
+  must not paste real API keys, tokens, patient identifiers, private datasets, or
+  unredacted local paths into instructions, ordinary chat fields, examples, or
+  public issues.
 
 ## Medical-Use Boundary
 
@@ -142,6 +168,10 @@ Before publishing Markdown, verify that it:
   `C:\Users\<you>\...`;
 - describes full-access mode as using only current OS/user privileges and never
   as silent privilege escalation;
+- describes self-evolution as preview-first and confirmation/permission-gated,
+  without claiming autonomous safe code changes or clinical validation;
+- mentions log storage/follow features only with redaction and local-storage
+  boundaries;
 - preserves medical-use limits and human-review requirements;
 - links to visible/trackable release documents or clearly labels ignored local
   docs as non-release references;

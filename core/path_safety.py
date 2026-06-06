@@ -8,8 +8,11 @@ semantics.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Iterable
+
+from core.redaction import redact_sensitive
 
 
 DEFAULT_PROTECTED_DIRECTORIES: tuple[str, ...] = (
@@ -34,6 +37,28 @@ class ProtectedPathError(PathSafetyError):
 
 class UnsafePathValueError(PathSafetyError):
     """Raised when a path contains unsafe control characters."""
+
+
+class SandboxWriteScopeError(PathSafetyError):
+    """Raised when a sandbox write target is outside approved writable roots."""
+
+
+class SandboxFileTypeError(PathSafetyError):
+    """Raised when a sandbox write target uses a disallowed file extension."""
+
+
+class DangerousOverwriteError(PathSafetyError):
+    """Raised when a generated write would overwrite an existing file unsafely."""
+
+
+class SensitiveContentError(PathSafetyError):
+    """Raised when generated content appears to contain sensitive material."""
+
+
+_BARE_TOKEN_SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"(?i)\btoken\s+sk-[A-Za-z0-9._\-]+\b"),
+    re.compile(r"\bsk-[A-Za-z0-9._\-]{4,}\b"),
+)
 
 
 def _path_text(path: str | Path) -> str:
@@ -144,3 +169,59 @@ def validate_destructive_path(
             f"Destructive operation targets protected path: {resolved_path}"
         )
     return resolved_path
+
+
+def validate_sandbox_write_path(
+    path: str | Path,
+    project_root: str | Path | None = None,
+    *,
+    writable_roots: Iterable[str | Path] = ("self_evolution", "generated", "tools/generated"),
+    allowed_extensions: Iterable[str] = (".md", ".py", ".txt"),
+    allow_overwrite: bool = False,
+) -> Path:
+    """Validate a sandbox/self-evolution write target.
+
+    The target must remain inside the project root, live below an approved
+    generated-output directory, use an approved file extension, and avoid silent
+    overwrites unless the caller explicitly allows replacement.
+    """
+
+    root = resolve_project_root(project_root)
+    resolved_path = validate_path_in_project_root(path, root)
+    normalized_extensions = {
+        ext.lower() if str(ext).startswith(".") else f".{str(ext).lower()}"
+        for ext in allowed_extensions
+    }
+    if resolved_path.suffix.lower() not in normalized_extensions:
+        raise SandboxFileTypeError(
+            f"Sandbox write file type is not allowed: {resolved_path.suffix}"
+        )
+    candidate_roots = tuple(
+        (root / writable_root).expanduser().resolve()
+        if not Path(writable_root).expanduser().is_absolute()
+        else Path(writable_root).expanduser().resolve()
+        for writable_root in writable_roots
+    )
+    if not any(_is_relative_to(resolved_path, writable_root) for writable_root in candidate_roots):
+        raise SandboxWriteScopeError(
+            f"Sandbox write target is outside approved writable roots: {resolved_path}"
+        )
+    if is_protected_path(resolved_path, root):
+        raise ProtectedPathError(f"Sandbox write targets protected path: {resolved_path}")
+    if resolved_path.exists() and not allow_overwrite:
+        raise DangerousOverwriteError(
+            f"Sandbox write would overwrite an existing file: {resolved_path}"
+        )
+    return resolved_path
+
+
+def reject_sensitive_content(content: str | bytes | None) -> None:
+    """Reject generated content that would be redacted before auditing/logging."""
+
+    if content is None:
+        return
+    text = content.decode("utf-8", errors="replace") if isinstance(content, bytes) else content
+    if any(pattern.search(text) for pattern in _BARE_TOKEN_SECRET_PATTERNS):
+        raise SensitiveContentError("Generated content appears to contain sensitive material")
+    if redact_sensitive(text) != text:
+        raise SensitiveContentError("Generated content appears to contain sensitive material")

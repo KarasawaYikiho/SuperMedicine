@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from core.redaction import redact_sensitive
+from core.redaction import redact_path_for_display, redact_sensitive
 
 
 _SAFE_LOG_NAME = re.compile(r"^[A-Za-z0-9_.-]+\.json$")
@@ -143,8 +143,42 @@ class LogReport:
         )
 
 
+@dataclass(frozen=True)
+class LogStorageLocations:
+    """Resolved storage locations for log/report/audit files."""
+
+    project_dir: Path
+    log_dir: Path
+    report_dir: Path
+    tui_log_file: Path
+    audit_file: Path
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "project_dir": redact_path_for_display(str(self.project_dir)),
+            "log_dir": redact_path_for_display(str(self.log_dir)),
+            "report_dir": redact_path_for_display(str(self.report_dir)),
+            "tui_log_file": redact_path_for_display(str(self.tui_log_file)),
+            "audit_file": redact_path_for_display(str(self.audit_file)),
+        }
+
+
 class LogReportError(ValueError):
     """Raised when a log report operation cannot be completed safely."""
+
+
+def resolve_log_storage_locations(project_dir: str | Path) -> LogStorageLocations:
+    """Return canonical project-local storage paths for logs, reports, and audit."""
+
+    root = Path(project_dir).resolve()
+    log_dir = root / ".supermedicine" / "logs"
+    return LogStorageLocations(
+        project_dir=root,
+        log_dir=log_dir,
+        report_dir=log_dir,
+        tui_log_file=log_dir / f"session-{TUI_LOG_SESSION_ID}.json",
+        audit_file=root / ".supermedicine" / "policies" / "audit.jsonl",
+    )
 
 
 class LogReportStore:
@@ -159,7 +193,8 @@ class LogReportStore:
         max_file_bytes: int = DEFAULT_MAX_FILE_BYTES,
     ) -> None:
         self.project_dir = Path(project_dir).resolve()
-        self.log_dir = self.project_dir / ".supermedicine" / "logs"
+        self._locations = resolve_log_storage_locations(self.project_dir)
+        self.log_dir = self._locations.log_dir
         self.max_message_length = self._positive_int(
             max_message_length, "max_message_length"
         )
@@ -237,6 +272,8 @@ class LogReportStore:
             reports.append(
                 {
                     "file": path.name,
+                    "path": redact_path_for_display(str(path)),
+                    "storage": self.storage_info(file_name=path.name),
                     "report_id": data.get("report_id"),
                     "created_at": data.get("created_at"),
                     "updated_at": data.get("updated_at", data.get("created_at")),
@@ -254,6 +291,38 @@ class LogReportStore:
                 }
             )
         return redact_sensitive(reports)
+
+    def storage_info(
+        self,
+        *,
+        file_name: str | None = None,
+        session_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Return redacted, resolvable storage paths for display surfaces."""
+
+        if file_name and session_id:
+            raise LogReportError(
+                "storage_info accepts either file_name or session_id, not both"
+            )
+        current_file: Path | None = None
+        if file_name:
+            current_file = self._safe_log_path(file_name)
+        else:
+            safe_session_id = self._validate_session_id(session_id)
+            if safe_session_id:
+                current_file = self._safe_log_path(f"session-{safe_session_id}.json")
+        payload: dict[str, Any] = self._locations.to_dict()
+        payload.update(
+            {
+                "current_file": str(current_file) if current_file else "",
+                "current_log_file": str(current_file) if current_file else "",
+                "current_report_file": str(current_file) if current_file else "",
+            }
+        )
+        for key in ("current_file", "current_log_file", "current_report_file"):
+            if payload.get(key):
+                payload[key] = redact_path_for_display(str(payload[key]))
+        return payload
 
     def list_entries(
         self,
@@ -305,6 +374,42 @@ class LogReportStore:
                 "session_id": session_id,
                 "statistics": statistics,
                 "entries": entries,
+            }
+        )
+
+    def follow_snapshot(
+        self,
+        *,
+        file_name: str | None = None,
+        session_id: str | None = None,
+        max_entries: int = 50,
+        max_lines: int | None = None,
+    ) -> dict[str, Any]:
+        """Return a redacted tail-style snapshot for realtime CLI log views."""
+
+        entry_limit = self._positive_int(max_entries, "max_entries")
+        line_limit = (
+            self._positive_int(max_lines, "max_lines")
+            if max_lines is not None
+            else None
+        )
+        entries = self.list_entries(file_name=file_name, session_id=session_id)
+        tail_entries = entries[-entry_limit:]
+        lines = self._tail_display_lines(tail_entries, max_lines=line_limit)
+        return redact_sensitive(
+            {
+                "generated_at": _utc_now(),
+                "mode": "follow_snapshot",
+                "file": file_name,
+                "session_id": session_id,
+                "storage": self.storage_info(file_name=file_name, session_id=session_id),
+                "entry_count": len(entries),
+                "displayed_entry_count": len(tail_entries),
+                "max_entries": entry_limit,
+                "max_lines": line_limit,
+                "entries": tail_entries,
+                "lines": lines,
+                "displayed_line_count": len(lines),
             }
         )
 
@@ -427,7 +532,8 @@ class LogReportStore:
     def _public_payload(self, path: Path, payload: dict[str, Any]) -> dict[str, Any]:
         safe_payload = dict(redact_sensitive(payload))
         safe_payload["file"] = path.name
-        safe_payload["path"] = str(path)
+        safe_payload["path"] = redact_path_for_display(str(path))
+        safe_payload["storage"] = self.storage_info(file_name=path.name)
         return redact_sensitive(safe_payload)
 
     def _reports_for_query(
@@ -470,6 +576,8 @@ class LogReportStore:
         raw_message = str(record.get("message") or "")
         return {
             "file": report.get("file"),
+            "path": report.get("path"),
+            "storage": report.get("storage"),
             "report_id": report.get("report_id"),
             "entry_id": record.get("entry_id"),
             "created_at": record.get("created_at"),
@@ -620,6 +728,23 @@ class LogReportStore:
             "dimensions": dimension_counts,
             "time_range": {"start": first_seen, "end": last_seen},
         }
+
+    @staticmethod
+    def _tail_display_lines(
+        entries: builtins.list[dict[str, Any]], *, max_lines: int | None
+    ) -> builtins.list[str]:
+        lines: builtins.list[str] = []
+        for entry in entries:
+            created_at = str(entry.get("created_at") or "")
+            severity = str(entry.get("severity") or "Info")
+            message = str(entry.get("message") or entry.get("raw_message") or "")
+            message_lines = message.splitlines() or [message]
+            for index, line in enumerate(message_lines):
+                prefix = f"{created_at} {severity} " if index == 0 else ""
+                lines.append(f"{prefix}{line}".rstrip())
+        if max_lines is not None:
+            return lines[-max_lines:]
+        return lines
 
     def _read_log_file(self, path: Path) -> dict[str, Any]:
         data = self._read_path(path)

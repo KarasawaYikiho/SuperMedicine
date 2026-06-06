@@ -23,3 +23,36 @@ class TestPromptGenerator:
         assert not hasattr(gen, "check")
         assert not hasattr(gen, "authorize")
         assert not hasattr(gen, "enforce")
+
+    def test_generate_prefix_injects_self_evolution_guidance(self):
+        prompt = PromptGenerator().generate_prefix(
+            "delta",
+            "execution",
+            ["self_evolution.generate"],
+            ["git.push"],
+        )
+
+        required_phrases = [
+            "permission mode",
+            "sandbox restrictions",
+            "目标路径",
+            "产物类型",
+            "风险等级",
+            "用户显式确认",
+            "敏感信息处理",
+            "审计/日志要求",
+            "self_evolution",
+            "generated",
+            "tools/generated",
+            "Docs",
+            "docs",
+            "REQUIREMENTS_TRACEABILITY.md",
+            "engineering-only files",
+            "Git-submittable artifacts",
+            "不可提交/不可上传 Git",
+            "redaction",
+            "permission engine",
+            "audit logger",
+        ]
+        for phrase in required_phrases:
+            assert phrase in prompt

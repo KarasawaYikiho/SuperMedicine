@@ -5,13 +5,19 @@ import os
 import pytest
 
 from core.path_safety import (
+    DangerousOverwriteError,
     PathOutsideProjectRootError,
     ProtectedPathError,
+    SandboxFileTypeError,
+    SandboxWriteScopeError,
+    SensitiveContentError,
     UnsafePathValueError,
     is_protected_path,
+    reject_sensitive_content,
     resolve_project_root,
     validate_destructive_path,
     validate_path_in_project_root,
+    validate_sandbox_write_path,
 )
 
 
@@ -84,3 +90,36 @@ def test_project_root_is_rejected_for_destructive_operations(tmp_path):
 def test_control_character_path_value_is_rejected_before_resolution(tmp_path):
     with pytest.raises(UnsafePathValueError):
         validate_path_in_project_root("safe\x00truncated.txt", tmp_path)
+
+
+def test_sandbox_write_path_allows_generated_markdown_and_python(tmp_path):
+    assert validate_sandbox_write_path("generated/notes.md", tmp_path) == (
+        tmp_path / "generated" / "notes.md"
+    ).resolve()
+    assert validate_sandbox_write_path("tools/generated/tool.py", tmp_path) == (
+        tmp_path / "tools" / "generated" / "tool.py"
+    ).resolve()
+
+
+def test_sandbox_write_path_rejects_traversal_scope_type_and_overwrite(tmp_path):
+    existing = tmp_path / "generated" / "notes.md"
+    existing.parent.mkdir()
+    existing.write_text("existing", encoding="utf-8")
+
+    with pytest.raises(PathOutsideProjectRootError):
+        validate_sandbox_write_path("generated/../../escape.md", tmp_path)
+    with pytest.raises(SandboxWriteScopeError):
+        validate_sandbox_write_path("src/tool.py", tmp_path)
+    with pytest.raises(SandboxFileTypeError):
+        validate_sandbox_write_path("generated/policy.yaml", tmp_path)
+    with pytest.raises(DangerousOverwriteError):
+        validate_sandbox_write_path(existing, tmp_path)
+
+
+def test_generated_content_with_secret_like_values_is_rejected():
+    with pytest.raises(SensitiveContentError):
+        reject_sensitive_content("api_key=sk-sensitive-content-secret")
+    with pytest.raises(SensitiveContentError):
+        reject_sensitive_content("token sk-test")
+    with pytest.raises(SensitiveContentError):
+        reject_sensitive_content("credential sk-abcdef")

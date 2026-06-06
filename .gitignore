@@ -23,6 +23,12 @@ coverage.xml
 htmlcov/
 
 # SuperMedicine runtime artifacts
+# These files are local-only bootstrap/runtime state, not uploadable content.
+# If any were previously tracked, commit their deletion/de-indexing; do not
+# commit additions or modifications under .supermedicine/.
+.supermedicine/
+.supermedicine/config.yaml
+.supermedicine/policies/default.yaml
 .supermedicine/install-record.json
 .supermedicine/policies/audit.jsonl
 .supermedicine/checkpoints/
@@ -40,10 +46,26 @@ htmlcov/
 superpowers/
 docs/superpowers/
 
-# Local engineering/audit documentation excluded from final release/upload sets
+# Repository documentation boundary:
+# - Maintainer-facing repository docs are commit/upload eligible when curated to
+#   explain project structure, execution roadmaps, function maps, or maintenance
+#   decisions (for example: Architecture/ExecutionRoadmap.md,
+#   Architecture/ExecutionRoadMap.md, FUNCTION_MAP.md, FunctionMap.md,
+#   REQUIREMENTS_TRACEABILITY.md).
+# - Local-only temporary engineering/audit artifacts stay excluded until they are
+#   intentionally converted into maintainer-facing documentation.
 Docs/
-docs/
-Architecture/
+EXTERNAL_PROJECT_ANALYSIS.md
+failure_inventory.md
+*_audit_dump*.md
+*_audit_dump*.json
+*_audit_log*.md
+*_audit_log*.jsonl
+*_scratch*.md
+*_scratch_notes*.md
+*_private_analysis*.md
+*_transient_checklist*.md
+*_uncurated_engineering*.md
 
 # Local-only planning notes
 /Planning/NextSteps.md

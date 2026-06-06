@@ -15,6 +15,24 @@ except ModuleNotFoundError:
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FORBIDDEN_PLATFORM_AGENT_NAMES = {"Brain", "Planner", "Coder", "Tester"}
+COMMIT_ELIGIBLE_MAINTAINER_DOC_EXAMPLES = {
+    "Architecture/ExecutionRoadmap.md",
+    "Architecture/ExecutionRoadMap.md",
+    "FUNCTION_MAP.md",
+    "FunctionMap.md",
+    "REQUIREMENTS_TRACEABILITY.md",
+}
+LOCAL_ONLY_ENGINEERING_ARTIFACT_PATTERNS = {
+    "*_audit_dump*.md",
+    "*_audit_dump*.json",
+    "*_audit_log*.md",
+    "*_audit_log*.jsonl",
+    "*_scratch*.md",
+    "*_scratch_notes*.md",
+    "*_private_analysis*.md",
+    "*_transient_checklist*.md",
+    "*_uncurated_engineering*.md",
+}
 
 
 def _read_pyproject() -> dict:
@@ -63,6 +81,14 @@ def _read_pyproject() -> dict:
 
 
 def _tracked_files() -> list[str]:
+    """Return paths currently present in the Git index.
+
+    Hygiene checks intentionally inspect the index rather than the working tree:
+    staged additions/modifications of local-only artifacts are visible here and
+    must fail, while staged deletions/de-indexing of previously tracked
+    local-only artifacts are absent and must be allowed so the repository can be
+    cleaned up.
+    """
     result = subprocess.run(
         ["git", "ls-files"],
         cwd=REPO_ROOT,
@@ -71,6 +97,30 @@ def _tracked_files() -> list[str]:
         capture_output=True,
     )
     return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+
+def _active_gitignore_patterns() -> set[str]:
+    """Return only active .gitignore patterns, excluding comments/blank lines."""
+    patterns: set[str] = set()
+    for line in (REPO_ROOT / ".gitignore").read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        patterns.add(stripped)
+    return patterns
+
+
+def _git_check_ignore(path: str) -> str:
+    result = subprocess.run(
+        ["git", "check-ignore", "-v", "--", path],
+        cwd=REPO_ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0, f"{path} is not ignored by active .gitignore"
+    assert result.stdout.strip(), f"{path} did not report an active ignore rule"
+    return result.stdout.strip()
 
 
 def _normalized_parts(path: str) -> tuple[str, ...]:
@@ -167,6 +217,10 @@ def test_tracked_files_do_not_include_forbidden_or_generated_artifacts():
             forbidden_matches.append(tracked_path)
         if parts and parts[0] in {".claude", ".opencode", "superpowers"}:
             forbidden_matches.append(tracked_path)
+        if tracked_path == "docs/superpowers" or tracked_path.startswith(
+            "docs/superpowers/"
+        ):
+            forbidden_matches.append(tracked_path)
         if "node_modules" in lower_parts or ".cache" in lower_parts:
             forbidden_matches.append(tracked_path)
         if name.endswith(".pyc"):
@@ -200,22 +254,33 @@ def test_tracked_files_do_not_include_forbidden_or_generated_artifacts():
     assert sorted(set(forbidden_matches)) == []
 
 
-def test_tracked_supermedicine_config_is_limited_to_core_bootstrap_files():
+def test_supermedicine_runtime_bootstrap_copies_are_local_only():
+    """No .supermedicine runtime copy may remain tracked in the Git index.
+
+    Local .supermedicine files are runtime/bootstrap artifacts, not repository
+    content. Adding or modifying them in the index must fail this check;
+    staging their deletion/de-indexing is permitted because it removes them from
+    the indexed file list returned by ``git ls-files``.
+    """
     tracked_supermedicine = sorted(
         path
         for path in _tracked_files()
         if path == ".supermedicine" or path.startswith(".supermedicine/")
     )
 
-    assert tracked_supermedicine == [
-        ".supermedicine/config.yaml",
-        ".supermedicine/policies/default.yaml",
-    ]
+    assert tracked_supermedicine == [], (
+        ".supermedicine/* is local-only and must not be tracked. Stage deletion "
+        "or de-indexing for any existing remote-tracked copies; do not stage "
+        "additions or modifications under .supermedicine/."
+    )
+    assert (REPO_ROOT / "permission" / "default_policy.yaml").is_file()
+    assert "permission/default_policy.yaml" in _tracked_files()
 
 
 def test_gitignore_excludes_runtime_and_external_platform_config_artifacts():
     gitignore = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
     required_patterns = {
+        ".supermedicine/",
         ".pytest_cache/",
         ".pytest-tmp/",
         ".ruff_cache/",
@@ -226,6 +291,8 @@ def test_gitignore_excludes_runtime_and_external_platform_config_artifacts():
         "release-artifacts/",
         "*.exe",
         "*.py[cod]",
+        ".supermedicine/config.yaml",
+        ".supermedicine/policies/default.yaml",
         ".supermedicine/install-record.json",
         ".supermedicine/policies/audit.jsonl",
         ".supermedicine/checkpoints/",
@@ -234,9 +301,51 @@ def test_gitignore_excludes_runtime_and_external_platform_config_artifacts():
         ".claude/",
         ".opencode/",
         "superpowers/",
+        "EXTERNAL_PROJECT_ANALYSIS.md",
+        "failure_inventory.md",
+        "docs/superpowers/",
+        "*_audit_dump*.md",
+        "*_audit_dump*.json",
+        "*_audit_log*.md",
+        "*_audit_log*.jsonl",
+        "*_scratch*.md",
+        "*_scratch_notes*.md",
+        "*_private_analysis*.md",
+        "*_transient_checklist*.md",
+        "*_uncurated_engineering*.md",
     }
 
     for pattern in required_patterns:
+        assert pattern in gitignore
+
+
+def test_local_only_files_are_ignored_by_active_gitignore_rules():
+    ignored_paths = [
+        ".supermedicine/config.yaml",
+        ".supermedicine/policies/default.yaml",
+        "EXTERNAL_PROJECT_ANALYSIS.md",
+        "failure_inventory.md",
+    ]
+
+    for path in ignored_paths:
+        rule = _git_check_ignore(path)
+        assert path in rule, rule
+
+
+def test_gitignore_allows_curated_maintainer_repository_docs():
+    gitignore = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
+    active_patterns = _active_gitignore_patterns()
+
+    assert "Maintainer-facing repository docs are commit/upload eligible" in gitignore
+    for pattern in COMMIT_ELIGIBLE_MAINTAINER_DOC_EXAMPLES:
+        assert pattern not in active_patterns
+
+
+def test_gitignore_keeps_temporary_engineering_artifacts_local_only():
+    gitignore = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
+
+    assert "Local-only temporary engineering/audit artifacts stay excluded" in gitignore
+    for pattern in LOCAL_ONLY_ENGINEERING_ARTIFACT_PATTERNS:
         assert pattern in gitignore
 
 

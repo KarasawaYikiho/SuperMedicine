@@ -319,3 +319,47 @@ class TestPermissionEngineWithPolicies:
         assert "hard_limit_exceeded:external_api:false" in audit_text
         assert "api_key" not in audit_text
         assert "sk-permission-secret" not in audit_text
+
+    def test_full_access_high_risk_requires_explicit_authorization_and_audits(self, tmp_path):
+        policy_dir = tmp_path / "policies"
+        policy_dir.mkdir()
+        audit_log = tmp_path / "audit.jsonl"
+        policy = {
+            "agent_id": "full_agent",
+            "role": "operator",
+            "permissions": {
+                "allowed": [{"action": "delete", "scope": "*"}],
+                "denied": [],
+            },
+        }
+        (policy_dir / "test.yaml").write_text(yaml.dump(policy), encoding="utf-8")
+        engine = PermissionEngine(policy_dir=policy_dir, audit_log=audit_log)
+
+        denied = engine.check(
+            "full_agent",
+            "delete",
+            "external/file.txt",
+            context={
+                "access_mode": "full",
+                "high_risk_operation": True,
+                "explicit_authorization": False,
+                "risk_notice_acknowledged": True,
+            },
+        )
+        allowed = engine.check(
+            "full_agent",
+            "delete",
+            "external/file.txt",
+            context={
+                "access_mode": "full",
+                "high_risk_operation": True,
+                "explicit_authorization": True,
+                "risk_notice_acknowledged": True,
+            },
+        )
+
+        audit_text = audit_log.read_text(encoding="utf-8")
+        assert denied == PermissionResult.DENIED
+        assert allowed == PermissionResult.ALLOWED
+        assert "full_access_high_risk_requires_explicit_authorization" in audit_text
+        assert "full_access_explicit_authorization_preserved" in audit_text

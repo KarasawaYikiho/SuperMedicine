@@ -17,7 +17,12 @@ from permission.access_mode import AccessModePolicy, FileAccessOperation
 from permission.engine import PermissionEngine
 from permission.policy import PermissionResult
 
-from core.path_safety import validate_destructive_path, validate_path_in_project_root
+from core.path_safety import (
+    reject_sensitive_content,
+    validate_destructive_path,
+    validate_path_in_project_root,
+    validate_sandbox_write_path,
+)
 
 
 class DangerousOperationDenied(PermissionError):
@@ -68,6 +73,10 @@ def authorize_dangerous_operation(
     file_operation: FileAccessOperation | str | None = None,
     operation: str = "dangerous_operation",
     trace_id: str | None = None,
+    content: str | bytes | None = None,
+    allow_overwrite: bool = False,
+    explicit_authorization: bool = False,
+    risk_notice_acknowledged: bool = False,
 ) -> OperationAuthorization:
     """Validate and authorize a future dangerous operation.
 
@@ -78,6 +87,8 @@ def authorize_dangerous_operation(
     audit record is written for both allow and deny decisions in addition to any
     logging performed internally by PermissionEngine.
     """
+
+    reject_sensitive_content(content)
 
     if access_policy is None:
         resolved_path = (
@@ -92,6 +103,14 @@ def authorize_dangerous_operation(
             or (FileAccessOperation.DELETE if destructive else FileAccessOperation.WRITE),
         )
         resolved_path = access_decision.path
+        if access_policy.mode.value == "sandbox" and access_decision.operation == FileAccessOperation.WRITE:
+            resolved_path = validate_sandbox_write_path(
+                resolved_path,
+                access_policy.project_root,
+                writable_roots=access_policy.sandbox_writable_roots,
+                allowed_extensions=access_policy.sandbox_allowed_extensions,
+                allow_overwrite=allow_overwrite,
+            )
         if destructive:
             try:
                 resolved_path.relative_to(access_policy.project_root)
@@ -102,6 +121,11 @@ def authorize_dangerous_operation(
     resource = str(resolved_path)
     permission_context = dict(context or {})
     permission_context.setdefault("operation", operation)
+    if access_policy is not None:
+        permission_context.setdefault("access_mode", access_policy.mode.value)
+        permission_context.setdefault("explicit_authorization", explicit_authorization)
+        permission_context.setdefault("risk_notice_acknowledged", risk_notice_acknowledged)
+        permission_context.setdefault("high_risk_operation", destructive)
 
     permission_result = permission_engine.check(
         agent_id,
@@ -128,6 +152,7 @@ def authorize_dangerous_operation(
             result=audit_record.result,
             reason=audit_record.reason,
             trace_id=audit_record.trace_id,
+            context=permission_context,
         )
 
     if not allowed:

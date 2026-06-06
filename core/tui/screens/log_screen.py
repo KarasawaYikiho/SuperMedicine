@@ -8,6 +8,7 @@ from typing import Any
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
+from textual.timer import Timer
 from textual.widgets import Button, DataTable, Input, Static, TextArea
 
 from core.log_report import LogReportStore, detect_log_severity, format_log_message
@@ -18,6 +19,7 @@ from core.tui.i18n import t
 
 _SUMMARY_LIMIT = 96
 _DETAIL_LINE_LIMIT = 160
+_REFRESH_INTERVAL_SECONDS = 2.0
 
 
 _SEVERITY_STYLES = {
@@ -35,17 +37,22 @@ class LogReportView(Vertical):
     def __init__(self, project_root: Path | str | None = None, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._project_root = Path(project_root) if project_root else Path.cwd()
+        self._auto_follow = True
+        self._refresh_timer: Timer | None = None
+        self._suppress_follow_detection = False
 
     def compose(self) -> ComposeResult:
         yield Static(t("log_title"), classes="section-title")
         yield Static(t("log_redaction_hint"), id="log-redaction-hint")
         yield Static(t("log_action_hint"), id="log-action-hint", classes="hint")
+        yield Static("", id="log-storage-location", classes="hint")
         yield Input(placeholder=t("log_session_id"), id="log-session-id-input")
         yield TextArea.code_editor("", language="markdown", id="log-message-input")
         with Horizontal(classes="form-row"):
             yield Button(t("log_write"), id="log-write", classes="btn btn-primary")
             yield Button(t("log_show"), id="log-show", classes="btn btn-secondary")
             yield Button(t("refresh"), id="log-refresh", classes="btn btn-secondary")
+            yield Button("自动跟随：开", id="log-auto-follow", classes="btn btn-secondary")
         yield DataTable(id="log-table", cursor_type="row")
         yield Static("", id="log-detail")
         yield Static("", id="log-status")
@@ -56,6 +63,16 @@ class LogReportView(Vertical):
 
     def on_mount(self) -> None:
         self.refresh_logs()
+        self._refresh_timer = self.set_interval(
+            _REFRESH_INTERVAL_SECONDS,
+            self._refresh_from_timer,
+            pause=False,
+        )
+
+    def on_unmount(self) -> None:
+        if self._refresh_timer is not None:
+            self._refresh_timer.stop()
+            self._refresh_timer = None
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "log-write":
@@ -64,12 +81,32 @@ class LogReportView(Vertical):
             self._show_selected_log()
         elif event.button.id == "log-refresh":
             self.refresh_logs(refreshed=True)
+        elif event.button.id == "log-auto-follow":
+            self._toggle_auto_follow()
 
-    def refresh_logs(self, *, refreshed: bool = False) -> str:
+    def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
+        if event.data_table.id != "log-table":
+            return
+        if self._suppress_follow_detection:
+            return
+        table = event.data_table
+        if table.row_count and table.cursor_row < max(0, table.row_count - 1):
+            self._set_auto_follow(False, announce=True)
+
+    def _refresh_from_timer(self) -> None:
+        self.refresh_logs(refreshed=True, automatic=True)
+
+    def refresh_logs(self, *, refreshed: bool = False, automatic: bool = False) -> str:
         table = self.query_one("#log-table", DataTable)
+        previous_cursor = table.cursor_row if table.row_count else None
+        previous_row_count = table.row_count
         table.clear(columns=True)
-        table.add_columns("文件", "报告 ID", "条目 ID", "会话", "时间", "级别", "摘要")
+        table.add_columns(
+            "文件", "报告 ID", "条目 ID", "会话", "时间", "级别", "存储位置", "摘要"
+        )
         try:
+            storage = self.store.storage_info()
+            self._set_storage_location(storage)
             entries = self.store.list_entries()
             for entry in entries:
                 severity = self._entry_severity(entry)
@@ -81,19 +118,28 @@ class LogReportView(Vertical):
                     str(entry.get("session_id") or ""),
                     str(entry.get("created_at") or ""),
                     self._severity_label(severity),
+                    self._preview_text(str(entry.get("path") or ""), limit=72),
                     self._severity_text(self._preview_text(message), severity=severity),
                 )
+            self._restore_log_position(
+                table,
+                previous_cursor=previous_cursor,
+                previous_row_count=previous_row_count,
+                new_row_count=len(entries),
+            )
             stats_text = self._statistics_text(
                 self.store.statistics_for_entries(entries)
             )
             label = t("log_refreshed") if refreshed else t("log_list")
+            refresh_mode = "实时刷新" if automatic else label
+            follow_text = "自动跟随：开" if self._auto_follow else "自动跟随：关"
             status_text = (
-                f"{label}: {len(entries)}；{stats_text}"
+                f"{refresh_mode}: {len(entries)}；{follow_text}；{stats_text}"
                 if entries
                 else (
-                    f"{t('log_refreshed')}：{t('log_no_reports')}；{stats_text}"
+                    f"{t('log_refreshed')}：{t('log_no_reports')}；{follow_text}；{stats_text}"
                     if refreshed
-                    else f"{t('log_no_reports')}；{stats_text}"
+                    else f"{t('log_no_reports')}；{follow_text}；{stats_text}"
                 )
             )
             self._set_status(status_text)
@@ -101,6 +147,75 @@ class LogReportView(Vertical):
         except Exception as exc:
             self._set_error(exc)
             return f"{t('error')}: {t('safe_error_hint')}"
+
+    def _restore_log_position(
+        self,
+        table: DataTable,
+        *,
+        previous_cursor: int | None,
+        previous_row_count: int,
+        new_row_count: int,
+    ) -> None:
+        if new_row_count <= 0:
+            return
+        if self._auto_follow:
+            self._move_cursor_preserving_follow(table, new_row_count - 1)
+            self._scroll_table_end(table)
+            return
+        if previous_cursor is not None:
+            self._move_cursor_preserving_follow(
+                table, min(previous_cursor, new_row_count - 1)
+            )
+            return
+        if previous_row_count:
+            self._move_cursor_preserving_follow(
+                table, min(previous_row_count - 1, new_row_count - 1)
+            )
+
+    @staticmethod
+    def _move_table_cursor(table: DataTable, row: int) -> None:
+        try:
+            table.move_cursor(row=row, column=0)
+        except Exception:
+            pass
+
+    @staticmethod
+    def _scroll_table_end(table: DataTable) -> None:
+        scroll_end = getattr(table, "scroll_end", None)
+        if callable(scroll_end):
+            try:
+                scroll_end(animate=False)
+            except TypeError:
+                scroll_end()
+
+    def _toggle_auto_follow(self) -> None:
+        self._set_auto_follow(not self._auto_follow, announce=True)
+        if self._auto_follow:
+            table = self.query_one("#log-table", DataTable)
+            if table.row_count:
+                self._move_cursor_preserving_follow(table, table.row_count - 1)
+                self._scroll_table_end(table)
+
+    def _move_cursor_preserving_follow(self, table: DataTable, row: int) -> None:
+        self._suppress_follow_detection = True
+        try:
+            self._move_table_cursor(table, row)
+        finally:
+            self._suppress_follow_detection = False
+
+    def _set_auto_follow(self, enabled: bool, *, announce: bool = False) -> None:
+        if self._auto_follow == enabled and not announce:
+            return
+        self._auto_follow = enabled
+        label = "自动跟随：开" if enabled else "自动跟随：关"
+        try:
+            self.query_one("#log-auto-follow", Button).label = label
+        except Exception:
+            pass
+        if announce:
+            self._set_status(
+                f"{label}；{'新日志将自动滚动到底部' if enabled else '手动浏览历史时保持当前位置'}"
+            )
 
     def _write_log(self) -> None:
         message = self.query_one("#log-message-input", TextArea).text.strip()
@@ -112,6 +227,7 @@ class LogReportView(Vertical):
         )
         try:
             self.store.write(message, session_id=session_id)
+            self._set_storage_location(self.store.storage_info(session_id=session_id))
             self.app.notify(t("log_saved"))
             list_status = self.refresh_logs()
             self._set_status(f"{t('log_saved')}；{list_status}")
@@ -157,11 +273,15 @@ class LogReportView(Vertical):
             message = self._wrapped_detail_text(
                 self._entry_message(selected_entry, severity=severity)
             )
+            storage = self.store.storage_info(file_name=file_name)
+            self._set_storage_location(storage)
             stats_text = self._statistics_text(
                 self.store.statistics_for_entries([selected_entry])
             )
             detail = (
                 f"{t('log_loaded')}: {selected_entry.get('file')}\n"
+                f"Storage: {selected_entry.get('path') or storage.get('current_file') or ''}\n"
+                f"Audit: {storage.get('audit_file') or ''}\n"
                 f"ID: {selected_entry.get('report_id')}\n"
                 f"Entry ID: {selected_entry.get('entry_id') or ''}\n"
                 f"{t('log_session_id')}: {selected_entry.get('session_id') or ''}\n"
@@ -188,6 +308,16 @@ class LogReportView(Vertical):
         )
         self._set_status(message)
         self.app.notify(message, severity="error")
+
+    def _set_storage_location(self, storage: dict[str, Any]) -> None:
+        location = self.query_one("#log-storage-location", Static)
+        safe_storage = redact_sensitive(storage)
+        current = str(
+            safe_storage.get("current_file") or safe_storage.get("log_dir") or ""
+        )
+        audit = str(safe_storage.get("audit_file") or "")
+        message = f"存储位置: Log/Report={current}；Audit={audit}"
+        location.update(str(redact_sensitive(message)))
 
     @staticmethod
     def _entry_severity(entry: dict[str, Any]) -> str:

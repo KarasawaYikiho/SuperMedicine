@@ -9,7 +9,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
-from core.redaction import redact_sensitive
+from core.redaction import redact_path_for_display, redact_sensitive
+from core.log_report import resolve_log_storage_locations
 
 
 logger = logging.getLogger(__name__)
@@ -28,13 +29,25 @@ class AuditLogger:
         self._log_path = Path(log_path)
         self._log_path.parent.mkdir(parents=True, exist_ok=True)
 
+    @classmethod
+    def for_project(cls, project_dir: Path) -> "AuditLogger":
+        """Create an audit logger using the shared storage resolver."""
+
+        return cls(resolve_log_storage_locations(project_dir).audit_file)
+
+    @property
+    def storage_path(self) -> str:
+        """Return the redacted audit log path for display/diagnostics."""
+
+        return redact_path_for_display(str(self._log_path))
+
     def _restrict_log_permissions(self) -> None:
         try:
             restrict_file_permissions(self._log_path, 0o600)
         except OSError as exc:
             logger.warning(
                 "audit_log_permission_restriction_failed path=%s error=%s",
-                redact_sensitive(str(self._log_path)),
+                redact_path_for_display(str(self._log_path)),
                 redact_sensitive(str(exc)),
             )
 
@@ -46,6 +59,7 @@ class AuditLogger:
         result: str,
         reason: str,
         trace_id: str | None = None,
+        context: dict | None = None,
     ) -> None:
         entry = redact_sensitive(
             {
@@ -56,8 +70,9 @@ class AuditLogger:
                 "resource": resource,
                 "result": result,
                 "reason": reason,
+                "context": context or {},
                 "diagnostic_stage": "audit.write",
-                "log_path": str(self._log_path),
+                "log_path": self.storage_path,
             }
         )
 

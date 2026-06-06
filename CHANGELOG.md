@@ -16,6 +16,12 @@ Python package fallback version: **0.4.1b0**.
   diagnostic redaction, cross-page workspace visibility after creation,
   interactive `python Install.py` setup, and CI release artifacts that include a
   releasable application Exe plus standalone installer Exe.
+- Documented the user-facing self-evolution workflow, including preview-first
+  generation, explicit write confirmation, sandbox/conservative/full access modes,
+  CLI and TUI entry points, and generated-output safety limits.
+- Documented log storage location display and realtime/refresh behavior for the
+  CLI `log location` / `log follow` commands and the TUI Log page, including
+  redaction and auto-follow boundaries.
 
 ### Changed
 
