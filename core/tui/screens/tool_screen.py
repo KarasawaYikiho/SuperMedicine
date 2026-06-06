@@ -247,6 +247,8 @@ class ToolView(Vertical):
 
     def on_select_changed(self, event: Select.Changed) -> None:
         if event.select.id == "tool-workspace-select":
+            if self._table_mode == "candidates":
+                return
             self._load_tools()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:

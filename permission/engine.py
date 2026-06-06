@@ -13,6 +13,7 @@ from .policy import (
     PermissionPolicy,
     PermissionResult,
     default_policy_path,
+    ensure_default_policy,
 )
 
 
@@ -33,6 +34,13 @@ class PermissionEngine:
     def default_policy_path(cls, project_dir: Path | None = None) -> Path:
         """Return the canonical tracked default permission policy path."""
         return default_policy_path(project_dir)
+
+    @classmethod
+    def ensure_default_policy(
+        cls, project_dir: Path, source_root: Path | None = None
+    ) -> Path:
+        """Ensure the canonical project default permission policy exists."""
+        return ensure_default_policy(project_dir, source_root=source_root)
 
     def _load_policies(self) -> None:
         if not self._policy_dir.exists():

@@ -1,4 +1,5 @@
 exclude .gitignore
+include permission/default_policy.yaml
 prune .github
 prune .supermedicine/checkpoints
 prune .supermedicine/experiments

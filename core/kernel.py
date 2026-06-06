@@ -17,7 +17,11 @@ from core.redaction import redact_sensitive
 from core.session_manager import SessionManager
 from core.workspace_tools import WorkspaceToolService, build_tool_authoring_llm_context
 from permission.engine import PermissionEngine
-from permission.policy import DEFAULT_POLICY_RELATIVE_PATH, PermissionResult
+from permission.policy import (
+    DEFAULT_POLICY_RELATIVE_PATH,
+    PermissionResult,
+    ensure_default_policy,
+)
 
 
 MEDICAL_BOUNDARY = (
@@ -78,6 +82,8 @@ class Kernel:
         self._plugins_dir = plugins_dir or Path("plugins")
         self._policies_dir = policies_dir or DEFAULT_POLICY_RELATIVE_PATH.parent
 
+        self._ensure_canonical_default_policy()
+
         self._config = ConfigCenter(self._config_path)
         self._llm_manager = LLMConfigManager(self._config)
         self._event_bus = EventBus()
@@ -93,6 +99,23 @@ class Kernel:
             self._policies_dir,
             audit_log_path,
         )
+
+    def _ensure_canonical_default_policy(self) -> None:
+        """Create the canonical default policy for normal project policy dirs.
+
+        Custom non-canonical policy directories are left untouched so tests and
+        callers that intentionally provide their own policy set still receive
+        clear loading errors from PermissionEngine when those files are absent.
+        """
+        policy_dir = self._policies_dir
+        if policy_dir == DEFAULT_POLICY_RELATIVE_PATH.parent:
+            ensure_default_policy(Path.cwd())
+            return
+        if (
+            policy_dir.name == DEFAULT_POLICY_RELATIVE_PATH.parent.name
+            and policy_dir.parent.name == DEFAULT_POLICY_RELATIVE_PATH.parent.parent.name
+        ):
+            ensure_default_policy(policy_dir.parent.parent)
 
     @property
     def config(self) -> ConfigCenter:

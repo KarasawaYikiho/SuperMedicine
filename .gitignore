@@ -23,12 +23,12 @@ coverage.xml
 htmlcov/
 
 # SuperMedicine runtime artifacts
-# These files are local-only bootstrap/runtime state, not uploadable content.
-# If any were previously tracked, commit their deletion/de-indexing; do not
-# commit additions or modifications under .supermedicine/.
-.supermedicine/
+# Keep the canonical policy file trackable while excluding local-only state.
+.supermedicine/*
+!.supermedicine/policies/
+.supermedicine/policies/*
+!.supermedicine/policies/default.yaml
 .supermedicine/config.yaml
-.supermedicine/policies/default.yaml
 .supermedicine/install-record.json
 .supermedicine/policies/audit.jsonl
 .supermedicine/checkpoints/

@@ -211,7 +211,7 @@ class CLI:
     ) -> dict:
         """执行任务 — 真实执行用户任务与医疗插件"""
         from core.kernel import Kernel
-        from permission.engine import PermissionEngine
+        from permission.policy import ensure_default_policy
         from core.workspace import WorkspaceManager
 
         # 确定项目根目录
@@ -235,12 +235,7 @@ class CLI:
 
         # 初始化 Kernel（集成 PermissionEngine）
         policies_dir = project_dir / ".supermedicine" / "policies"
-        default_policy = policies_dir / PermissionEngine.DEFAULT_POLICY_FILENAME
-        if not default_policy.exists():
-            raise FileNotFoundError(
-                f"默认权限策略不存在: {default_policy}. 请先运行 'supermedicine init' "
-                "或恢复仓库中的 .supermedicine/policies/default.yaml。"
-            )
+        ensure_default_policy(project_dir)
 
         kernel = Kernel(
             config_path=project_dir / ".supermedicine" / "config.yaml",
@@ -323,6 +318,7 @@ class CLI:
         from core.workspace import WorkspaceManager, validate_workspace_id
         from permission.audit import AuditLogger
         from permission.engine import PermissionEngine
+        from permission.policy import ensure_default_policy
 
         project_dir = Path.cwd()
         manager = WorkspaceManager(project_dir)
@@ -345,8 +341,9 @@ class CLI:
         safe_path = validate_destructive_path(workspace_path, project_dir)
 
         policies_dir = project_dir / ".supermedicine" / "policies"
-        default_policy = policies_dir / PermissionEngine.DEFAULT_POLICY_FILENAME
-        if not default_policy.exists():
+        try:
+            ensure_default_policy(project_dir)
+        except FileNotFoundError:
             audit_logger.log(
                 agent_id="delta",
                 action="workspace.delete",
@@ -354,10 +351,7 @@ class CLI:
                 result="cancelled",
                 reason="missing_default_policy",
             )
-            raise FileNotFoundError(
-                f"默认权限策略不存在: {default_policy}. 请先运行 'supermedicine init' "
-                "或恢复仓库中的 .supermedicine/policies/default.yaml。"
-            )
+            raise
 
         permission_engine = PermissionEngine(policies_dir, audit_log)
         authorization = authorize_dangerous_operation(
@@ -739,6 +733,7 @@ class CLI:
         from core.paper_import.importer import PaperImporter
         from permission.audit import AuditLogger
         from permission.engine import PermissionEngine
+        from permission.policy import ensure_default_policy
 
         project_dir = Path.cwd()
         importer = PaperImporter(project_dir)
@@ -747,6 +742,7 @@ class CLI:
 
         if enrich:
             audit_log = project_dir / ".supermedicine" / "policies" / "audit.jsonl"
+            ensure_default_policy(project_dir)
             enricher = PaperEnricher(
                 PermissionEngine(
                     project_dir / ".supermedicine" / "policies", audit_log
@@ -806,11 +802,13 @@ class CLI:
         from core.paper_import.importer import PaperImporter
         from permission.audit import AuditLogger
         from permission.engine import PermissionEngine
+        from permission.policy import ensure_default_policy
 
         project_dir = Path.cwd()
         importer = PaperImporter(project_dir)
         metadata = importer.get_paper(workspace_id, paper_id)
         audit_log = project_dir / ".supermedicine" / "policies" / "audit.jsonl"
+        ensure_default_policy(project_dir)
         enrichment_result = PaperEnricher(
             PermissionEngine(project_dir / ".supermedicine" / "policies", audit_log),
             AuditLogger(audit_log),
