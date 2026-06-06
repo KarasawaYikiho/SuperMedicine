@@ -15,6 +15,7 @@ except ModuleNotFoundError:
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FORBIDDEN_PLATFORM_AGENT_NAMES = {"Brain", "Planner", "Coder", "Tester"}
+CANONICAL_SUPERMEDICINE_POLICY = ".supermedicine/policies/default.yaml"
 COMMIT_ELIGIBLE_MAINTAINER_DOC_EXAMPLES = {
     "Architecture/ExecutionRoadmap.md",
     "Architecture/ExecutionRoadMap.md",
@@ -209,6 +210,8 @@ def test_tracked_files_do_not_include_forbidden_or_generated_artifacts():
     forbidden_matches = []
 
     for tracked_path in _tracked_files():
+        if tracked_path == CANONICAL_SUPERMEDICINE_POLICY:
+            continue
         parts = _normalized_parts(tracked_path)
         name = parts[-1]
         lower_parts = tuple(part.lower() for part in parts)
@@ -255,12 +258,12 @@ def test_tracked_files_do_not_include_forbidden_or_generated_artifacts():
 
 
 def test_supermedicine_runtime_bootstrap_copies_are_local_only():
-    """No .supermedicine runtime copy may remain tracked in the Git index.
+    """Only the canonical default policy may remain tracked under .supermedicine.
 
-    Local .supermedicine files are runtime/bootstrap artifacts, not repository
-    content. Adding or modifying them in the index must fail this check;
-    staging their deletion/de-indexing is permitted because it removes them from
-    the indexed file list returned by ``git ls-files``.
+    All other .supermedicine runtime/bootstrap files are local-only artifacts,
+    not repository content. Adding or modifying them in the index must fail this
+    check; staging their deletion/de-indexing is permitted because it removes
+    them from the indexed file list returned by ``git ls-files``.
     """
     tracked_supermedicine = sorted(
         path
@@ -268,13 +271,30 @@ def test_supermedicine_runtime_bootstrap_copies_are_local_only():
         if path == ".supermedicine" or path.startswith(".supermedicine/")
     )
 
-    assert tracked_supermedicine == [], (
-        ".supermedicine/* is local-only and must not be tracked. Stage deletion "
-        "or de-indexing for any existing remote-tracked copies; do not stage "
-        "additions or modifications under .supermedicine/."
+    assert tracked_supermedicine == [CANONICAL_SUPERMEDICINE_POLICY], (
+        ".supermedicine runtime files must stay local-only; only the canonical "
+        "default policy may be tracked. Stage deletion or de-indexing for any "
+        "other existing remote-tracked copies; do not stage additions or "
+        "modifications under .supermedicine/."
     )
-    assert (REPO_ROOT / "permission" / "default_policy.yaml").is_file()
-    assert "permission/default_policy.yaml" in _tracked_files()
+    assert (REPO_ROOT / CANONICAL_SUPERMEDICINE_POLICY).is_file()
+
+
+def test_canonical_supermedicine_default_policy_is_tracked_and_not_ignored():
+    path = CANONICAL_SUPERMEDICINE_POLICY
+
+    assert path in _tracked_files()
+
+    result = subprocess.run(
+        ["git", "check-ignore", "-v", "--", path],
+        cwd=REPO_ROOT,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 1, f"{path} must not be ignored by .gitignore"
+    assert result.stdout.strip() == ""
 
 
 def test_gitignore_excludes_runtime_and_external_platform_config_artifacts():
@@ -322,7 +342,6 @@ def test_gitignore_excludes_runtime_and_external_platform_config_artifacts():
 def test_local_only_files_are_ignored_by_active_gitignore_rules():
     ignored_paths = [
         ".supermedicine/config.yaml",
-        ".supermedicine/policies/default.yaml",
         "EXTERNAL_PROJECT_ANALYSIS.md",
         "failure_inventory.md",
     ]
