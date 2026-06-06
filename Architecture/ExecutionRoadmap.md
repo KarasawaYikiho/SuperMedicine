@@ -183,7 +183,8 @@ flowchart TD
   documented as a release-candidate state, without any new claim that later
   skill-deep-integration work has already been implemented.
 - Repository reading pass: completed against the tracked-file inventory in this
-  roadmap, plus the three named local intended self-evolution files when present.
+  roadmap, including the self-evolution source and regression-test files now
+  tracked by Git.
   Curated results live in
   [`MaintainerRepositoryReading.md`](MaintainerRepositoryReading.md).
 - Function/callable mapping: `../FUNCTION_MAP.md` now combines a maintainer
@@ -202,10 +203,9 @@ flowchart TD
 
 1. Start from `git ls-files` and this roadmap's maintained inventory. Treat the
    listed tracked files as the source reading boundary.
-2. Include the three named intended self-evolution files only when present
-   locally: `core/self_evolution.py`, `tests/test_self_evolution.py`, and
-   `tests/test_self_evolution_cli.py`. Record their status separately from the
-   tracked-file count unless they are later promoted into Git.
+2. Include the self-evolution source and regression-test files as normal tracked
+   repository inputs: `core/self_evolution.py`, `tests/test_self_evolution.py`,
+   and `tests/test_self_evolution_cli.py`.
 3. Exclude caches, build outputs, distribution artifacts, egg-info, runtime
    `.supermedicine/` state, local private analysis, raw logs, ignored scratch
    docs, binaries, release bundles, and transient generated files.
@@ -288,9 +288,9 @@ until code, docs, and verification have been completed in a later approved scope
 
 This section is the commit/upload-eligible repository inventory artifact for
 maintainers. It records the tracked-file reading scope from `git ls-files`, the
-intended-but-currently-untracked self-evolution files that should also be read
-for that workstream, explicit exclusions, and target skill/project candidate
-anchors. Maintainer-facing repository docs such as this roadmap and
+self-evolution files included in that tracked scope, explicit exclusions, and
+target skill/project candidate anchors. Maintainer-facing repository docs such
+as this roadmap and
 `../FUNCTION_MAP.md` are commit/upload eligible. Scratch notes, raw audits,
 private analysis, transient runtime logs, local planning files, ignored local
 docs, and generated artifacts remain local-only unless a maintainer explicitly
@@ -308,6 +308,7 @@ maintenance risks while preserving the exclusions in this inventory.
 - `.gitignore`
 - `ARCHITECTURE.md`
 - `Architecture/ExecutionRoadmap.md`
+- `Architecture/MaintainerRepositoryReading.md`
 - `Architecture/OptimizationAudit.md`
 - `Architecture/PhaseImplementationPlan.md`
 - `Architecture/PlatformIntegrationAudit.md`
@@ -375,6 +376,7 @@ maintenance risks while preserving the exclusions in this inventory.
 - `core/path_safety.py`
 - `core/plugin_registry.py`
 - `core/redaction.py`
+- `core/self_evolution.py`
 - `core/serialization.py`
 - `core/session_manager.py`
 - `core/time_utils.py`
@@ -520,6 +522,8 @@ maintenance risks while preserving the exclusions in this inventory.
 - `tests/test_regression_baseline.py`
 - `tests/test_release_smoke.py`
 - `tests/test_repo_hygiene.py`
+- `tests/test_self_evolution.py`
+- `tests/test_self_evolution_cli.py`
 - `tests/test_session_manager.py`
 - `tests/test_standalone_adapter.py`
 - `tests/test_stard.py`
@@ -543,14 +547,13 @@ maintenance risks while preserving the exclusions in this inventory.
 - `tests/test_workspace_cli.py`
 - `tests/test_workspace_tools.py`
 
-### Intended untracked self-evolution files to include in reading scope
+### Self-evolution files included in tracked reading scope
 
-- `core/self_evolution.py` — intended source file for the self-evolution
-  workstream; read with the tracked sources when present locally.
-- `tests/test_self_evolution.py` — intended test coverage for the
-  self-evolution source file; read with tracked tests when present locally.
-- `tests/test_self_evolution_cli.py` — intended CLI-facing test coverage for the
-  self-evolution workstream; read with tracked tests when present locally.
+- `core/self_evolution.py` — source file for the self-evolution workstream.
+- `tests/test_self_evolution.py` — service-level regression coverage for the
+  self-evolution source file.
+- `tests/test_self_evolution_cli.py` — CLI-facing regression coverage for the
+  self-evolution workstream.
 
 ### Exclusions from required reading, with reasons
 

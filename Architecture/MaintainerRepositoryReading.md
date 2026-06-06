@@ -5,11 +5,11 @@ This maintainer-facing report records the line-by-line repository reading pass r
 ## Reading Coverage Summary
 
 - Inventory source: `Architecture/ExecutionRoadmap.md` -> `## Maintainer Repository Reading Inventory`.
-- Included tracked files read line by line: 238.
-- Supplemental intended untracked files read line by line: 3 (`core/self_evolution.py`, `tests/test_self_evolution.py`, `tests/test_self_evolution_cli.py`).
+- Included tracked files read line by line: 242.
+- Supplemental intended untracked files read line by line: 0.
 - Missing included files: none.
-- Python files: 180; tests: 67; non-Python/declarative docs/config/scripts: 58.
-- Intended untracked self-evolution files present locally and covered in this report: `core/self_evolution.py`, `tests/test_self_evolution.py`, and `tests/test_self_evolution_cli.py`. They remain outside the 238 tracked-file count but are included because the roadmap inventory scope names them and the files exist locally.
+- Python files: 183; tests: 69; non-Python/declarative docs/config/scripts: 59.
+- Self-evolution files are now covered as tracked repository inputs: `core/self_evolution.py`, `tests/test_self_evolution.py`, and `tests/test_self_evolution_cli.py`.
 - Exclusions respected: caches, build/dist/egg-info, runtime `.supermedicine/`, binary/release artifacts, ignored scratch docs (including `EXTERNAL_PROJECT_ANALYSIS.md` and `failure_inventory.md`), and raw/private transient notes are not treated as source inputs.
 
 ## Module and Flow Analysis
@@ -45,7 +45,7 @@ adapters/base_adapter.py plus opencode/claude/standalone implement permissioned 
 Cli.py, core/workspace*.py, core/experience.py, core/tui/* provide workspace creation/selection, paper and experience screens, dialog history, permissions UI, LLM UI, and Chinese workbench flows.
 
 ### Self-evolution
-Self-evolution is implemented locally by `core/self_evolution.py` with coverage in `tests/test_self_evolution.py` and `tests/test_self_evolution_cli.py`. The flow is user intent plus optional confirmed experience source -> deterministic preview plan/artifacts -> explicit confirmation and permission/audit authorization -> sandbox/conservative/full write handling for whitelisted Markdown/Python/R generated artifacts.
+Self-evolution is implemented by tracked `core/self_evolution.py` with coverage in `tests/test_self_evolution.py` and `tests/test_self_evolution_cli.py`. The flow is user intent plus optional confirmed experience source -> deterministic preview plan/artifacts -> explicit confirmation and permission/audit authorization -> sandbox/conservative/full write handling for whitelisted Markdown/Python/R generated artifacts.
 
 ### Tests and CI
 tests/* and .github/workflows/ci.yml cover unit/integration/regression/release hygiene across adapters, core, plugins, TUI, install/uninstall, paper import, LLM, permissions, and workspace paths.
@@ -64,7 +64,7 @@ tests/* and .github/workflows/ci.yml cover unit/integration/regression/release h
 - Permissions: `permission/*`, path safety, operation guard, and adapter checks enforce governance; maintenance risk is bypass through new tools/callbacks.
 - CLI/TUI: `Cli.py` and `core/tui/*` provide command and Chinese workbench surfaces; maintenance risk is callback/state drift not visible in static maps.
 - Install/uninstall: top-level and installer modules cover setup/removal/release support; maintenance risk is host-specific filesystem/PATH behavior.
-- Test coverage: broad tests exist for core/plugin/adapter/TUI/import/permission/install paths, and local intended self-evolution tests cover service safety and CLI surfaces for preview, confirmation, permission modes, path rejection, and help regression.
+- Test coverage: broad tests exist for core/plugin/adapter/TUI/import/permission/install paths, and tracked self-evolution tests cover service safety and CLI surfaces for preview, confirmation, permission modes, path rejection, and help regression.
 
 ## Per-File Reading Inventory
 
@@ -102,9 +102,20 @@ tests/* and .github/workflows/ci.yml cover unit/integration/regression/release h
 - Maintenance risks: keep synchronized with callers and documentation.
 
 ### `Architecture/ExecutionRoadmap.md`
-- Lines read: 487.
+- Lines read: 625.
 - Purpose: Maintainer/user documentation for ExecutionRoadmap.
 - Key responsibilities: declared sections/keys: # Execution Roadmap, ## Current Architecture, ## Completed Roadmap Flow, ## Project Rule: Planning vs Push Gate, ## Release-Candidate State
+- Public interfaces: Human-facing Markdown content; headings and checklists are the public interface.
+- Internal dependencies: none beyond file format/runtime loader.
+- Data flow: loaded/read by packaging, CLI, docs, registry, or maintainer workflows as appropriate.
+- Side effects: no runtime side effects when read as documentation/config.
+- Configuration assumptions: standard project/runtime assumptions only.
+- Maintenance risks: keep synchronized with callers and documentation.
+
+### `Architecture/MaintainerRepositoryReading.md`
+- Lines read: 2726.
+- Purpose: Maintainer/user documentation for MaintainerRepositoryReading.
+- Key responsibilities: declared sections/keys: # Maintainer Repository Reading Report, ## Reading Coverage Summary, ## Module and Flow Analysis, ## Target Integration Candidate Findings, ## Per-File Reading Inventory
 - Public interfaces: Human-facing Markdown content; headings and checklists are the public interface.
 - Internal dependencies: none beyond file format/runtime loader.
 - Data flow: loaded/read by packaging, CLI, docs, registry, or maintainer workflows as appropriate.
@@ -201,7 +212,7 @@ tests/* and .github/workflows/ci.yml cover unit/integration/regression/release h
 - Maintenance risks: keep synchronized with callers and documentation.
 
 ### `FUNCTION_MAP.md`
-- Lines read: 19538.
+- Lines read: 19786.
 - Purpose: Maintainer/user documentation for FUNCTION MAP.
 - Key responsibilities: declared sections/keys: # Function Map / Repository Callable Inventory, ## Security and Review Notes, ## Static/Dynamic Analysis Limitations, ## Summary, ## Callable Inventory by Source File
 - Public interfaces: Human-facing Markdown content; headings and checklists are the public interface.
@@ -256,7 +267,7 @@ tests/* and .github/workflows/ci.yml cover unit/integration/regression/release h
 - Maintenance risks: keep synchronized with callers and documentation.
 
 ### `README.md`
-- Lines read: 518.
+- Lines read: 519.
 - Purpose: Maintainer/user documentation for README.
 - Key responsibilities: declared sections/keys: # SuperMedicine, ## 中文简介, ## Feature Summary, ## Installation, Requirements:
 - Public interfaces: Human-facing Markdown content; headings and checklists are the public interface.
