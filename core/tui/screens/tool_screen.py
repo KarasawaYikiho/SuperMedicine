@@ -110,7 +110,7 @@ class ToolView(Vertical):
 
     def focus_default(self) -> None:
         try:
-            self.query_one("#self-evolution-instruction-input", Input).focus()
+            self.query_one("#tool-workspace-select", Select).focus()
         except Exception:
             pass
 

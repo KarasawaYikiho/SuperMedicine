@@ -81,6 +81,12 @@ workspaces/
 
 # Log files
 *.log
+*.zip
+
+# Temporary directories/files
+tmp/
+temp/
+*.tmp
 
 # macOS metadata
 .DS_Store

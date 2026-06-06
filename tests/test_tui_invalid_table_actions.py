@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import time
 
 import yaml
-from textual.widgets import DataTable, Input, Select, Static
+from textual.widgets import Button, DataTable, Input, Select, Static
 
 from core.tui.app import SuperMedicineTUI
 from core.tui.i18n import t
@@ -36,6 +37,16 @@ def _assert_tool_empty_run_error(status: Static) -> None:
     assert "status-error" in classes or (
         callable(has_class) and has_class("status-error")
     )
+
+
+async def _wait_for_tui_condition(pilot, condition, *, timeout: float = 2.0) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        await pilot.pause()
+        if condition():
+            return
+    await pilot.pause()
+    assert condition()
 
 
 def test_tool_run_on_empty_table_shows_red_error_without_exiting_tui(tmp_path):
@@ -90,10 +101,20 @@ def test_tool_screen_scans_candidates_without_tool_id_input(tmp_path):
             view = app._views["tool"]
             assert list(view.query("#tool-id-input")) == []
             view.query_one("#tool-workspace-select", Select).value = "study-a"
+            await _wait_for_tui_condition(
+                pilot,
+                lambda: view.query_one("#tool-workspace-select", Select).value
+                == "study-a",
+            )
+            view.query_one("#tool-scan", Button).focus()
             await pilot.click("#tool-scan")
-            await pilot.pause()
 
             table = view.query_one("#tool-table", DataTable)
+            await _wait_for_tui_condition(
+                pilot,
+                lambda: getattr(view, "_table_mode") == "candidates"
+                and table.row_count == 1,
+            )
             assert table.row_count == 1
             assert table.get_row_at(0)[2] == "python-stats"
 
