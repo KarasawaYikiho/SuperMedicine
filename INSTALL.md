@@ -41,6 +41,14 @@ confirmation summary. API key input is hidden. Defaults are shown in brackets,
 blank required LLM values are rejected, Base URL is validated as an `http(s)`
 address, and `.supermedicine/config.yaml` is written automatically.
 
+When the chosen target already looks like a SuperMedicine install, the no-flag
+wizard stops and asks how to proceed before any files are changed. The two main
+choices are **uninstall old version** or **update version**. Update preserves the
+existing `.supermedicine/config.yaml` and recorded user data by default, refreshes
+`.supermedicine/install-record.json`, and enables overwrite behavior only for
+installer-owned payload/Desktop artifacts. If you choose uninstall, the wizard asks
+a second confirmation: preserve user data or remove recorded user data.
+
 普通用户推荐流程是：下载或克隆完整项目/发布包，进入包含 `Install.py` 的根目录，
 直接运行 `python install.py`，按提示确认安装/项目路径并填写 LLM provider、BaseURL、
 model 和 API key。不要只复制单个 `Install.py` 到其他目录；发布包内的 Python 包、
@@ -120,6 +128,8 @@ The no-flag installer asks these questions in order:
 | Prompt | Meaning | Typical answer |
 |--------|---------|----------------|
 | `安装/项目路径` | Directory where local SuperMedicine state and, for the Exe installer, extracted files are placed. | Press Enter for the current directory, or enter a full path such as `C:\SuperMedicine`. |
+| `已有安装处理` | Appears only when an existing install is detected. Choose uninstall old version, update version, or cancel. | Choose update to keep current config/user data; choose uninstall only when you want a removal pass first. |
+| `用户数据处理` | Appears only after choosing uninstall old version. | Choose preserve user data unless you intentionally want a clean removal. |
 | `释放完整程序文件到该目录` | Copy the bundled release payload into the target directory. | Source `python install.py` usually defaults to no; `SuperMedicineInstaller.exe` defaults to yes. |
 | `初始化 .supermedicine 配置` | Create/update `.supermedicine/config.yaml`. | Choose the default yes for first install. |
 | `Provider` | Provider name, such as `openai`, `anthropic`, `openrouter`, `deepseek`, or your gateway name. | Press Enter for `openai` if using OpenAI-compatible defaults. |
@@ -176,6 +186,25 @@ python install.py --release-exe dist/SuperMedicine.exe \
   --desktop-dir .pytest-tmp/Desktop \
   --exe-dry-run
 ```
+
+Existing-install handling is explicit in scripted mode and never prompts. If the
+installer detects `.supermedicine/install-record.json`, `.supermedicine/config.yaml`,
+payload collisions, or a Desktop Exe collision, pass one of:
+
+- `--if-installed update` — preserve `.supermedicine/config.yaml` and user data,
+  refresh the install record, and overwrite installer-owned payload/Desktop
+  artifacts where the requested action writes them.
+- `--if-installed uninstall --preserve-user-data` — run the safe uninstall flow
+  first and retain paths recorded as user data.
+- `--if-installed uninstall --remove-user-data` — run the safe uninstall flow first
+  and remove recorded user data for a clean reinstall.
+- `--if-installed fail` — exit safely when anything is detected.
+- `--if-installed ignore` — bypass this guard for advanced callers that already
+  handled existing state.
+
+For safety, `--if-installed uninstall` fails unless exactly one of
+`--preserve-user-data` or `--remove-user-data` is supplied. Scripted mode does not
+fall back to prompts.
 
 ### Standalone Windows Installer Exe
 
@@ -255,6 +284,11 @@ Use `--extract-overwrite` only when you intentionally want to replace existing
 files in the target directory. The extraction path and the `--release-exe` desktop
 copy path share `installer/exe_release.py`, so CI, the Python installer, and the
 standalone installer Exe use one release-layout contract.
+
+For unattended upgrades, prefer `--if-installed update` instead of manually pairing
+`--extract-overwrite` and `--exe-overwrite`; the installer applies overwrite to
+installer-owned payload/Desktop artifacts while preserving local configuration and
+recorded user data.
 
 Use placeholders in shared examples. Replace them only in private shells, secret
 managers, CI secrets, or untracked local files.

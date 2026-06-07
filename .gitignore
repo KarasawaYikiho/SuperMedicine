@@ -11,6 +11,7 @@ release-artifacts/
 .eggs/
 *.egg
 *.exe
+!tests/fixtures/**/*.exe
 
 # Test/lint/type-check/coverage artifacts
 .pytest_cache/
@@ -50,11 +51,15 @@ docs/superpowers/
 # - Maintainer-facing repository docs are commit/upload eligible when curated to
 #   explain project structure, execution roadmaps, function maps, or maintenance
 #   decisions (for example: Architecture/ExecutionRoadmap.md,
-#   Architecture/ExecutionRoadMap.md, FUNCTION_MAP.md, FunctionMap.md,
-#   REQUIREMENTS_TRACEABILITY.md).
+#   Architecture/ExecutionRoadMap.md, FUNCTION_MAP.md). The authoritative
+#   FunctionMap location is the root uppercase `FUNCTION_MAP.md`; avoid
+#   case-conflicting or duplicate FunctionMap files.
+# - `REQUIREMENTS_TRACEABILITY.md` is local-only and forbidden from upload.
 # - Local-only temporary engineering/audit artifacts stay excluded until they are
 #   intentionally converted into maintainer-facing documentation.
-Docs/
+# - Do not ignore a broad Docs/ directory: Windows case-insensitive matching can
+#   also hide curated lowercase docs/. Use the specific scratch/private patterns
+#   below for local-only notes instead.
 EXTERNAL_PROJECT_ANALYSIS.md
 failure_inventory.md
 *_audit_dump*.md
@@ -66,15 +71,28 @@ failure_inventory.md
 *_private_analysis*.md
 *_transient_checklist*.md
 *_uncurated_engineering*.md
+/REQUIREMENTS_TRACEABILITY.md
 
 # Local-only planning notes
 /Planning/NextSteps.md
 
 # Environment secrets
 .env
+.env.*
+.envrc
+!.env.example
+!.env.sample
+!.env.template
+!*.env.example
+!*.env.sample
+!*.env.template
 
 # Python virtual environments
 .venv/
+venv/
+env/
+.tox/
+.nox/
 
 # Runtime workspace data (not committed)
 workspaces/
@@ -82,6 +100,7 @@ workspaces/
 # Log files
 *.log
 *.zip
+!tests/fixtures/**/*.zip
 
 # Temporary directories/files
 tmp/
@@ -93,3 +112,35 @@ temp/
 
 # Windows metadata
 Thumbs.db
+
+# Protected curated repository inputs that must remain trackable for CI,
+# installer/source review, maintainer documentation, and policy governance.
+!.github/
+!.github/workflows/
+!.github/workflows/**
+!tests/
+!tests/**
+!installer/
+!installer/**
+
+# Re-ignore generated/cache artifacts re-exposed by protected tree negations.
+tests/**/__pycache__/
+tests/**/*.py[cod]
+installer/**/__pycache__/
+installer/**/*.py[cod]
+
+!install.py
+!Install.py
+!Uninstall.py
+!install.json
+!FUNCTION_MAP.md
+!Architecture/
+!Architecture/**
+!README.md
+!ARCHITECTURE.md
+!CHANGELOG.md
+!CONTRIBUTING.md
+!INSTALL.md
+!SECURITY.md
+!SECURITY_HARDENING_CHECKLIST.md
+!.supermedicine/policies/default.yaml

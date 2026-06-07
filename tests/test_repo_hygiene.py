@@ -20,9 +20,8 @@ COMMIT_ELIGIBLE_MAINTAINER_DOC_EXAMPLES = {
     "Architecture/ExecutionRoadmap.md",
     "Architecture/ExecutionRoadMap.md",
     "FUNCTION_MAP.md",
-    "FunctionMap.md",
-    "REQUIREMENTS_TRACEABILITY.md",
 }
+FORBIDDEN_LOCAL_ONLY_ROOT_DOCS = {"REQUIREMENTS_TRACEABILITY.md"}
 LOCAL_ONLY_ENGINEERING_ARTIFACT_PATTERNS = {
     "*_audit_dump*.md",
     "*_audit_dump*.json",
@@ -212,6 +211,8 @@ def test_tracked_files_do_not_include_forbidden_or_generated_artifacts():
     for tracked_path in _tracked_files():
         if tracked_path == CANONICAL_SUPERMEDICINE_POLICY:
             continue
+        if tracked_path in FORBIDDEN_LOCAL_ONLY_ROOT_DOCS:
+            forbidden_matches.append(tracked_path)
         parts = _normalized_parts(tracked_path)
         name = parts[-1]
         lower_parts = tuple(part.lower() for part in parts)
@@ -333,6 +334,7 @@ def test_gitignore_excludes_runtime_and_external_platform_config_artifacts():
         "*_private_analysis*.md",
         "*_transient_checklist*.md",
         "*_uncurated_engineering*.md",
+        "/REQUIREMENTS_TRACEABILITY.md",
     }
 
     for pattern in required_patterns:
@@ -344,6 +346,7 @@ def test_local_only_files_are_ignored_by_active_gitignore_rules():
         ".supermedicine/config.yaml",
         "EXTERNAL_PROJECT_ANALYSIS.md",
         "failure_inventory.md",
+        "REQUIREMENTS_TRACEABILITY.md",
     ]
 
     for path in ignored_paths:
@@ -358,6 +361,21 @@ def test_gitignore_allows_curated_maintainer_repository_docs():
     assert "Maintainer-facing repository docs are commit/upload eligible" in gitignore
     for pattern in COMMIT_ELIGIBLE_MAINTAINER_DOC_EXAMPLES:
         assert pattern not in active_patterns
+
+
+def test_function_map_is_authoritative_root_doc_and_traceability_is_local_only():
+    tracked_files = _tracked_files()
+
+    assert "FUNCTION_MAP.md" in tracked_files
+    assert (REPO_ROOT / "FUNCTION_MAP.md").is_file()
+    assert "docs/function-map.md" not in tracked_files
+    assert "docs/FunctionMap.md" not in tracked_files
+    assert "FunctionMap.md" not in tracked_files
+
+    assert "REQUIREMENTS_TRACEABILITY.md" not in tracked_files
+    assert (REPO_ROOT / "REQUIREMENTS_TRACEABILITY.md").is_file()
+    rule = _git_check_ignore("REQUIREMENTS_TRACEABILITY.md")
+    assert "/REQUIREMENTS_TRACEABILITY.md" in rule, rule
 
 
 def test_gitignore_keeps_temporary_engineering_artifacts_local_only():

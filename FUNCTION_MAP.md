@@ -1,8 +1,9 @@
 # Function Map / Repository Callable Inventory
 
-> Visible release path: `docs/function-map.md` would be ignored by repository
-> rules (`.gitignore` contains `docs/`), so this root-level `FUNCTION_MAP.md` is
-> the trackable verification artifact. Do not delete it. This document is
+> Authoritative maintainer location: this root-level `FUNCTION_MAP.md` is the
+> single trackable FunctionMap artifact for the repository. Do not create
+> case-conflicting `FunctionMap.md` or duplicate `docs/function-map.md` copies.
+> This document is
 > generated from Python AST static analysis and must not include configuration
 > values, environment values, API keys, tokens, passwords, private endpoints,
 > raw logs, or other secret material.
@@ -50,11 +51,11 @@ runtime directories.
 | File/module | Main functions/classes/components | Responsibility | Inputs / outputs | Side effects and dependencies |
 | --- | --- | --- | --- | --- |
 | `Cli.py` | `_configure_stdio_errors`, `_log_json`, `_configure_cli_logging`, workspace/experience/paper/self-evolution helper converters, `CLI`, `main` | Compatibility CLI entry point and user command router for init/status/test/run/workspace/paper/experience/log/permission/tool flows. | Receives argparse-style command parameters and user paths; emits console text, JSON responses, workspace records, plugin/task results, and structured errors. | Console I/O, filesystem writes, subprocess/release-helper calls; depends on `core`, `permission`, `plugins`, installer helpers, and redaction/logging utilities. |
-| `Install.py`, `install.py`, `installer/entrypoint.py` | `write_llm_config`, `detect_platform`, `init_config`, `main` plus config merge/provider normalization helpers | Installation/bootstrap entry points and default runtime configuration creation. | Install flags, provider/environment choices, filesystem locations; outputs config files and installer messages. | Filesystem mutation, possible PATH/platform probing; depends on `core`, `permission`, `urllib`, and host filesystem permissions. |
+| `Install.py`, `install.py`, `installer/entrypoint.py` | `ExistingInstallEvidence`, `ExistingInstallDetection`, `detect_existing_install`, `write_install_record`, `write_llm_config`, `detect_platform`, `init_config`, `main` plus config merge/provider normalization helpers | Installation/bootstrap entry points, existing-install handling, install-record refresh, and default runtime configuration creation. | Install flags, existing-install policy choices, provider/environment choices, filesystem locations; outputs config files, secret-free install records, installer messages, and safe exits for scripted ambiguity. | Filesystem mutation for confirmed install/update/uninstall paths, possible PATH/platform probing; existing-install detection itself is read-only; depends on `core`, `permission`, `Uninstall`, `urllib`, and host filesystem permissions. |
 | `Uninstall.py` | `RemovalCandidate`, `Residual`, `_redact_text`, `_redact_data`, `_safe_display`, `_is_within`, `_load_install_record`, `_iter_recorded_paths`, `collect_removal_candidates`, `uninstall`, `main` | Safe uninstall and residual cleanup discovery. | Install records/manifests and user confirmation flags; outputs removal plans, console status, and structured residuals. | Filesystem deletion when confirmed, subprocess/registry probing on supported hosts, path containment/redaction. |
 | `installer/exe_release.py` | `ExeReleaseError`, `resolve_desktop_dir`, `resolve_exe_path`, `validate_release_payload_root`, `iter_release_payload_files`, `release_exe_to_desktop` | Local executable release payload validation/copy support. | Release payload roots and target filename; outputs copied payload/exe paths or validation errors. | Filesystem traversal/copy; excludes generated/cache/private payloads by rule. |
 
-Call/data flow: console command -> `Cli.py`/installer compatibility wrapper -> core service/plugin/permission layer -> structured result/log/audit/console output. Install/uninstall/release helpers are host-facing and must keep path safety/redaction aligned with `permission` and `core.path_safety`.
+Call/data flow: console command -> `Cli.py`/installer compatibility wrapper -> existing-install detection/policy branch when installing -> core service/plugin/permission layer -> structured result/log/audit/console output. Install/uninstall/release helpers are host-facing and must keep path safety/redaction aligned with `permission` and `core.path_safety`; install records must not contain API keys or other secrets.
 
 ### Core kernel, configuration, events, sessions, and logging
 

@@ -273,6 +273,7 @@ def collect_removal_candidates(
         )
 
     unique: dict[Path, RemovalCandidate] = {}
+    preserved_roots: list[Path] = []
     for candidate in candidates:
         resolved = candidate.path.resolve()
         if not _is_within(resolved, project_dir):
@@ -283,12 +284,24 @@ def collect_removal_candidates(
             continue
         if preserve_user_data and candidate.user_data:
             skipped.append(f"preserved-user-data:{resolved}")
+            preserved_roots.append(resolved)
+            continue
+        if preserve_user_data and any(
+            preserved == resolved or _is_within(preserved, resolved)
+            for preserved in preserved_roots
+        ):
+            skipped.append(f"preserved-user-data-parent:{resolved}")
             continue
         existing = unique.get(resolved)
         if existing is None or candidate.recorded:
             unique[resolved] = RemovalCandidate(
                 resolved, candidate.reason, candidate.recorded
             )
+    if preserve_user_data and preserved_roots:
+        for path in list(unique):
+            if any(preserved == path or _is_within(preserved, path) for preserved in preserved_roots):
+                skipped.append(f"preserved-user-data-parent:{path}")
+                unique.pop(path, None)
     return sorted(
         unique.values(), key=lambda item: len(item.path.parts), reverse=True
     ), skipped

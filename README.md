@@ -89,6 +89,14 @@ should run the command with no flags and answer the questions on screen:
    only if you choose yes.
 4. **确认安装** — review the summary, start installation, or return to edit answers.
 
+If the selected target already appears to contain SuperMedicine, the wizard pauses
+before continuing. It offers two primary choices: **uninstall the old version** or
+**update the version**. Choosing uninstall asks a second safety question: preserve
+user data (recommended) or remove recorded user data for a clean uninstall. The
+update path preserves `.supermedicine/config.yaml` and user data by default,
+refreshes `.supermedicine/install-record.json`, and overwrites installer-owned
+payload/Desktop artifacts only where the installer action requires it.
+
 Windows release artifacts also include **SuperMedicineInstaller.exe**. Double-click
 it or run it from a terminal with no flags for the same console wizard. In the Exe
 build, the first step defaults to releasing the full bundled program payload into
@@ -140,6 +148,13 @@ python install.py --unified-install --release-exe dist/SuperMedicine.exe \
   --base-url https://api.openai.com/v1 \
   --model gpt-4o-mini
 ```
+
+Scripted installs never prompt when an existing install is detected. Add
+`--if-installed update|uninstall|fail|ignore` explicitly. `update` preserves
+`.supermedicine/config.yaml` and user data while refreshing the install record;
+`uninstall` must also include exactly one of `--preserve-user-data` or
+`--remove-user-data`; `fail` exits safely; `ignore` bypasses the protection for
+advanced callers that have already made their own decision.
 
 Use `python Cli.py status` if the `supermedicine` console script is not on PATH.
 For virtual environments, development dependencies, optional R support, and

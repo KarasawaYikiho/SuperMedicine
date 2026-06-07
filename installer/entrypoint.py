@@ -11,12 +11,16 @@ the explicit optional ``--detect`` command.
 from __future__ import annotations
 
 import argparse
+import json
 import getpass
 import importlib.util
 import logging
 import os
 import shutil
 import sys
+import tempfile
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urlparse
@@ -54,6 +58,42 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "providers": {},
     },
 }
+
+INSTALL_RECORD_RELATIVE = Path(".supermedicine") / "install-record.json"
+CONFIG_RELATIVE = Path(".supermedicine") / "config.yaml"
+INSTALL_RECORD_SCHEMA_VERSION = 1
+INSTALL_RECORD_NAME = "supermedicine"
+PAYLOAD_COLLISION_PATHS: tuple[Path, ...] = (
+    Path("Cli.py"),
+    Path("Install.py"),
+    Path("install.py"),
+    Path("installer") / "entrypoint.py",
+    Path("installer") / "exe_release.py",
+    Path("core"),
+    Path("permission"),
+    Path("dist") / "SuperMedicine.exe",
+    Path("SuperMedicine.exe"),
+)
+
+
+@dataclass(frozen=True)
+class ExistingInstallEvidence:
+    kind: str
+    path: Path
+    priority: int
+    detail: str = ""
+
+
+@dataclass(frozen=True)
+class ExistingInstallDetection:
+    installed: bool
+    project_dir: Path
+    primary: ExistingInstallEvidence | None = None
+    evidence: tuple[ExistingInstallEvidence, ...] = field(default_factory=tuple)
+
+    @property
+    def reason(self) -> str:
+        return self.primary.kind if self.primary is not None else "none"
 
 _PROVIDER_ENV_MAP: dict[str, str] = {
     "openai": "OPENAI_API_KEY",
@@ -219,6 +259,139 @@ def _redact(value: str | None) -> str:
     return "<redacted>" if value else ""
 
 
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def _safe_relative_string(path: Path, root: Path) -> str:
+    try:
+        return path.resolve(strict=False).relative_to(root.resolve(strict=False)).as_posix()
+    except ValueError:
+        return str(path)
+
+
+def _read_package_version() -> str:
+    return str(DEFAULT_CONFIG.get("version", ""))
+
+
+def _atomic_write_json(path: Path, data: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    text = json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    with tempfile.NamedTemporaryFile(
+        "w", encoding="utf-8", dir=path.parent, delete=False
+    ) as handle:
+        tmp_name = handle.name
+        handle.write(text)
+    os.replace(tmp_name, path)
+
+
+def detect_existing_install(
+    project_dir: Path,
+    *,
+    desktop_dir: Path | None = None,
+    exe_target_name: str | None = None,
+    include_project: bool = True,
+    include_payload: bool = True,
+) -> ExistingInstallDetection:
+    """Detect an existing SuperMedicine install without modifying files.
+
+    Priority is deterministic: install record, config file, payload collision,
+    then desktop executable collision.
+    """
+
+    project_dir = Path(project_dir).expanduser().resolve()
+    evidence: list[ExistingInstallEvidence] = []
+    record_path = project_dir / INSTALL_RECORD_RELATIVE
+    config_path = project_dir / CONFIG_RELATIVE
+    if include_project and record_path.is_file():
+        evidence.append(
+            ExistingInstallEvidence("install-record", record_path, 10, "record exists")
+        )
+    if include_project and config_path.is_file():
+        evidence.append(ExistingInstallEvidence("config", config_path, 20, "config exists"))
+    if include_project and include_payload:
+        for relative in PAYLOAD_COLLISION_PATHS:
+            candidate = project_dir / relative
+            if candidate.exists():
+                evidence.append(
+                    ExistingInstallEvidence(
+                        "payload-collision", candidate, 30, relative.as_posix()
+                    )
+                )
+                break
+    if desktop_dir is not None:
+        desktop_candidate = Path(desktop_dir).expanduser() / (
+            exe_target_name or "SuperMedicine.exe"
+        )
+        if desktop_candidate.exists():
+            evidence.append(
+                ExistingInstallEvidence(
+                    "desktop-exe-collision", desktop_candidate, 40, "desktop exe exists"
+                )
+            )
+    ordered = tuple(sorted(evidence, key=lambda item: item.priority))
+    return ExistingInstallDetection(bool(ordered), project_dir, ordered[0] if ordered else None, ordered)
+
+
+def _record_artifact_value(value: Any, project_dir: Path) -> str | None:
+    if value is None:
+        return None
+    path = Path(value)
+    if not path.is_absolute():
+        return path.as_posix()
+    return _safe_relative_string(path, project_dir)
+
+
+def write_install_record(
+    project_dir: Path,
+    *,
+    artifacts: dict[str, Any] | None = None,
+    mode: str = "init",
+) -> dict[str, Any]:
+    """Write or refresh secret-free installer ownership metadata."""
+
+    project_dir = Path(project_dir).expanduser().resolve()
+    record_path = project_dir / INSTALL_RECORD_RELATIVE
+    previous: dict[str, Any] = {}
+    if record_path.is_file():
+        try:
+            loaded = json.loads(record_path.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                previous = loaded
+        except json.JSONDecodeError:
+            previous = {}
+    now = _utc_now_iso()
+    record: dict[str, Any] = {
+        "schema_version": INSTALL_RECORD_SCHEMA_VERSION,
+        "name": INSTALL_RECORD_NAME,
+        "version": str(DEFAULT_CONFIG.get("version", "")),
+        "package_version": _read_package_version(),
+        "install_dir": str(project_dir),
+        "created_at": previous.get("created_at") or now,
+        "updated_at": now,
+        "mode": mode,
+        "artifacts": previous.get("artifacts", {}),
+    }
+    if artifacts:
+        merged = dict(record["artifacts"] if isinstance(record["artifacts"], dict) else {})
+        for key, value in artifacts.items():
+            if value is None:
+                continue
+            if isinstance(value, list):
+                normalized_values = [
+                    item for item in (_record_artifact_value(v, project_dir) for v in value) if item
+                ]
+                merged[key] = normalized_values
+                record[key] = normalized_values
+            else:
+                normalized_value = _record_artifact_value(value, project_dir)
+                merged[key] = normalized_value
+                record[key] = normalized_value
+        record["artifacts"] = merged
+    _atomic_write_json(record_path, record)
+    return record
+
+
 def _resolve_install_value(name: str, explicit: str | None) -> str | None:
     if explicit:
         return explicit
@@ -284,6 +457,42 @@ def _prompt_yes_no(prompt: str, default: bool = False) -> bool:
         if value in {"n", "no", "0", "false", "否", "不"}:
             return False
         logger.info("提示: 请输入 y 或 n。")
+
+
+def _prompt_existing_install_action(detection: ExistingInstallDetection) -> str:
+    logger.info("")
+    logger.info("检测到已有 SuperMedicine 安装: %s", detection.project_dir)
+    logger.info("检测依据: %s (%s)", detection.reason, detection.primary.path if detection.primary else "")
+    logger.info("请选择处理方式:")
+    logger.info("  1) 卸载旧版本后继续安装")
+    logger.info("  2) 更新版本（保留 .supermedicine/config.yaml 和用户数据）")
+    logger.info("  3) 取消安装")
+    while True:
+        value = input("已有安装处理 [1/2/3]: ").strip().lower()
+        if value in {"1", "uninstall", "u", "卸载"}:
+            return "uninstall"
+        if value in {"2", "update", "更新"}:
+            return "update"
+        if value in {"3", "cancel", "c", "取消"}:
+            return "cancel"
+        logger.info("提示: 请输入 1、2 或 3。")
+
+
+def _prompt_preserve_user_data() -> bool:
+    logger.info("")
+    logger.info("卸载旧版本时是否保留用户数据？")
+    logger.info("  1) 保留用户数据（推荐）")
+    logger.info("  2) 删除用户数据（干净卸载）")
+    logger.info("  3) 返回上一步")
+    while True:
+        value = input("用户数据处理 [1/2/3]: ").strip().lower()
+        if value in {"1", "preserve", "keep", "保留"}:
+            return True
+        if value in {"2", "remove", "delete", "删除"}:
+            return False
+        if value in {"3", "back", "返回"}:
+            raise KeyboardInterrupt("back")
+        logger.info("提示: 请输入 1、2 或 3。")
 
 
 def _prompt_path(prompt: str, default: Path) -> Path:
@@ -362,6 +571,19 @@ def _run_interactive_installer(args: argparse.Namespace) -> None:
         logger.info("")
         logger.info("[1/4] 选择安装位置")
         install_path = _prompt_path("安装/项目路径", Path.cwd())
+        detection = detect_existing_install(install_path, include_payload=False)
+        existing_action = "ignore"
+        preserve_user_data = True
+        if detection.installed:
+            existing_action = _prompt_existing_install_action(detection)
+            if existing_action == "cancel":
+                logger.info("安装已取消。")
+                return
+            if existing_action == "uninstall":
+                try:
+                    preserve_user_data = _prompt_preserve_user_data()
+                except KeyboardInterrupt:
+                    continue
         extract_release = _prompt_yes_no(
             "释放完整程序文件到该目录", bool(getattr(sys, "frozen", False))
         )
@@ -375,7 +597,9 @@ def _run_interactive_installer(args: argparse.Namespace) -> None:
             "api_key": None,
             "model": None,
         }
-        if init_config_enabled:
+        if init_config_enabled and existing_action == "update" and (install_path / CONFIG_RELATIVE).is_file():
+            logger.info("更新模式: 跳过 LLM 重新填写，保留现有 config.yaml。")
+        elif init_config_enabled:
             imported_config = (
                 _load_llm_config_file(args.llm_config) if args.llm_config else {}
             )
@@ -431,23 +655,44 @@ def _run_interactive_installer(args: argparse.Namespace) -> None:
         try:
             logger.info("")
             logger.info("正在安装...")
-            if init_config_enabled:
-                init_config(
-                    install_path,
-                    provider=llm_config.get("provider"),
-                    base_url=llm_config.get("base_url"),
-                    api_key=llm_config.get("api_key"),
-                    model=llm_config.get("model"),
+            if existing_action == "uninstall":
+                _uninstall_existing_install(
+                    install_path, preserve_user_data=preserve_user_data
                 )
+            elif existing_action == "update":
+                args.extract_overwrite = True
+                args.exe_overwrite = True
+                logger.info("更新模式: 将保留 .supermedicine/config.yaml 和用户数据。")
+            payload_result: dict[str, Any] | None = None
+            exe_result: dict[str, Any] | None = None
+            if init_config_enabled:
+                if existing_action == "update" and (install_path / CONFIG_RELATIVE).is_file():
+                    _refresh_existing_project_config(install_path)
+                else:
+                    init_config(
+                        install_path,
+                        provider=llm_config.get("provider"),
+                        base_url=llm_config.get("base_url"),
+                        api_key=llm_config.get("api_key"),
+                        model=llm_config.get("model"),
+                    )
                 logger.info("配置完成: %s", install_path / ".supermedicine")
             if extract_release:
                 args.extract_release_to = install_path
-                _extract_release_from_args(args)
+                payload_result = _extract_release_from_args(args)
             if release_exe:
                 args.release_exe = release_exe
                 if extract_release:
                     _align_release_exe_with_extracted_payload(args)
-                _release_exe_from_args(args)
+                exe_result = _release_exe_from_args(args)
+            if init_config_enabled or extract_release or release_exe:
+                write_install_record(
+                    install_path,
+                    artifacts=_install_record_artifacts_from_results(
+                        payload_result=payload_result, exe_result=exe_result
+                    ),
+                    mode="update" if existing_action == "update" else "init",
+                )
             if add_to_path:
                 logger.info(
                     "PATH 提示: 可将 Python Scripts 目录加入系统 PATH，或使用 python Cli.py。"
@@ -649,6 +894,7 @@ def init_config(
         raise
     if backup_dir is not None and backup_dir.exists():
         shutil.rmtree(backup_dir)
+    write_install_record(project_dir, mode="init")
     logger.info("初始化完成: %s", config_dir)
     logger.info("")
     logger.info("如果 'supermedicine' 命令不可用，请将以下目录添加到系统 PATH：")
@@ -863,6 +1109,99 @@ def _align_release_exe_with_extracted_payload(args: argparse.Namespace) -> None:
         args.release_exe = extracted_candidate
 
 
+def _resolve_desktop_collision_args(args: argparse.Namespace) -> tuple[Path | None, str | None]:
+    if not getattr(args, "release_exe", None):
+        return None, None
+    desktop_dir = getattr(args, "desktop_dir", None)
+    if desktop_dir is None:
+        return Path.home() / "Desktop", getattr(args, "exe_target_name", None)
+    return Path(desktop_dir).expanduser(), getattr(args, "exe_target_name", None)
+
+
+def _uninstall_existing_install(project_dir: Path, *, preserve_user_data: bool) -> dict[str, Any]:
+    project_dir = Path(project_dir).expanduser().resolve()
+    preserved_config_backup: Path | None = None
+    preserved_tempdir: tempfile.TemporaryDirectory[str] | None = None
+    config_dir = project_dir / ".supermedicine"
+    if preserve_user_data and config_dir.exists():
+        preserved_tempdir = tempfile.TemporaryDirectory(prefix="supermedicine-preserve-")
+        preserved_config_backup = Path(preserved_tempdir.name) / ".supermedicine"
+        shutil.copytree(config_dir, preserved_config_backup)
+    try:
+        from Uninstall import uninstall
+    except ImportError as exc:
+        raise SystemExit(f"error: 卸载旧版本失败: Uninstall.py 不可用 ({exc})") from exc
+    try:
+        result = uninstall(project_dir, force=True, preserve_user_data=preserve_user_data)
+        if preserved_config_backup is not None and preserved_config_backup.exists() and not config_dir.exists():
+            shutil.copytree(preserved_config_backup, config_dir)
+        if str(result.get("status", "")).startswith("removed-with-residuals"):
+            logger.warning("旧版本卸载存在残留，请查看上方 repair_suggestions。")
+        elif result.get("status") not in {"removed", "dry-run"}:
+            raise SystemExit(f"error: 卸载旧版本未完成: {result.get('status')}")
+        return result
+    finally:
+        if preserved_tempdir is not None:
+            preserved_tempdir.cleanup()
+
+
+def _refresh_existing_project_config(project_dir: Path) -> None:
+    """Refresh installer-owned metadata around an existing config without rewriting secrets."""
+
+    project_dir = Path(project_dir).expanduser().resolve()
+    config_dir = project_dir / ".supermedicine"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    (config_dir / "agents").mkdir(exist_ok=True)
+    (config_dir / "plugins").mkdir(exist_ok=True)
+    ensure_default_policy(project_dir, Path(__file__).resolve().parents[1])
+
+
+def _enforce_existing_install_policy(args: argparse.Namespace, detection: ExistingInstallDetection) -> str:
+    if not detection.installed:
+        return "ignore"
+    action = getattr(args, "if_installed", None)
+    if action is None:
+        raise SystemExit(
+            "error: 检测到已有 SuperMedicine 安装；脚本模式请显式传入 "
+            "--if-installed update|uninstall|fail|ignore"
+        )
+    if action == "fail":
+        raise SystemExit("error: 检测到已有 SuperMedicine 安装，按 --if-installed fail 退出")
+    if action == "ignore":
+        return action
+    if action == "uninstall":
+        if getattr(args, "preserve_user_data", False) == getattr(args, "remove_user_data", False):
+            raise SystemExit(
+                "error: --if-installed uninstall 需要显式选择 --preserve-user-data 或 --remove-user-data"
+            )
+        _uninstall_existing_install(
+            detection.project_dir, preserve_user_data=bool(args.preserve_user_data)
+        )
+        return action
+    if action == "update":
+        args.extract_overwrite = True
+        args.exe_overwrite = True
+        return action
+    raise SystemExit(f"error: unknown --if-installed action: {action}")
+
+
+def _install_record_artifacts_from_results(
+    *,
+    payload_result: dict[str, Any] | None = None,
+    exe_result: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    artifacts: dict[str, Any] = {
+        "created_paths": [".supermedicine"],
+        "config_dirs": [".supermedicine"],
+        "user_data_paths": [".supermedicine"],
+    }
+    if payload_result and payload_result.get("status") in {"copied", "dry-run"}:
+        artifacts["payload_dir"] = payload_result.get("target_dir")
+    if exe_result and exe_result.get("target_path"):
+        artifacts["binaries"] = [exe_result.get("target_path")]
+    return artifacts
+
+
 def main(argv: list[str] | None = None) -> None:
     _configure_stdio_errors()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -951,7 +1290,24 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--extract-overwrite", action="store_true", help="释放 payload 时覆盖已有文件"
     )
+    parser.add_argument(
+        "--if-installed",
+        choices=("update", "uninstall", "fail", "ignore"),
+        help="脚本模式检测到已有安装时的处理: update 覆盖安装器拥有的产物并保留用户数据；uninstall 先卸载；fail 安全退出；ignore 跳过检测保护",
+    )
+    parser.add_argument(
+        "--preserve-user-data",
+        action="store_true",
+        help="配合 --if-installed uninstall 使用：卸载旧版本时保留用户数据",
+    )
+    parser.add_argument(
+        "--remove-user-data",
+        action="store_true",
+        help="配合 --if-installed uninstall 使用：卸载旧版本时删除记录的用户数据",
+    )
     args = parser.parse_args(argv)
+    if args.preserve_user_data and args.remove_user_data:
+        parser.error("--preserve-user-data and --remove-user-data are mutually exclusive")
     if not (argv if argv is not None else sys.argv[1:]):
         _run_interactive_installer(args)
         return
@@ -963,10 +1319,30 @@ def main(argv: list[str] | None = None) -> None:
     if args.detect:
         logger.info("Detected platform: %s", detect_platform())
         return
+    scripted_project_dir = _resolve_project_dir(args)
+    desktop_dir, exe_target_name = _resolve_desktop_collision_args(args)
+    detection = detect_existing_install(
+        scripted_project_dir,
+        desktop_dir=desktop_dir,
+        exe_target_name=exe_target_name,
+        include_project=bool(run_init or args.extract_release_to),
+        include_payload=bool(args.extract_release_to),
+    )
+    install_policy_action = "ignore"
+    if run_init or args.extract_release_to or args.release_exe:
+        install_policy_action = _enforce_existing_install_policy(args, detection)
+    payload_result: dict[str, Any] | None = None
+    exe_result: dict[str, Any] | None = None
     if args.extract_release_to:
-        _extract_release_from_args(args)
+        payload_result = _extract_release_from_args(args)
         _align_release_exe_with_extracted_payload(args)
         if not run_init and not args.release_exe:
+            if payload_result.get("status") != "dry-run":
+                write_install_record(
+                    scripted_project_dir,
+                    artifacts=_install_record_artifacts_from_results(payload_result=payload_result),
+                    mode="update" if install_policy_action == "update" else "init",
+                )
             return
     if run_init:
         imported_config = (
@@ -996,22 +1372,38 @@ def main(argv: list[str] | None = None) -> None:
             base_url = cast(str | None, prompted_config.get("base_url"))
             model = cast(str | None, prompted_config.get("model"))
             api_key = cast(str | None, prompted_config.get("api_key"))
-        init_config(
-            _resolve_project_dir(args),
-            provider=normalized_provider,
-            base_url=base_url,
-            api_key=api_key,
-            model=model,
-        )
+        if install_policy_action == "update" and (scripted_project_dir / CONFIG_RELATIVE).is_file():
+            _refresh_existing_project_config(scripted_project_dir)
+        else:
+            init_config(
+                scripted_project_dir,
+                provider=normalized_provider,
+                base_url=base_url,
+                api_key=api_key,
+                model=model,
+            )
         logger.info(
             "安装初始化结果: .supermedicine=%s",
-            _resolve_project_dir(args) / ".supermedicine",
+            scripted_project_dir / ".supermedicine",
         )
         if args.release_exe:
-            _release_exe_from_args(args)
+            exe_result = _release_exe_from_args(args)
+        write_install_record(
+            scripted_project_dir,
+            artifacts=_install_record_artifacts_from_results(
+                payload_result=payload_result, exe_result=exe_result
+            ),
+            mode="update" if install_policy_action == "update" else "init",
+        )
         return
     if args.release_exe:
-        _release_exe_from_args(args)
+        exe_result = _release_exe_from_args(args)
+        if exe_result.get("status") != "dry-run":
+            write_install_record(
+                scripted_project_dir,
+                artifacts=_install_record_artifacts_from_results(exe_result=exe_result),
+                mode="update" if install_policy_action == "update" else "init",
+            )
         return
     parser.print_help()
 
@@ -1020,9 +1412,13 @@ __all__ = [
     "DEFAULT_CONFIG",
     "INSTALL_ENV_NAMES",
     "PROVIDER_ENV_NAMES",
+    "ExistingInstallDetection",
+    "ExistingInstallEvidence",
     "detect_platform",
+    "detect_existing_install",
     "init_config",
     "main",
+    "write_install_record",
     "write_llm_config",
     "_normalize_provider",
     "_resolve_api_key",

@@ -238,6 +238,23 @@ def test_uninstall_can_preserve_recorded_user_data_explicitly(tmp_path):
     assert any("preserved-user-data" in item for item in result["skipped"])
 
 
+def test_uninstall_preserve_user_data_keeps_supermedicine_config_when_recorded(tmp_path):
+    config = tmp_path / ".supermedicine" / "config.yaml"
+    config.parent.mkdir(parents=True, exist_ok=True)
+    config.write_text("project_name: supermedicine\n", encoding="utf-8")
+    record = tmp_path / ".supermedicine" / "install-record.json"
+    record.write_text(
+        json.dumps({"user_data_paths": [".supermedicine"]}),
+        encoding="utf-8",
+    )
+
+    result = uninstall(tmp_path, force=True, preserve_user_data=True)
+
+    assert result["status"] == "removed"
+    assert config.exists()
+    assert any("preserved-user-data-parent" in item for item in result["skipped"])
+
+
 def test_uninstall_reports_residuals_and_repair_suggestions_when_delete_fails(
     tmp_path, monkeypatch
 ):

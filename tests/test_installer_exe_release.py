@@ -298,6 +298,125 @@ def test_install_help_documents_unified_install_and_desktop_release(capsys):
     assert "统一安装" in output
 
 
+def test_existing_install_detection_priority_uses_record_before_config_payload_and_desktop(tmp_path):
+    install = importlib.import_module("installer.entrypoint")
+    (tmp_path / ".supermedicine").mkdir()
+    (tmp_path / ".supermedicine" / "install-record.json").write_text("{}", encoding="utf-8")
+    (tmp_path / ".supermedicine" / "config.yaml").write_text("project_name: supermedicine\n", encoding="utf-8")
+    (tmp_path / "Cli.py").write_text("print('payload')\n", encoding="utf-8")
+    desktop = tmp_path / "Desktop"
+    desktop.mkdir()
+    (desktop / "SuperMedicine.exe").write_bytes(b"old exe")
+
+    result = install.detect_existing_install(tmp_path, desktop_dir=desktop)
+
+    assert result.installed is True
+    assert result.reason == "install-record"
+    assert [item.kind for item in result.evidence] == [
+        "install-record",
+        "config",
+        "payload-collision",
+        "desktop-exe-collision",
+    ]
+
+
+def test_scripted_existing_install_without_policy_fails_without_prompt(tmp_path, monkeypatch):
+    install = importlib.import_module("installer.entrypoint")
+    config = tmp_path / ".supermedicine" / "config.yaml"
+    config.parent.mkdir()
+    config.write_text("project_name: supermedicine\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    def fail_input(prompt):
+        raise AssertionError(f"scripted mode prompted unexpectedly: {prompt}")
+
+    monkeypatch.setattr("builtins.input", fail_input)
+
+    with pytest.raises(SystemExit) as excinfo:
+        install.main(["--init", *_llm_args()])
+
+    assert "--if-installed" in str(excinfo.value)
+
+
+def test_scripted_uninstall_policy_requires_explicit_user_data_choice(tmp_path, monkeypatch):
+    install = importlib.import_module("installer.entrypoint")
+    config = tmp_path / ".supermedicine" / "config.yaml"
+    config.parent.mkdir()
+    config.write_text("project_name: supermedicine\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(SystemExit) as excinfo:
+        install.main(["--init", "--if-installed", "uninstall", *_llm_args()])
+
+    assert "--preserve-user-data" in str(excinfo.value)
+    assert config.exists()
+
+
+def test_update_policy_preserves_existing_config_secret_and_writes_secret_free_record(tmp_path, monkeypatch):
+    install = importlib.import_module("installer.entrypoint")
+    secret = "sk-existing-secret-to-preserve"
+    config = tmp_path / ".supermedicine" / "config.yaml"
+    config.parent.mkdir()
+    config.write_text(
+        "project_name: supermedicine\nllm:\n  provider: openai\n  providers:\n    openai:\n      api_key: "
+        + secret
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+
+    install.main(["--init", "--if-installed", "update", *_llm_args()])
+
+    config_text = config.read_text(encoding="utf-8")
+    record_text = (tmp_path / ".supermedicine" / "install-record.json").read_text(encoding="utf-8")
+    assert secret in config_text
+    assert secret not in record_text
+    record = json.loads(record_text)
+    assert record["name"] == "supermedicine"
+    assert record["mode"] == "update"
+
+
+def test_interactive_existing_install_update_branch_prompts_two_main_choices(tmp_path, monkeypatch):
+    install = importlib.import_module("installer.entrypoint")
+    config = tmp_path / ".supermedicine" / "config.yaml"
+    config.parent.mkdir()
+    config.write_text("project_name: supermedicine\n", encoding="utf-8")
+    prompts: list[str] = []
+    answers = iter([str(tmp_path), "2", "n", "n", "n", "n", "n", ""])
+
+    def fake_input(prompt):
+        prompts.append(prompt)
+        return next(answers)
+
+    monkeypatch.setattr("builtins.input", fake_input)
+
+    install.main([])
+
+    assert any("已有安装处理" in prompt for prompt in prompts)
+    assert config.exists()
+
+
+def test_interactive_uninstall_branch_asks_second_user_data_confirmation(tmp_path, monkeypatch):
+    install = importlib.import_module("installer.entrypoint")
+    config = tmp_path / ".supermedicine" / "config.yaml"
+    config.parent.mkdir()
+    config.write_text("project_name: supermedicine\n", encoding="utf-8")
+    prompts: list[str] = []
+    answers = iter([str(tmp_path), "1", "1", "n", "n", "n", "n", "n", ""])
+
+    def fake_input(prompt):
+        prompts.append(prompt)
+        return next(answers)
+
+    monkeypatch.setattr("builtins.input", fake_input)
+    monkeypatch.setattr(install, "_uninstall_existing_install", lambda project_dir, *, preserve_user_data: {"status": "removed", "preserve": preserve_user_data})
+
+    install.main([])
+
+    assert any("已有安装处理" in prompt for prompt in prompts)
+    assert any("用户数据处理" in prompt for prompt in prompts)
+
+
 def test_unified_install_dry_run_initializes_project_without_real_desktop_write(
     tmp_path, monkeypatch, caplog
 ):
