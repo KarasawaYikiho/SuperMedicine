@@ -268,9 +268,9 @@ secrets were added to source, tests, or documentation.
   bootstrap copies must not contain real LLM endpoints, BaseURLs, API keys, or
   private platform configuration.
 - Tracked `.supermedicine/**` is intentionally limited by
-  `tests/test_repo_hygiene.py` to `.supermedicine/config.yaml` and
-  `.supermedicine/policies/default.yaml`; runtime audit logs and checkpoints are
-  treated as ignored/generated artifacts.
+  `tests/test_repo_hygiene.py` to `.supermedicine/policies/default.yaml`;
+  `.supermedicine/config.yaml`, runtime audit logs, and checkpoints are treated
+  as ignored/generated or local-only artifacts.
 - `README.md`, `INSTALL.md`, and `ARCHITECTURE.md` consistently describe the
   default setup as standalone Python core installation. OpenCode and Claude Code
   are documented as optional add-ons and are not prerequisites for installation,
@@ -394,7 +394,8 @@ secrets were added to source, tests, or documentation.
 ### 8.7 Current Documentation Hygiene Addendum
 
 - Public release label is `Beta0.4.2`; package metadata fallback is `0.4.2b0`.
-- `FUNCTION_MAP.md` is the visible callable inventory because `docs/` is ignored.
+- `FUNCTION_MAP.md` is the authoritative root callable inventory; duplicate or
+  case-conflicting FunctionMap copies under `docs/` are not used.
 - OpenCode-style experience references are design-analysis input only; no external
   source, logs, prompts, or private configuration are copied into SuperMedicine.
 - Optional adapter documents must continue to distinguish local/orchestrator

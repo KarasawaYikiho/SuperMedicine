@@ -22,6 +22,14 @@ COMMIT_ELIGIBLE_MAINTAINER_DOC_EXAMPLES = {
     "FUNCTION_MAP.md",
 }
 FORBIDDEN_LOCAL_ONLY_ROOT_DOCS = {"REQUIREMENTS_TRACEABILITY.md"}
+INTENTIONAL_CASE_ONLY_PATH_COLLISIONS = {
+    ("Install.py", "install.py"): (
+        "Intentional installer compatibility pair: Install.py preserves the "
+        "legacy entrypoint while install.py provides the documented lowercase "
+        "command on case-sensitive platforms. Do not rename or delete either "
+        "file without changing the installer compatibility contract."
+    ),
+}
 LOCAL_ONLY_ENGINEERING_ARTIFACT_PATTERNS = {
     "*_audit_dump*.md",
     "*_audit_dump*.json",
@@ -32,6 +40,19 @@ LOCAL_ONLY_ENGINEERING_ARTIFACT_PATTERNS = {
     "*_private_analysis*.md",
     "*_transient_checklist*.md",
     "*_uncurated_engineering*.md",
+}
+INTENTIONAL_GENERATED_ARTIFACT_REFERENCES = {
+    "build/": "ignored build output pattern; not a required repository directory",
+    "dist/": "ignored distribution output pattern; not a required repository directory",
+    "supermedicine.egg-info/": "editable/build metadata output; not repository content",
+    ".mypy_cache/": "ignored type-check cache pattern; not repository content",
+    ".ruff_cache/": "ignored lint cache pattern; not repository content",
+    ".supermedicine/checkpoints/": "ignored runtime checkpoint state; not repository content",
+    ".supermedicine/policies/audit.jsonl": "ignored runtime audit log; not repository content",
+    "plugins/tools/r_template/plugin.yaml": (
+        "stale distribution member cleanup target; setup.py removes this formerly "
+        "packaged manifest name when old build artifacts are rewritten"
+    ),
 }
 
 
@@ -256,6 +277,51 @@ def test_tracked_files_do_not_include_forbidden_or_generated_artifacts():
             forbidden_matches.append(tracked_path)
 
     assert sorted(set(forbidden_matches)) == []
+
+
+def test_case_only_tracked_path_collisions_are_intentional_and_documented():
+    """Case-only path collisions must be explicit compatibility exceptions."""
+
+    collisions: dict[str, set[str]] = {}
+    for tracked_path in _tracked_files():
+        collisions.setdefault(tracked_path.lower(), set()).add(tracked_path)
+
+    actual_collisions = {
+        tuple(sorted(paths)) for paths in collisions.values() if len(paths) > 1
+    }
+    documented_collisions = set(INTENTIONAL_CASE_ONLY_PATH_COLLISIONS)
+
+    assert actual_collisions == documented_collisions, (
+        "Unexpected case-only tracked path collision set. Any intentional "
+        "compatibility collision must be documented in "
+        "INTENTIONAL_CASE_ONLY_PATH_COLLISIONS with a non-semantic rationale; "
+        "unintentional collisions must be removed safely. "
+        f"Actual: {sorted(actual_collisions)!r}; "
+        f"Documented: {sorted(documented_collisions)!r}"
+    )
+
+    assert all(
+        rationale.strip() for rationale in INTENTIONAL_CASE_ONLY_PATH_COLLISIONS.values()
+    )
+
+
+def test_intentional_generated_artifact_references_are_documented_non_repository_paths():
+    """Generated/cache/stale-cleanup path strings must be explicit exceptions.
+
+    These strings are not repository files and should not be "fixed" to existing
+    paths: they document ignore rules or cleanup targets for artifacts that may
+    appear outside a clean source checkout.
+    """
+
+    tracked_files = set(_tracked_files())
+
+    for path, rationale in INTENTIONAL_GENERATED_ARTIFACT_REFERENCES.items():
+        assert rationale.strip(), path
+        normalized_path = path.rstrip("/")
+        assert normalized_path not in tracked_files, (
+            f"{path} is documented as a generated/cache/stale-artifact reference "
+            "but is currently tracked repository content"
+        )
 
 
 def test_supermedicine_runtime_bootstrap_copies_are_local_only():

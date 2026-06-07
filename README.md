@@ -15,8 +15,8 @@ Public/release label: **Beta0.4.2**. Python package fallback version:
 
 For detailed setup, see [INSTALL.md](INSTALL.md). For design boundaries, see
 [ARCHITECTURE.md](ARCHITECTURE.md). For security and medical-use limits, see
-[SECURITY.md](SECURITY.md). Repository-callable inventory is kept in
-[FUNCTION_MAP.md](FUNCTION_MAP.md) because `docs/` is ignored in this repository.
+[SECURITY.md](SECURITY.md). Repository-callable inventory is kept in the
+authoritative root document [FUNCTION_MAP.md](FUNCTION_MAP.md).
 
 ## 中文简介
 

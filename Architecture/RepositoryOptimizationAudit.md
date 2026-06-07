@@ -33,7 +33,7 @@
 | 29 | 2026-05-27 | Repository cleanliness cleanup | Removed safe ignored cache/build/runtime/local artifacts; preserved tracked config/policy inputs. |
 | 30 | 2026-05-27 | Verification preparation | Recorded validation gates and evidence expectations for Tester. |
 | 31 | 2026-05-27 | Git review and submission | Recorded Tester-reported verification evidence; cleaned regenerated artifacts; final diff limited to this document. |
-| 32 | 2026-05-28 | Repository cleanliness cleanup | Removed accessible ignored cache/build/package/runtime artifacts; preserved tracked `.supermedicine` config/policy. |
+| 32 | 2026-05-28 | Repository cleanliness cleanup | Removed accessible ignored cache/build/package/runtime artifacts; preserved canonical `.supermedicine` policy while keeping local runtime config out of repository content. |
 | 33 | 2026-05-28 | Full regression and path integrity verification cleanup | All Tester gates passed (install, lint, type, wheel, sdist, pytest, hygiene, path/case, diff scope, secret check). Cleaned regenerated artifacts. |
 | 34 | 2026-05-28 | Final diff review and functional invariance confirmation | Final diff confirmed audit-document only; no functional semantic change. |
 
@@ -101,7 +101,7 @@ Artifacts eligible for removal when accessible:
 - `Planning/NextSteps.md` — ignored local planning note
 
 **Not eligible for removal:**
-- Tracked `.supermedicine/config.yaml` and `.supermedicine/policies/default.yaml` (bootstrap inputs)
+- Local-only `.supermedicine/config.yaml` when present, and tracked `.supermedicine/policies/default.yaml` (bootstrap policy input)
 - `.pytest_cache/` when inaccessible due to permission denial (document and skip)
 
 ---
