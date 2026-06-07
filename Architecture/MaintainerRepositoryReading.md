@@ -15,10 +15,10 @@ This maintainer-facing report records the line-by-line repository reading pass r
 ## Reading Coverage Summary
 
 - Inventory source: `Architecture/ExecutionRoadmap.md` -> `## Maintainer Repository Reading Inventory`.
-- Included tracked files read line by line: 242.
+- Included tracked files read line by line: 241.
 - Supplemental intended untracked files read line by line: 0.
 - Missing included files: none.
-- Python files: 183; tests: 69; non-Python/declarative docs/config/scripts: 59.
+- Python files: 183; tests: 69; non-Python/declarative docs/config/scripts: 58.
 - Self-evolution files are now covered as tracked repository inputs: `core/self_evolution.py`, `tests/test_self_evolution.py`, and `tests/test_self_evolution_cli.py`.
 - Exclusions respected: caches, build/dist/egg-info, runtime `.supermedicine/`, binary/release artifacts, ignored scratch docs (including `EXTERNAL_PROJECT_ANALYSIS.md` and `failure_inventory.md`), and raw/private transient notes are not treated as source inputs.
 
@@ -297,17 +297,6 @@ tests/* and .github/workflows/ci.yml cover unit/integration/regression/release h
 - Lines read: 519.
 - Purpose: Maintainer/user documentation for README.
 - Key responsibilities: declared sections/keys: # SuperMedicine, ## 中文简介, ## Feature Summary, ## Installation, Requirements:
-- Public interfaces: Human-facing Markdown content; headings and checklists are the public interface.
-- Internal dependencies: none beyond file format/runtime loader.
-- Data flow: loaded/read by packaging, CLI, docs, registry, or maintainer workflows as appropriate.
-- Side effects: no runtime side effects when read as documentation/config.
-- Configuration assumptions: standard project/runtime assumptions only.
-- Maintenance risks: keep synchronized with callers and documentation.
-
-### `REQUIREMENTS_TRACEABILITY.md`
-- Lines read: 104.
-- Purpose: Maintainer/user documentation for REQUIREMENTS TRACEABILITY.
-- Key responsibilities: declared sections/keys: # SuperMedicine 用户要求执行清单与需求映射, ## 使用规则, ## 总览映射, ## 分领域执行清单, ### A. 实验指导器与实验配置
 - Public interfaces: Human-facing Markdown content; headings and checklists are the public interface.
 - Internal dependencies: none beyond file format/runtime loader.
 - Data flow: loaded/read by packaging, CLI, docs, registry, or maintainer workflows as appropriate.

@@ -365,15 +365,17 @@ def test_gitignore_allows_curated_maintainer_repository_docs():
 
 def test_function_map_is_authoritative_root_doc_and_traceability_is_local_only():
     tracked_files = _tracked_files()
+    active_patterns = _active_gitignore_patterns()
 
     assert "FUNCTION_MAP.md" in tracked_files
     assert (REPO_ROOT / "FUNCTION_MAP.md").is_file()
     assert "docs/function-map.md" not in tracked_files
+    assert not (REPO_ROOT / "docs" / "function-map.md").exists()
     assert "docs/FunctionMap.md" not in tracked_files
     assert "FunctionMap.md" not in tracked_files
 
     assert "REQUIREMENTS_TRACEABILITY.md" not in tracked_files
-    assert (REPO_ROOT / "REQUIREMENTS_TRACEABILITY.md").is_file()
+    assert "/REQUIREMENTS_TRACEABILITY.md" in active_patterns
     rule = _git_check_ignore("REQUIREMENTS_TRACEABILITY.md")
     assert "/REQUIREMENTS_TRACEABILITY.md" in rule, rule
 

@@ -323,7 +323,6 @@ maintenance risks while preserving the exclusions in this inventory.
 - `LICENSE`
 - `MANIFEST.in`
 - `README.md`
-- `REQUIREMENTS_TRACEABILITY.md`
 - `SECURITY.md`
 - `SECURITY_HARDENING_CHECKLIST.md`
 - `Uninstall.py`
