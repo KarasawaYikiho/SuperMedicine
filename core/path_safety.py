@@ -175,7 +175,11 @@ def validate_sandbox_write_path(
     path: str | Path,
     project_root: str | Path | None = None,
     *,
-    writable_roots: Iterable[str | Path] = ("self_evolution", "generated", "tools/generated"),
+    writable_roots: Iterable[str | Path] = (
+        "self_evolution",
+        "generated",
+        "tools/generated",
+    ),
     allowed_extensions: Iterable[str] = (".md", ".py", ".txt"),
     allow_overwrite: bool = False,
 ) -> Path:
@@ -202,12 +206,17 @@ def validate_sandbox_write_path(
         else Path(writable_root).expanduser().resolve()
         for writable_root in writable_roots
     )
-    if not any(_is_relative_to(resolved_path, writable_root) for writable_root in candidate_roots):
+    if not any(
+        _is_relative_to(resolved_path, writable_root)
+        for writable_root in candidate_roots
+    ):
         raise SandboxWriteScopeError(
             f"Sandbox write target is outside approved writable roots: {resolved_path}"
         )
     if is_protected_path(resolved_path, root):
-        raise ProtectedPathError(f"Sandbox write targets protected path: {resolved_path}")
+        raise ProtectedPathError(
+            f"Sandbox write targets protected path: {resolved_path}"
+        )
     if resolved_path.exists() and not allow_overwrite:
         raise DangerousOverwriteError(
             f"Sandbox write would overwrite an existing file: {resolved_path}"
@@ -220,8 +229,16 @@ def reject_sensitive_content(content: str | bytes | None) -> None:
 
     if content is None:
         return
-    text = content.decode("utf-8", errors="replace") if isinstance(content, bytes) else content
+    text = (
+        content.decode("utf-8", errors="replace")
+        if isinstance(content, bytes)
+        else content
+    )
     if any(pattern.search(text) for pattern in _BARE_TOKEN_SECRET_PATTERNS):
-        raise SensitiveContentError("Generated content appears to contain sensitive material")
+        raise SensitiveContentError(
+            "Generated content appears to contain sensitive material"
+        )
     if redact_sensitive(text) != text:
-        raise SensitiveContentError("Generated content appears to contain sensitive material")
+        raise SensitiveContentError(
+            "Generated content appears to contain sensitive material"
+        )

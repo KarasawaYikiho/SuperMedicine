@@ -1,7 +1,7 @@
 # SuperMedicine Security Hardening Checklist
 
 This release-scope checklist summarizes documentation and runtime safety themes
-for **Beta0.4.1**. It does not add product features; it records the boundaries that
+for **Beta0.4.2**. It does not add product features; it records the boundaries that
 Markdown, examples, adapters, logs, and release packaging must preserve.
 
 ## Scope

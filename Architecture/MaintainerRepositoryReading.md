@@ -208,7 +208,7 @@ tests/* and .github/workflows/ci.yml cover unit/integration/regression/release h
 ### `CHANGELOG.md`
 - Lines read: 135.
 - Purpose: Maintainer/user documentation for CHANGELOG.
-- Key responsibilities: declared sections/keys: # Changelog, ## [Beta0.4.1] - 2026-05-31, ### Added, ### Changed, ### Fixed
+- Key responsibilities: declared sections/keys: # Changelog, ## [Beta0.4.2] - 2026-06-07, ## [Beta0.4.1] - 2026-05-31, ### Added, ### Changed, ### Fixed
 - Public interfaces: Human-facing Markdown content; headings and checklists are the public interface.
 - Internal dependencies: none beyond file format/runtime loader.
 - Data flow: loaded/read by packaging, CLI, docs, registry, or maintainer workflows as appropriate.
@@ -1957,7 +1957,7 @@ tests/* and .github/workflows/ci.yml cover unit/integration/regression/release h
 ### `pyproject.toml`
 - Lines read: 106.
 - Purpose: Python package/build configuration.
-- Key responsibilities: declared sections/keys: requires = ["setuptools>=68.0", "wheel"], build-backend = "setuptools.build_meta", name = "supermedicine", version = "0.4.1b0", description = "Modular Medical Research Agent with RAG and Harness"
+- Key responsibilities: declared sections/keys: requires = ["setuptools>=68.0", "wheel"], build-backend = "setuptools.build_meta", name = "supermedicine", version = "0.4.2b0", description = "Modular Medical Research Agent with RAG and Harness"
 - Public interfaces: No function-level public interface; file is declarative/package metadata.
 - Internal dependencies: none beyond file format/runtime loader.
 - Data flow: loaded/read by packaging, CLI, docs, registry, or maintainer workflows as appropriate.

@@ -402,7 +402,9 @@ class LogReportStore:
                 "mode": "follow_snapshot",
                 "file": file_name,
                 "session_id": session_id,
-                "storage": self.storage_info(file_name=file_name, session_id=session_id),
+                "storage": self.storage_info(
+                    file_name=file_name, session_id=session_id
+                ),
                 "entry_count": len(entries),
                 "displayed_entry_count": len(tail_entries),
                 "max_entries": entry_limit,

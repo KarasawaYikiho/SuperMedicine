@@ -318,10 +318,11 @@ class ViewSelectMenuScreen(ModalScreen[str | None]):
 
     BINDINGS = [Binding("escape", "dismiss", t("menu_back"), show=False)]
 
-
     def compose(self) -> ComposeResult:
         with Vertical(id="tui-menu-panel"):
-            yield Static(t("menu_select_view"), id="tui-menu-title", classes="shell-title")
+            yield Static(
+                t("menu_select_view"), id="tui-menu-title", classes="shell-title"
+            )
             yield ListView(
                 *(
                     MenuOption(f"{item.icon} {item.label}", "view", item.view_id)
@@ -898,7 +899,7 @@ class SuperMedicineTUI(App[Any]):
 
             return pkg_version("supermedicine")
         except Exception:
-            return "0.4.1b0"
+            return "0.4.2b0"
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
         """Handle sidebar navigation item selection."""
@@ -995,7 +996,9 @@ class SuperMedicineTUI(App[Any]):
 
             def execute_in_thread() -> Any:
                 with _capture_current_thread_tui_streams(self.project_root):
-                    return kernel.execute_task(message, progress_callback=progress_callback)
+                    return kernel.execute_task(
+                        message, progress_callback=progress_callback
+                    )
 
             result = await asyncio.to_thread(execute_in_thread)
             formatted = self._format_kernel_result(result)
@@ -1094,9 +1097,7 @@ class SuperMedicineTUI(App[Any]):
 
     def _permission_status_label(self) -> str:
         try:
-            config = ConfigCenter(
-                self.project_root / ".supermedicine" / "config.yaml"
-            )
+            config = ConfigCenter(self.project_root / ".supermedicine" / "config.yaml")
             return f"🛡️ 权限：{config.get_permission_mode_label()}"
         except Exception:
             return "🛡️ 权限：保守"
@@ -1138,13 +1139,17 @@ def launch_tui(
     llm_ready, llm_provider = _describe_llm_status(root)
     shell = SuperMedicineTUI(project_root=root)
     valid_views = {item.view_id for item in shell.nav_items()} | {"permission"}
-    restored_view = shell._current_view if shell._current_view in valid_views else "chat"
+    restored_view = (
+        shell._current_view if shell._current_view in valid_views else "chat"
+    )
     shell_status = shell.status_text(restored_view)
     view_title = shell.view_title_text(restored_view)
     shortcut_hint = shell.shortcut_hint_text()
     status_message = t("dry_run_status") if dry_run else t("welcome")
-    config_load_error = ConfigCenter(root / ".supermedicine" / "config.yaml").diagnostics().get(
-        "load_error", ""
+    config_load_error = (
+        ConfigCenter(root / ".supermedicine" / "config.yaml")
+        .diagnostics()
+        .get("load_error", "")
     )
     if dry_run:
         llm_text = (
@@ -1152,7 +1157,9 @@ def launch_tui(
         )
         status_message = f"{status_message}；{llm_text}"
         if config_load_error:
-            status_message = f"{status_message}；配置读取异常，已使用安全默认值：{config_load_error}"
+            status_message = (
+                f"{status_message}；配置读取异常，已使用安全默认值：{config_load_error}"
+            )
     logger.info(
         "TUI launch: stage=start dry_run=%s project_root=%s llm_ready=%s provider=%s",
         dry_run,

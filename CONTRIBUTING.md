@@ -1,7 +1,7 @@
 # Contributing to SuperMedicine
 
 Thank you for contributing to SuperMedicine. This guide summarizes the local
-development workflow for the **Beta0.4.1** codebase. User installation details
+development workflow for the **Beta0.4.2** codebase. User installation details
 are in [INSTALL.md](INSTALL.md), and the local quality gate is in
 [README.md](README.md#local-quality-gate).
 
@@ -55,8 +55,8 @@ that purpose.
   `Docs/`, `docs/`, or `Architecture/`.
 - If a Markdown file in an ignored directory must be published, either force-track
   it intentionally with review or provide a visible root-level alternative.
-- Keep documented versions aligned: public/release label `Beta0.4.1`, Python
-  package fallback version `0.4.1b0`.
+- Keep documented versions aligned: public/release label `Beta0.4.2`, Python
+  package fallback version `0.4.2b0`.
 - Use placeholders such as `<OPENAI_API_KEY>` in examples; never use real secrets.
 - Keep external project references as design analysis unless code has been
   license-reviewed, implemented, and tested in this repository.

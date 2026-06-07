@@ -127,13 +127,24 @@ class TestKernel:
             in captured["messages"][1]["content"]
         )
         assert captured["messages"][2]["role"] == "system"
-        assert "Unified runtime configuration state" in captured["messages"][2]["content"]
+        assert (
+            "Unified runtime configuration state" in captured["messages"][2]["content"]
+        )
         assert captured["messages"][3]["role"] == "system"
-        assert "Python/R workspace tool authoring rules" in captured["messages"][3]["content"]
+        assert (
+            "Python/R workspace tool authoring rules"
+            in captured["messages"][3]["content"]
+        )
         assert "plugins/tools/<tool-directory>/" in captured["messages"][3]["content"]
         assert "tool.yaml" in captured["messages"][3]["content"]
-        assert "workspaces/<workspace-id>/tools/python/<tool-id>/" in captured["messages"][3]["content"]
-        assert "workspaces/<workspace-id>/tools/r/<tool-id>/" in captured["messages"][3]["content"]
+        assert (
+            "workspaces/<workspace-id>/tools/python/<tool-id>/"
+            in captured["messages"][3]["content"]
+        )
+        assert (
+            "workspaces/<workspace-id>/tools/r/<tool-id>/"
+            in captured["messages"][3]["content"]
+        )
         assert captured["messages"][4] == {"role": "user", "content": "你是谁？"}
 
     def test_llm_chat_system_prompt_preserves_permission_generator_boundary(

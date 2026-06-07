@@ -180,7 +180,10 @@ def test_tool_authoring_context_matches_manifest_and_scanner_contract():
     fields = context["manifest_fields"]
 
     assert context["source_directory"] == "plugins/tools"
-    assert context["storage"]["python"] == "workspaces/<workspace-id>/tools/python/<tool-id>/"
+    assert (
+        context["storage"]["python"]
+        == "workspaces/<workspace-id>/tools/python/<tool-id>/"
+    )
     assert context["storage"]["r"] == "workspaces/<workspace-id>/tools/r/<tool-id>/"
     assert context["tool_folder_format"]["required_manifest"] == MANIFEST_FILE
     assert set(fields) == {
@@ -198,7 +201,10 @@ def test_tool_authoring_context_matches_manifest_and_scanner_contract():
     assert "r" in fields["language"]
     assert "relative" in fields["entrypoint"]
     assert "plugins/tools/<tool-directory>/" in context["llm_authoring_rule"]
-    assert TOOL_AUTHORING_SPEC["scan_validate_import_flow"] == context["scan_validate_import_flow"]
+    assert (
+        TOOL_AUTHORING_SPEC["scan_validate_import_flow"]
+        == context["scan_validate_import_flow"]
+    )
 
 
 def test_list_discovers_tools_grouped_by_language(tmp_path):
@@ -287,12 +293,12 @@ def test_import_scanned_tools_by_selection_rejects_invalid_candidate(tmp_path):
     assert result["status"] == "partial"
     assert result["imported"][0]["tool"]["id"] == "python-stats"
     assert result["errors"][0]["id"] == "r-bad"
-    assert not (
-        tmp_path / "workspaces" / "trial-1" / "tools" / "r" / "r-bad"
-    ).exists()
+    assert not (tmp_path / "workspaces" / "trial-1" / "tools" / "r" / "r-bad").exists()
 
 
-def test_cli_tool_add_without_selection_returns_scanned_candidates(tmp_path, monkeypatch):
+def test_cli_tool_add_without_selection_returns_scanned_candidates(
+    tmp_path, monkeypatch
+):
     monkeypatch.chdir(tmp_path)
     source = tmp_path / "plugins" / "tools" / "python_stats"
     source.mkdir(parents=True)
@@ -345,9 +351,7 @@ def test_cli_tool_add_selection_imports_scanned_tool_and_records_runtime_state(
     assert state["last_workspace_id"] == "trial-1"
     assert state["last_tool_import"] == {
         "workspace_id": "trial-1",
-        "tools": [
-            {"language": "python", "id": "python-stats", "name": "python-stats"}
-        ],
+        "tools": [{"language": "python", "id": "python-stats", "name": "python-stats"}],
     }
 
 

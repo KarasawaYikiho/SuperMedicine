@@ -101,9 +101,9 @@ def test_log_report_keeps_business_fields_while_redacting_error_payload(tmp_path
 
     written = store.write(json.dumps(payload), session_id="business-regression")
     shown = store.show(written["file"])
-    persisted = (
-        tmp_path / ".supermedicine" / "logs" / written["file"]
-    ).read_text(encoding="utf-8")
+    persisted = (tmp_path / ".supermedicine" / "logs" / written["file"]).read_text(
+        encoding="utf-8"
+    )
     combined = json.dumps({"shown": shown, "persisted": persisted}, ensure_ascii=False)
 
     assert secret not in combined
@@ -355,7 +355,9 @@ def test_tui_stream_output_is_routed_by_stream_severity_and_session(tmp_path):
     assert entries[1]["raw_message"] == "captured stderr: problem output"
 
 
-def test_tui_stream_output_redacts_sensitive_stdout_and_stderr_before_persisting(tmp_path):
+def test_tui_stream_output_redacts_sensitive_stdout_and_stderr_before_persisting(
+    tmp_path,
+):
     secret = "sk-tui-stream-secret"
 
     append_tui_stream_output(

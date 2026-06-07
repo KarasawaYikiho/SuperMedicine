@@ -54,13 +54,17 @@ def test_cli_permission_authorize_and_revoke_external_directory_updates_policy(
     cli = CLI()
 
     authorized = cli.permission_authorize(external_root)
-    allowed = ConfigCenter(
-        project_root / ".supermedicine" / "config.yaml"
-    ).get_file_access_policy(project_root).decide(external_root / "out.csv", "write")
+    allowed = (
+        ConfigCenter(project_root / ".supermedicine" / "config.yaml")
+        .get_file_access_policy(project_root)
+        .decide(external_root / "out.csv", "write")
+    )
     revoked = cli.permission_revoke(external_root)
-    denied = ConfigCenter(
-        project_root / ".supermedicine" / "config.yaml"
-    ).get_file_access_policy(project_root).decide(external_root / "out.csv", "write")
+    denied = (
+        ConfigCenter(project_root / ".supermedicine" / "config.yaml")
+        .get_file_access_policy(project_root)
+        .decide(external_root / "out.csv", "write")
+    )
 
     assert str(external_root.resolve()) in authorized["authorized_external_roots"]
     assert allowed.status == AccessDecisionStatus.ALLOWED

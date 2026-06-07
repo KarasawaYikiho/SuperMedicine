@@ -175,7 +175,7 @@ platform add-ons**:
 
 ## Current Documentation Hygiene Addendum
 
-- Public release label is `Beta0.4.1`; package fallback version is `0.4.1b0`.
+- Public release label is `Beta0.4.2`; package fallback version is `0.4.2b0`.
 - Security-sensitive Markdown must use placeholders and must not include real
   credentials, private endpoints, raw audit logs, or local user paths.
 - Function relationship documentation belongs in the visible root

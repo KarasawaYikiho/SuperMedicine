@@ -124,7 +124,9 @@ def test_self_evolve_full_access_notice_is_visible_and_requires_confirmation_fla
     assert result["full_access_notice"]["full_access_requested"] is True
     assert result["full_access_notice"]["explicit_full_access_confirmed"] is False
     assert result["full_access_notice"]["risk_notice_acknowledged"] is False
-    assert "current user/process permissions" in result["full_access_notice"]["semantics"]
+    assert (
+        "current user/process permissions" in result["full_access_notice"]["semantics"]
+    )
     assert "[REDACTED]" not in json.dumps(result["full_access_notice"])
     assert any("--confirm-full-access" in step for step in result["next_steps"])
 

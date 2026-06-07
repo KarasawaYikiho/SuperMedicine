@@ -130,8 +130,8 @@ flowchart TD
 
 ## Release-Candidate State
 
-- Release-ready label: `Beta0.4.1`.
-- Python package metadata fallback: `0.4.1b0` is the selected PEP 440-compatible
+- Release-ready label: `Beta0.4.2`.
+- Python package metadata fallback: `0.4.2b0` is the selected PEP 440-compatible
   value for package metadata.
 - R/rpy2 backend: formal support is represented through the optional `r` extra
   and the local `plugins.tools.r_survival` adapter path; it requires a local R

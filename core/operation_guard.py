@@ -100,10 +100,15 @@ def authorize_dangerous_operation(
         access_decision = access_policy.require_allowed(
             path,
             file_operation
-            or (FileAccessOperation.DELETE if destructive else FileAccessOperation.WRITE),
+            or (
+                FileAccessOperation.DELETE if destructive else FileAccessOperation.WRITE
+            ),
         )
         resolved_path = access_decision.path
-        if access_policy.mode.value == "sandbox" and access_decision.operation == FileAccessOperation.WRITE:
+        if (
+            access_policy.mode.value == "sandbox"
+            and access_decision.operation == FileAccessOperation.WRITE
+        ):
             resolved_path = validate_sandbox_write_path(
                 resolved_path,
                 access_policy.project_root,
@@ -124,7 +129,9 @@ def authorize_dangerous_operation(
     if access_policy is not None:
         permission_context.setdefault("access_mode", access_policy.mode.value)
         permission_context.setdefault("explicit_authorization", explicit_authorization)
-        permission_context.setdefault("risk_notice_acknowledged", risk_notice_acknowledged)
+        permission_context.setdefault(
+            "risk_notice_acknowledged", risk_notice_acknowledged
+        )
         permission_context.setdefault("high_risk_operation", destructive)
 
     permission_result = permission_engine.check(

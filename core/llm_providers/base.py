@@ -337,7 +337,9 @@ class ConfiguredLLMClient(LLMClient):
         if not parsed.hostname:
             raise UnsafeProviderURL("LLM provider base_url must include a host")
         if parsed.username or parsed.password:
-            raise UnsafeProviderURL("LLM provider base_url must not include credentials")
+            raise UnsafeProviderURL(
+                "LLM provider base_url must not include credentials"
+            )
         if parsed.fragment:
             raise UnsafeProviderURL("LLM provider base_url must not include a fragment")
         return urllib.parse.urljoin(base_url.rstrip("/") + "/", path.lstrip("/"))

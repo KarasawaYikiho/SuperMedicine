@@ -113,7 +113,8 @@ class Kernel:
             return
         if (
             policy_dir.name == DEFAULT_POLICY_RELATIVE_PATH.parent.name
-            and policy_dir.parent.name == DEFAULT_POLICY_RELATIVE_PATH.parent.parent.name
+            and policy_dir.parent.name
+            == DEFAULT_POLICY_RELATIVE_PATH.parent.parent.name
         ):
             ensure_default_policy(policy_dir.parent.parent)
 
@@ -244,7 +245,10 @@ class Kernel:
             action=selected_action,
             recoverable=True,
         )
-        emit("status", f"已选择插件 {selected_plugin} / {selected_action}，正在进行权限检查。")
+        emit(
+            "status",
+            f"已选择插件 {selected_plugin} / {selected_action}，正在进行权限检查。",
+        )
 
         execution_context = {
             "task": task,
@@ -485,12 +489,16 @@ class Kernel:
         progress_callback: Callable[[dict[str, Any]], None] | None = None,
     ) -> dict[str, Any]:
         """Execute an unmatched natural-language task through the configured LLM."""
+
         def emit(kind: str, message: str = "", **payload: Any) -> None:
             if progress_callback is None:
                 return
             progress_callback({"kind": kind, "message": message, **payload})
 
-        emit("reasoning", "模型正在处理请求；当前 Provider 未暴露完整思考内容，仅显示合规处理进度。")
+        emit(
+            "reasoning",
+            "模型正在处理请求；当前 Provider 未暴露完整思考内容，仅显示合规处理进度。",
+        )
         client_or_error = self._llm_manager.create_client()
         if not isinstance(client_or_error, LLMClient):
             error = (
@@ -545,7 +553,11 @@ class Kernel:
                             or ""
                         )
                         response_metadata.update(
-                            {k: v for k, v in chunk.items() if k not in {"delta", "content", "text"}}
+                            {
+                                k: v
+                                for k, v in chunk.items()
+                                if k not in {"delta", "content", "text"}
+                            }
                         )
                     else:
                         delta = str(chunk or "")
@@ -753,7 +765,9 @@ class Kernel:
             {
                 "role": "system",
                 "content": "Python/R workspace tool authoring rules:\n"
-                + json.dumps(tool_authoring_context, ensure_ascii=False, sort_keys=True),
+                + json.dumps(
+                    tool_authoring_context, ensure_ascii=False, sort_keys=True
+                ),
             },
             {"role": "user", "content": task},
         ]
@@ -766,9 +780,9 @@ class Kernel:
         try:
             return {
                 "workspace_id": workspace_id,
-                "tools": WorkspaceToolService(self._config_path.parent.parent).list_tools(
-                    workspace_id
-                ),
+                "tools": WorkspaceToolService(
+                    self._config_path.parent.parent
+                ).list_tools(workspace_id),
             }
         except Exception as exc:
             return {"workspace_id": workspace_id, "tools": {}, "error": str(exc)}

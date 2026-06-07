@@ -156,7 +156,9 @@ class TestConsortChecklist:
             == "Add a supported source before export."
         )
         assert result["claim_annotations"][0]["source_provenance"]["valid"] is False
-        assert result["citation_errors"][0]["citation_issue_type"] == "missing_source_id"
+        assert (
+            result["citation_errors"][0]["citation_issue_type"] == "missing_source_id"
+        )
         assert result["claim_audit_summary"]["network_lookup_performed"] is False
         assert result["claim_audit_summary"]["gate_status"] == "blocked"
 

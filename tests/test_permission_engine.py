@@ -320,7 +320,9 @@ class TestPermissionEngineWithPolicies:
         assert "api_key" not in audit_text
         assert "sk-permission-secret" not in audit_text
 
-    def test_full_access_high_risk_requires_explicit_authorization_and_audits(self, tmp_path):
+    def test_full_access_high_risk_requires_explicit_authorization_and_audits(
+        self, tmp_path
+    ):
         policy_dir = tmp_path / "policies"
         policy_dir.mkdir()
         audit_log = tmp_path / "audit.jsonl"

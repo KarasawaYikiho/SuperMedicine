@@ -134,7 +134,9 @@ def test_run_kernel_task_emits_running_completion_and_formatted_messages(
         def add_status_message(self, message: str) -> None:
             events.append(("status", message))
 
-        def add_assistant_message(self, message: str, turn_id: int | None = None) -> None:
+        def add_assistant_message(
+            self, message: str, turn_id: int | None = None
+        ) -> None:
             events.append(("assistant", message))
 
         def add_error_message(self, message: str) -> None:
@@ -178,7 +180,9 @@ def test_chat_streaming_methods_keep_assistant_turn_and_append_safe_deltas():
 
     view.begin_assistant_message(turn_id)
     view.append_assistant_delta("delta [bold] <x> token=secret")
-    view.add_reasoning_status("模型正在处理请求；当前 Provider 未暴露完整思考内容，仅显示合规处理进度。")
+    view.add_reasoning_status(
+        "模型正在处理请求；当前 Provider 未暴露完整思考内容，仅显示合规处理进度。"
+    )
     rendered = "\n".join(view.output.lines)
 
     assert f"{t('chat_user_label')} #1" in rendered

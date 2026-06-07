@@ -126,7 +126,9 @@ def _citation_issue_type(validation_status: str, source_id: object) -> str | Non
 
 
 def _claim_audit_summary(annotations: list[dict[str, Any]]) -> dict[str, Any]:
-    required = [annotation for annotation in annotations if annotation["requires_citation"]]
+    required = [
+        annotation for annotation in annotations if annotation["requires_citation"]
+    ]
     blocked = [
         annotation
         for annotation in required
@@ -138,7 +140,9 @@ def _claim_audit_summary(annotations: list[dict[str, Any]]) -> dict[str, Any]:
         if annotation.get("citation_status") == "warning"
     ]
     linked = [
-        annotation for annotation in required if annotation.get("citation_status") == "ok"
+        annotation
+        for annotation in required
+        if annotation.get("citation_status") == "ok"
     ]
     return {
         "audit_mode": "provided_sources_only",
@@ -148,7 +152,11 @@ def _claim_audit_summary(annotations: list[dict[str, Any]]) -> dict[str, Any]:
         "linked_claims": len(linked),
         "needs_human_review_claims": len(needs_review),
         "blocked_claims": len(blocked),
-        "gate_status": "blocked" if blocked else "review_required" if needs_review else "pass",
+        "gate_status": "blocked"
+        if blocked
+        else "review_required"
+        if needs_review
+        else "pass",
     }
 
 

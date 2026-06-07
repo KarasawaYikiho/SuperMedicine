@@ -393,7 +393,7 @@ secrets were added to source, tests, or documentation.
 
 ### 8.7 Current Documentation Hygiene Addendum
 
-- Public release label is `Beta0.4.1`; package metadata fallback is `0.4.1b0`.
+- Public release label is `Beta0.4.2`; package metadata fallback is `0.4.2b0`.
 - `FUNCTION_MAP.md` is the visible callable inventory because `docs/` is ignored.
 - OpenCode-style experience references are design-analysis input only; no external
   source, logs, prompts, or private configuration are copied into SuperMedicine.

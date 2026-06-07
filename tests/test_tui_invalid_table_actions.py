@@ -118,8 +118,9 @@ def test_tool_screen_scans_candidates_without_tool_id_input(tmp_path):
             view.query_one("#tool-workspace-select", Select).value = "study-a"
             await _wait_for_tui_condition(
                 pilot,
-                lambda: view.query_one("#tool-workspace-select", Select).value
-                == "study-a",
+                lambda: (
+                    view.query_one("#tool-workspace-select", Select).value == "study-a"
+                ),
             )
             view.query_one("#tool-scan", Button).focus()
             await pilot.click("#tool-scan")
@@ -127,8 +128,10 @@ def test_tool_screen_scans_candidates_without_tool_id_input(tmp_path):
             table = view.query_one("#tool-table", DataTable)
             await _wait_for_tui_condition(
                 pilot,
-                lambda: getattr(view, "_table_mode") == "candidates"
-                and table.row_count == 1,
+                lambda: (
+                    getattr(view, "_table_mode") == "candidates"
+                    and table.row_count == 1
+                ),
             )
             assert table.row_count == 1
             assert table.get_row_at(0)[2] == "python-stats"

@@ -52,7 +52,9 @@ class LogReportView(Vertical):
             yield Button(t("log_write"), id="log-write", classes="btn btn-primary")
             yield Button(t("log_show"), id="log-show", classes="btn btn-secondary")
             yield Button(t("refresh"), id="log-refresh", classes="btn btn-secondary")
-            yield Button("自动跟随：开", id="log-auto-follow", classes="btn btn-secondary")
+            yield Button(
+                "自动跟随：开", id="log-auto-follow", classes="btn btn-secondary"
+            )
         yield DataTable(id="log-table", cursor_type="row")
         yield Static("", id="log-detail")
         yield Static("", id="log-status")

@@ -299,7 +299,10 @@ def collect_removal_candidates(
             )
     if preserve_user_data and preserved_roots:
         for path in list(unique):
-            if any(preserved == path or _is_within(preserved, path) for preserved in preserved_roots):
+            if any(
+                preserved == path or _is_within(preserved, path)
+                for preserved in preserved_roots
+            ):
                 skipped.append(f"preserved-user-data-parent:{path}")
                 unique.pop(path, None)
     return sorted(

@@ -278,7 +278,9 @@ def _optional_metadata_str(value: Any, default: str) -> str:
     if value is None:
         return default
     if not isinstance(value, str):
-        raise ValueError("optional source provenance fields must be strings when provided")
+        raise ValueError(
+            "optional source provenance fields must be strings when provided"
+        )
     return value
 
 

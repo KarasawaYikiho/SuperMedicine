@@ -234,7 +234,9 @@ class ExperimentProtocol:
 def _load_config_file(path: Path) -> dict[str, Any]:
     try:
         raw = path.read_text(encoding="utf-8")
-        loaded = json.loads(raw) if path.suffix.lower() == ".json" else yaml.safe_load(raw)
+        loaded = (
+            json.loads(raw) if path.suffix.lower() == ".json" else yaml.safe_load(raw)
+        )
     except Exception as exc:
         raise ExperimentProtocolConfigError(
             f"experiment config format error in {path}: {exc}"
@@ -272,7 +274,9 @@ def load_protocols(
 ) -> tuple[dict[str, ExperimentProtocol], dict[str, Path]]:
     """Load experiment protocols from the unified plugin experiment directory."""
 
-    directory = Path(config_dir) if config_dir is not None else default_experiment_config_dir()
+    directory = (
+        Path(config_dir) if config_dir is not None else default_experiment_config_dir()
+    )
     protocols_by_name: dict[str, ExperimentProtocol] = {}
     sources_by_name: dict[str, Path] = {}
     normalized_names: dict[str, str] = {}
@@ -331,7 +335,9 @@ def validate_experiment_config(data: dict[str, Any]) -> ExperimentProtocol:
     """Validate a candidate experiment config and return its normalized protocol."""
 
     if not isinstance(data, dict):
-        raise ExperimentProtocolAuthoringError("experiment config root must be an object")
+        raise ExperimentProtocolAuthoringError(
+            "experiment config root must be an object"
+        )
     try:
         protocol = ExperimentProtocol.from_dict(data)
     except Exception as exc:
@@ -392,7 +398,11 @@ def build_experiment_llm_context(protocol_id: str | None = None) -> dict[str, An
         selected = get_protocol(protocol_id)
     elif protocols:
         selected = next(
-            (protocol for protocol in protocols if protocol.protocol_id == "western_blot_basic"),
+            (
+                protocol
+                for protocol in protocols
+                if protocol.protocol_id == "western_blot_basic"
+            ),
             protocols[0],
         )
     return {
@@ -407,7 +417,9 @@ def build_experiment_llm_context(protocol_id: str | None = None) -> dict[str, An
             }
             for protocol in protocols
         ],
-        "selected_protocol": summarize_experiment_protocol(selected) if selected else None,
+        "selected_protocol": summarize_experiment_protocol(selected)
+        if selected
+        else None,
     }
 
 
@@ -493,11 +505,16 @@ def save_experiment_config(
     """Validate and write an experiment config into the unified directory safely."""
 
     protocol = validate_experiment_config(data)
-    directory = Path(config_dir) if config_dir is not None else default_experiment_config_dir()
+    directory = (
+        Path(config_dir) if config_dir is not None else default_experiment_config_dir()
+    )
     _ensure_writable_config_dir(directory)
     safe_name = filename or f"{protocol.protocol_id}.yaml"
     target = directory / safe_name
-    if target.name != safe_name or target.suffix.lower() not in EXPERIMENT_CONFIG_EXTENSIONS:
+    if (
+        target.name != safe_name
+        or target.suffix.lower() not in EXPERIMENT_CONFIG_EXTENSIONS
+    ):
         raise ExperimentProtocolAuthoringError(
             "experiment config filename must be a safe .yaml, .yml, or .json basename"
         )
@@ -518,7 +535,10 @@ def save_experiment_config(
             same_target = source is not None and source.resolve() == target.resolve()
             if same_target and overwrite:
                 continue
-            if name.casefold() == existing_name.casefold() or name.casefold() == existing_protocol.protocol_id.casefold():
+            if (
+                name.casefold() == existing_name.casefold()
+                or name.casefold() == existing_protocol.protocol_id.casefold()
+            ):
                 raise ExperimentProtocolAuthoringError(
                     f"experiment protocol name conflict: {name} already exists in {source}"
                 )
@@ -529,9 +549,15 @@ def save_experiment_config(
     payload = protocol.to_dict()
     try:
         if target.suffix.lower() == ".json":
-            target.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            target.write_text(
+                json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
         else:
-            target.write_text(yaml.safe_dump(payload, allow_unicode=True, sort_keys=False), encoding="utf-8")
+            target.write_text(
+                yaml.safe_dump(payload, allow_unicode=True, sort_keys=False),
+                encoding="utf-8",
+            )
     except Exception as exc:
         raise ExperimentProtocolAuthoringError(
             f"could not write experiment config {target}: {exc}"

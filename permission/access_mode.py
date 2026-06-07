@@ -110,8 +110,7 @@ class AccessModePolicy:
                 "Full file access mode requires explicit user/system confirmation."
             )
         self.authorized_external_roots = tuple(
-            Path(root).expanduser().resolve()
-            for root in authorized_external_roots
+            Path(root).expanduser().resolve() for root in authorized_external_roots
         )
         configured_sandbox_roots = tuple(sandbox_writable_roots) or (
             "self_evolution",
@@ -199,7 +198,9 @@ class AccessModePolicy:
 
         root = Path(path).expanduser().resolve()
         if not root.is_dir():
-            raise AccessModeError(f"Authorized external path must be a directory: {root}")
+            raise AccessModeError(
+                f"Authorized external path must be a directory: {root}"
+            )
         if self._is_relative_to(root, self.project_root):
             return root
         roots = list(self.authorized_external_roots)
@@ -371,7 +372,9 @@ def normalize_access_mode(mode: AccessMode | str) -> AccessMode:
         raise UnsupportedAccessMode(f"Unsupported file access mode: {mode}") from exc
 
 
-def normalize_file_operation(operation: FileAccessOperation | str) -> FileAccessOperation:
+def normalize_file_operation(
+    operation: FileAccessOperation | str,
+) -> FileAccessOperation:
     """Normalize operation strings to :class:`FileAccessOperation`."""
 
     if isinstance(operation, FileAccessOperation):
@@ -391,7 +394,9 @@ def normalize_file_operation(operation: FileAccessOperation | str) -> FileAccess
     try:
         return aliases[value]
     except KeyError as exc:
-        raise AccessModeError(f"Unsupported file access operation: {operation}") from exc
+        raise AccessModeError(
+            f"Unsupported file access operation: {operation}"
+        ) from exc
 
 
 def insufficient_permission_helper(path: Path | str) -> str:

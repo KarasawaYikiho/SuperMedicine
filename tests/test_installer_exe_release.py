@@ -298,11 +298,17 @@ def test_install_help_documents_unified_install_and_desktop_release(capsys):
     assert "统一安装" in output
 
 
-def test_existing_install_detection_priority_uses_record_before_config_payload_and_desktop(tmp_path):
+def test_existing_install_detection_priority_uses_record_before_config_payload_and_desktop(
+    tmp_path,
+):
     install = importlib.import_module("installer.entrypoint")
     (tmp_path / ".supermedicine").mkdir()
-    (tmp_path / ".supermedicine" / "install-record.json").write_text("{}", encoding="utf-8")
-    (tmp_path / ".supermedicine" / "config.yaml").write_text("project_name: supermedicine\n", encoding="utf-8")
+    (tmp_path / ".supermedicine" / "install-record.json").write_text(
+        "{}", encoding="utf-8"
+    )
+    (tmp_path / ".supermedicine" / "config.yaml").write_text(
+        "project_name: supermedicine\n", encoding="utf-8"
+    )
     (tmp_path / "Cli.py").write_text("print('payload')\n", encoding="utf-8")
     desktop = tmp_path / "Desktop"
     desktop.mkdir()
@@ -320,7 +326,9 @@ def test_existing_install_detection_priority_uses_record_before_config_payload_a
     ]
 
 
-def test_scripted_existing_install_without_policy_fails_without_prompt(tmp_path, monkeypatch):
+def test_scripted_existing_install_without_policy_fails_without_prompt(
+    tmp_path, monkeypatch
+):
     install = importlib.import_module("installer.entrypoint")
     config = tmp_path / ".supermedicine" / "config.yaml"
     config.parent.mkdir()
@@ -338,7 +346,9 @@ def test_scripted_existing_install_without_policy_fails_without_prompt(tmp_path,
     assert "--if-installed" in str(excinfo.value)
 
 
-def test_scripted_uninstall_policy_requires_explicit_user_data_choice(tmp_path, monkeypatch):
+def test_scripted_uninstall_policy_requires_explicit_user_data_choice(
+    tmp_path, monkeypatch
+):
     install = importlib.import_module("installer.entrypoint")
     config = tmp_path / ".supermedicine" / "config.yaml"
     config.parent.mkdir()
@@ -352,7 +362,9 @@ def test_scripted_uninstall_policy_requires_explicit_user_data_choice(tmp_path, 
     assert config.exists()
 
 
-def test_update_policy_preserves_existing_config_secret_and_writes_secret_free_record(tmp_path, monkeypatch):
+def test_update_policy_preserves_existing_config_secret_and_writes_secret_free_record(
+    tmp_path, monkeypatch
+):
     install = importlib.import_module("installer.entrypoint")
     secret = "sk-existing-secret-to-preserve"
     config = tmp_path / ".supermedicine" / "config.yaml"
@@ -368,7 +380,9 @@ def test_update_policy_preserves_existing_config_secret_and_writes_secret_free_r
     install.main(["--init", "--if-installed", "update", *_llm_args()])
 
     config_text = config.read_text(encoding="utf-8")
-    record_text = (tmp_path / ".supermedicine" / "install-record.json").read_text(encoding="utf-8")
+    record_text = (tmp_path / ".supermedicine" / "install-record.json").read_text(
+        encoding="utf-8"
+    )
     assert secret in config_text
     assert secret not in record_text
     record = json.loads(record_text)
@@ -376,7 +390,9 @@ def test_update_policy_preserves_existing_config_secret_and_writes_secret_free_r
     assert record["mode"] == "update"
 
 
-def test_interactive_existing_install_update_branch_prompts_two_main_choices(tmp_path, monkeypatch):
+def test_interactive_existing_install_update_branch_prompts_two_main_choices(
+    tmp_path, monkeypatch
+):
     install = importlib.import_module("installer.entrypoint")
     config = tmp_path / ".supermedicine" / "config.yaml"
     config.parent.mkdir()
@@ -396,7 +412,9 @@ def test_interactive_existing_install_update_branch_prompts_two_main_choices(tmp
     assert config.exists()
 
 
-def test_interactive_uninstall_branch_asks_second_user_data_confirmation(tmp_path, monkeypatch):
+def test_interactive_uninstall_branch_asks_second_user_data_confirmation(
+    tmp_path, monkeypatch
+):
     install = importlib.import_module("installer.entrypoint")
     config = tmp_path / ".supermedicine" / "config.yaml"
     config.parent.mkdir()
@@ -409,7 +427,14 @@ def test_interactive_uninstall_branch_asks_second_user_data_confirmation(tmp_pat
         return next(answers)
 
     monkeypatch.setattr("builtins.input", fake_input)
-    monkeypatch.setattr(install, "_uninstall_existing_install", lambda project_dir, *, preserve_user_data: {"status": "removed", "preserve": preserve_user_data})
+    monkeypatch.setattr(
+        install,
+        "_uninstall_existing_install",
+        lambda project_dir, *, preserve_user_data: {
+            "status": "removed",
+            "preserve": preserve_user_data,
+        },
+    )
 
     install.main([])
 

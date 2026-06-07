@@ -1,6 +1,6 @@
 # SuperMedicine
 
-![Version](https://img.shields.io/badge/version-Beta0.4.1-blue)
+![Version](https://img.shields.io/badge/version-Beta0.4.2-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -10,8 +10,8 @@ medical writing/citation helpers, workspace management, paper import, experience
 learning, and a Chinese terminal UI. OpenCode and Claude Code integrations are
 optional add-ons; the Python CLI and Kernel are the default supported runtime.
 
-Public/release label: **Beta0.4.1**. Python package fallback version:
-**0.4.1b0**.
+Public/release label: **Beta0.4.2**. Python package fallback version:
+**0.4.2b0**.
 
 For detailed setup, see [INSTALL.md](INSTALL.md). For design boundaries, see
 [ARCHITECTURE.md](ARCHITECTURE.md). For security and medical-use limits, see
@@ -123,9 +123,9 @@ The installer also supports local `Dist/SuperMedicine.exe` and a root-level
 that also contains `installer/__init__.py`, `installer/exe_release.py`, and the
 executable/resources. Do not copy only `Install.py` out of the archive.
 If you see `ModuleNotFoundError: No module named 'installer'` at a path like
-`C:\Users\<you>\Downloads\SuperMedicine.Beta0.4.1\SuperMedicine Beta0.4.1\Install.py`,
+`C:\Users\<you>\Downloads\SuperMedicine.Beta0.4.2\SuperMedicine Beta0.4.2\Install.py`,
 the archive is likely incomplete or from an older broken release; re-download the
-fixed Beta0.4.1 package or run from a complete source/release directory.
+fixed Beta0.4.2 package or run from a complete source/release directory.
 If `SuperMedicine.exe` is missing, the installer reports the requested file,
 every searched path, and instructs you to regenerate the CI/local package.
 

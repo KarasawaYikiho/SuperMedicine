@@ -2,7 +2,7 @@
 
 This guide covers installation, initialization, provider configuration, optional
 R support, platform adapter notes, troubleshooting, and uninstall behavior for
-SuperMedicine **Beta0.4.1**. The Python package fallback version is **0.4.1b0**.
+SuperMedicine **Beta0.4.2**. The Python package fallback version is **0.4.2b0**.
 
 For a shorter overview, start with [README.md](README.md). For design and
 security boundaries, see [ARCHITECTURE.md](ARCHITECTURE.md) and
@@ -108,7 +108,7 @@ configuration when you confirm initialization. It does not require or create
 OpenCode or Claude Code configuration.
 
 If you launch `Install.py` from a release archive, keep the extracted directory
-intact. The fixed Beta0.4.1 release layout places `Install.py` next to the
+intact. The fixed Beta0.4.2 release layout places `Install.py` next to the
 `installer/` package, including `installer/__init__.py` and
 `installer/exe_release.py`, under the extracted root. CI release archives also
 include the application executable at `dist/SuperMedicine.exe` and the standalone
@@ -460,7 +460,7 @@ pip install -e .
 ### `ModuleNotFoundError: No module named 'installer'`
 
 This usually means `Install.py` was copied out of the release archive instead of
-being run from the full extracted directory. The Beta0.4.1 release must keep the
+being run from the full extracted directory. The Beta0.4.2 release must keep the
 complete layout with `Install.py` and the `installer/` package together at the
 extracted root, including `installer/__init__.py` and `installer/exe_release.py`.
 Re-download the fixed complete package or run from a complete source/release

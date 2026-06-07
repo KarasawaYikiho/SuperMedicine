@@ -44,7 +44,9 @@ class ToolView(Vertical):
                 value="python",
                 id="tool-language-select",
             )
-            yield Static("选择候选工具后点击添加；无需输入或知道工具 ID。", classes="hint")
+            yield Static(
+                "选择候选工具后点击添加；无需输入或知道工具 ID。", classes="hint"
+            )
         with Horizontal(classes="form-row"):
             yield Button(t("tool_init"), id="tool-init", classes="btn btn-secondary")
             yield Button("扫描候选", id="tool-scan", classes="btn btn-secondary")
@@ -97,9 +99,15 @@ class ToolView(Vertical):
                 placeholder="确认写入输入 WRITE；full 模式输入 FULL WRITE",
                 id="self-evolution-confirm-input",
             )
-            yield Button("生成预览", id="self-evolution-preview", classes="btn btn-primary")
-            yield Button("确认写入", id="self-evolution-confirm-write", classes="btn btn-danger")
-            yield Button("取消", id="self-evolution-cancel", classes="btn btn-secondary")
+            yield Button(
+                "生成预览", id="self-evolution-preview", classes="btn btn-primary"
+            )
+            yield Button(
+                "确认写入", id="self-evolution-confirm-write", classes="btn btn-danger"
+            )
+            yield Button(
+                "取消", id="self-evolution-cancel", classes="btn btn-secondary"
+            )
         yield DataTable(id="self-evolution-files-table", cursor_type="row")
         yield Static("预览内容将在这里显示。", id="self-evolution-preview-content")
         yield Static("审计结果将在确认写入后显示。", id="self-evolution-audit-result")
@@ -189,9 +197,7 @@ class ToolView(Vertical):
             if refreshed:
                 self._tool_run_empty_error_active = False
                 self._tool_run_empty_error_workspace_id = None
-                self._set_status(
-                    f"{t('tool_refreshed')}：{t('tool_no_tools')}"
-                )
+                self._set_status(f"{t('tool_refreshed')}：{t('tool_no_tools')}")
                 return
             if (
                 self._tool_run_empty_error_active
@@ -200,9 +206,7 @@ class ToolView(Vertical):
                 return
             self._tool_run_empty_error_active = False
             self._tool_run_empty_error_workspace_id = None
-            self._set_status(
-                t("tool_no_tools")
-            )
+            self._set_status(t("tool_no_tools"))
             return
         self._tool_run_empty_error_active = False
         self._tool_run_empty_error_workspace_id = None
@@ -216,7 +220,9 @@ class ToolView(Vertical):
         self._table_mode = "candidates"
         table = self.query_one("#tool-table", DataTable)
         table.clear(columns=True)
-        table.add_columns("编号", t("tool_language"), "ID", "名称", t("dashboard_status"))
+        table.add_columns(
+            "编号", t("tool_language"), "ID", "名称", t("dashboard_status")
+        )
 
         language_select = self.query_one("#tool-language-select", Select)
         language = (
@@ -227,7 +233,9 @@ class ToolView(Vertical):
         from core.workspace_tools import WorkspaceToolService
 
         try:
-            grouped = WorkspaceToolService(self._project_root).scan_import_candidates(language)
+            grouped = WorkspaceToolService(self._project_root).scan_import_candidates(
+                language
+            )
         except Exception as e:
             self._set_error(e)
             return
@@ -250,7 +258,9 @@ class ToolView(Vertical):
         if count == 0:
             self._set_status("未扫描到 Python/R 工具目录或目录为空。")
         else:
-            self._set_status(f"扫描到 {count} 个候选工具，其中 {invalid} 个格式错误不可导入。")
+            self._set_status(
+                f"扫描到 {count} 个候选工具，其中 {invalid} 个格式错误不可导入。"
+            )
 
     def _set_status(self, message: str) -> None:
         status = self.query_one("#tool-status", Static)
@@ -412,7 +422,9 @@ class ToolView(Vertical):
         # Show tool path for user
         self._set_status(f"{t('tool_run')}: {tool_dir}")
 
-    def _sync_self_evolution_permission_mode(self, *, show_status: bool = False) -> None:
+    def _sync_self_evolution_permission_mode(
+        self, *, show_status: bool = False
+    ) -> None:
         """Reflect the persisted permission mode in the self-evolution selector."""
 
         try:
@@ -485,7 +497,9 @@ class ToolView(Vertical):
         )
         if request is None:
             return
-        confirmation = self.query_one("#self-evolution-confirm-input", Input).value.strip()
+        confirmation = self.query_one(
+            "#self-evolution-confirm-input", Input
+        ).value.strip()
         access_mode = str(request.get("access_mode") or "sandbox")
         if access_mode == "full":
             if confirmation != "FULL WRITE":
@@ -505,7 +519,9 @@ class ToolView(Vertical):
             from core.self_evolution import SelfEvolutionService
             from permission.audit import AuditLogger
 
-            audit_log = self._project_root / ".supermedicine" / "policies" / "audit.jsonl"
+            audit_log = (
+                self._project_root / ".supermedicine" / "policies" / "audit.jsonl"
+            )
             result = SelfEvolutionService(self._project_root).generate(
                 **request,
                 confirmed=True,
@@ -554,14 +570,18 @@ class ToolView(Vertical):
                     preview_text = f"目标文件：{path}\n\n{content}"
         if not preview_text:
             errors = "; ".join(str(error) for error in result.get("errors", []))
-            preview_text = errors or str(result.get("message") or "没有可显示的预览内容。")
+            preview_text = errors or str(
+                result.get("message") or "没有可显示的预览内容。"
+            )
         self.query_one("#self-evolution-preview-content", Static).update(
             str(redact_sensitive(preview_text))
         )
         audit_records = result.get("audit_records", [])
         audit_log = self._project_root / ".supermedicine" / "policies" / "audit.jsonl"
         if audit_records:
-            audit_text = f"审计结果：已记录 {len(audit_records)} 条；日志路径：{audit_log}"
+            audit_text = (
+                f"审计结果：已记录 {len(audit_records)} 条；日志路径：{audit_log}"
+            )
         elif preview:
             audit_text = f"审计结果：预览模式未写入文件；确认写入后记录到 {audit_log}。"
         else:

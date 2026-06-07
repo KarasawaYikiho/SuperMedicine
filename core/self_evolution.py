@@ -266,11 +266,15 @@ class SelfEvolutionService:
             overwrite=bool(kwargs.get("overwrite", False)),
             agent_id=str(kwargs.get("agent_id") or "delta"),
             full_access_confirmed=bool(kwargs.get("full_access_confirmed", False)),
-            risk_notice_acknowledged=bool(kwargs.get("risk_notice_acknowledged", False)),
+            risk_notice_acknowledged=bool(
+                kwargs.get("risk_notice_acknowledged", False)
+            ),
             metadata=dict(kwargs.get("metadata") or {}),
         )
 
-    def _build_artifacts(self, request: SelfEvolutionRequest) -> list[GeneratedArtifact]:
+    def _build_artifacts(
+        self, request: SelfEvolutionRequest
+    ) -> list[GeneratedArtifact]:
         experience_records = self._resolve_experience_records(
             request.experience_source, request.workspace_id
         )
@@ -281,15 +285,17 @@ class SelfEvolutionService:
                 allowed_extensions=ALLOWED_MARKDOWN_EXTENSIONS,
                 default_filename="self-evolution.md",
             )
-            return self._finalize_artifacts([
-                GeneratedArtifact(
-                    path=path,
-                    artifact_type=request.artifact_type,
-                    content=self._render_markdown(request, experience_records),
-                    description="Markdown self-evolution plan/preview artifact",
-                    exists=path.exists(),
-                )
-            ])
+            return self._finalize_artifacts(
+                [
+                    GeneratedArtifact(
+                        path=path,
+                        artifact_type=request.artifact_type,
+                        content=self._render_markdown(request, experience_records),
+                        description="Markdown self-evolution plan/preview artifact",
+                        exists=path.exists(),
+                    )
+                ]
+            )
 
         extension = ".py" if request.artifact_type == "python_tool" else ".R"
         filename = f"{self._slug_from_intent(request.user_intent)}{extension}"
@@ -310,22 +316,26 @@ class SelfEvolutionService:
             request,
             allowed_extensions=ALLOWED_TOOL_EXTENSIONS,
         )
-        return self._finalize_artifacts([
-            GeneratedArtifact(
-                path=path,
-                artifact_type=request.artifact_type,
-                content=content,
-                description="Generated guarded workspace tool runner",
-                exists=path.exists(),
-            ),
-            GeneratedArtifact(
-                path=readme,
-                artifact_type=request.artifact_type,
-                content=self._render_tool_readme(request, experience_records, path.name),
-                description="Generated tool companion Markdown metadata",
-                exists=readme.exists(),
-            ),
-        ])
+        return self._finalize_artifacts(
+            [
+                GeneratedArtifact(
+                    path=path,
+                    artifact_type=request.artifact_type,
+                    content=content,
+                    description="Generated guarded workspace tool runner",
+                    exists=path.exists(),
+                ),
+                GeneratedArtifact(
+                    path=readme,
+                    artifact_type=request.artifact_type,
+                    content=self._render_tool_readme(
+                        request, experience_records, path.name
+                    ),
+                    description="Generated tool companion Markdown metadata",
+                    exists=readme.exists(),
+                ),
+            ]
+        )
 
     def _finalize_artifacts(
         self, artifacts: list[GeneratedArtifact]
@@ -390,7 +400,9 @@ class SelfEvolutionService:
         allow_overwrite: bool,
     ) -> None:
         normalized_extensions = {
-            extension.lower() if str(extension).startswith(".") else f".{str(extension).lower()}"
+            extension.lower()
+            if str(extension).startswith(".")
+            else f".{str(extension).lower()}"
             for extension in allowed_extensions
         }
         if path.suffix.lower() not in normalized_extensions:
@@ -493,7 +505,9 @@ class SelfEvolutionService:
                 raise SelfEvolutionValidationError(
                     "workspace_id is required when experience_source is a record id"
                 )
-            return [self.experience_store.get_experience(source, workspace_id=workspace_id)]
+            return [
+                self.experience_store.get_experience(source, workspace_id=workspace_id)
+            ]
         if isinstance(source, Sequence) and not isinstance(source, (bytes, bytearray)):
             records: list[ExperienceRecord] = []
             for item in source:
@@ -509,7 +523,9 @@ class SelfEvolutionService:
             "intent": request.user_intent,
             "artifact_type": request.artifact_type,
             "access_mode": request.access_mode,
-            "target": str(artifacts[0].path if len(artifacts) == 1 else artifacts[0].path.parent),
+            "target": str(
+                artifacts[0].path if len(artifacts) == 1 else artifacts[0].path.parent
+            ),
             "files": [
                 {
                     "path": str(artifact.path),
@@ -578,7 +594,7 @@ class SelfEvolutionService:
         experience_notes = self._experience_notes(experiences)
         return (
             "#!/usr/bin/env python\n"
-            "\"\"\"Generated SuperMedicine self-evolution helper tool.\"\"\"\n\n"
+            '"""Generated SuperMedicine self-evolution helper tool."""\n\n'
             "from __future__ import annotations\n\n"
             "import argparse\n"
             "from pathlib import Path\n\n"
@@ -637,7 +653,11 @@ class SelfEvolutionService:
 
     def _experience_markdown(self, experiences: list[ExperienceRecord]) -> list[str]:
         if not experiences:
-            return ["", "## Experience Source", "No confirmed experience source supplied."]
+            return [
+                "",
+                "## Experience Source",
+                "No confirmed experience source supplied.",
+            ]
         lines = ["", "## Experience Source"]
         for record in experiences:
             lines.extend(

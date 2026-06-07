@@ -203,7 +203,9 @@ class ConfigCenter:
         config = self._merged_default_section("file_access", DEFAULT_FILE_ACCESS_CONFIG)
         raw_mode = config.get("mode", AccessMode.CONSERVATIVE.value)
         mode_value: str | AccessMode = (
-            raw_mode if isinstance(raw_mode, AccessMode) else str(raw_mode or AccessMode.CONSERVATIVE.value)
+            raw_mode
+            if isinstance(raw_mode, AccessMode)
+            else str(raw_mode or AccessMode.CONSERVATIVE.value)
         )
         config["mode"] = normalize_access_mode(mode_value).value
         roots = config.get("authorized_external_roots", [])
@@ -235,23 +237,31 @@ class ConfigCenter:
     def get_permission_mode_label(self) -> str:
         """Return the canonical user-facing permission mode label for CLI/TUI."""
 
-        mode = str(self.get_file_access_config().get("mode") or AccessMode.CONSERVATIVE.value)
+        mode = str(
+            self.get_file_access_config().get("mode") or AccessMode.CONSERVATIVE.value
+        )
         return "完全访问" if mode == AccessMode.FULL.value else "保守"
 
     def get_runtime_state(self) -> dict[str, Any]:
         """Return persisted runtime UI/LLM synchronization state with safe defaults."""
 
-        state = self._merged_default_section("runtime_state", DEFAULT_RUNTIME_STATE_CONFIG)
+        state = self._merged_default_section(
+            "runtime_state", DEFAULT_RUNTIME_STATE_CONFIG
+        )
         state["current_view"] = _safe_runtime_slug(state.get("current_view"), "chat")
         state["selected_experiment_protocol"] = _safe_runtime_slug(
             state.get("selected_experiment_protocol"), ""
         )
-        state["last_workspace_id"] = _safe_runtime_slug(state.get("last_workspace_id"), "")
+        state["last_workspace_id"] = _safe_runtime_slug(
+            state.get("last_workspace_id"), ""
+        )
         if not isinstance(state.get("last_tool_import"), dict):
             state["last_tool_import"] = {}
         return state
 
-    def set_runtime_state_value(self, key: str, value: Any, *, save: bool = False) -> dict[str, Any]:
+    def set_runtime_state_value(
+        self, key: str, value: Any, *, save: bool = False
+    ) -> dict[str, Any]:
         """Update one runtime-state key in the unified config service."""
 
         state = self._config.setdefault("runtime_state", {})
@@ -268,7 +278,9 @@ class ConfigCenter:
 
         return str(self.get_runtime_state().get("selected_experiment_protocol") or "")
 
-    def set_selected_experiment_protocol(self, protocol_id: str, *, save: bool = False) -> dict[str, Any]:
+    def set_selected_experiment_protocol(
+        self, protocol_id: str, *, save: bool = False
+    ) -> dict[str, Any]:
         """Persist the experiment protocol selected for subsequent LLM context."""
 
         return self.set_runtime_state_value(
@@ -348,7 +360,9 @@ class ConfigCenter:
         config["full_mode_confirmed"] = normalized == AccessMode.FULL
         return self.get_file_access_config()
 
-    def authorize_external_file_access_directory(self, path: str | Path) -> dict[str, Any]:
+    def authorize_external_file_access_directory(
+        self, path: str | Path
+    ) -> dict[str, Any]:
         """Persist an explicitly authorized external directory in memory."""
 
         root = Path(path).expanduser().resolve()

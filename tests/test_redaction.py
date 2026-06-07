@@ -179,4 +179,4 @@ def test_cli_formatter_and_tui_kernel_format_redact_plain_auth_fields():
     assert secret not in tui_rendered
     assert "[REDACTED]" in cli_rendered
     assert "[已隐藏]" in tui_rendered
-    assert "\n  \"ok\": true" in tui_rendered
+    assert '\n  "ok": true' in tui_rendered

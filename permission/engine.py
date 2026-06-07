@@ -121,7 +121,9 @@ class PermissionEngine:
         policy = self._policies[agent_id]
 
         if context and context.get("access_mode") == "full":
-            if context.get("high_risk_operation") and not context.get("explicit_authorization"):
+            if context.get("high_risk_operation") and not context.get(
+                "explicit_authorization"
+            ):
                 self._audit.log(
                     agent_id=agent_id,
                     action=action,
@@ -132,11 +134,15 @@ class PermissionEngine:
                         "access_mode": context.get("access_mode"),
                         "high_risk_operation": context.get("high_risk_operation"),
                         "explicit_authorization": context.get("explicit_authorization"),
-                        "risk_notice_acknowledged": context.get("risk_notice_acknowledged"),
+                        "risk_notice_acknowledged": context.get(
+                            "risk_notice_acknowledged"
+                        ),
                     },
                 )
                 return PermissionResult.DENIED
-            if context.get("high_risk_operation") and not context.get("risk_notice_acknowledged"):
+            if context.get("high_risk_operation") and not context.get(
+                "risk_notice_acknowledged"
+            ):
                 self._audit.log(
                     agent_id=agent_id,
                     action=action,
@@ -147,7 +153,9 @@ class PermissionEngine:
                         "access_mode": context.get("access_mode"),
                         "high_risk_operation": context.get("high_risk_operation"),
                         "explicit_authorization": context.get("explicit_authorization"),
-                        "risk_notice_acknowledged": context.get("risk_notice_acknowledged"),
+                        "risk_notice_acknowledged": context.get(
+                            "risk_notice_acknowledged"
+                        ),
                     },
                 )
                 return PermissionResult.DENIED
@@ -200,7 +208,11 @@ class PermissionEngine:
             if result == PermissionResult.ALLOWED
             else "blacklist_match_or_default_deny"
         )
-        if result == PermissionResult.ALLOWED and context and context.get("access_mode") == "full":
+        if (
+            result == PermissionResult.ALLOWED
+            and context
+            and context.get("access_mode") == "full"
+        ):
             reason = "full_access_explicit_authorization_preserved:risk_notice_required_for_high_risk"
         self._audit.log(
             agent_id=agent_id,

@@ -10,6 +10,7 @@ import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+INSTALLER_SUBPROCESS_TIMEOUT_SECONDS = 30
 
 
 def _has_exact_child_name(directory: Path, filename: str) -> bool:
@@ -168,6 +169,7 @@ def _run_isolated_install(
         input=input_text,
         capture_output=True,
         check=False,
+        timeout=INSTALLER_SUBPROCESS_TIMEOUT_SECONDS,
     )
 
 
@@ -185,6 +187,7 @@ def _run_isolated_lowercase_install(
         input=input_text,
         capture_output=True,
         check=False,
+        timeout=INSTALLER_SUBPROCESS_TIMEOUT_SECONDS,
     )
 
 
@@ -236,6 +239,7 @@ def _run_isolated_cli(workspace: Path, *args: str) -> subprocess.CompletedProces
         encoding="cp1252",
         capture_output=True,
         check=False,
+        timeout=INSTALLER_SUBPROCESS_TIMEOUT_SECONDS,
     )
 
 
@@ -386,15 +390,31 @@ def test_install_defaults_to_interactive_question_answer_when_args_are_absent(
 
     def fake_input(prompt: str) -> str:
         prompts.append(prompt)
-        if "provider" in prompt.lower():
+        prompt_text = prompt.lower()
+        if "provider" in prompt_text:
             return "openai"
-        if "base" in prompt.lower():
+        if "base" in prompt_text:
             return "https://openai.local.test/v1"
-        if "model" in prompt.lower():
+        if "model" in prompt_text:
             return "gpt-test"
-        if "api key" in prompt.lower():
+        if "api key" in prompt_text:
             return "sk-test-interactive-installer"
-        return ""
+        if "重试安装向导" in prompt:
+            raise AssertionError(f"installer unexpectedly requested retry: {prompts!r}")
+        if any(
+            expected in prompt
+            for expected in (
+                "安装/项目路径",
+                "释放完整程序文件到该目录",
+                "初始化 .supermedicine 配置",
+                "记录创建快捷方式意向",
+                "显示 PATH 手动配置提示",
+                "复制 SuperMedicine.exe 到桌面",
+                "开始安装",
+            )
+        ):
+            return ""
+        raise AssertionError(f"unexpected installer prompt: {prompt!r}")
 
     def fake_getpass(prompt: str) -> str:
         prompts.append(prompt)

@@ -93,12 +93,14 @@ def test_control_character_path_value_is_rejected_before_resolution(tmp_path):
 
 
 def test_sandbox_write_path_allows_generated_markdown_and_python(tmp_path):
-    assert validate_sandbox_write_path("generated/notes.md", tmp_path) == (
-        tmp_path / "generated" / "notes.md"
-    ).resolve()
-    assert validate_sandbox_write_path("tools/generated/tool.py", tmp_path) == (
-        tmp_path / "tools" / "generated" / "tool.py"
-    ).resolve()
+    assert (
+        validate_sandbox_write_path("generated/notes.md", tmp_path)
+        == (tmp_path / "generated" / "notes.md").resolve()
+    )
+    assert (
+        validate_sandbox_write_path("tools/generated/tool.py", tmp_path)
+        == (tmp_path / "tools" / "generated" / "tool.py").resolve()
+    )
 
 
 def test_sandbox_write_path_rejects_traversal_scope_type_and_overwrite(tmp_path):

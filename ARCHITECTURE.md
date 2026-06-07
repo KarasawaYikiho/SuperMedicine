@@ -1,7 +1,7 @@
 # SuperMedicine Architecture
 
-This root architecture reference describes the public **Beta0.4.1** design. The
-Python package fallback version is **0.4.1b0**. Engineering notes in excluded
+This root architecture reference describes the public **Beta0.4.2** design. The
+Python package fallback version is **0.4.2b0**. Engineering notes in excluded
 folders are intentionally not referenced here.
 
 ## Overview

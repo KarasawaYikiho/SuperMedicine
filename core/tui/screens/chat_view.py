@@ -166,9 +166,7 @@ class ChatView(Vertical):
 
     def add_reasoning_status(self, message: str) -> None:
         """Show provider-safe reasoning/progress status without exposing hidden thoughts."""
-        self._write_block(
-            "推理状态", "🧠", "bold magenta", message, blank_after=False
-        )
+        self._write_block("推理状态", "🧠", "bold magenta", message, blank_after=False)
 
     def clear_chat(self) -> None:
         """Clear the chat display."""

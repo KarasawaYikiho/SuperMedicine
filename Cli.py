@@ -155,7 +155,7 @@ class CLI:
 
     def status(self) -> None:
         """显示项目状态"""
-        logger.info("SuperMedicine Beta0.4.1")
+        logger.info("SuperMedicine Beta0.4.2")
         logger.info("=" * 40)
 
         # 检查配置
@@ -217,7 +217,7 @@ class CLI:
         # 确定项目根目录
         project_dir = Path.cwd()
 
-        logger.info("SuperMedicine Beta0.4.1 — 任务执行")
+        logger.info("SuperMedicine Beta0.4.2 — 任务执行")
         logger.info("任务: %s", redact_sensitive(task))
         logger.info("=" * 50)
 
@@ -425,7 +425,11 @@ class CLI:
             )
             imported_raw: object = result.get("imported")
             imported_items: list[dict[str, Any]] = (
-                [cast(dict[str, Any], item) for item in imported_raw if isinstance(item, dict)]
+                [
+                    cast(dict[str, Any], item)
+                    for item in imported_raw
+                    if isinstance(item, dict)
+                ]
                 if isinstance(imported_raw, list)
                 else []
             )
@@ -980,7 +984,9 @@ class CLI:
         from core.log_report import LogReportStore
 
         session = ExperimentGuide().create_session(protocol, session_id=session_id)
-        ConfigCenter(Path.cwd() / ".supermedicine" / "config.yaml").set_selected_experiment_protocol(
+        ConfigCenter(
+            Path.cwd() / ".supermedicine" / "config.yaml"
+        ).set_selected_experiment_protocol(
             session.protocol.protocol_id,
             save=True,
         )
@@ -1026,7 +1032,9 @@ class CLI:
         result = build_experiment_llm_context(protocol)
         selected = result.get("selected_protocol") if isinstance(result, dict) else None
         if protocol and isinstance(selected, dict) and selected.get("protocol_id"):
-            ConfigCenter(Path.cwd() / ".supermedicine" / "config.yaml").set_selected_experiment_protocol(
+            ConfigCenter(
+                Path.cwd() / ".supermedicine" / "config.yaml"
+            ).set_selected_experiment_protocol(
                 str(selected["protocol_id"]),
                 save=True,
             )
@@ -1051,7 +1059,9 @@ class CLI:
             save_experiment_config,
         )
 
-        if bool(instruction and instruction.strip()) == bool(config_json and config_json.strip()):
+        if bool(instruction and instruction.strip()) == bool(
+            config_json and config_json.strip()
+        ):
             raise ValueError("provide exactly one of --instruction or --config-json")
         if config_json and config_json.strip():
             payload = _load_input_json(config_json)
@@ -1070,7 +1080,9 @@ class CLI:
         if isinstance(protocol, dict) and protocol.get("protocol_id"):
             from core.config_center import ConfigCenter
 
-            ConfigCenter(Path.cwd() / ".supermedicine" / "config.yaml").set_selected_experiment_protocol(
+            ConfigCenter(
+                Path.cwd() / ".supermedicine" / "config.yaml"
+            ).set_selected_experiment_protocol(
                 str(protocol["protocol_id"]),
                 save=True,
             )
@@ -1259,7 +1271,9 @@ class CLI:
         from core.log_report import LogReportError, LogReportStore
 
         if file_name and session_id:
-            raise ValueError("log follow accepts either --file or --session-id, not both")
+            raise ValueError(
+                "log follow accepts either --file or --session-id, not both"
+            )
         try:
             refresh_interval = float(interval)
         except (TypeError, ValueError) as exc:
@@ -1311,7 +1325,9 @@ class CLI:
         result = dict(latest or {})
         result["refresh_interval"] = refresh_interval
         result["iterations"] = rendered_snapshots
-        result["exit_mode"] = "iterations" if iterations is not None else "keyboard_interrupt"
+        result["exit_mode"] = (
+            "iterations" if iterations is not None else "keyboard_interrupt"
+        )
         return result
 
     def tui(self, dry_run: bool = False):
@@ -1420,7 +1436,9 @@ def _self_evolution_cli_result(
             "For full access writes, pass both --confirm-full-access and --acknowledge-risk after explicit authorization."
         )
     if status == "success":
-        next_steps.append("Inspect generated artifacts before adopting them into the workflow.")
+        next_steps.append(
+            "Inspect generated artifacts before adopting them into the workflow."
+        )
     return cast(
         dict[str, Any],
         redact_sensitive(
@@ -1913,7 +1931,10 @@ def main(argv: list[str] | None = None) -> None:
         "--config-json", type=str, default=None, help="已生成的实验配置 JSON 对象"
     )
     experiment_add_config_parser.add_argument(
-        "--filename", type=str, default=None, help="保存到 plugins/experiments/ 的文件名"
+        "--filename",
+        type=str,
+        default=None,
+        help="保存到 plugins/experiments/ 的文件名",
     )
     experiment_add_config_parser.add_argument(
         "--overwrite", action="store_true", help="显式确认允许覆盖同名配置文件"

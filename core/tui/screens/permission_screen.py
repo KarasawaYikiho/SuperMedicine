@@ -12,7 +12,11 @@ from textual.widgets import Button, DataTable, Input, Select, Static
 from core.config_center import ConfigCenter
 from core.redaction import redact_sensitive
 from core.tui.app import apply_status_style
-from permission.access_mode import AccessMode, FileAccessOperation, normalize_access_mode
+from permission.access_mode import (
+    AccessMode,
+    FileAccessOperation,
+    normalize_access_mode,
+)
 
 
 PERMISSION_RISK_NOTICE = (
@@ -55,7 +59,9 @@ class PermissionScreenController:
         self.config.save()
         return file_access
 
-    def access_decision(self, path: str | Path, operation: str = "write") -> dict[str, str]:
+    def access_decision(
+        self, path: str | Path, operation: str = "write"
+    ) -> dict[str, str]:
         """Return a serializable decision from the unified permission policy."""
 
         decision = self.config.get_file_access_policy(self.project_root).decide(
@@ -99,13 +105,19 @@ class PermissionView(Vertical):
                 placeholder="切换到完全访问模式需输入 FULL",
                 id="permission-confirm-input",
             )
-            yield Button("切换模式", id="permission-set-mode", classes="btn btn-primary")
+            yield Button(
+                "切换模式", id="permission-set-mode", classes="btn btn-primary"
+            )
         yield Static("外部授权目录（保守模式下允许访问这些目录）", classes="hint")
         yield DataTable(id="permission-roots-table", cursor_type="row")
         with Horizontal(classes="form-row"):
             yield Input(placeholder="外部目录路径", id="permission-root-input")
-            yield Button("添加授权目录", id="permission-add-root", classes="btn btn-primary")
-            yield Button("移除选中目录", id="permission-remove-root", classes="btn btn-secondary")
+            yield Button(
+                "添加授权目录", id="permission-add-root", classes="btn btn-primary"
+            )
+            yield Button(
+                "移除选中目录", id="permission-remove-root", classes="btn btn-secondary"
+            )
             yield Button("刷新", id="permission-refresh", classes="btn btn-secondary")
         yield Static("", id="permission-status")
 
@@ -125,7 +137,9 @@ class PermissionView(Vertical):
         roots = [str(root) for root in config.get("authorized_external_roots", [])]
 
         current = self.query_one("#permission-current", Static)
-        mode_label = "完全访问模式" if mode == AccessMode.FULL.value else "保守/沙箱模式"
+        mode_label = (
+            "完全访问模式" if mode == AccessMode.FULL.value else "保守/沙箱模式"
+        )
         current.update(
             f"当前模式：{mode_label} ({mode}) · 完全模式确认：{'是' if confirmed else '否'}"
         )
@@ -190,7 +204,11 @@ class PermissionView(Vertical):
 
     def _remove_selected_root(self) -> None:
         table = self.query_one("#permission-roots-table", DataTable)
-        if table.cursor_row is None or table.cursor_row < 0 or table.cursor_row >= table.row_count:
+        if (
+            table.cursor_row is None
+            or table.cursor_row < 0
+            or table.cursor_row >= table.row_count
+        ):
             self._set_status("请先在表格中选择要移除的授权目录。")
             return
         row = table.get_row_at(table.cursor_row)

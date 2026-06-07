@@ -238,7 +238,9 @@ def test_uninstall_can_preserve_recorded_user_data_explicitly(tmp_path):
     assert any("preserved-user-data" in item for item in result["skipped"])
 
 
-def test_uninstall_preserve_user_data_keeps_supermedicine_config_when_recorded(tmp_path):
+def test_uninstall_preserve_user_data_keeps_supermedicine_config_when_recorded(
+    tmp_path,
+):
     config = tmp_path / ".supermedicine" / "config.yaml"
     config.parent.mkdir(parents=True, exist_ok=True)
     config.write_text("project_name: supermedicine\n", encoding="utf-8")

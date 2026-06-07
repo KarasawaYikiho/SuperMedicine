@@ -53,9 +53,7 @@ if __name__ == "__main__":
         raise SystemExit(f"error: {exc}") from exc
 '''
 
-STALE_DISTRIBUTION_MEMBERS = frozenset(
-    {"plugins/tools/r_template/plugin.yaml"}
-)
+STALE_DISTRIBUTION_MEMBERS = frozenset({"plugins/tools/r_template/plugin.yaml"})
 
 
 def _repo_root() -> Path:

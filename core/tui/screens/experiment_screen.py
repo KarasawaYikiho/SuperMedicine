@@ -36,7 +36,9 @@ class ExperimentGuideView(Vertical):
         self._protocols = self._guide.list_protocols()
         if not self._protocols:
             raise ValueError("no experiment protocols are configured")
-        self._config = ConfigCenter(self._project_root / ".supermedicine" / "config.yaml")
+        self._config = ConfigCenter(
+            self._project_root / ".supermedicine" / "config.yaml"
+        )
         selected_protocol = self._config.get_selected_experiment_protocol() or "wb"
         self._sessions_by_protocol: dict[str, ExperimentSession] = {}
         try:
@@ -59,7 +61,9 @@ class ExperimentGuideView(Vertical):
             t("experiment_action_hint"), id="experiment-action-hint", classes="hint"
         )
         yield DataTable(id="experiment-protocol-table", cursor_type="row")
-        yield Button("切换到下一个实验配置", id="experiment-switch", classes="btn btn-secondary")
+        yield Button(
+            "切换到下一个实验配置", id="experiment-switch", classes="btn btn-secondary"
+        )
         yield Static("", id="experiment-session")
         yield Static("", id="experiment-step")
         yield Static("", id="experiment-instructions")

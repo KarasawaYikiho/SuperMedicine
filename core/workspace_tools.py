@@ -112,7 +112,11 @@ TOOL_AUTHORING_SPEC: dict[str, Any] = {
         "version": "Required semantic or project version string.",
     },
     "input_output_conventions": {
-        "cli_flags": ["--input <workspace-relative-path>", "--output <workspace-relative-path>", "--check-deps optional"],
+        "cli_flags": [
+            "--input <workspace-relative-path>",
+            "--output <workspace-relative-path>",
+            "--check-deps optional",
+        ],
         "paths": "Runtime input/output paths must stay inside the selected workspace; entrypoints must stay inside the tool folder.",
         "stdout": "Print concise progress and dependency/error messages; avoid secrets and raw sensitive data.",
         "exit_codes": "Return 0 for success, 2 for missing optional dependencies or invalid user input, non-zero for execution failures.",
@@ -703,7 +707,9 @@ class WorkspaceToolService:
                     reason = "; ".join(item.get("warnings") or []) or item.get(
                         "status", "invalid"
                     )
-                    raise ToolCandidateError(f"Tool candidate is not importable: {reason}")
+                    raise ToolCandidateError(
+                        f"Tool candidate is not importable: {reason}"
+                    )
                 imported.append(
                     self._import_candidate(workspace_id, candidate, overwrite=overwrite)
                 )
@@ -716,7 +722,11 @@ class WorkspaceToolService:
                     }
                 )
         return {
-            "status": "imported" if imported and not errors else "partial" if imported else "failed",
+            "status": "imported"
+            if imported and not errors
+            else "partial"
+            if imported
+            else "failed",
             "imported": imported,
             "errors": errors,
             "candidates": grouped,
@@ -763,7 +773,9 @@ class WorkspaceToolService:
 
         raw_name = str(data.get("name") or source_path.name)
         try:
-            tool_id = _slug_from_name(str(data.get("id") or raw_name or source_path.name))
+            tool_id = _slug_from_name(
+                str(data.get("id") or raw_name or source_path.name)
+            )
         except InvalidToolId:
             tool_id = _slug_from_name(source_path.name)
             warnings.append("metadata id is invalid; using directory slug")
@@ -773,8 +785,12 @@ class WorkspaceToolService:
             language_value = "r"
             warnings.append("source directory is under R naming convention; inferred r")
         elif language_value not in SUPPORTED_LANGUAGES:
-            language_value = "r" if source_path.name.lower().startswith("r_") else "python"
-            warnings.append(f"metadata language missing/unsupported; inferred {language_value}")
+            language_value = (
+                "r" if source_path.name.lower().startswith("r_") else "python"
+            )
+            warnings.append(
+                f"metadata language missing/unsupported; inferred {language_value}"
+            )
         lang = validate_language(language_value)
 
         entrypoint = str(data.get("entrypoint") or data.get("entry") or "")
@@ -815,10 +831,14 @@ class WorkspaceToolService:
             warnings.append("dependencies metadata invalid; using empty list")
         inputs = data.get("inputs", [])
         outputs = data.get("outputs", [])
-        if not isinstance(inputs, list) or not all(isinstance(item, dict) for item in inputs):
+        if not isinstance(inputs, list) or not all(
+            isinstance(item, dict) for item in inputs
+        ):
             inputs = []
             warnings.append("inputs metadata invalid; using empty list")
-        if not isinstance(outputs, list) or not all(isinstance(item, dict) for item in outputs):
+        if not isinstance(outputs, list) or not all(
+            isinstance(item, dict) for item in outputs
+        ):
             outputs = []
             warnings.append("outputs metadata invalid; using empty list")
 
@@ -827,7 +847,9 @@ class WorkspaceToolService:
             id=tool_id,
             language=lang,
             name=raw_name,
-            description=str(data.get("description") or "No description metadata provided"),
+            description=str(
+                data.get("description") or "No description metadata provided"
+            ),
             source_path=source_path,
             entrypoint=entrypoint if status == "ready" else None,
             version=str(data.get("version") or "0.0.0"),
@@ -868,7 +890,11 @@ class WorkspaceToolService:
         destination = self.tool_path(workspace_id, manifest.language, manifest.id)
         if destination.exists() and any(destination.iterdir()) and not overwrite:
             existing = self.load_manifest(workspace_id, manifest.language, manifest.id)
-            return {"status": "exists", "tool": existing.to_dict(), "path": str(destination)}
+            return {
+                "status": "exists",
+                "tool": existing.to_dict(),
+                "path": str(destination),
+            }
         if destination.exists():
             shutil.rmtree(destination)
         shutil.copytree(
@@ -881,7 +907,11 @@ class WorkspaceToolService:
             encoding="utf-8",
         )
         loaded = self.load_manifest(workspace_id, manifest.language, manifest.id)
-        return {"status": "imported", "tool": loaded.to_dict(), "path": str(destination)}
+        return {
+            "status": "imported",
+            "tool": loaded.to_dict(),
+            "path": str(destination),
+        }
 
     def list_tools(
         self, workspace_id: str, language: str | None = None

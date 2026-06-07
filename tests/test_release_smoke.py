@@ -10,7 +10,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-RELEASE_DIR_NAME = "SuperMedicine Beta0.4.1"
+RELEASE_DIR_NAME = "SuperMedicine Beta0.4.2"
 CRITICAL_RELEASE_PATHS = (
     "Install.py",
     "core",

@@ -60,7 +60,9 @@ def test_confirmed_markdown_writes_allowed_file_and_bootstraps_policy(tmp_path):
     assert (tmp_path / ".supermedicine" / "policies" / "default.yaml").is_file()
 
 
-def test_python_tool_preview_and_confirmed_creation_use_safe_output_validation(tmp_path):
+def test_python_tool_preview_and_confirmed_creation_use_safe_output_validation(
+    tmp_path,
+):
     target = tmp_path / "tools" / "generated" / "helper.py"
 
     preview = _service(tmp_path).preview(
