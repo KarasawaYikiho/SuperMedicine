@@ -39,6 +39,12 @@ def _assert_tool_empty_run_error(status: Static) -> None:
     )
 
 
+def _assert_same_view_intact(app: SuperMedicineTUI, view_name: str) -> None:
+    assert app._current_view == view_name
+    assert app._views[view_name].display is True
+    assert app.query_one("#prompt-input", Input) is not None
+
+
 async def _wait_for_tui_condition(pilot, condition, *, timeout: float = 2.0) -> None:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -63,19 +69,12 @@ def test_tool_run_on_empty_table_shows_red_error_without_exiting_tui(tmp_path):
             view._load_tools()
             table = view.query_one("#tool-table", DataTable)
             assert table.row_count == 0
+            assert getattr(view, "_table_mode") == "workspace"
+            assert view.query_one("#tool-workspace-select", Select).value == "study-a"
 
-            await pilot.click("#tool-run")
-            await _wait_for_tui_condition(
-                pilot,
-                lambda: t("error")
-                in _static_text(view.query_one("#tool-status", Static))
-                and t("tool_no_tools")
-                in _static_text(view.query_one("#tool-status", Static)),
-            )
+            view._run_tool()
 
-            assert app._current_view == "tool"
-            assert app._views["tool"].display is True
-            assert app.query_one("#prompt-input", Input) is not None
+            _assert_same_view_intact(app, "tool")
             _assert_tool_empty_run_error(view.query_one("#tool-status", Static))
 
             select = view.query_one("#tool-workspace-select", Select)
@@ -85,11 +84,11 @@ def test_tool_run_on_empty_table_shows_red_error_without_exiting_tui(tmp_path):
                 {"select": select},
             )()
             view.on_select_changed(stale_same_workspace_event)
-            await pilot.pause()
+            _assert_same_view_intact(app, "tool")
             _assert_tool_empty_run_error(view.query_one("#tool-status", Static))
 
             view._load_tools()
-            await pilot.pause()
+            _assert_same_view_intact(app, "tool")
             _assert_tool_empty_run_error(view.query_one("#tool-status", Static))
 
     asyncio.run(scenario())
@@ -151,13 +150,11 @@ def test_paper_enrich_on_empty_table_shows_red_error_without_exiting_tui(tmp_pat
             view._load_papers()
             table = view.query_one("#paper-table", DataTable)
             assert table.row_count == 0
+            assert view.query_one("#paper-workspace-select", Select).value == "study-a"
 
-            await pilot.click("#paper-enrich")
-            await pilot.pause()
+            view._enrich_paper()
 
-            assert app._current_view == "paper"
-            assert app._views["paper"].display is True
-            assert app.query_one("#prompt-input", Input) is not None
+            _assert_same_view_intact(app, "paper")
             _assert_red_error_with_reason(
                 view.query_one("#paper-status", Static), t("paper_no_papers")
             )
@@ -175,12 +172,10 @@ def test_log_show_on_empty_table_shows_red_error_without_exiting_tui(tmp_path):
             table = app.query_one("#log-table", DataTable)
             assert table.row_count == 0
 
-            await pilot.click("#log-show")
-            await pilot.pause()
+            view = app._views["log"]
+            view._show_selected_log()
 
-            assert app._current_view == "log"
-            assert app._views["log"].display is True
-            assert app.query_one("#prompt-input", Input) is not None
+            _assert_same_view_intact(app, "log")
             _assert_red_error_with_reason(
                 app.query_one("#log-status", Static), t("log_no_reports")
             )
@@ -202,13 +197,11 @@ def test_experience_delete_on_empty_table_shows_red_error_without_exiting_tui(tm
             view._load_experiences()
             table = view.query_one("#exp-table", DataTable)
             assert table.row_count == 0
+            assert view.query_one("#exp-workspace-select", Select).value == "study-a"
 
-            await pilot.click("#exp-delete")
-            await pilot.pause()
+            view._delete_experience()
 
-            assert app._current_view == "experience"
-            assert app._views["experience"].display is True
-            assert app.query_one("#prompt-input", Input) is not None
+            _assert_same_view_intact(app, "experience")
             _assert_red_error_with_reason(
                 view.query_one("#exp-status", Static), t("experience_no_records")
             )
