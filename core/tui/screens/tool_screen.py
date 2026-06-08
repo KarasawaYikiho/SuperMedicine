@@ -54,7 +54,7 @@ class ToolView(Vertical):
             yield Button(t("tool_run"), id="tool-run", classes="btn btn-secondary")
             yield Button(t("refresh"), id="tool-refresh", classes="btn btn-secondary")
         yield Static("", id="tool-status")
-        yield Static("自进化入口", classes="section-title")
+        yield Static("自进化", classes="section-title")
         yield Static(
             "输入自进化指令，选择权限/产物类型，先预览生成内容；只有显式确认后才写入文件。",
             id="self-evolution-hint",

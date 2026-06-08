@@ -357,6 +357,8 @@ class MainMenuScreen(ModalScreen[str | None]):
             yield ListView(
                 MenuOption(f"▸ {t('menu_select_view')}", "select-view"),
                 MenuOption(f"◐ {t('menu_change_theme')}", "change-theme"),
+                MenuOption(f"□ {t('menu_toggle_maximize')}", "toggle-maximize"),
+                MenuOption(f"? {t('menu_show_help')}", "show-help"),
                 MenuOption(f"← {t('menu_close')}", "close"),
                 id="tui-main-menu-list",
                 classes="tui-menu-list",
@@ -368,11 +370,18 @@ class MainMenuScreen(ModalScreen[str | None]):
     def on_list_view_selected(self, event: ListView.Selected) -> None:
         if not isinstance(event.item, MenuOption):
             return
+        app = cast("SuperMedicineTUI", self.app)
         if event.item.option_id == "select-view":
             self.app.push_screen(ViewSelectMenuScreen(), self._handle_view_menu_result)
         elif event.item.option_id == "change-theme":
             self.dismiss(None)
             self.app.action_change_theme()
+        elif event.item.option_id == "toggle-maximize":
+            self.dismiss(None)
+            app.action_toggle_maximize()
+        elif event.item.option_id == "show-help":
+            self.dismiss(None)
+            app.action_show_help()
         elif event.item.option_id == "close":
             self.dismiss(None)
 
@@ -511,9 +520,7 @@ class SuperMedicineTUI(App[Any]):
     BINDINGS = [
         Binding("q", "quit", t("nav_quit")),
         Binding("m", "open_menu", t("menu_open"), show=True),
-        Binding("f", "toggle_maximize", t("nav_maximize"), show=True),
-        Binding("p", "switch_view('permission')", "权限模式", show=True),
-        Binding("question_mark", "show_help", t("help_title"), show=True),
+        Binding("p", "switch_view('permission')", "权限", show=True),
     ]
 
     NAV_ITEMS = (
@@ -533,19 +540,19 @@ class SuperMedicineTUI(App[Any]):
         super().__init__(**kwargs)
         custom_theme = Theme(
             name="supermedicine",
-            primary="#0078D4",
-            secondary="#89B4FA",
-            accent="#89B4FA",
-            foreground="#CDD6F4",
-            background="#11111B",
-            surface="#1E1E2E",
-            panel="#181825",
-            success="#A6E3A1",
-            warning="#F9E2AF",
-            error="#F38BA8",
+            primary="#6B7280",
+            secondary="#9CA3AF",
+            accent="#A7F3D0",
+            foreground="#E5E7EB",
+            background="#0B0F14",
+            surface="#111827",
+            panel="#0F172A",
+            success="#86EFAC",
+            warning="#FDE68A",
+            error="#FCA5A5",
             variables={
-                "border": "#313244",
-                "text-muted": "#A6ADC8",
+                "border": "#374151",
+                "text-muted": "#9CA3AF",
             },
         )
         self.register_theme(custom_theme)
@@ -555,6 +562,7 @@ class SuperMedicineTUI(App[Any]):
         self._current_view = ConfigCenter(self._config_path).get_current_view()
         self._views: dict[str, Any] = {}
         self._task_running = False
+        self._chat_processing = False
         self._status_cache: dict[str, str] = {}
 
     def compose(self) -> ComposeResult:
@@ -582,7 +590,7 @@ class SuperMedicineTUI(App[Any]):
                     classes="shortcut-hint",
                 )
                 yield Static(
-                    "P 🛡️ 权限模式：查看/切换访问模式与外部授权目录",
+                    "P 权限 · 访问模式/授权目录",
                     id="sidebar-permission-entry",
                     classes="shortcut-hint",
                 )
@@ -640,13 +648,14 @@ class SuperMedicineTUI(App[Any]):
 
         self._update_status_bar()
         self._update_view_title(self._current_view)
+        self._refresh_visible_dynamic_data(self._current_view)
         # Focus the input
         self.query_one("#prompt-input", Input).focus()
 
     def action_switch_view(self, view_id: str) -> None:
         """Switch the visible content view."""
         if view_id == self._current_view:
-            self._refresh_visible_workspace_state(view_id)
+            self._refresh_visible_dynamic_data(view_id)
             self._focus_current_view_default()
             self._update_status_bar()
             return
@@ -657,7 +666,7 @@ class SuperMedicineTUI(App[Any]):
             self._views[view_id].display = True
             self._current_view = view_id
             self._persist_current_view(view_id)
-            self._refresh_visible_workspace_state(view_id)
+            self._refresh_visible_dynamic_data(view_id)
             self._update_view_title(view_id)
             self._update_status_bar()
             # Update sidebar selection
@@ -694,11 +703,22 @@ class SuperMedicineTUI(App[Any]):
                     select_workspace(selected_workspace_id)
                 except Exception:
                     continue
+        try:
+            self._update_status_bar()
+        except Exception:
+            pass
 
-    def _refresh_visible_workspace_state(self, view_id: str) -> None:
-        """Reload workspace selectors whenever a mounted page becomes visible."""
+    def _refresh_visible_dynamic_data(self, view_id: str) -> None:
+        """Reload dynamic view data whenever a mounted page becomes visible."""
 
         view = self._views.get(view_id)
+        refresh_view_data = getattr(view, "refresh_view_data", None)
+        if callable(refresh_view_data):
+            try:
+                refresh_view_data()
+            except Exception:
+                pass
+            return
         load_workspaces = getattr(view, "_load_workspaces", None)
         if not callable(load_workspaces):
             return
@@ -714,7 +734,7 @@ class SuperMedicineTUI(App[Any]):
 
     @classmethod
     def nav_items(cls) -> tuple[NavMetadata, ...]:
-        """Return navigation items and numeric shortcuts."""
+        """Return navigation items for sidebar and menu view selection."""
 
         return cls.NAV_ITEMS
 
@@ -723,7 +743,7 @@ class SuperMedicineTUI(App[Any]):
         """Return the human-readable title for a view."""
 
         title_map = {item.view_id: item.label for item in cls.nav_items()}
-        title_map["permission"] = "权限模式"
+        title_map["permission"] = "权限"
         return title_map.get(view_id, view_id)
 
     @staticmethod
@@ -737,7 +757,13 @@ class SuperMedicineTUI(App[Any]):
 
         current_view = view_id or self._current_view
         task_state = (
-            t("status_task_running") if self._task_running else t("status_task_idle")
+            t("chat_processing_state")
+            if self.is_chat_processing
+            else (
+                t("status_task_running")
+                if self._task_running
+                else t("status_task_idle")
+            )
         )
         layout_state = self._layout_status_label()
         left = f"📁 {self._workspace_count()} {t('status_workspaces')}"
@@ -767,6 +793,48 @@ class SuperMedicineTUI(App[Any]):
             self.query_one("#prompt-input", Input).focus()
         except Exception:
             pass
+
+    def _refresh_visible_workspace_state(self, view_id: str) -> None:
+        """Backward-compatible alias for mounted-page refresh hooks."""
+
+        self._refresh_visible_dynamic_data(view_id)
+
+    @property
+    def is_chat_processing(self) -> bool:
+        """Return whether the main Chat submit flow is currently processing."""
+
+        return self._chat_processing
+
+    def _begin_chat_processing(self) -> bool:
+        """Activate the central Chat processing guard if no request is active."""
+
+        if self._chat_processing:
+            return False
+        self._set_chat_processing(True)
+        return True
+
+    def _set_chat_processing(self, active: bool) -> None:
+        """Update central Chat processing state and main prompt input lock."""
+
+        self._chat_processing = active
+        self._task_running = active
+        self._update_prompt_input_lock(active)
+        try:
+            self._update_status_bar()
+        except Exception:
+            pass
+
+    def _update_prompt_input_lock(self, active: bool) -> None:
+        """Lock only the main Chat prompt input while Chat is processing."""
+
+        try:
+            prompt = self.query_one("#prompt-input", Input)
+        except Exception:
+            return
+        prompt.disabled = active
+        prompt.placeholder = (
+            t("input_placeholder_processing") if active else t("input_placeholder")
+        )
 
     def _focus_current_view_default(self) -> None:
         """Focus the active view's default control, falling back to chat prompt."""
@@ -908,7 +976,15 @@ class SuperMedicineTUI(App[Any]):
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle user input submission."""
+        if getattr(event.input, "id", None) != "prompt-input":
+            return
         event.stop()
+        if self.is_chat_processing:
+            chat_view = self._views.get("chat")
+            if chat_view and hasattr(chat_view, "add_status_message"):
+                chat_view.add_status_message(t("chat_processing_reject"))
+            self._focus_prompt_input()
+            return
         message = event.value.strip()
         if not message:
             event.input.value = ""
@@ -932,12 +1008,18 @@ class SuperMedicineTUI(App[Any]):
         chat_view = self._views.get("chat")
         if not chat_view:
             return
+        if not self._begin_chat_processing():
+            if hasattr(chat_view, "add_status_message"):
+                chat_view.add_status_message(t("chat_processing_reject"))
+            return
         # Run in background worker to avoid blocking UI
-        self._task_running = True
-        self._update_status_bar()
-        self.run_worker(
-            self._run_kernel_task(message, chat_view, turn_id=turn_id), exclusive=True
-        )
+        worker_coro = self._run_kernel_task(message, chat_view, turn_id=turn_id)
+        try:
+            self.run_worker(worker_coro, exclusive=True)
+        except Exception:
+            worker_coro.close()
+            self._set_chat_processing(False)
+            raise
 
     async def _run_kernel_task(
         self, message: str, chat_view: Any, *, turn_id: int | None = None
@@ -1012,8 +1094,7 @@ class SuperMedicineTUI(App[Any]):
         except Exception as e:
             chat_view.add_error_message(f"{t('error')}: {e}")
         finally:
-            self._task_running = False
-            self._update_status_bar()
+            self._set_chat_processing(False)
 
     @staticmethod
     def _format_kernel_output(output: Any) -> str:

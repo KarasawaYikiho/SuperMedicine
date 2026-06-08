@@ -185,13 +185,13 @@ def test_tui_shell_status_object_exposes_workspace_plugin_llm_version_and_task_s
     assert "🔌 1 插件" in status.center
     assert "openai LLM 已就绪" in status.center
     assert "任务空闲" in status.center
-    assert "当前视图：LLM 管理" in status.right
+    assert "当前视图：LLM 配置" in status.right
     assert "SuperMedicine" in status.right
     assert "sk-hidden-state" not in status.center
-    assert status.focus == "焦点：输入栏"
+    assert status.focus == "焦点：输入框"
 
 
-def test_tui_navigation_metadata_preserves_numeric_shortcuts_and_chinese_titles(
+def test_tui_navigation_metadata_preserves_numeric_shortcuts_and_minimal_titles(
     tmp_path,
 ):
     app = SuperMedicineTUI(project_root=tmp_path)
@@ -221,5 +221,5 @@ def test_tui_navigation_metadata_preserves_numeric_shortcuts_and_chinese_titles(
         "log",
     ]
     assert app.nav_items()[0].label == "对话"
-    assert app.nav_items()[-2].label == "实验指导器"
+    assert app.nav_items()[-2].label == "实验"
     assert app.nav_items()[-1].label == "Log 报告"

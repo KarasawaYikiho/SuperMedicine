@@ -25,6 +25,58 @@ class CapturingChatView(ChatView):
         return self.output
 
 
+class DummyPromptInput:
+    id = "prompt-input"
+
+    def __init__(self, value: str = "") -> None:
+        self.value = value
+        self.disabled = False
+        self.placeholder = t("input_placeholder")
+        self.focused = False
+
+    def focus(self) -> None:
+        self.focused = True
+
+
+class DummySecondaryInput(DummyPromptInput):
+    id = "secondary-input"
+
+
+class DummySubmittedEvent:
+    def __init__(
+        self, value: str, input_widget: DummyPromptInput | None = None
+    ) -> None:
+        self.value = value
+        self.input = input_widget or DummyPromptInput(value)
+        self.stopped = False
+
+    def stop(self) -> None:
+        self.stopped = True
+
+
+class CapturingSubmitChat:
+    def __init__(self) -> None:
+        self.user_messages: list[str] = []
+        self.status_messages: list[str] = []
+        self.error_messages: list[str] = []
+
+    def add_user_message(self, message: str) -> int:
+        self.user_messages.append(message)
+        return len(self.user_messages)
+
+    def add_status_message(self, message: str) -> None:
+        self.status_messages.append(message)
+
+    def add_system_message(self, message: str) -> None:
+        self.status_messages.append(message)
+
+    def add_assistant_message(self, message: str, turn_id: int | None = None) -> None:
+        self.status_messages.append(message)
+
+    def add_error_message(self, message: str) -> None:
+        self.error_messages.append(message)
+
+
 def test_chat_messages_are_escaped_redacted_and_stably_prefixed():
     view = CapturingChatView()
 
@@ -172,6 +224,153 @@ def test_run_kernel_task_emits_running_completion_and_formatted_messages(
     )
     assert events[-1] == ("status", t("chat_completed"))
     assert app._task_running is False
+
+
+def test_chat_submit_sets_processing_state_locks_main_input_and_displays_status(tmp_path):
+    app = SuperMedicineTUI(project_root=tmp_path)
+    prompt = DummyPromptInput("hello")
+    chat = CapturingSubmitChat()
+    workers: list[object] = []
+    app._views = {"chat": chat}
+    app.query_one = lambda selector, widget_type=None: prompt
+    app._update_status_bar = lambda: None
+
+    def capture_worker(worker, exclusive=True):
+        workers.append(worker)
+        worker.close()
+
+    app.run_worker = capture_worker
+
+    app.on_input_submitted(DummySubmittedEvent("hello", prompt))
+    status = app.status_text("chat")
+
+    assert app.is_chat_processing is True
+    assert prompt.disabled is True
+    assert prompt.placeholder == t("input_placeholder_processing")
+    assert t("chat_processing_state") in status.center
+    assert chat.user_messages == ["hello"]
+    assert len(workers) == 1
+
+
+def test_chat_processing_locks_only_main_prompt_input(tmp_path):
+    app = SuperMedicineTUI(project_root=tmp_path)
+    prompt = DummyPromptInput("hello")
+    secondary = DummySecondaryInput()
+    chat = CapturingSubmitChat()
+    workers: list[object] = []
+    app._views = {"chat": chat}
+
+    def fake_query_one(selector, widget_type=None):
+        if selector == "#prompt-input":
+            return prompt
+        return secondary
+
+    app.query_one = fake_query_one
+    app._update_status_bar = lambda: None
+
+    def capture_worker(worker, exclusive=True):
+        workers.append(worker)
+        worker.close()
+
+    app.run_worker = capture_worker
+
+    app.on_input_submitted(DummySubmittedEvent("hello", prompt))
+
+    assert prompt.disabled is True
+    assert secondary.disabled is False
+    assert len(workers) == 1
+
+
+def test_chat_repeated_submit_while_processing_ignores_second_worker(tmp_path):
+    app = SuperMedicineTUI(project_root=tmp_path)
+    prompt = DummyPromptInput("first")
+    chat = CapturingSubmitChat()
+    workers: list[object] = []
+    app._views = {"chat": chat}
+    app.query_one = lambda selector, widget_type=None: prompt
+    app._update_status_bar = lambda: None
+
+    def capture_worker(worker, exclusive=True):
+        workers.append(worker)
+        worker.close()
+
+    app.run_worker = capture_worker
+
+    app.on_input_submitted(DummySubmittedEvent("first", prompt))
+    app.on_input_submitted(DummySubmittedEvent("second", prompt))
+
+    assert chat.user_messages == ["first"]
+    assert len(workers) == 1
+    assert t("chat_processing_reject") in chat.status_messages
+
+
+def test_chat_processing_unlocks_on_completion(monkeypatch, tmp_path):
+    class FakeKernel:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def execute_task(self, message: str, progress_callback=None):
+            return {"status": "success", "output": "ok"}
+
+    monkeypatch.setattr("core.kernel.Kernel", FakeKernel)
+    app = SuperMedicineTUI(project_root=tmp_path)
+    prompt = DummyPromptInput()
+    app.query_one = lambda selector, widget_type=None: prompt
+    app._update_status_bar = lambda: None
+    app._set_chat_processing(True)
+
+    import asyncio
+
+    asyncio.run(app._run_kernel_task("hello", CapturingSubmitChat(), turn_id=1))
+
+    assert app.is_chat_processing is False
+    assert prompt.disabled is False
+    assert prompt.placeholder == t("input_placeholder")
+
+
+def test_chat_processing_status_refreshes_when_switching_views(tmp_path):
+    app = SuperMedicineTUI(project_root=tmp_path)
+    updates: list[str] = []
+
+    class FakeView:
+        display = True
+
+    app._views = {"chat": FakeView()}
+    app._current_view = "chat"
+    app._chat_processing = True
+    app._task_running = True
+    app._focus_current_view_default = lambda: None
+    app._update_status_bar = lambda: updates.append(app.status_text("chat").center)
+
+    app.action_switch_view("chat")
+
+    assert updates
+    assert t("chat_processing_state") in updates[-1]
+
+
+def test_chat_processing_unlocks_on_exception(monkeypatch, tmp_path):
+    class FakeKernel:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def execute_task(self, message: str, progress_callback=None):
+            raise RuntimeError("boom")
+
+    monkeypatch.setattr("core.kernel.Kernel", FakeKernel)
+    app = SuperMedicineTUI(project_root=tmp_path)
+    prompt = DummyPromptInput()
+    chat = CapturingSubmitChat()
+    app.query_one = lambda selector, widget_type=None: prompt
+    app._update_status_bar = lambda: None
+    app._set_chat_processing(True)
+
+    import asyncio
+
+    asyncio.run(app._run_kernel_task("hello", chat, turn_id=1))
+
+    assert app.is_chat_processing is False
+    assert prompt.disabled is False
+    assert chat.error_messages
 
 
 def test_chat_streaming_methods_keep_assistant_turn_and_append_safe_deltas():

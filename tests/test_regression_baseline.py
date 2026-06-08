@@ -149,6 +149,7 @@ def test_tui_input_submission_clears_input_without_raw_terminal_echo_or_screen_c
     rendered_user_messages: list[str] = []
 
     class FakeInput:
+        id = "prompt-input"
         value = "sensitive prompt that must not leak"
 
     class FakeEvent:
@@ -438,7 +439,7 @@ def test_experiment_and_log_tui_views_are_additive_to_existing_navigation():
         "dialog",
     }.issubset(nav_views)
     assert nav_by_key["9"].view_id == "experiment"
-    assert nav_by_key["9"].label == "实验指导器"
+    assert nav_by_key["9"].label == "实验"
     assert nav_by_key["0"].view_id == "log"
     assert nav_by_key["0"].label == "Log 报告"
     assert not ({"1", "2", "3", "4", "5", "6", "7", "8", "9", "0"} & binding_keys)

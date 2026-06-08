@@ -181,7 +181,7 @@ def test_log_screen_populated_table_and_detail_statistics_match_selected_entry(
             table = app.query_one("#log-table", DataTable)
             assert table.row_count == 3
             status = _static_text(app.query_one("#log-status", Static))
-            assert f"{t('log_list')}: 3" in status
+            assert f"{t('log_refreshed')}: 3" in status
             assert "entries=3" in status
             assert "Error=1" in status
             assert "Warning=1" in status
@@ -208,6 +208,37 @@ def test_log_screen_populated_table_and_detail_statistics_match_selected_entry(
             assert "alpha saved" not in detail
 
     asyncio.run(scenario())
+
+
+def test_log_screen_refresh_button_reads_entries_created_after_enter(tmp_path):
+    async def scenario() -> None:
+        app = SuperMedicineTUI(project_root=tmp_path)
+        async with app.run_test(size=(140, 45)) as pilot:
+            app.action_switch_view("log")
+            await pilot.pause()
+
+            table = app.query_one("#log-table", DataTable)
+            assert table.row_count == 0
+
+            LogReportStore(tmp_path).write("late log", session_id="late")
+            await pilot.click("#log-refresh")
+            await pilot.pause()
+
+            assert table.row_count == 1
+            assert "late" in str(table.get_row_at(0))
+            assert t("log_refreshed") in _static_text(app.query_one("#log-status", Static))
+
+    asyncio.run(scenario())
+
+
+def test_log_screen_uses_targeted_refresh_hook_without_timer_polling():
+    import inspect
+
+    source = inspect.getsource(LogReportView)
+
+    assert "refresh_view_data" in source
+    assert "set_interval" not in source
+    assert "Timer" not in source
 
 
 def test_log_screen_severity_label_uses_explicit_mapping_for_each_level():

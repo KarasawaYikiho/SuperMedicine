@@ -263,3 +263,49 @@ def test_business_views_set_deterministic_non_empty_reload_statuses():
     assert "tool_count" in tool_loader
     assert "dialog_refreshed" in dialog_loader
     assert "len(events)" in dialog_loader
+
+
+def test_workspace_view_refresh_button_reads_external_workspace_created_after_enter(tmp_path):
+    import asyncio
+    from core.workspace import WorkspaceManager
+
+    async def scenario() -> None:
+        app = SuperMedicineTUI(project_root=tmp_path)
+        async with app.run_test(size=(140, 45)) as pilot:
+            app.action_switch_view("workspace")
+            await pilot.pause()
+
+            table = app.query_one("#workspace-table", DataTable)
+            assert table.row_count == 0
+
+            WorkspaceManager(tmp_path).initialize_workspace("external-a")
+            await pilot.click("#workspace-refresh")
+            await pilot.pause()
+
+            assert table.row_count == 1
+            assert table.get_row("external-a")[0] == "external-a"
+            assert t("workspace_refreshed") in str(
+                app.query_one("#workspace-status", Static).renderable
+            )
+
+    asyncio.run(scenario())
+
+
+def test_app_switch_view_invokes_dynamic_refresh_hooks(tmp_path):
+    app = SuperMedicineTUI(project_root=tmp_path)
+    calls: list[str] = []
+
+    class FakeView:
+        display = False
+
+        def refresh_view_data(self) -> None:
+            calls.append("refresh")
+
+    app._views = {"workspace": FakeView()}
+    app._current_view = "workspace"
+    app._focus_current_view_default = lambda: None
+    app._update_status_bar = lambda: None
+
+    app.action_switch_view("workspace")
+
+    assert calls == ["refresh"]

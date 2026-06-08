@@ -8,7 +8,6 @@ from typing import Any
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
-from textual.timer import Timer
 from textual.widgets import Button, DataTable, Input, Static, TextArea
 
 from core.log_report import LogReportStore, detect_log_severity, format_log_message
@@ -19,9 +18,6 @@ from core.tui.i18n import t
 
 _SUMMARY_LIMIT = 96
 _DETAIL_LINE_LIMIT = 160
-_REFRESH_INTERVAL_SECONDS = 2.0
-
-
 _SEVERITY_STYLES = {
     "Error": "bold red",
     "Warning": "yellow",
@@ -38,7 +34,6 @@ class LogReportView(Vertical):
         super().__init__(**kwargs)
         self._project_root = Path(project_root) if project_root else Path.cwd()
         self._auto_follow = True
-        self._refresh_timer: Timer | None = None
         self._suppress_follow_detection = False
 
     def compose(self) -> ComposeResult:
@@ -65,16 +60,11 @@ class LogReportView(Vertical):
 
     def on_mount(self) -> None:
         self.refresh_logs()
-        self._refresh_timer = self.set_interval(
-            _REFRESH_INTERVAL_SECONDS,
-            self._refresh_from_timer,
-            pause=False,
-        )
 
-    def on_unmount(self) -> None:
-        if self._refresh_timer is not None:
-            self._refresh_timer.stop()
-            self._refresh_timer = None
+    def refresh_view_data(self) -> None:
+        """Refresh log list/output when the view becomes active."""
+
+        self.refresh_logs(refreshed=True)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "log-write":
@@ -95,10 +85,7 @@ class LogReportView(Vertical):
         if table.row_count and table.cursor_row < max(0, table.row_count - 1):
             self._set_auto_follow(False, announce=True)
 
-    def _refresh_from_timer(self) -> None:
-        self.refresh_logs(refreshed=True, automatic=True)
-
-    def refresh_logs(self, *, refreshed: bool = False, automatic: bool = False) -> str:
+    def refresh_logs(self, *, refreshed: bool = False) -> str:
         table = self.query_one("#log-table", DataTable)
         previous_cursor = table.cursor_row if table.row_count else None
         previous_row_count = table.row_count
@@ -133,10 +120,9 @@ class LogReportView(Vertical):
                 self.store.statistics_for_entries(entries)
             )
             label = t("log_refreshed") if refreshed else t("log_list")
-            refresh_mode = "实时刷新" if automatic else label
             follow_text = "自动跟随：开" if self._auto_follow else "自动跟随：关"
             status_text = (
-                f"{refresh_mode}: {len(entries)}；{follow_text}；{stats_text}"
+                f"{label}: {len(entries)}；{follow_text}；{stats_text}"
                 if entries
                 else (
                     f"{t('log_refreshed')}：{t('log_no_reports')}；{follow_text}；{stats_text}"

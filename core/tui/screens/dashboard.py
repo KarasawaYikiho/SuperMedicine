@@ -201,6 +201,11 @@ class DashboardView(Vertical):
     def on_mount(self) -> None:
         self._load_data()
 
+    def refresh_view_data(self) -> None:
+        """Refresh dynamic dashboard metrics when the view becomes active."""
+
+        self._load_data()
+
     def _load_data(self) -> None:
         table = self.query_one("#dashboard-table", DataTable)
         table.clear(columns=True)

@@ -40,6 +40,7 @@ class WorkspaceView(Vertical):
             yield Button(
                 t("workspace_create"), id="workspace-create", classes="btn btn-primary"
             )
+        with Horizontal(classes="form-row"):
             yield Button(
                 t("workspace_select"),
                 id="workspace-select",
@@ -55,6 +56,11 @@ class WorkspaceView(Vertical):
 
     def on_mount(self) -> None:
         self._load_workspaces()
+
+    def refresh_view_data(self) -> None:
+        """Refresh workspace file/list data when the view becomes active."""
+
+        self._load_workspaces(refreshed=True)
 
     def focus_default(self) -> None:
         self.query_one("#workspace-id-input", Input).focus()
@@ -163,6 +169,9 @@ class WorkspaceView(Vertical):
                 refresh_workspace_views(selected_workspace_id=str(created_id))
                 self._select_table_row(str(created_id))
                 input_widget.focus()
+            update_status_bar = getattr(self.app, "_update_status_bar", None)
+            if callable(update_status_bar):
+                update_status_bar()
         except Exception as e:
             self._set_error(e)
 
@@ -219,6 +228,12 @@ class WorkspaceView(Vertical):
             self.app.notify(result.get("message", t("workspace_deleted")))
             self._load_workspaces()
             self._set_status(result.get("message", t("workspace_deleted")))
+            refresh_workspace_views = getattr(self.app, "refresh_workspace_views", None)
+            if callable(refresh_workspace_views):
+                refresh_workspace_views()
+            update_status_bar = getattr(self.app, "_update_status_bar", None)
+            if callable(update_status_bar):
+                update_status_bar()
         except Exception as e:
             self._set_error(e)
 

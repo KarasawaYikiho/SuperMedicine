@@ -92,7 +92,7 @@ class PermissionView(Vertical):
         return self._controller
 
     def compose(self) -> ComposeResult:
-        yield Static("权限模式", classes="section-title")
+        yield Static("权限", classes="section-title")
         yield Static("", id="permission-current")
         yield Static(PERMISSION_RISK_NOTICE, id="permission-risk", classes="hint")
         with Horizontal(classes="form-row"):

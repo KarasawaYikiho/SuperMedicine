@@ -10,16 +10,16 @@ Screen {
 }
 
 Header {
-    background: $primary;
+    background: $background;
     color: $foreground;
-    text-style: bold;
+    text-style: none;
     height: 1;
 }
 
 Footer {
-    background: $surface;
+    background: $background;
     color: $text-muted;
-    border-top: tall $primary 35%;
+    border-top: solid $border;
 }
 
 #app-body {
@@ -30,35 +30,35 @@ Footer {
 
 /* Sidebar */
 #sidebar {
-    width: 24;
+    width: 25;
     min-width: 20;
     height: 100%;
     background: $surface;
-    border-right: tall $primary 60%;
+    border-right: solid $border;
 }
 
 #sidebar-title {
-    height: 2;
+    height: 1;
     padding: 0 1;
     text-style: bold;
     color: $accent;
-    content-align: center middle;
+    content-align: left middle;
 }
 
 #sidebar-subtitle {
-    height: 2;
+    height: 1;
     padding: 0 1;
     color: $text-muted;
-    content-align: center middle;
-    border-bottom: tall $primary 25%;
+    content-align: left middle;
+    border-bottom: solid $border;
 }
 
 .shell-title {
-    background: $primary 8%;
+    background: $surface;
 }
 
 .shell-subtitle {
-    text-style: italic;
+    text-style: none;
 }
 
 #nav-list {
@@ -73,13 +73,13 @@ Footer {
 }
 
 #nav-list > NavItem:hover {
-    background: $primary 18%;
+    background: $primary 12%;
 }
 
 #nav-list > NavItem.-active {
-    background: $primary 35%;
+    background: $primary 18%;
     text-style: bold;
-    border-left: heavy $accent;
+    border-left: solid $accent;
     color: $foreground;
 }
 
@@ -88,9 +88,9 @@ Footer {
     height: auto;
     max-height: 85%;
     margin: 1 0 0 1;
-    padding: 1 1;
+    padding: 0 1;
     background: $surface;
-    border: round $primary;
+    border: solid $border;
 }
 
 #tui-menu-title {
@@ -112,16 +112,23 @@ Footer {
 
 .tui-menu-list > MenuOption:hover,
 .tui-menu-list > MenuOption.-active {
-    background: $primary 35%;
+    background: $primary 18%;
     text-style: bold;
 }
 
 #sidebar-shortcuts {
-    height: 4;
+    height: 3;
     padding: 0 1;
     color: $text-muted;
-    border-top: tall $primary 35%;
-    background: $primary 8%;
+    border-top: solid $border;
+    background: $surface;
+}
+
+#sidebar-permission-entry {
+    height: 2;
+    padding: 0 1;
+    color: $text-muted;
+    background: $surface;
 }
 
 .shortcut-hint {
@@ -136,14 +143,14 @@ Footer {
 }
 
 #view-title {
-    height: 2;
+    height: 1;
     width: 100%;
-    padding: 0 2;
+    padding: 0 1;
     background: $surface;
     color: $foreground;
     text-style: bold;
     content-align: left middle;
-    border-bottom: tall $primary 35%;
+    border-bottom: solid $border;
 }
 
 .view-heading {
@@ -164,12 +171,12 @@ Footer {
     height: auto;
     width: 100%;
     background: $surface;
-    border-top: tall $primary 60%;
+    border-top: solid $border;
     padding: 0 1;
 }
 
 #prompt-prefix {
-    width: 4;
+    width: 3;
     height: auto;
     content-align: center middle;
     text-style: bold;
@@ -179,12 +186,12 @@ Footer {
 #prompt-input {
     width: 1fr;
     height: auto;
-    border: round $primary 35%;
+    border: solid $border;
     background: $background;
 }
 
 #prompt-input:focus {
-    border: round $accent;
+    border: solid $accent;
 }
 
 /* Status Bar */
@@ -192,7 +199,7 @@ Footer {
     height: 1;
     width: 100%;
     background: $surface;
-    border-top: tall $primary 35%;
+    border-top: solid $border;
     color: $text-muted;
 }
 
@@ -217,12 +224,12 @@ Footer {
     width: 100%;
     overflow-y: auto;
     padding: 0 1;
-    border: round $primary 30%;
-    background: $surface;
+    border: solid $border;
+    background: $background;
 }
 
 #chat-output:focus {
-    border: round $accent;
+    border: solid $accent;
 }
 
 /* Dashboard */
@@ -241,8 +248,8 @@ Footer {
 #dashboard-advice {
     height: auto;
     padding: 1 2;
-    border: round $primary 40%;
-    background: $primary 10%;
+    border: solid $border;
+    background: $surface;
 }
 
 /* Tables */
@@ -257,7 +264,7 @@ Footer {
 #log-table {
     height: 1fr;
     min-height: 5;
-    border: round $primary 30%;
+    border: solid $border;
 }
 
 #log-table {
@@ -268,8 +275,14 @@ Footer {
     min-width: 14;
 }
 
+.hint {
+    height: auto;
+    color: $text-muted;
+    padding: 0 1;
+}
+
 DataTable:focus {
-    border: round $accent;
+    border: solid $accent;
 }
 
 Input,
@@ -304,21 +317,21 @@ Select {
     min-height: 1;
     padding: 0 1;
     color: $text-muted;
-    border-left: tall $primary 40%;
+    border-left: solid $border;
     background: $surface;
 }
 
 #log-detail {
     max-height: 12;
     overflow-y: auto;
-    border: round $primary 35%;
+    border: solid $border;
     margin: 1 0 0 0;
 }
 
 #self-evolution-preview-content {
     max-height: 16;
     overflow-y: auto;
-    border: round $primary 35%;
+    border: solid $border;
     margin: 1 0 0 0;
 }
 
@@ -328,22 +341,22 @@ Select {
 
 .status-info {
     color: $text-muted;
-    border-left: tall $primary;
+    border-left: solid $border;
 }
 
 .status-success {
     color: $success;
-    border-left: tall $success;
+    border-left: solid $success;
 }
 
 .status-warning {
     color: $warning;
-    border-left: tall $warning;
+    border-left: solid $warning;
 }
 
 .status-error {
     color: $error;
-    border-left: tall $error;
+    border-left: solid $error;
     text-style: bold;
 }
 
@@ -360,7 +373,7 @@ Select {
 
 #llm-form {
     height: auto;
-    border: round $primary 30%;
+    border: solid $border;
     padding: 1;
 }
 
@@ -372,7 +385,7 @@ Select {
 }
 
 .btn:focus {
-    border: tall $accent;
+    border: solid $accent;
 }
 
 .btn:hover {
@@ -380,30 +393,30 @@ Select {
 }
 
 .btn-primary {
-    background: $primary;
+    background: $primary 35%;
     color: $foreground;
 }
 
 .btn-primary:hover {
-    background: $primary-lighten-1;
+    background: $primary 45%;
 }
 
 .btn-danger {
-    background: $error;
+    background: $error 45%;
     color: $foreground;
 }
 
 .btn-danger:hover {
-    background: $error-lighten-1;
+    background: $error 55%;
 }
 
 .btn-secondary {
     background: $surface;
-    border: tall $primary;
+    border: solid $border;
 }
 
 .btn-secondary:hover {
-    background: $primary 20%;
+    background: $primary 12%;
 }
 
 /* Section Titles */
@@ -411,13 +424,14 @@ Select {
     text-style: bold;
     margin: 0 0 1 0;
     padding: 0 1;
-    color: $primary;
-    background: $primary 10%;
+    color: $accent;
+    background: $surface;
+    border-left: solid $accent;
 }
 
 /* Maximized View */
 .-maximized {
     height: 1fr;
-    border: heavy $accent;
+    border: solid $accent;
     background: $background;
 }

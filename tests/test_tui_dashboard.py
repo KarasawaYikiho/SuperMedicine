@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import yaml
+import inspect
 
 from core.tui.screens.dashboard import (
+    DashboardView,
     DashboardOverviewController,
     collect_dashboard_context,
 )
@@ -66,7 +68,7 @@ def test_dashboard_context_for_initialized_project_with_workspace_and_ready_llm_
     assert context["module_count"] == 1
     assert context["llm_status"] == "LLM 已就绪：openai（gpt-dashboard）"
     assert context["recent_hint"] == "最近工作区：study-a"
-    assert rows[0] == ("初始化状态", "已初始化")
+    assert rows[0] == ("初始化", "已初始化")
     assert secret not in rendered
 
 
@@ -160,3 +162,10 @@ def test_dashboard_context_reports_incomplete_llm_without_api_key_leak(tmp_path)
 
     assert context["llm_status"] == "LLM 未就绪：broken（缺少：model）"
     assert secret not in str(context)
+
+
+def test_dashboard_view_exposes_activation_refresh_hook():
+    view = DashboardView()
+
+    assert hasattr(view, "refresh_view_data")
+    assert "_load_data" in inspect.getsource(DashboardView.refresh_view_data)

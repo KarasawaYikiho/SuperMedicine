@@ -38,15 +38,20 @@ def test_cli_init_help_documents_optional_desktop_exe_release(monkeypatch, capsy
 
 
 def test_chinese_labels_available():
-    assert t("app_title") == "SuperMedicine 终端工作台"
+    assert t("app_title") == "SuperMedicine"
     assert LABELS["permission_required"] == "需要权限确认"
     assert LABELS["layout_shortcuts"] == "快捷键"
     assert LABELS["status_task_idle"] == "任务空闲"
-    assert LABELS["status_focus_input"] == "输入栏"
+    assert LABELS["status_focus_input"] == "输入框"
     assert "Tab/Shift+Tab" in LABELS["status_shortcuts_hint"]
     assert "M 菜单" in LABELS["status_shortcuts_hint"]
-    assert "选择视图" in LABELS["menu_select_view"]
-    assert LABELS["menu_change_theme"] == "Change Theme"
+    assert "更多操作" in LABELS["status_shortcuts_hint"]
+    assert "F" not in LABELS["status_maximized"]
+    assert "M 菜单" in LABELS["status_maximized"]
+    assert LABELS["menu_select_view"] == "选择视图"
+    assert LABELS["menu_change_theme"] == "切换主题"
+    assert LABELS["menu_toggle_maximize"] == "最大化/还原"
+    assert LABELS["menu_show_help"] == "帮助"
     assert "Enter" in LABELS["help_submission"]
     assert "危险操作" in LABELS["help_danger"]
     assert "LLM" in LABELS["help_status"]
@@ -57,7 +62,7 @@ def test_tui_dry_run_returns_chinese_status(capsys):
     status = launch_tui(dry_run=True)
 
     assert status.interactive is False
-    assert status.title == "SuperMedicine 终端工作台"
+    assert status.title == "SuperMedicine"
     assert "基础组件已就绪" in status.message
     assert status.current_view == "chat"
     assert status.view_title == "对话"
@@ -66,7 +71,7 @@ def test_tui_dry_run_returns_chinese_status(capsys):
     assert "M 菜单" in status.shortcut_hint
     assert "Tab/Shift+Tab" in status.shortcut_hint
     assert status.focus_target == "prompt-input"
-    assert "SuperMedicine 终端工作台" in capsys.readouterr().out
+    assert "SuperMedicine" in capsys.readouterr().out
 
 
 def test_tui_startup_metadata_covers_all_primary_views_and_shortcuts():
@@ -99,14 +104,14 @@ def test_tui_startup_metadata_covers_all_primary_views_and_shortcuts():
     ]
     assert [item.label for item in nav_items] == [
         "对话",
-        "仪表盘",
-        "工作区管理",
-        "论文管理",
-        "经验学习",
-        "工具管理",
+        "状态看板",
+        "工作区",
+        "论文",
+        "经验",
+        "工具",
         "对话历史",
-        "LLM 管理",
-        "实验指导器",
+        "LLM 配置",
+        "实验",
         "Log 报告",
     ]
     assert all(item.icon for item in nav_items)
@@ -118,8 +123,52 @@ def test_tui_startup_metadata_covers_all_primary_views_and_shortcuts():
     assert "1-0" not in SuperMedicineTUI.shortcut_hint_text()
     assert "切换视图" not in SuperMedicineTUI.shortcut_hint_text()
     assert "Enter 提交" in SuperMedicineTUI.shortcut_hint_text()
-    assert "? 帮助" in SuperMedicineTUI.shortcut_hint_text()
     assert "M 菜单" in SuperMedicineTUI.shortcut_hint_text()
+    assert "F 最大化" not in SuperMedicineTUI.shortcut_hint_text()
+    assert "? 帮助" not in SuperMedicineTUI.shortcut_hint_text()
+
+
+def test_tui_labels_follow_chinese_first_policy_with_reasonable_english_terms():
+    chinese_first_expectations = {
+        "nav_dashboard": "状态看板",
+        "nav_workspace": "工作区",
+        "nav_paper": "论文",
+        "nav_experience": "经验",
+        "nav_tool": "工具",
+        "nav_dialog": "对话历史",
+        "dashboard_title": "状态看板",
+        "workspace_title": "工作区",
+        "paper_title": "论文",
+        "experience_title": "经验",
+        "tool_title": "工具",
+        "dialog_title": "对话历史",
+        "help_title": "帮助",
+        "menu_title": "菜单",
+        "experiment_title": "实验",
+        "layout_shortcuts": "快捷键",
+        "layout_current_view": "当前视图",
+        "layout_focus": "焦点",
+    }
+
+    for key, expected in chinese_first_expectations.items():
+        assert t(key) == expected
+
+    retained_english_terms = [
+        t("app_title"),
+        t("nav_llm"),
+        t("llm_provider"),
+        t("llm_api_key"),
+        t("dashboard_llm_no_provider"),
+        t("log_title"),
+        t("chat_user_label"),
+        t("chat_system_label"),
+        t("chat_assistant_label"),
+        t("chat_result_output"),
+    ]
+    combined = "\n".join(retained_english_terms)
+    for expected in ["SuperMedicine", "LLM", "Provider", "API Key", "Log", "User", "System", "Assistant", "Output"]:
+        assert expected in combined
+    assert re.search(r"LLM Provider", combined)
 
 
 def test_tui_theme_layout_and_status_text_are_testable_without_terminal(tmp_path):
@@ -136,12 +185,12 @@ def test_tui_theme_layout_and_status_text_are_testable_without_terminal(tmp_path
     assert "LLM 未就绪" in idle_status.center
     assert "任务空闲" in idle_status.center
     assert "当前视图：对话" in idle_status.right
-    assert idle_status.focus == "焦点：输入栏"
+    assert idle_status.focus == "焦点：输入框"
 
     app._task_running = True
     running_status = app.status_text("llm")
     assert "任务执行中" in running_status.center
-    assert "当前视图：LLM 管理" in running_status.right
+    assert "当前视图：LLM 配置" in running_status.right
 
 
 def test_tui_dry_run_prints_modern_status_without_secrets(capsys):
@@ -152,7 +201,7 @@ def test_tui_dry_run_prints_modern_status_without_secrets(capsys):
     assert "快捷键：1-0 切换视图" not in output
     assert "1-0" not in output
     assert "Enter 提交" in output
-    assert "焦点：输入栏" in output
+    assert "焦点：输入框" in output
     assert status.status_left.startswith("📁")
     assert "🔌" in status.status_center
     assert "任务空闲" in status.status_center
@@ -193,7 +242,7 @@ def test_tui_dry_run_status_and_output_use_chinese_copy_and_no_llm_secret(
     assert "LLM 已就绪" in status.message
     assert "工具执行必须经过权限引擎" in output
     assert "当前视图：对话" in output
-    assert "焦点：输入栏" in output
+    assert "焦点：输入框" in output
     assert secret not in combined
 
 
@@ -250,12 +299,12 @@ def test_tui_dry_run_restores_last_exit_provider_without_secret_leak(tmp_path, c
 def test_tui_view_title_and_status_text_are_test_friendly(tmp_path):
     app = SuperMedicineTUI(project_root=tmp_path)
 
-    assert app.view_title_text("workspace") == "工作区管理"
-    assert app.view_title_text("llm") == "LLM 管理"
-    assert app.view_title_text("experiment") == "实验指导器"
+    assert app.view_title_text("workspace") == "工作区"
+    assert app.view_title_text("llm") == "LLM 配置"
+    assert app.view_title_text("experiment") == "实验"
     assert app.view_title_text("log") == "Log 报告"
-    assert app.status_text("workspace").focus == "焦点：输入栏"
-    assert "当前视图：工作区管理" in app.status_text("workspace").right
+    assert app.status_text("workspace").focus == "焦点：输入框"
+    assert "当前视图：工作区" in app.status_text("workspace").right
     assert "1-0" not in app.shortcut_hint_text()
     assert "切换视图" not in app.shortcut_hint_text()
     assert "Tab/Shift+Tab" in app.shortcut_hint_text()
@@ -267,11 +316,12 @@ def test_tui_help_text_documents_actual_bindings_and_state_meanings():
 
     for key in {
         "q",
-        "f",
         "m",
-        "question_mark",
+        "p",
     }:
         assert key in binding_keys
+    assert "f" not in binding_keys
+    assert "question_mark" not in binding_keys
 
     help_text = "\n".join(
         [
@@ -292,10 +342,10 @@ def test_tui_help_text_documents_actual_bindings_and_state_meanings():
         "LLM",
         "任务",
         "Q",
-        "F",
-        "?",
         "M",
         "选择视图",
+        "帮助",
+        "最大化/还原",
     ]:
         assert expected in help_text
 
@@ -304,29 +354,35 @@ def test_tui_help_text_documents_actual_bindings_and_state_meanings():
 
 
 def test_readme_tui_docs_match_bindings_and_preserve_boundaries():
-    readme = (
-        Path(__file__)
-        .resolve()
-        .parents[1]
-        .joinpath("README.md")
-        .read_text(encoding="utf-8")
-    )
+    root = Path(__file__).resolve().parents[1]
+    readme = root.joinpath("README.md").read_text(encoding="utf-8")
+    readme_zh_cn = root.joinpath("README.zh-CN.md").read_text(encoding="utf-8")
 
     for expected in [
         "`Tab`",
         "`Shift+Tab`",
         "`Enter`",
         "`m`",
-        "`f`",
-        "`?`",
+        "`p`",
         "`q`",
     ]:
         assert expected in readme
-    assert "数字键 `1-0` 不作为直接切换视图快捷键" in readme
+    assert "`f`" not in readme
+    assert "`?`" not in readme
+    assert "Number keys `1-0` are not direct view-switching shortcuts" in readme
+    assert "数字键 `1-0` 不是直接视图切换快捷键" in readme_zh_cn
     assert "选择视图" in readme
-    assert "Change Theme" in readme
+    assert "切换主题" in readme
+    assert "帮助" in readme
+    assert "最大化/还原" in readme
     assert "LLM 状态" in readme
     assert "任务运行状态" in readme
+    assert "Chat Processing" in readme
+    assert "Only the main\nprompt input is locked" in readme
+    assert "watcher or polling" in readme
+    assert "Chat Processing" in readme_zh_cn
+    assert "只有主输入框" in readme_zh_cn
+    assert "watcher 或轮询" in readme_zh_cn
     assert "CLI commands always require explicit `--workspace`" in readme
     assert "OpenCode runtime" not in readme
 
@@ -397,7 +453,9 @@ def test_tui_menu_binding_opens_view_submenu_and_theme_entry(tmp_path, menu_key)
                 for static in app.screen.query("#tui-main-menu-list Static")
             )
             assert "选择视图" in menu_text
-            assert "Change Theme" in menu_text
+            assert "切换主题" in menu_text
+            assert "帮助" in menu_text
+            assert "最大化/还原" in menu_text
 
             await pilot.press("enter")
             await pilot.pause()
@@ -411,7 +469,7 @@ def test_tui_menu_binding_opens_view_submenu_and_theme_entry(tmp_path, menu_key)
             await pilot.press("down", "enter")
             await pilot.pause()
             assert app._current_view == "dashboard"
-            assert app.view_title_text(app._current_view) == "仪表盘"
+            assert app.view_title_text(app._current_view) == "状态看板"
 
     asyncio.run(scenario())
 
@@ -431,3 +489,14 @@ def test_prompt_input_treats_m_and_shift_m_as_menu_key(key, char):
             self.character = character
 
     assert PromptInput()._is_menu_key(KeyEvent(key, char))
+
+
+@pytest.mark.parametrize("key", ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "f", "?", "p"])
+def test_prompt_input_keeps_removed_shortcuts_and_ordinary_keys_as_text(key):
+    class KeyEvent:
+        def __init__(self, key: str, character: str) -> None:
+            self.key = key
+            self.character = character
+
+    assert not PromptInput()._is_menu_key(KeyEvent(key, key))
+    assert not PromptInput()._is_terminal_control_key(KeyEvent(key, key))
