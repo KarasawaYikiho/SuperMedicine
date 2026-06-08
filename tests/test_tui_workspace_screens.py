@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import time
 
 import pytest
 from textual.widgets import DataTable, Input, Static
@@ -11,6 +12,16 @@ from core.tui.screens.dialog_screen import DialogView
 from core.tui.screens.tool_screen import ToolView
 from core.tui.screens.workspace_screen import WorkspaceView
 from core.tui.app import SuperMedicineTUI
+
+
+async def _wait_for_tui_condition(pilot, condition, *, timeout: float = 2.0) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        await pilot.pause()
+        if condition():
+            return
+    await pilot.pause()
+    assert condition()
 
 
 def _allow_delete_policy(tmp_path):
@@ -280,7 +291,7 @@ def test_workspace_view_refresh_button_reads_external_workspace_created_after_en
 
             WorkspaceManager(tmp_path).initialize_workspace("external-a")
             await pilot.click("#workspace-refresh")
-            await pilot.pause()
+            await _wait_for_tui_condition(pilot, lambda: table.row_count == 1)
 
             assert table.row_count == 1
             assert table.get_row("external-a")[0] == "external-a"

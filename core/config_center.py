@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import logging
+import shlex
 from pathlib import Path
 from typing import Any
 
@@ -365,7 +366,7 @@ class ConfigCenter:
     ) -> dict[str, Any]:
         """Persist an explicitly authorized external directory in memory."""
 
-        root = Path(path).expanduser().resolve()
+        root = _normalize_user_directory_path(path)
         if not root.is_dir():
             raise ValueError(f"Authorized external path must be a directory: {root}")
         config = self._config.setdefault("file_access", {})
@@ -384,7 +385,7 @@ class ConfigCenter:
     def revoke_external_file_access_directory(self, path: str | Path) -> dict[str, Any]:
         """Remove an explicitly authorized external directory from memory."""
 
-        root = Path(path).expanduser().resolve()
+        root = _normalize_user_directory_path(path)
         config = self._config.setdefault("file_access", {})
         if not isinstance(config, dict):
             config = {}
@@ -550,3 +551,22 @@ def _safe_runtime_slug(value: Any, default: str) -> str:
     if any(char not in allowed for char in text) or len(text) > 128:
         return default
     return text
+
+
+def _normalize_user_directory_path(path: str | Path) -> Path:
+    """Resolve user-entered directory text with optional shell-style quotes."""
+
+    if isinstance(path, Path):
+        return path.expanduser().resolve()
+    text = str(path or "").strip()
+    if not text:
+        return Path(text).resolve()
+    try:
+        parts = shlex.split(text, posix=False)
+    except ValueError:
+        parts = []
+    if len(parts) == 1:
+        text = parts[0]
+    if len(text) >= 2 and text[0] == text[-1] and text[0] in {'"', "'"}:
+        text = text[1:-1]
+    return Path(text).expanduser().resolve()

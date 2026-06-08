@@ -175,7 +175,7 @@ supermedicine permission mode full --confirm-full
 ```
 
 In the TUI, open the permission screen from the sidebar entry `P 🛡️ 权限模式` or the
-global `p` shortcut. Switching to full access requires the confirmation text
+global `P` shortcut. Switching to full access requires the confirmation text
 `FULL`.
 
 ## Security and Medical-Use Boundaries
@@ -236,13 +236,17 @@ Global shortcuts:
 | `Tab` | Move focus forward between interactive controls. |
 | `Shift+Tab` | Move focus backward between interactive controls. |
 | `Enter` | Submit the focused input or confirm the selected action. |
-| `m` | Open the main menu, including `选择视图`, theme, help, and maximize/restore actions. |
-| `p` | Open the permission-mode view. |
+| `M` | Open the main menu, including `选择视图`, theme, help, and maximize/restore actions. |
+| `P` | Open the permission-mode view. |
 | `Esc` | Exit maximized mode. |
-| `q` | Quit the TUI. |
+| `Q` | Quit the TUI. |
 
-The menu contains `选择视图` for view selection, `切换主题`, `帮助`, and `最大化/还原`.
-Status lines continue to show entries such as `LLM 状态` and `任务运行状态`.
+The menu can be opened either with uppercase `M` or with the upper-left sidebar
+affordance `≡ 菜单 (M)`. It contains `选择视图` for view selection,
+`切换主题`, `帮助`, and `最大化/还原`. Status lines continue to show entries
+such as `LLM 状态` and `任务运行状态`.
+Alphabetic global shortcuts are documented as uppercase-only (`M`, `P`, `Q`) so
+lowercase text such as `m`, `p`, and `q` plus IME composition remain ordinary input when the prompt has focus.
 Number keys `1-0` are not direct view-switching shortcuts;
 they remain normal input when the prompt has focus. `Backspace`, `Ctrl+H`, and common delete control
 bytes are handled by the prompt input instead of being swallowed by global
@@ -251,10 +255,23 @@ shortcuts.
 During active chat work, the status bar shows `Chat Processing`. Only the main
 prompt input is locked until the request reaches success or failure; secondary
 screen controls remain reachable through focus navigation and the `M` menu.
-Dynamic TUI views refresh when entered or switched to, when their refresh action
-is used, and after related operations update their data. This targeted refresh
-behavior covers dashboard/status information, log reports, workspace/file lists,
-and the Chat Processing status without adding watcher or polling behavior.
+Dynamic TUI refresh is intentionally targeted rather than a broad filesystem
+watcher or polling loop. The code-backed inventory is workspace, log,
+dashboard, tool, and dialog refresh surfaces; these refresh when entered or
+switched to, when their refresh action is used, or after related operations update
+their data. Other dynamic surfaces should be inventoried and fixed individually
+if stale-display evidence is found.
+
+The TUI string inventory keeps English emphasis labels such as `User`, `System`,
+`Assistant`, `Error`, `Status`, and `Output` as single capitalized words while
+preserving Chinese-first navigation and screen titles. This is not a full
+English-only title sweep.
+
+For TUI visual redesign work, `scripts/tui_preview_artifact.py` can generate a
+text preview artifact in the user's Downloads directory by default. The workflow
+records preview metadata only; it does not create an image by itself and does not
+claim user approval. Any substantial visual redesign remains gated on a preview
+and explicit user confirmation.
 
 Main screens include chat, dashboard, workspace management, paper management,
 experience learning, tool management, dialog history, LLM management, experiment
@@ -348,6 +365,9 @@ should follow the maintained quality gate above and CI packaging smoke checks.
 - Python package fallback version: **0.4.2b0**.
 - Package metadata is defined in [pyproject.toml](pyproject.toml).
 - Release history is recorded in [CHANGELOG.md](CHANGELOG.md).
+- GitHub Wiki publication evidence for the current debug-documentation pass is
+  recorded in the architecture tracking docs as remote commit `d6a1e11`; local
+  repository tests cannot prove future remote Wiki availability or content.
 - The fixed Beta0.4.2 release layout keeps installer entry points, the installer
   package, runtime packages, documentation/templates, and `dist/SuperMedicine.exe`
   together.
@@ -357,8 +377,13 @@ should follow the maintained quality gate above and CI packaging smoke checks.
 ## Planned or Under Review
 
 Items captured in private/debug planning notes but not represented by implemented
-code, tests, or tracked release documentation are **planned** or **under review**,
-not completed. In particular, future native platform runtime bridges, broader
+code, tests, tracked release documentation, or recorded external evidence are
+**planned** or **under review**, not completed. Remaining external or
+approval-gated items include user approval of any TUI preview, image/screenshot
+preview output if specifically required, OS-level IME verification, a full
+English-only TUI title sweep that would replace Chinese-first localization, a
+fresh legal-safe external OpenCode comparison/alignment program, and any broad
+whole-repository refactor. Future native platform runtime bridges, broader
 autonomous repository maintenance, clinical validation, and any capability that
 would bypass current permission or OS controls must be implemented, reviewed, and
 tested before documentation can describe it as supported.

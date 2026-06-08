@@ -288,6 +288,16 @@ class ShellStatusText:
     layout: str
 
 
+@dataclass(frozen=True, slots=True)
+class DynamicRefreshSurface:
+    """Code-backed boundary for targeted TUI refresh behavior."""
+
+    view_id: str
+    refresh_hook: str
+    manual_control: str
+    policy: str
+
+
 class NavItem(ListItem):
     """A sidebar navigation item."""
 
@@ -311,6 +321,15 @@ class MenuOption(ListItem):
 
     def compose(self) -> ComposeResult:
         yield Static(self._label)
+
+
+class MenuButton(Static):
+    """Clickable upper-left menu affordance for mouse-capable terminals."""
+
+    def on_click(self, event: events.Click) -> None:
+        event.stop()
+        app = cast("SuperMedicineTUI", self.app)
+        app.action_open_menu()
 
 
 class ViewSelectMenuScreen(ModalScreen[str | None]):
@@ -459,9 +478,9 @@ class PromptInput(Input):
     def _is_menu_key(self, event: events.Key) -> bool:
         """Return True when the prompt should delegate to the TUI menu action."""
 
-        key = str(getattr(event, "key", "") or "").lower()
+        key = str(getattr(event, "key", "") or "")
         char = getattr(event, "character", None) or getattr(event, "char", "") or ""
-        return key in {"m", "shift+m"} or char in {"m", "M"}
+        return key in {"M", "shift+m"} or char == "M"
 
     def _is_backspace_key(self, event: events.Key) -> bool:
         """Return True for terminal/Textual backspace events that should edit text."""
@@ -518,9 +537,9 @@ class SuperMedicineTUI(App[Any]):
     AUTO_FOCUS = "#prompt-input"
 
     BINDINGS = [
-        Binding("q", "quit", t("nav_quit")),
-        Binding("m", "open_menu", t("menu_open"), show=True),
-        Binding("p", "switch_view('permission')", "权限", show=True),
+        Binding("Q", "quit", t("nav_quit")),
+        Binding("M", "open_menu", t("menu_open"), show=True),
+        Binding("P", "switch_view('permission')", "权限", show=True),
     ]
 
     NAV_ITEMS = (
@@ -569,6 +588,11 @@ class SuperMedicineTUI(App[Any]):
         yield Header()
         with Horizontal(id="app-body"):
             with Vertical(id="sidebar"):
+                yield MenuButton(
+                    f"≡ {t('menu_open')} (M)",
+                    id="menu-button",
+                    classes="menu-affordance",
+                )
                 yield Static(
                     t("layout_sidebar_title"), id="sidebar-title", classes="shell-title"
                 )
@@ -737,6 +761,19 @@ class SuperMedicineTUI(App[Any]):
         """Return navigation items for sidebar and menu view selection."""
 
         return cls.NAV_ITEMS
+
+    @classmethod
+    def dynamic_refresh_surfaces(cls) -> tuple[DynamicRefreshSurface, ...]:
+        """Return the targeted refresh inventory without broad polling/watchers."""
+
+        targeted = "activation/manual targeted refresh; no broad polling or filesystem watcher"
+        return (
+            DynamicRefreshSurface("workspace", "refresh_view_data", "#workspace-refresh", targeted),
+            DynamicRefreshSurface("log", "refresh_view_data", "#log-refresh", targeted),
+            DynamicRefreshSurface("dashboard", "refresh_view_data", "view activation", targeted),
+            DynamicRefreshSurface("tool", "refresh_view_data", "#tool-refresh", targeted),
+            DynamicRefreshSurface("dialog", "refresh_view_data", "#dialog-refresh", targeted),
+        )
 
     @classmethod
     def view_title_text(cls, view_id: str) -> str:

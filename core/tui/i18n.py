@@ -213,7 +213,7 @@ LABELS: dict[str, str] = {
     "status_maximized": "已最大化当前焦点组件，按 Esc 或从 M 菜单选择最大化/还原。",
     "status_restored": "已还原标准布局。",
     "status_maximize_unavailable": "当前焦点组件不支持最大化，请先聚焦列表、表格或内容区。",
-    "status_shortcuts_hint": "Tab/Shift+Tab 切换焦点 · Enter 提交 · M 菜单/选择视图/更多操作 · P 权限 · Q 退出",
+    "status_shortcuts_hint": "Tab/Shift+Tab 切换焦点 · Enter 提交 · 大写 M 菜单/选择视图/更多操作 · 大写 P 权限 · 大写 Q 退出",
     "thinking": "正在思考...",
     "chat_separator": "────────────────────────",
     "chat_user_label": "User",
@@ -236,7 +236,7 @@ LABELS: dict[str, str] = {
     "help_refresh": "刷新：各管理页的“刷新”按钮会重新读取当前工作区、论文、经验、工具、对话或 LLM Provider 列表。",
     "help_danger": "危险操作：删除工作区、删除经验、在线补全和完全访问权限切换等操作需要明确输入 ID、点击确认或输入 FULL；不可恢复/高风险操作会使用危险按钮样式或风险提示。",
     "help_status": "状态栏：左侧显示工作区和焦点；中间显示插件数、LLM 状态和任务运行状态（任务空闲/任务执行中）；右侧显示当前视图和版本。",
-    "help_global": "全局：M 菜单/选择视图/更多操作 | P 权限模式 | Q 退出 | Esc 退出最大化或返回菜单上级；帮助、主题切换、最大化/还原请从 M 菜单进入。",
+    "help_global": "全局：仅大写 M 打开菜单/选择视图/更多操作 | 仅大写 P 打开权限模式 | 仅大写 Q 退出 | Esc 退出最大化或返回菜单上级；帮助、主题切换、最大化/还原请从 M 菜单进入。",
     "help_escape_hint": "按 Esc 可退出最大化",
     "menu_title": "菜单",
     "menu_open": "菜单",
@@ -283,6 +283,70 @@ LABELS: dict[str, str] = {
     "log_refreshed": "Log 报告列表已刷新",
     "log_action_hint": "操作提示：输入日志内容后保存，可刷新列表并查看选中报告；报告详情展示时继续脱敏。",
 }
+
+
+TUI_ENGLISH_TITLE_STYLE_KEYS: tuple[str, ...] = (
+    "chat_user_label",
+    "chat_system_label",
+    "chat_assistant_label",
+    "chat_error_label",
+    "chat_status_label",
+    "chat_result_status",
+    "chat_result_output",
+)
+
+TUI_CHINESE_FIRST_TITLE_KEYS: tuple[str, ...] = (
+    "nav_chat",
+    "nav_dashboard",
+    "nav_workspace",
+    "nav_paper",
+    "nav_experience",
+    "nav_tool",
+    "nav_dialog",
+    "nav_experiment",
+    "workspace_title",
+    "dialog_title",
+    "dashboard_title",
+    "menu_title",
+)
+
+
+def _is_single_capitalized_english_word(value: str) -> bool:
+    """Return whether a retained English emphasis label follows title style."""
+
+    return bool(value) and " " not in value and value[:1].isupper() and value[1:].islower()
+
+
+def tui_title_style_inventory() -> dict[str, Any]:
+    """Return the code-backed TUI title/style inventory.
+
+    The current product direction is Chinese-first localization with a small set
+    of retained English chat emphasis labels.  Enforce single-word initial
+    capitalization only on those retained English emphasis labels so a style
+    check does not falsely replace Chinese navigation or screen titles.
+    """
+
+    english_labels = {
+        key: LABELS[key]
+        for key in TUI_ENGLISH_TITLE_STYLE_KEYS
+        if key in LABELS
+    }
+    chinese_first_labels = {
+        key: LABELS[key]
+        for key in TUI_CHINESE_FIRST_TITLE_KEYS
+        if key in LABELS
+    }
+    violations = {
+        key: value
+        for key, value in english_labels.items()
+        if not _is_single_capitalized_english_word(value)
+    }
+    return {
+        "english_single_word_labels": english_labels,
+        "chinese_first_labels": chinese_first_labels,
+        "english_style_violations": violations,
+        "policy": "Chinese-first TUI; retained English emphasis labels are single capitalized words.",
+    }
 
 
 def t(key: str) -> str:

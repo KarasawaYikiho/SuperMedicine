@@ -10,7 +10,8 @@ from textual.widgets import Input, ListView, Static
 
 from Cli import CLI, main
 from core.tui.app import PromptInput, STATUS_STYLE_CLASSES, SuperMedicineTUI, launch_tui
-from core.tui.i18n import LABELS, t
+from core.tui.i18n import LABELS, t, tui_title_style_inventory
+from scripts.tui_preview_artifact import write_preview_artifact
 
 
 def test_tui_help_is_registered(monkeypatch, capsys):
@@ -171,6 +172,23 @@ def test_tui_labels_follow_chinese_first_policy_with_reasonable_english_terms():
     assert re.search(r"LLM Provider", combined)
 
 
+def test_tui_title_style_inventory_enforces_english_emphasis_without_replacing_chinese():
+    inventory = tui_title_style_inventory()
+
+    assert inventory["english_style_violations"] == {}
+    assert inventory["english_single_word_labels"] == {
+        "chat_user_label": "User",
+        "chat_system_label": "System",
+        "chat_assistant_label": "Assistant",
+        "chat_error_label": "Error",
+        "chat_status_label": "Status",
+        "chat_result_status": "Status",
+        "chat_result_output": "Output",
+    }
+    assert inventory["chinese_first_labels"]["nav_dashboard"] == "状态看板"
+    assert "Chinese-first" in inventory["policy"]
+
+
 def test_tui_theme_layout_and_status_text_are_testable_without_terminal(tmp_path):
     app = SuperMedicineTUI(project_root=tmp_path)
 
@@ -191,6 +209,28 @@ def test_tui_theme_layout_and_status_text_are_testable_without_terminal(tmp_path
     running_status = app.status_text("llm")
     assert "任务执行中" in running_status.center
     assert "当前视图：LLM 配置" in running_status.right
+
+
+def test_tui_dynamic_refresh_inventory_documents_targeted_boundary():
+    surfaces = SuperMedicineTUI.dynamic_refresh_surfaces()
+    by_view = {surface.view_id: surface for surface in surfaces}
+
+    assert set(by_view) == {"workspace", "log", "dashboard", "tool", "dialog"}
+    assert by_view["workspace"].manual_control == "#workspace-refresh"
+    assert by_view["log"].refresh_hook == "refresh_view_data"
+    assert all("no broad polling" in surface.policy for surface in surfaces)
+    assert all("filesystem watcher" in surface.policy for surface in surfaces)
+
+
+def test_tui_preview_artifact_workflow_writes_text_without_approval_claim(tmp_path):
+    artifact = write_preview_artifact(project_root=tmp_path, output_dir=tmp_path)
+    text = artifact.read_text(encoding="utf-8")
+
+    assert artifact.name == "SuperMedicine_TUI_preview.txt"
+    assert "SuperMedicine TUI Preview Artifact" in text
+    assert "Upper-left clickable label" in text
+    assert "User approval has NOT been recorded" in text
+    assert "Targeted refresh boundary" in text
 
 
 def test_tui_dry_run_prints_modern_status_without_secrets(capsys):
@@ -315,9 +355,9 @@ def test_tui_help_text_documents_actual_bindings_and_state_meanings():
     binding_keys = {binding.key for binding in SuperMedicineTUI.BINDINGS}
 
     for key in {
-        "q",
-        "m",
-        "p",
+        "Q",
+        "M",
+        "P",
     }:
         assert key in binding_keys
     assert "f" not in binding_keys
@@ -362,9 +402,9 @@ def test_readme_tui_docs_match_bindings_and_preserve_boundaries():
         "`Tab`",
         "`Shift+Tab`",
         "`Enter`",
-        "`m`",
-        "`p`",
-        "`q`",
+        "`M`",
+        "`P`",
+        "`Q`",
     ]:
         assert expected in readme
     assert "`f`" not in readme
@@ -421,6 +461,7 @@ def test_tui_stylesheet_selectors_match_declared_widgets_and_classes():
             "-active",
             "-maximized",
             "tui-menu-list",
+            "menu-affordance",
         }
     )
 
@@ -433,7 +474,7 @@ def test_tui_stylesheet_selectors_match_declared_widgets_and_classes():
     assert css_classes <= declared_classes
 
 
-@pytest.mark.parametrize("menu_key", ["m", "M"])
+@pytest.mark.parametrize("menu_key", ["M"])
 def test_tui_menu_binding_opens_view_submenu_and_theme_entry(tmp_path, menu_key):
     import asyncio
 
@@ -442,6 +483,7 @@ def test_tui_menu_binding_opens_view_submenu_and_theme_entry(tmp_path, menu_key)
         async with app.run_test(size=(140, 45)) as pilot:
             prompt = app.query_one("#prompt-input", Input)
             assert prompt.has_focus
+            assert app.query_one("#menu-button", Static) is not None
 
             await pilot.press(menu_key)
             await pilot.pause()
@@ -474,10 +516,27 @@ def test_tui_menu_binding_opens_view_submenu_and_theme_entry(tmp_path, menu_key)
     asyncio.run(scenario())
 
 
+def test_tui_upper_left_menu_button_opens_menu(tmp_path):
+    import asyncio
+
+    async def scenario() -> None:
+        app = SuperMedicineTUI(project_root=tmp_path)
+        async with app.run_test(size=(140, 45)) as pilot:
+            button = app.query_one("#menu-button", Static)
+            assert "菜单" in str(button.renderable)
+            assert "M" in str(button.renderable)
+
+            await pilot.click("#menu-button")
+            await pilot.pause()
+
+            assert app.screen.query_one("#tui-main-menu-list", ListView)
+
+    asyncio.run(scenario())
+
+
 @pytest.mark.parametrize(
     ("key", "char"),
     [
-        ("m", "m"),
         ("shift+m", "M"),
         ("M", "M"),
     ],
@@ -489,6 +548,18 @@ def test_prompt_input_treats_m_and_shift_m_as_menu_key(key, char):
             self.character = character
 
     assert PromptInput()._is_menu_key(KeyEvent(key, char))
+
+
+def test_prompt_input_treats_lowercase_m_as_ordinary_text():
+    class KeyEvent:
+        def __init__(self, key: str, character: str) -> None:
+            self.key = key
+            self.character = character
+
+    event = KeyEvent("m", "m")
+
+    assert not PromptInput()._is_menu_key(event)
+    assert not PromptInput()._is_terminal_control_key(event)
 
 
 @pytest.mark.parametrize("key", ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "f", "?", "p"])

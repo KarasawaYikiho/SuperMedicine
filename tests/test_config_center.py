@@ -378,3 +378,34 @@ class TestConfigCenter:
         assert full.status == AccessDecisionStatus.ALLOWED
         assert "administrator" in full.helper.lower()
         assert "will not silently" in full.helper
+
+    def test_file_access_authorized_roots_normalize_quoted_absolute_and_relative_paths(
+        self, tmp_path, monkeypatch
+    ):
+        config_path = tmp_path / "config.yaml"
+        project_root = tmp_path / "project"
+        external_root = tmp_path / "external quoted"
+        project_root.mkdir()
+        external_root.mkdir()
+        monkeypatch.chdir(tmp_path)
+        cc = ConfigCenter(config_path)
+
+        absolute_quoted = f'"{external_root}"'
+        relative_quoted = "'external quoted'"
+
+        config = cc.authorize_external_file_access_directory(absolute_quoted)
+        policy = cc.get_file_access_policy(project_root)
+        authorized = policy.decide(external_root / "out.csv", "write")
+
+        assert config["authorized_external_roots"] == [str(external_root.resolve())]
+        assert authorized.status == AccessDecisionStatus.ALLOWED
+        assert authorized.reason == "external_directory_explicitly_authorized"
+
+        cc.authorize_external_file_access_directory(relative_quoted)
+        assert cc.get_file_access_config()["authorized_external_roots"] == [
+            str(external_root.resolve())
+        ]
+
+        revoked = cc.revoke_external_file_access_directory(relative_quoted)
+
+        assert revoked["authorized_external_roots"] == []

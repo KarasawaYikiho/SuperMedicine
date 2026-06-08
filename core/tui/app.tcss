@@ -45,6 +45,23 @@ Footer {
     content-align: left middle;
 }
 
+#menu-button {
+    height: 1;
+    padding: 0 1;
+    background: $surface;
+    color: $accent;
+    text-style: bold;
+    content-align: left middle;
+}
+
+#menu-button:hover {
+    background: $primary 18%;
+}
+
+.menu-affordance {
+    color: $accent;
+}
+
 #sidebar-subtitle {
     height: 1;
     padding: 0 1;
