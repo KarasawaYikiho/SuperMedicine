@@ -7,12 +7,12 @@ This package provides SQLite-based database functionality with:
 
 Usage:
     from core.database import Database, SessionRepository, AgentRepository
-    
+
     # Using context manager
     with Database() as db:
         sessions = SessionRepository(db)
         session = sessions.create({"key": "value"})
-        
+
         agents = AgentRepository(db)
         agent = agents.create({"name": "my_agent", "state": {"active": True}})
 """

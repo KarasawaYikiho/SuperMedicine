@@ -13,14 +13,14 @@ from core.database.database import Database
 
 class Migration:
     """Represents a single database migration.
-    
+
     Attributes:
         version: Migration version number (must be unique and sequential)
         name: Human-readable migration name
         up: Function to apply the migration
         down: Function to rollback the migration (optional)
     """
-    
+
     def __init__(
         self,
         version: int,
@@ -29,7 +29,7 @@ class Migration:
         down: Callable[[Database], None] | None = None
     ):
         """Initialize migration.
-        
+
         Args:
             version: Unique version number
             name: Descriptive name
@@ -44,29 +44,29 @@ class Migration:
 
 class MigrationManager:
     """Manages database migrations with version tracking.
-    
+
     Usage:
         manager = MigrationManager(db)
         manager.register(migration_001)
         manager.register(migration_002)
         manager.run_pending()
     """
-    
+
     def __init__(self, db: Database):
         """Initialize migration manager.
-        
+
         Args:
             db: Database instance to manage migrations for
         """
         self._db = db
         self._migrations: dict[int, Migration] = {}
-    
+
     def register(self, migration: Migration) -> None:
         """Register a migration.
-        
+
         Args:
             migration: Migration to register
-            
+
         Raises:
             ValueError: If migration version already exists
         """
@@ -75,10 +75,10 @@ class MigrationManager:
                 f"Migration version {migration.version} already registered"
             )
         self._migrations[migration.version] = migration
-    
+
     def get_current_version(self) -> int:
         """Get the current database schema version.
-        
+
         Returns:
             Current version number, 0 if no migrations applied
         """
@@ -88,10 +88,10 @@ class MigrationManager:
         if result is None or result["version"] is None:
             return 0
         return result["version"]
-    
+
     def get_pending(self) -> list[Migration]:
         """Get list of pending migrations.
-        
+
         Returns:
             List of migrations that haven't been applied yet
         """
@@ -100,71 +100,71 @@ class MigrationManager:
             [m for m in self._migrations.values() if m.version > current],
             key=lambda m: m.version
         )
-    
+
     def get_applied(self) -> list[dict[str, Any]]:
         """Get list of applied migrations.
-        
+
         Returns:
             List of applied migration records
         """
         return self._db.fetchall(
             "SELECT version, name, applied_at FROM migrations ORDER BY version"
         )
-    
+
     def run_pending(self) -> list[Migration]:
         """Run all pending migrations in order.
-        
+
         Returns:
             List of migrations that were applied
-            
+
         Raises:
             Exception: If any migration fails
         """
         pending = self.get_pending()
         applied = []
-        
+
         for migration in pending:
             try:
                 # Apply the migration
                 migration.up(self._db)
-                
+
                 # Record the migration
                 self._db.execute(
                     "INSERT INTO migrations (version, name) VALUES (?, ?)",
                     (migration.version, migration.name)
                 )
-                
+
                 applied.append(migration)
             except Exception as e:
                 # Log the failure and re-raise
                 print(f"Migration {migration.version} ({migration.name}) failed: {e}")
                 raise
-        
+
         return applied
-    
+
     def rollback(self, target_version: int) -> list[Migration]:
         """Rollback migrations to target version.
-        
+
         Args:
             target_version: Version to rollback to (exclusive)
-            
+
         Returns:
             List of migrations that were rolled back
-            
+
         Raises:
             ValueError: If migration doesn't have a down function
         """
         current = self.get_current_version()
         if target_version >= current:
             return []
-        
+
         # Get migrations to rollback (in reverse order)
         to_rollback = sorted(
             [m for m in self._migrations.values() if m.version > target_version],
             key=lambda m: m.version,
             reverse=True
         )
-        
+
         rolled_back = []
         for migration in to_rollback:
             if migration.down is None:
@@ -172,22 +172,22 @@ class MigrationManager:
                     f"Migration {migration.version} ({migration.name}) "
                     f"does not support rollback"
                 )
-            
+
             try:
                 # Apply the rollback
                 migration.down(self._db)
-                
+
                 # Remove the migration record
                 self._db.execute(
                     "DELETE FROM migrations WHERE version = ?",
                     (migration.version,)
                 )
-                
+
                 rolled_back.append(migration)
             except Exception as e:
                 print(f"Rollback of migration {migration.version} failed: {e}")
                 raise
-        
+
         return rolled_back
 
 
