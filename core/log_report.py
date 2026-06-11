@@ -3,17 +3,24 @@
 from __future__ import annotations
 
 import json
-import logging
 import re
 import builtins
-import sys
 import threading
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from core.log_severity import (
+    _SEVERITY_ORDER,
+    _display_message,
+    detect_log_severity,
+    normalize_log_severity,
+)
+from core.log_report_models import (
+    TUI_LOG_SESSION_ID,
+    resolve_log_storage_locations,
+)
 from core.redaction import redact_path_for_display, redact_sensitive
 
 
@@ -24,161 +31,16 @@ _SCHEMA_VERSION = 2
 DEFAULT_MAX_MESSAGE_LENGTH = 10000
 DEFAULT_MAX_RECORDS_PER_SESSION = 1000
 DEFAULT_MAX_FILE_BYTES = 1024 * 1024
-TUI_LOG_SESSION_ID = "tui-application"
 _LOG_STORAGE_LOCK = threading.RLock()
-_SEVERITY_LABELS = {
-    "critical": "Error",
-    "error": "Error",
-    "warning": "Warning",
-    "warn": "Warning",
-    "info": "Info",
-    "information": "Info",
-    "debug": "Debug",
-    "trace": "Debug",
-    "success": "Success",
-    "ok": "Success",
-}
-_SEVERITY_ORDER = ("Error", "Warning", "Info", "Debug", "Success")
 _STAT_DIMENSIONS = ("session_id", "source", "module", "category")
-_SEVERITY_PREFIX = re.compile(
-    r"^\s*(?:【\s*(?P<cjk>critical|error|warning|warn|info|information|debug|trace|success|ok)\s*】|"
-    r"\[\s*(?P<bracket>critical|error|warning|warn|info|information|debug|trace|success|ok)\s*\]|"
-    r"(?P<plain>critical|error|warning|warn|info|information|debug|trace|success|ok)\s*[:：-])",
-    re.IGNORECASE,
-)
-
-
-def normalize_log_severity(severity: str | None) -> str:
-    """Return a supported display severity name."""
-
-    key = str(severity or "info").strip().lower()
-    return _SEVERITY_LABELS.get(key, "Info")
-
-
-def detect_log_severity(message: str, *, default: str = "Info") -> str:
-    """Infer a supported severity from an existing log message."""
-
-    text = str(message or "").strip()
-    prefix_match = _SEVERITY_PREFIX.match(text)
-    if prefix_match:
-        return normalize_log_severity(
-            next(value for value in prefix_match.groupdict().values() if value)
-        )
-
-    lowered = text.lower()
-    if "captured stderr" in lowered:
-        return "Error"
-    if (
-        re.search(
-            r"\b(critical|fatal|exception|traceback|error|failed|failure)\b", lowered
-        )
-        or "失败" in text
-    ):
-        return "Error"
-    if re.search(r"\b(warning|warn)\b", lowered) or any(
-        token in text for token in ("警告", "缺少", "请选择", "确认")
-    ):
-        return "Warning"
-    if re.search(r"\b(debug|trace)\b", lowered):
-        return "Debug"
-    if re.search(r"\b(success|succeeded|ready|ok|saved|completed)\b", lowered) or any(
-        token in text for token in ("成功", "已保存", "完成")
-    ):
-        return "Success"
-    if re.search(r"\b(info|information)\b", lowered):
-        return "Info"
-    return normalize_log_severity(default)
-
-
-def format_log_message(message: str, *, severity: str | None = None) -> str:
-    """Ensure a log message has one leading severity marker without duplicating legacy labels."""
-
-    safe_message = str(message or "").strip()
-    if not safe_message:
-        return safe_message
-    if _SEVERITY_PREFIX.match(safe_message):
-        return safe_message
-    label = (
-        normalize_log_severity(severity)
-        if severity
-        else detect_log_severity(safe_message)
-    )
-    return f"【{label}】 {safe_message}"
-
-
-def _display_message(message: Any, *, severity: str | None = None) -> str:
-    return format_log_message(str(message or ""), severity=severity)
 
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-@dataclass(frozen=True)
-class LogReport:
-    """One redacted log report record persisted as JSON."""
-
-    report_id: str
-    created_at: str
-    message: str
-    session_id: str | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "report_id": self.report_id,
-            "created_at": self.created_at,
-            "session_id": self.session_id,
-            "message": self.message,
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "LogReport":
-        return cls(
-            report_id=str(data["report_id"]),
-            created_at=str(data["created_at"]),
-            session_id=str(data["session_id"])
-            if data.get("session_id") is not None
-            else None,
-            message=str(data.get("message", "")),
-        )
-
-
-@dataclass(frozen=True)
-class LogStorageLocations:
-    """Resolved storage locations for log/report/audit files."""
-
-    project_dir: Path
-    log_dir: Path
-    report_dir: Path
-    tui_log_file: Path
-    audit_file: Path
-
-    def to_dict(self) -> dict[str, str]:
-        return {
-            "project_dir": redact_path_for_display(str(self.project_dir)),
-            "log_dir": redact_path_for_display(str(self.log_dir)),
-            "report_dir": redact_path_for_display(str(self.report_dir)),
-            "tui_log_file": redact_path_for_display(str(self.tui_log_file)),
-            "audit_file": redact_path_for_display(str(self.audit_file)),
-        }
-
-
 class LogReportError(ValueError):
     """Raised when a log report operation cannot be completed safely."""
-
-
-def resolve_log_storage_locations(project_dir: str | Path) -> LogStorageLocations:
-    """Return canonical project-local storage paths for logs, reports, and audit."""
-
-    root = Path(project_dir).resolve()
-    log_dir = root / ".supermedicine" / "logs"
-    return LogStorageLocations(
-        project_dir=root,
-        log_dir=log_dir,
-        report_dir=log_dir,
-        tui_log_file=log_dir / f"session-{TUI_LOG_SESSION_ID}.json",
-        audit_file=root / ".supermedicine" / "policies" / "audit.jsonl",
-    )
 
 
 class LogReportStore:
@@ -213,8 +75,8 @@ class LogReportStore:
         """Write a redacted JSON log report.
 
         Session-scoped writes append to one safe session file. Writes without a
-        session remain isolated in unique files, preserving existing CLI/TUI
-        behavior while adding multi-record storage for experiment sessions.
+        session route to the shared TUI session log file (session-tui-application.json),
+        consolidating all application logs into a single file per launch.
         """
 
         message = self._require_message(message)
@@ -425,18 +287,8 @@ class LogReportStore:
     def _write_isolated(
         self, message: str, *, severity: str | None = None
     ) -> dict[str, Any]:
-        with _LOG_STORAGE_LOCK:
-            payload = self._new_payload(session_id=None)
-            entry = self._new_record(message, session_id=None, severity=severity)
-            payload["records"] = [entry]
-            payload["updated_at"] = entry["created_at"]
-            payload["message"] = entry["message"]
-            payload["severity"] = entry["severity"]
-            payload["entry_count"] = 1
-            filename = f"{payload['created_at'].replace(':', '').replace('+', 'Z')}-{payload['report_id']}.json"
-            path = self._safe_log_path(filename)
-            self._write_payload(path, payload, allow_existing=False)
-            return self._public_payload(path, payload)
+        """Route all non-session writes to the TUI session log file."""
+        return self.append(message, session_id=TUI_LOG_SESSION_ID, severity=severity)
 
     def _new_payload(self, *, session_id: str | None) -> dict[str, Any]:
         created_at = _utc_now()
@@ -773,95 +625,3 @@ class LogReportStore:
         if not isinstance(data, dict):
             raise LogReportError(f"log report {path.name} is not a JSON object")
         return redact_sensitive(data)
-
-
-class LogReportLoggingHandler(logging.Handler):
-    """Logging handler that persists application records into Log storage."""
-
-    def __init__(
-        self, project_dir: str | Path, *, session_id: str = TUI_LOG_SESSION_ID
-    ) -> None:
-        super().__init__()
-        self.store = LogReportStore(project_dir)
-        self.session_id = session_id
-
-    def emit(self, record: logging.LogRecord) -> None:
-        try:
-            message = self.format(record)
-            if message.strip():
-                for chunk in _log_chunks(message):
-                    self.store.append(
-                        chunk, session_id=self.session_id, severity=record.levelname
-                    )
-        except Exception:
-            pass
-
-
-def configure_tui_log_storage(project_dir: str | Path) -> None:
-    """Route TUI-mode logs only to Log storage, never console streams."""
-
-    root = logging.getLogger()
-    root.setLevel(logging.INFO)
-
-    for handler in list(root.handlers):
-        root.removeHandler(handler)
-        handler.close()
-
-    handler = LogReportLoggingHandler(project_dir)
-    handler.setLevel(logging.INFO)
-    handler.setFormatter(
-        logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
-    )
-    root.addHandler(handler)
-
-    for logger_name in ("core", "plugins", "permission", "adapters", "installer"):
-        named_logger = logging.getLogger(logger_name)
-        named_logger.handlers.clear()
-        named_logger.propagate = True
-
-    for existing_logger in list(logging.Logger.manager.loggerDict.values()):
-        if not isinstance(existing_logger, logging.Logger):
-            continue
-        for handler in list(existing_logger.handlers):
-            if _is_console_stream_handler(handler):
-                existing_logger.removeHandler(handler)
-                handler.close()
-        existing_logger.propagate = True
-
-
-def append_tui_stream_output(
-    project_dir: str | Path, stream_name: str, text: str
-) -> None:
-    """Persist stdout/stderr text captured during TUI background execution."""
-
-    message = str(text).strip()
-    if not message:
-        return
-    severity = "Error" if str(stream_name).lower() == "stderr" else "Info"
-    try:
-        store = LogReportStore(project_dir)
-        for chunk in _log_chunks(f"captured {stream_name}: {message}"):
-            store.append(chunk, session_id=TUI_LOG_SESSION_ID, severity=severity)
-    except Exception:
-        pass
-
-
-def _is_console_stream_handler(handler: logging.Handler) -> bool:
-    stream = getattr(handler, "stream", None)
-    return stream in {
-        sys.stdout,
-        sys.stderr,
-        getattr(sys, "__stdout__", None),
-        getattr(sys, "__stderr__", None),
-    }
-
-
-def _log_chunks(message: str) -> builtins.list[str]:
-    safe_message = str(message).strip()
-    if len(safe_message) <= DEFAULT_MAX_MESSAGE_LENGTH:
-        return [safe_message]
-    chunk_size = DEFAULT_MAX_MESSAGE_LENGTH - 32
-    return [
-        safe_message[index : index + chunk_size]
-        for index in range(0, len(safe_message), chunk_size)
-    ]
