@@ -13,6 +13,11 @@ from __future__ import annotations
 import string
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+# Skip all tests in this file if matplotlib is not installed
+pytest.importorskip("matplotlib")
+
 # ---------------------------------------------------------------------------
 # Fix 1: check.py — DPI empty tuple
 # ---------------------------------------------------------------------------
