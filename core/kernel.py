@@ -12,6 +12,9 @@ from agents.beta_agent import BetaAgent
 from agents.gamma_agent import GammaAgent
 from agents.delta_agent import DeltaAgent
 from core.config_center import ConfigCenter
+from core.database.database import Database
+from core.database.migrations import MigrationManager
+from core.database.repository import AgentRepository
 from core.event_bus import EventBus
 from core.llm_manager import LLMConfigManager
 from core.plugin_registry import PluginRegistry
@@ -64,6 +67,31 @@ class Kernel:
         self._checkpoint_manager = CheckpointManager(
             self._config_path.parent / "checkpoints"
         )
+
+        # Database initialization with graceful fallback
+        self._database: Database | None = None
+        try:
+            db_path = self._config_path.parent / "data.db"
+            self._database = Database(db_path)
+            self._database.connect()
+            # Run pending migrations
+            migration_manager = MigrationManager(self._database)
+            migration_manager.run_pending()
+            # Re-initialize SessionManager with database support
+            self._session_manager = SessionManager(db=self._database)
+        except Exception:
+            # Fall back to in-memory mode (no persistence)
+            if self._database is not None:
+                try:
+                    self._database.disconnect()
+                except Exception:
+                    pass
+            self._database = None
+
+        # Agent repository for state persistence
+        self._agent_repo: AgentRepository | None = None
+        if self._database is not None:
+            self._agent_repo = AgentRepository(self._database)
 
         # P0 权限引擎集成
         audit_log_path = self._policies_dir / "audit.jsonl"
@@ -135,6 +163,10 @@ class Kernel:
 
         if not beta_result.get("approved", False):
             emit("status", "Beta agent rejected the analysis; chain halted.")
+            # Persist agent states after chain execution
+            self.save_agent_state("delta", delta_result)
+            self.save_agent_state("alpha", alpha_result)
+            self.save_agent_state("beta", beta_result)
             return {
                 "status": "rejected",
                 "task": task,
@@ -156,6 +188,11 @@ class Kernel:
         gamma_result = orch.dispatch("gamma", gamma_input)
 
         emit("status", "Agent chain completed successfully.")
+        # Persist agent states after chain execution
+        self.save_agent_state("delta", delta_result)
+        self.save_agent_state("alpha", alpha_result)
+        self.save_agent_state("beta", beta_result)
+        self.save_agent_state("gamma", gamma_result)
         return {
             "status": "success",
             "task": task,
@@ -193,6 +230,11 @@ class Kernel:
         return self._session_manager
 
     @property
+    def database(self) -> Database | None:
+        """Database instance for persistent storage, or None if in-memory mode."""
+        return self._database
+
+    @property
     def permission_engine(self) -> PermissionEngine:
         """P0 运行时权限引擎。
 
@@ -205,6 +247,50 @@ class Kernel:
     @property
     def checkpoint_manager(self) -> CheckpointManager:
         return self._checkpoint_manager
+
+    def close(self) -> None:
+        """Close database connection and release resources."""
+        if self._database is not None:
+            try:
+                self._database.disconnect()
+            except Exception:
+                pass
+            self._database = None
+
+    def save_agent_state(self, agent_id: str, state: dict[str, Any]) -> None:
+        """Persist agent runtime state to the database.
+
+        This is a no-op when the database is not available.
+
+        Args:
+            agent_id: Agent identifier (e.g. 'alpha', 'beta', 'gamma', 'delta')
+            state: Arbitrary state dict to persist
+        """
+        if self._agent_repo is None:
+            return
+        existing = self._agent_repo.get_by_name(agent_id)
+        if existing is None:
+            self._agent_repo.create({"name": agent_id, "state": state})
+        else:
+            existing["state"] = state
+            self._agent_repo.update(existing)
+
+    def load_agent_state(self, agent_id: str) -> dict[str, Any] | None:
+        """Load persisted agent runtime state from the database.
+
+        Args:
+            agent_id: Agent identifier (e.g. 'alpha', 'beta', 'gamma', 'delta')
+
+        Returns:
+            The agent's persisted state dict, or None if not found or
+            database is unavailable.
+        """
+        if self._agent_repo is None:
+            return None
+        agent = self._agent_repo.get_by_name(agent_id)
+        if agent is None:
+            return None
+        return agent.get("state")
 
     def _checkpoint_task(
         self,

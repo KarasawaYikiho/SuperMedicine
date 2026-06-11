@@ -487,15 +487,17 @@ def create_app() -> Any:
 
                 # Stream progress updates via progress_callback
                 async def _stream_result() -> None:
+                    loop = asyncio.get_running_loop()
+
                     def progress_callback(info: dict[str, Any]) -> None:
-                        # Send progress events to the client
-                        loop = asyncio.get_event_loop()
-                        if loop.is_running():
-                            asyncio.ensure_future(
-                                websocket.send_json(
-                                    {"type": "progress", "data": info}
-                                )
-                            )
+                        # Thread-safe: submit coroutine to the main event loop
+                        # from the worker thread spawned by run_in_executor.
+                        asyncio.run_coroutine_threadsafe(
+                            websocket.send_json(
+                                {"type": "progress", "data": info}
+                            ),
+                            loop,
+                        )
 
                     try:
                         kernel = _get_kernel()
