@@ -93,9 +93,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m PyInstaller --onefile --name SuperMedicine --distpath dist --workpath .pyinstaller-build --specpath .pyinstaller-spec Cli.py
+          python -m PyInstaller --onefile --name SuperMedicine --distpath dist --workpath .pyinstaller-build --specpath .pyinstaller-spec cli_entry.py
           test -f dist/SuperMedicine.exe
-          python Install.py --release-exe dist/SuperMedicine.exe --desktop-dir "$RUNNER_TEMP/Desktop" --exe-dry-run
+          python install_entry.py --release-exe dist/SuperMedicine.exe --desktop-dir "$RUNNER_TEMP/Desktop" --exe-dry-run
 
       - name: Build standalone installer Exe artifact
         shell: bash
@@ -109,10 +109,10 @@ jobs:
           root = Path.cwd()
           payload = root / ".installer-payload-stage" / "release_payload"
           include_files = [
-              "Cli.py",
-              "install.py",
-              "Install.py",
-              "Uninstall.py",
+              "cli_entry.py",
+              "install_entry.py",
+              "install_entry.py",
+              "uninstall_entry.py",
               "pyproject.toml",
               "requirements.txt",
               "install.json",
@@ -178,7 +178,7 @@ jobs:
           test -d "$payload_source"
           python -m PyInstaller --onefile --name SuperMedicineInstaller --distpath dist --workpath .pyinstaller-installer-build --specpath .pyinstaller-installer-spec --hidden-import installer.exe_release --add-data "${payload_source};release_payload" install.py
           test -f dist/SuperMedicineInstaller.exe
-          python Install.py --extract-release-to "$RUNNER_TEMP/InstallerDryRun" --release-payload-root .installer-payload-stage/release_payload --exe-dry-run
+          python install_entry.py --extract-release-to "$RUNNER_TEMP/InstallerDryRun" --release-payload-root .installer-payload-stage/release_payload --exe-dry-run
           ./dist/SuperMedicineInstaller.exe --help
           ./dist/SuperMedicineInstaller.exe --extract-release-to "$RUNNER_TEMP/InstallerExeDryRun" --exe-dry-run
 
@@ -205,10 +205,10 @@ jobs:
           stage = root / ".release-zip-stage" / f"SuperMedicine {release_label}"
 
           include_files = [
-              "Cli.py",
-              "install.py",
-              "Install.py",
-              "Uninstall.py",
+              "cli_entry.py",
+              "install_entry.py",
+              "install_entry.py",
+              "uninstall_entry.py",
               "pyproject.toml",
               "requirements.txt",
               "install.json",
@@ -292,9 +292,9 @@ jobs:
               # in the staging directory, but release archives must keep the
               # canonical lowercase entry alongside the legacy uppercase entry
               # for case-sensitive extraction targets.
-              lowercase_entry = f"SuperMedicine {release_label}/install.py"
+              lowercase_entry = f"SuperMedicine {release_label}/install_entry.py"
               if lowercase_entry not in archive.namelist():
-                  lowercase_source = subprocess.check_output(["git", "show", ":install.py"], cwd=root, text=True)
+                  lowercase_source = subprocess.check_output(["git", "show", ":install_entry.py"], cwd=root, text=True)
                   archive.writestr(lowercase_entry, lowercase_source)
 
           shutil.rmtree(stage.parent)

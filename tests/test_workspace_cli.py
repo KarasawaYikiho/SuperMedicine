@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from Cli import CLI, main
+from cli_entry import CLI, main
 from core.workspace import WorkspaceManager
 from permission.engine import PermissionEngine
 from permission.policy import ensure_default_policy

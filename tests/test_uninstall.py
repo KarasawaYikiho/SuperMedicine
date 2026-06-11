@@ -5,7 +5,7 @@ import logging
 
 import yaml
 
-from Uninstall import collect_removal_candidates, uninstall
+from uninstall_entry import collect_removal_candidates, uninstall
 
 
 def test_dry_run_does_not_delete_project_owned_files(tmp_path):

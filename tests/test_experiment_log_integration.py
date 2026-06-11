@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from Cli import CLI
+from cli_entry import CLI
 
 
 def _message(record: dict[str, Any]) -> dict[str, Any]:

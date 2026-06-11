@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import yaml
 
-from Cli import CLI
+from cli_entry import CLI
 from core.config_center import ConfigCenter
 from core.llm_manager import LLMConfigManager
 from core.tui.app import SuperMedicineTUI

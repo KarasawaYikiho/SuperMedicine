@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from Cli import CLI, main
+from cli_entry import CLI, main
 
 
 def test_experiment_start_persists_session_and_show_returns_current_step(

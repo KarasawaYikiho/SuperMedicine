@@ -9,7 +9,7 @@ from pathlib import Path
 import yaml
 import pytest
 
-from Cli import CLI
+from cli_entry import CLI
 from cli import _resolve_run_params
 from installer.entrypoint import (
     DEFAULT_CONFIG,

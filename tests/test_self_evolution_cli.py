@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from Cli import main
+from cli_entry import main
 
 
 def _cli_json(capsys) -> dict:

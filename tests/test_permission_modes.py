@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from Cli import CLI
+from cli_entry import CLI
 from core.config_center import ConfigCenter
 from permission.access_mode import (
     AccessDecisionStatus,

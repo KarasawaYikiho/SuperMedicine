@@ -128,7 +128,7 @@ def create_app() -> Any:
     def _get_cli() -> Any:
         """Lazily initialise a CLI instance (cached)."""
         if "cli" not in _kernel_holder:
-            from Cli import CLI
+            from cli_entry import CLI
             _kernel_holder["cli"] = CLI()
         return _kernel_holder["cli"]
 

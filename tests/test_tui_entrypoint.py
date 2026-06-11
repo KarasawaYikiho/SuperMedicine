@@ -8,7 +8,7 @@ from typing import cast
 
 from textual.widgets import Input, ListView, Static
 
-from Cli import CLI, main
+from cli_entry import CLI, main
 from core.tui.app import PromptInput, SuperMedicineTUI, launch_tui
 from core.tui.status_helpers import STATUS_STYLE_CLASSES
 from core.tui.i18n import LABELS, t, tui_title_style_inventory

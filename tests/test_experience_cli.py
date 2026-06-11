@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from Cli import CLI, main
+from cli_entry import CLI, main
 from core.experience import ExperiencePrivacyError, ExperienceStore
 from core.workspace import WorkspaceManager
 

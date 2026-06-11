@@ -58,7 +58,7 @@ def test_manager_adds_lists_and_redacts_providers(tmp_path):
 def test_cli_add_switch_and_list_are_secret_safe_and_persist_current(
     tmp_path, monkeypatch, caplog
 ):
-    from Cli import CLI
+    from cli_entry import CLI
 
     secret = "sk-cli-manager-secret"
     monkeypatch.chdir(tmp_path)

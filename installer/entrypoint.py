@@ -1158,7 +1158,7 @@ def _uninstall_existing_install(
         preserved_config_backup = Path(preserved_tempdir.name) / ".supermedicine"
         shutil.copytree(config_dir, preserved_config_backup)
     try:
-        from Uninstall import uninstall
+        from uninstall_entry import uninstall
     except ImportError as exc:
         raise SystemExit(f"error: 卸载旧版本失败: Uninstall.py 不可用 ({exc})") from exc
     try:

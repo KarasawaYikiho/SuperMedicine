@@ -7,7 +7,7 @@ import sys
 import pytest
 import yaml
 
-from Cli import CLI, main
+from cli_entry import CLI, main
 from adapters.base_adapter import BaseAdapter
 from core.kernel import Kernel
 from core.llm_client import create_llm_client

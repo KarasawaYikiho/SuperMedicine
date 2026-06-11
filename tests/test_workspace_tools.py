@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 import yaml
 
-from Cli import CLI, main
+from cli_entry import CLI, main
 from core.operation_guard import DangerousOperationDenied
 from core.workspace import WorkspaceManager
 from core.workspace_tools import (

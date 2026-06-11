@@ -731,7 +731,7 @@ def main(argv: list[str] | None = None) -> None:
         _configure_cli_logging()
 
     # Lazy import to avoid circular dependency
-    from Cli import CLI
+    from cli_entry import CLI
 
     cli = CLI()
 

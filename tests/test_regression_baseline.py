@@ -9,7 +9,7 @@ import yaml
 from textual import events
 
 from installer.entrypoint import init_config
-from Uninstall import uninstall
+from uninstall_entry import uninstall
 from core.config_center import ConfigCenter
 from core.llm_client import create_configured_llm_client
 from core.tui.app import PromptInput, SuperMedicineTUI, launch_tui

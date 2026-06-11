@@ -15,10 +15,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 RELEASE_LABEL = "Beta0.4.2"
 PACKAGE_VERSION = "0.4.2b0"
 CRITICAL_RELEASE_FILES = {
-    "Cli.py",
-    "install.py",
-    "Install.py",
-    "Uninstall.py",
+    "cli_entry.py",
+    "install_entry.py",
+    "install_entry.py",
+    "uninstall_entry.py",
     "pyproject.toml",
     "requirements.txt",
     "install.json",

@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from Cli import CLI, main
+from cli_entry import CLI, main
 from core.paper_import.enrichment import PaperEnricher
 from core.paper_import.importer import PaperImporter
 from core.workspace import WorkspaceManager
