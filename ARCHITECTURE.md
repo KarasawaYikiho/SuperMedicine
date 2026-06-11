@@ -200,9 +200,9 @@ documentation claims native support.
 
 ## Repository Hygiene
 
-Git uploads should contain only necessary project files. `Docs/`, `docs/`, and
-`Architecture/` are ignored by default; tracked files in those locations are
-historical or explicitly force-added and must be reviewed before release. Do not
+Git uploads should contain only necessary project files. `Docs/` is ignored by
+default. Archived planning documents live in `docs/archive/` and are tracked for
+historical reference but must be reviewed before release. Do not
 upload generated build artifacts, caches, runtime checkpoint directories, raw
 logs, or local configuration containing secrets/private endpoints.
 

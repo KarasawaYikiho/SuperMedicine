@@ -134,8 +134,12 @@ installer/**/*.py[cod]
 !Uninstall.py
 !install.json
 !FUNCTION_MAP.md
-!Architecture/
-!Architecture/**
+# !Architecture/  # moved to docs/archive/
+# !Architecture/**  # moved to docs/archive/
+!docs/
+!docs/**
+!docs/archive/
+!docs/archive/**
 !README.md
 !ARCHITECTURE.md
 !CHANGELOG.md

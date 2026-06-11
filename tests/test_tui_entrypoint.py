@@ -12,7 +12,7 @@ from Cli import CLI, main
 from core.tui.app import PromptInput, SuperMedicineTUI, launch_tui
 from core.tui.status_helpers import STATUS_STYLE_CLASSES
 from core.tui.i18n import LABELS, t, tui_title_style_inventory
-from scripts.tui_preview_artifact import write_preview_artifact
+from core.tui.preview_artifact import write_preview_artifact
 
 
 def test_tui_help_is_registered(monkeypatch, capsys):
