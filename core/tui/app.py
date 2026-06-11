@@ -4,529 +4,42 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import contextlib
 import json
 import logging
-import re
 import sys
-import threading
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
-from textual import events
 from rich.console import Console
 from textual.app import App, ComposeResult
 from textual.theme import Theme
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
-from textual.screen import ModalScreen
-from textual.widgets import Footer, Header, Input, ListItem, ListView, Static
+from textual.widgets import Footer, Header, Input, ListView, Static
 
 from core.config_center import ConfigCenter
 from core.llm_manager import LLMConfigManager
-from core.redaction import redact_sensitive
 from core.tui.i18n import LABELS, t
+from core.tui.status_helpers import _console_safe_text, _describe_llm_status, apply_status_style  # noqa: F401
+from core.tui.kernel_output import (
+    _KERNEL_OUTPUT_ASSISTANT_KEYS,
+    _redact_display_secrets,
+    _strip_internal_kernel_output,
+)
+from core.tui.menu_screens import MainMenuScreen
+from core.tui.nav_widgets import MenuButton, NavItem
+from core.tui.prompt_input import PromptInput
+from core.tui.stream_capture import _capture_current_thread_tui_streams
+from core.tui.types import DynamicRefreshSurface, NavMetadata, ShellStatusText, TUIStatus
 
 
 logger = logging.getLogger(__name__)
 
 
-class _TUILogTextSink:
-    """File-like sink that routes background stdout/stderr text into Log storage."""
-
-    def __init__(self, project_root: Path, stream_name: str) -> None:
-        self.project_root = project_root
-        self.stream_name = stream_name
-        self._buffer = ""
-
-    def write(self, value: str) -> int:
-        text = str(value)
-        self._buffer += text
-        while "\n" in self._buffer:
-            line, self._buffer = self._buffer.split("\n", 1)
-            self._append(line)
-        return len(text)
-
-    def flush(self) -> None:
-        if self._buffer:
-            self._append(self._buffer)
-            self._buffer = ""
-
-    def _append(self, text: str) -> None:
-        if not text.strip():
-            return
-        from core.log_report import append_tui_stream_output
-
-        append_tui_stream_output(self.project_root, self.stream_name, text)
-
-
-class _TUIThreadRoutedStream:
-    """Route only the current worker thread stream writes to Log storage."""
-
-    def __init__(
-        self, original: Any, sink: _TUILogTextSink, owner_thread_id: int
-    ) -> None:
-        self._original = original
-        self._sink = sink
-        self._owner_thread_id = owner_thread_id
-        self.encoding = getattr(original, "encoding", None)
-        self.errors = getattr(original, "errors", None)
-
-    def write(self, value: str) -> int:
-        if threading.get_ident() == self._owner_thread_id:
-            return self._sink.write(value)
-        return self._original.write(value)
-
-    def flush(self) -> None:
-        if threading.get_ident() == self._owner_thread_id:
-            self._sink.flush()
-            return
-        self._original.flush()
-
-    def isatty(self) -> bool:
-        return False
-
-    def fileno(self) -> int:
-        return self._original.fileno()
-
-    def __getattr__(self, name: str) -> Any:
-        return getattr(self._original, name)
-
-
-@contextlib.contextmanager
-def _capture_current_thread_tui_streams(project_root: Path):
-    """Capture Kernel stdout/stderr without redirecting TUI renderer writes."""
-
-    stdout_sink = _TUILogTextSink(project_root, "stdout")
-    stderr_sink = _TUILogTextSink(project_root, "stderr")
-    owner_thread_id = threading.get_ident()
-    original_stdout = sys.stdout
-    original_stderr = sys.stderr
-    sys.stdout = _TUIThreadRoutedStream(original_stdout, stdout_sink, owner_thread_id)  # type: ignore[assignment]
-    sys.stderr = _TUIThreadRoutedStream(original_stderr, stderr_sink, owner_thread_id)  # type: ignore[assignment]
-    try:
-        yield
-    finally:
-        stdout_sink.flush()
-        stderr_sink.flush()
-        sys.stdout = original_stdout
-        sys.stderr = original_stderr
-
-
-_DISPLAY_SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (
-    re.compile(r"(?i)(api[_-]?key|token|secret|password|passwd)\s*([:=])\s*([^\s,;]+)"),
-    re.compile(r"\bsk-[A-Za-z0-9][A-Za-z0-9_-]{8,}\b"),
-    re.compile(r"\bBearer\s+[A-Za-z0-9._~+/-]+=*\b", re.IGNORECASE),
-)
-
-
-def _redact_display_secrets(value: str) -> str:
-    """Redact common secret shapes before handing text to chat rendering."""
-
-    return str(redact_sensitive(value)).replace("[REDACTED]", "[已隐藏]")
-
-
-_KERNEL_OUTPUT_ASSISTANT_KEYS = (
-    "assistant",
-    "answer",
-    "response",
-    "content",
-    "message",
-    "text",
-)
-_KERNEL_OUTPUT_INTERNAL_KEYS = {
-    "backend_command",
-    "debug",
-    "debug_event",
-    "diagnostic",
-    "diagnostics",
-    "event",
-    "event_type",
-    "internal",
-    "internal_event",
-    "llm_debug",
-    "request",
-    "request_id",
-    "stage",
-    "telemetry",
-    "transport",
-}
-_KERNEL_OUTPUT_INTERNAL_COMMAND_KEYS = {"backend_command", "command"}
-_KERNEL_OUTPUT_INTERNAL_MARKERS = (
-    "LLM Request Sending",
-    "backend command",
-    "debug event",
-)
-
-
-def _looks_like_internal_kernel_text(value: Any) -> bool:
-    """Return whether text is backend telemetry rather than chat content."""
-
-    if not isinstance(value, str):
-        return False
-    lowered = value.lower()
-    return any(marker.lower() in lowered for marker in _KERNEL_OUTPUT_INTERNAL_MARKERS)
-
-
-def _strip_internal_kernel_output(value: Any) -> tuple[Any, list[Any]]:
-    """Remove backend-only telemetry from a Kernel output payload for chat display."""
-
-    removed: list[Any] = []
-    if isinstance(value, dict):
-        visible: dict[Any, Any] = {}
-        for key, item in value.items():
-            key_text = str(key)
-            key_normalized = key_text.lower()
-            if (
-                key_normalized in _KERNEL_OUTPUT_INTERNAL_KEYS
-                or (
-                    key_normalized in _KERNEL_OUTPUT_INTERNAL_COMMAND_KEYS
-                    and _looks_like_internal_kernel_text(item)
-                )
-                or _looks_like_internal_kernel_text(item)
-            ):
-                removed.append({key_text: item})
-                continue
-            cleaned, child_removed = _strip_internal_kernel_output(item)
-            removed.extend(child_removed)
-            if cleaned is not None and cleaned != {} and cleaned != []:
-                visible[key] = cleaned
-        return visible, removed
-    if isinstance(value, list):
-        visible_list: list[Any] = []
-        for item in value:
-            if _looks_like_internal_kernel_text(item):
-                removed.append(item)
-                continue
-            cleaned, child_removed = _strip_internal_kernel_output(item)
-            removed.extend(child_removed)
-            if cleaned is not None and cleaned != {} and cleaned != []:
-                visible_list.append(cleaned)
-        return visible_list, removed
-    if isinstance(value, tuple):
-        visible_items: list[Any] = []
-        for item in value:
-            if _looks_like_internal_kernel_text(item):
-                removed.append(item)
-                continue
-            cleaned, child_removed = _strip_internal_kernel_output(item)
-            removed.extend(child_removed)
-            if cleaned is not None and cleaned != {} and cleaned != []:
-                visible_items.append(cleaned)
-        return tuple(visible_items), removed
-    if _looks_like_internal_kernel_text(value):
-        return None, [value]
-    return value, removed
-
-
 _CSS_PATH = Path(__file__).parent / "app.tcss"
 
-STATUS_STYLE_CLASSES = (
-    "status-info",
-    "status-success",
-    "status-warning",
-    "status-error",
-)
 
-
-def apply_status_style(widget: Static, message: str) -> None:
-    """Apply a semantic style class to a status widget based on its message."""
-
-    widget.remove_class(*STATUS_STYLE_CLASSES)
-    text = message.lower()
-    if t("error").lower() in text or "error" in text or "失败" in message:
-        widget.add_class("status-error")
-    elif (
-        "缺少" in message or "未" in message or "请选择" in message or "确认" in message
-    ):
-        widget.add_class("status-warning")
-    elif "成功" in message or "已" in message or "ready" in text or "ok" in text:
-        widget.add_class("status-success")
-    else:
-        widget.add_class("status-info")
-
-
-@dataclass(frozen=True, slots=True)
-class TUIStatus:
-    """Test-friendly TUI startup status."""
-
-    title: str
-    message: str
-    labels: dict[str, str]
-    interactive: bool
-    llm_ready: bool = False
-    llm_provider: str = ""
-    current_view: str = "chat"
-    view_title: str = ""
-    shortcut_hint: str = ""
-    status_left: str = ""
-    status_center: str = ""
-    status_right: str = ""
-    focus_target: str = "prompt-input"
-
-
-@dataclass(frozen=True, slots=True)
-class NavMetadata:
-    """Test-friendly navigation metadata."""
-
-    key: str
-    view_id: str
-    label: str
-    icon: str
-
-
-@dataclass(frozen=True, slots=True)
-class ShellStatusText:
-    """Status bar text for the TUI shell."""
-
-    left: str
-    center: str
-    right: str
-    focus: str
-    layout: str
-
-
-@dataclass(frozen=True, slots=True)
-class DynamicRefreshSurface:
-    """Code-backed boundary for targeted TUI refresh behavior."""
-
-    view_id: str
-    refresh_hook: str
-    manual_control: str
-    policy: str
-
-
-class NavItem(ListItem):
-    """A sidebar navigation item."""
-
-    def __init__(self, label: str, view_id: str) -> None:
-        super().__init__()
-        self.view_id = view_id
-        self._label = label
-
-    def compose(self) -> ComposeResult:
-        yield Static(self._label)
-
-
-class MenuOption(ListItem):
-    """A selectable entry in the TUI menu overlay."""
-
-    def __init__(self, label: str, option_id: str, view_id: str | None = None) -> None:
-        super().__init__()
-        self.option_id = option_id
-        self.view_id = view_id
-        self._label = label
-
-    def compose(self) -> ComposeResult:
-        yield Static(self._label)
-
-
-class MenuButton(Static):
-    """Clickable upper-left menu affordance for mouse-capable terminals."""
-
-    def on_click(self, event: events.Click) -> None:
-        event.stop()
-        app = cast("SuperMedicineTUI", self.app)
-        app.action_open_menu()
-
-
-class ViewSelectMenuScreen(ModalScreen[str | None]):
-    """Submenu that lists all available TUI views."""
-
-    BINDINGS = [Binding("escape", "dismiss", t("menu_back"), show=False)]
-
-    def compose(self) -> ComposeResult:
-        with Vertical(id="tui-menu-panel"):
-            yield Static(
-                t("menu_select_view"), id="tui-menu-title", classes="shell-title"
-            )
-            yield ListView(
-                *(
-                    MenuOption(f"{item.icon} {item.label}", "view", item.view_id)
-                    for item in SuperMedicineTUI.nav_items()
-                ),
-                MenuOption(f"← {t('menu_back')}", "back"),
-                id="tui-view-menu-list",
-                classes="tui-menu-list",
-            )
-
-    def on_mount(self) -> None:
-        self.query_one("#tui-view-menu-list", ListView).focus()
-
-    def on_list_view_selected(self, event: ListView.Selected) -> None:
-        if not isinstance(event.item, MenuOption):
-            return
-        if event.item.option_id == "back":
-            self.dismiss(None)
-            return
-        if event.item.view_id:
-            self.dismiss(event.item.view_id)
-
-
-class MainMenuScreen(ModalScreen[str | None]):
-    """Main menu opened by a single key, matching Textual theme-menu access."""
-
-    BINDINGS = [Binding("escape", "dismiss", t("menu_close"), show=False)]
-
-    def compose(self) -> ComposeResult:
-        with Vertical(id="tui-menu-panel"):
-            yield Static(t("menu_title"), id="tui-menu-title", classes="shell-title")
-            yield ListView(
-                MenuOption(f"▸ {t('menu_select_view')}", "select-view"),
-                MenuOption(f"◐ {t('menu_change_theme')}", "change-theme"),
-                MenuOption(f"□ {t('menu_toggle_maximize')}", "toggle-maximize"),
-                MenuOption(f"? {t('menu_show_help')}", "show-help"),
-                MenuOption(f"← {t('menu_close')}", "close"),
-                id="tui-main-menu-list",
-                classes="tui-menu-list",
-            )
-
-    def on_mount(self) -> None:
-        self.query_one("#tui-main-menu-list", ListView).focus()
-
-    def on_list_view_selected(self, event: ListView.Selected) -> None:
-        if not isinstance(event.item, MenuOption):
-            return
-        app = cast("SuperMedicineTUI", self.app)
-        if event.item.option_id == "select-view":
-            self.app.push_screen(ViewSelectMenuScreen(), self._handle_view_menu_result)
-        elif event.item.option_id == "change-theme":
-            self.dismiss(None)
-            self.app.action_change_theme()
-        elif event.item.option_id == "toggle-maximize":
-            self.dismiss(None)
-            app.action_toggle_maximize()
-        elif event.item.option_id == "show-help":
-            self.dismiss(None)
-            app.action_show_help()
-        elif event.item.option_id == "close":
-            self.dismiss(None)
-
-    def _handle_view_menu_result(self, result: str | None) -> None:
-        if result is None:
-            return
-        self.dismiss(result)
-
-
-class PromptInput(Input):
-    """Prompt input that filters terminal controls while preserving normal text."""
-
-    ANSI_CONTROL_SEQUENCE_PATTERN = re.compile(
-        r"(?:\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-Z\\-_])"
-        r"|(?:\[<\d+(?:;\d+){0,2}[mM]|\[\?\d+(?:;\d+)*[hl]|\[\d+(?:;\d+)*[~A-Za-z])"
-    )
-    RAW_CONTROL_CHARS_PATTERN = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
-    INCOMPLETE_CONTROL_SEQUENCE_PATTERN = re.compile(
-        r"(?:\x1b(?:\[[0-?;<>]*[ -/]*|\][^\x07\x1b]*|)$|(?:\[<\d*(?:;\d*){0,2}|\[\?\d*(?:;\d*)*|\[\d+(?:;\d*)*)$)"
-    )
-    CONTROL_SEQUENCE_FINAL_CHARS = frozenset(
-        "@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
-    )
-    BACKSPACE_KEYS = frozenset({"backspace", "ctrl+h", "ctrl+?"})
-    BACKSPACE_CHARACTERS = frozenset({"\b", "\x7f"})
-
-    def on_key(self, event: events.Key) -> None:
-        """Filter terminal control bytes without consuming ordinary input."""
-
-        if self._is_menu_key(event):
-            self._consume_key_event(event)
-            event.stop()
-            app = cast("SuperMedicineTUI", self.app)
-            app.action_open_menu()
-            return
-
-        if self._is_backspace_key(event):
-            return
-
-        if self._is_terminal_control_key(event):
-            self._consume_key_event(event)
-            event.stop()
-            return
-
-        if self._value_has_incomplete_terminal_sequence():
-            self._consume_key_event(event)
-            event.stop()
-            self.value = self._clean_terminal_control_text(self.value)
-        return
-
-    def on_input_changed(self, event: Input.Changed) -> None:
-        """Drop terminal/mouse control bytes if they reach the prompt value."""
-
-        if event.input is not self:
-            return
-        clean_value = self._clean_terminal_control_text(event.value)
-        if clean_value != event.value:
-            self.value = clean_value
-
-    def _is_terminal_control_key(self, event: events.Key) -> bool:
-        """Return True when a key event is part of a terminal control sequence."""
-
-        if self._is_backspace_key(event):
-            return False
-        key = event.key
-        char = getattr(event, "character", None) or getattr(event, "char", "") or ""
-        if key in {"escape", "ctrl+["} or char == "\x1b":
-            return True
-        if char and self.RAW_CONTROL_CHARS_PATTERN.search(char):
-            return True
-        if char and self.ANSI_CONTROL_SEQUENCE_PATTERN.search(char):
-            return True
-        return False
-
-    def _is_menu_key(self, event: events.Key) -> bool:
-        """Return True when the prompt should delegate to the TUI menu action."""
-
-        key = str(getattr(event, "key", "") or "")
-        char = getattr(event, "character", None) or getattr(event, "char", "") or ""
-        return key in {"M", "shift+m"} or char == "M"
-
-    def _is_backspace_key(self, event: events.Key) -> bool:
-        """Return True for terminal/Textual backspace events that should edit text."""
-
-        key = str(getattr(event, "key", "") or "").lower()
-        char = getattr(event, "character", None) or getattr(event, "char", "") or ""
-        return key in self.BACKSPACE_KEYS or char in self.BACKSPACE_CHARACTERS
-
-    def _consume_key_event(self, event: events.Key) -> None:
-        """Prevent Textual's Input default handler from inserting consumed keys."""
-
-        prevent_default = getattr(event, "prevent_default", None)
-        if callable(prevent_default):
-            prevent_default()
-
-    def _value_has_incomplete_terminal_sequence(self) -> bool:
-        """Detect orphan CSI/mouse prefixes before digits become prompt text."""
-
-        value = self.value
-        if not value:
-            return False
-        escape_index = value.rfind("\x1b")
-        if escape_index >= 0:
-            tail = value[escape_index:]
-            return not self.ANSI_CONTROL_SEQUENCE_PATTERN.fullmatch(tail)
-        csi_index = value.rfind("[")
-        if csi_index < 0:
-            return False
-        tail = value[csi_index:]
-        if self.ANSI_CONTROL_SEQUENCE_PATTERN.fullmatch(tail):
-            return False
-        if len(tail) == 1:
-            return True
-        if tail.startswith(("[<", "[?")):
-            return tail[-1] not in self.CONTROL_SEQUENCE_FINAL_CHARS
-        return bool(re.fullmatch(r"\[\d*(?:;\d*)*", tail))
-
-    @classmethod
-    def _clean_terminal_control_text(cls, value: str) -> str:
-        """Remove terminal control/mouse escape sequences while preserving normal text."""
-
-        without_sequences = cls.ANSI_CONTROL_SEQUENCE_PATTERN.sub("", value)
-        without_incomplete_sequences = cls.INCOMPLETE_CONTROL_SEQUENCE_PATTERN.sub(
-            "", without_sequences
-        )
-        return cls.RAW_CONTROL_CHARS_PATTERN.sub("", without_incomplete_sequences)
 
 
 class SuperMedicineTUI(App[Any]):
@@ -928,6 +441,15 @@ class SuperMedicineTUI(App[Any]):
         """Open the main TUI menu."""
         self.push_screen(MainMenuScreen(), self._handle_main_menu_result)
 
+    def action_command_palette(self) -> None:
+        """Disable Textual's built-in Command Palette; settings live in the M menu."""
+        self.notify(
+            t("menu_open"),
+            title=t("menu_title"),
+            severity="information",
+            timeout=2,
+        )
+
     def _handle_main_menu_result(self, result: str | None) -> None:
         """Apply a completed main-menu selection after modal dismissal."""
 
@@ -1013,32 +535,42 @@ class SuperMedicineTUI(App[Any]):
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle user input submission."""
-        if getattr(event.input, "id", None) != "prompt-input":
-            return
-        event.stop()
-        if self.is_chat_processing:
-            chat_view = self._views.get("chat")
-            if chat_view and hasattr(chat_view, "add_status_message"):
-                chat_view.add_status_message(t("chat_processing_reject"))
-            self._focus_prompt_input()
-            return
-        message = event.value.strip()
-        if not message:
+        input_id = getattr(event.input, "id", None)
+        if input_id == "prompt-input":
+            # existing chat handling (keep unchanged)
+            event.stop()
+            if self.is_chat_processing:
+                chat_view = self._views.get("chat")
+                if chat_view and hasattr(chat_view, "add_status_message"):
+                    chat_view.add_status_message(t("chat_processing_reject"))
+                self._focus_prompt_input()
+                return
+            message = event.value.strip()
+            if not message:
+                event.input.value = ""
+                self._focus_prompt_input()
+                return
+            # Clear input
             event.input.value = ""
+            # Send to chat view
+            chat_view = self._views.get("chat")
+            turn_id: int | None = None
+            if chat_view and hasattr(chat_view, "add_user_message"):
+                added_turn = chat_view.add_user_message(message)
+                if isinstance(added_turn, int):
+                    turn_id = added_turn
+            # Process the message
+            self._process_message(message, turn_id=turn_id)
             self._focus_prompt_input()
             return
-        # Clear input
-        event.input.value = ""
-        # Send to chat view
-        chat_view = self._views.get("chat")
-        turn_id: int | None = None
-        if chat_view and hasattr(chat_view, "add_user_message"):
-            added_turn = chat_view.add_user_message(message)
-            if isinstance(added_turn, int):
-                turn_id = added_turn
-        # Process the message
-        self._process_message(message, turn_id=turn_id)
-        self._focus_prompt_input()
+        # Route to current view's unified handler
+        view = self._views.get(self._current_view)
+        handler = getattr(view, "handle_input_submit", None)
+        if callable(handler):
+            try:
+                handler(input_id, event.value)
+            except Exception:
+                pass
 
     def _process_message(self, message: str, *, turn_id: int | None = None) -> None:
         """Process a user message through the Kernel asynchronously."""
@@ -1077,26 +609,34 @@ class SuperMedicineTUI(App[Any]):
                 plugins_dir=plugins_dir,
                 policies_dir=policies_dir,
             )
-            if hasattr(chat_view, "add_status_message"):
-                chat_view.add_status_message(t("chat_running"))
+            if hasattr(chat_view, "start_processing_animation"):
+                chat_view.start_processing_animation()
             assistant_started = False
 
             def render_progress(event: dict[str, Any]) -> None:
                 nonlocal assistant_started
                 kind = str(event.get("kind") or "")
                 text = str(event.get("message") or event.get("content") or "")
-                if kind == "reasoning" and hasattr(chat_view, "add_reasoning_status"):
-                    chat_view.add_reasoning_status(
-                        text
-                        or "模型正在处理请求；当前 Provider 未暴露完整思考内容，仅显示合规处理进度。"
-                    )
-                elif kind == "status" and hasattr(chat_view, "add_status_message"):
-                    chat_view.add_status_message(text)
-                elif kind == "assistant_start" and hasattr(
-                    chat_view, "begin_assistant_message"
-                ):
-                    chat_view.begin_assistant_message(turn_id)
-                    assistant_started = True
+                if kind == "reasoning":
+                    if hasattr(chat_view, "start_thinking_animation"):
+                        chat_view.start_thinking_animation()
+                elif kind == "thinking_content":
+                    if hasattr(chat_view, "append_thinking_content"):
+                        chat_view.append_thinking_content(text)
+                elif kind == "thinking_done":
+                    if hasattr(chat_view, "stop_thinking_animation"):
+                        chat_view.stop_thinking_animation()
+                elif kind == "status":
+                    if hasattr(chat_view, "stop_thinking_animation"):
+                        chat_view.stop_thinking_animation()
+                    if hasattr(chat_view, "add_status_message"):
+                        chat_view.add_status_message(text)
+                elif kind == "assistant_start":
+                    if hasattr(chat_view, "stop_thinking_animation"):
+                        chat_view.stop_thinking_animation()
+                    if hasattr(chat_view, "begin_assistant_message"):
+                        chat_view.begin_assistant_message(turn_id)
+                        assistant_started = True
                 elif kind == "assistant_delta" and hasattr(
                     chat_view, "append_assistant_delta"
                 ):
@@ -1131,6 +671,8 @@ class SuperMedicineTUI(App[Any]):
         except Exception as e:
             chat_view.add_error_message(f"{t('error')}: {e}")
         finally:
+            if hasattr(chat_view, "stop_processing_animation"):
+                chat_view.stop_processing_animation()
             self._set_chat_processing(False)
 
     @staticmethod
@@ -1251,7 +793,7 @@ def launch_tui(
 
     root = Path(project_root) if project_root else Path.cwd()
     if not dry_run:
-        from core.log_report import configure_tui_log_storage
+        from core.log_report_handler import configure_tui_log_storage
 
         configure_tui_log_storage(root)
     llm_ready, llm_provider = _describe_llm_status(root)
@@ -1349,50 +891,6 @@ def launch_tui(
         )
     logger.info("TUI launch: stage=exit project_root=%s", project_root or Path.cwd())
     return status
-
-
-def _console_safe_text(value: str, encoding: str | None = None) -> str:
-    """Return text that can be encoded by the active console.
-
-    Windows legacy consoles may use GBK or another non-UTF-8 code page that
-    cannot encode emoji used in TUI status labels.  Keep Unicode output on
-    capable terminals, but replace only unencodable characters for safe
-    non-interactive status printing.
-    """
-
-    target_encoding = encoding or "utf-8"
-    try:
-        value.encode(target_encoding)
-    except (LookupError, UnicodeEncodeError):
-        try:
-            return value.encode(target_encoding, errors="replace").decode(
-                target_encoding, errors="replace"
-            )
-        except LookupError:
-            return value.encode("utf-8", errors="replace").decode(
-                "utf-8", errors="replace"
-            )
-    return value
-
-
-def _describe_llm_status(project_root: Path | str) -> tuple[bool, str]:
-    try:
-        root = Path(project_root)
-        manager = LLMConfigManager(
-            ConfigCenter(root / ".supermedicine" / "config.yaml")
-        )
-        current = manager.get_current_provider(redacted=True)
-        provider = str(current.get("provider") or "")
-        if not provider:
-            return False, ""
-        return manager.validate_provider(provider) is None, provider
-    except Exception as exc:
-        logger.warning(
-            "TUI LLM status diagnostic failed: stage=config project_root=%s error=%s",
-            project_root,
-            exc,
-        )
-        return False, ""
 
 
 def build_parser() -> argparse.ArgumentParser:

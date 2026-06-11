@@ -302,6 +302,19 @@ DataTable:focus {
     border: solid $accent;
 }
 
+/* Experiment page - prevent focus enlargement */
+#experiment-protocol-table {
+    max-height: 12;
+}
+
+#experiment-input-table {
+    max-height: 8;
+}
+
+#experiment-data-input {
+    max-height: 10;
+}
+
 Input,
 Select {
     height: auto;
