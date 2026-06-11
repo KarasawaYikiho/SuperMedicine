@@ -153,6 +153,10 @@ class PaperView(Vertical):
         elif event.button.id == "paper-refresh":
             self._load_papers(refreshed=True)
 
+    def handle_input_submit(self, input_id: str, value: str) -> None:
+        if input_id == "paper-path-input":
+            self._import_paper()
+
     def _import_paper(self) -> None:
         workspace_id = self._get_selected_workspace()
         if not workspace_id:

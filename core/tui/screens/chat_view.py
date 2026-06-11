@@ -10,6 +10,7 @@ from typing import Any
 from rich.markup import escape
 from textual.app import ComposeResult
 from textual.containers import Vertical
+from textual.timer import Timer
 from textual.widgets import RichLog
 
 from core.tui.i18n import t
@@ -53,6 +54,12 @@ class ChatView(Vertical):
         self._turn_count = 0
         self._last_user_turn = 0
         self._last_assistant_turn = 0
+        self._thinking_active = False
+        self._thinking_frame = 0
+        self._thinking_timer: Timer | None = None
+        self._processing_active = False
+        self._processing_frame = 0
+        self._processing_timer: Timer | None = None
 
     def compose(self) -> ComposeResult:
         yield RichLog(id="chat-output", wrap=True, highlight=True, markup=True)
@@ -167,6 +174,67 @@ class ChatView(Vertical):
     def add_reasoning_status(self, message: str) -> None:
         """Show provider-safe reasoning/progress status without exposing hidden thoughts."""
         self._write_block("推理状态", "🧠", "bold magenta", message, blank_after=False)
+
+    def start_thinking_animation(self) -> None:
+        """Start the thinking animation with 5 circle indicators."""
+        self._thinking_active = True
+        self._thinking_frame = 0
+        output = self.query_one("#chat-output", RichLog)
+        output.write("\n[bold magenta]🧠 思考中 ○○○○○[/]")
+        if self._thinking_timer is not None:
+            self._thinking_timer.stop()
+        self._thinking_timer = self.set_interval(0.3, self._advance_thinking_frame)
+
+    def _advance_thinking_frame(self) -> None:
+        """Advance the thinking animation by one frame."""
+        if not getattr(self, "_thinking_active", False):
+            return
+        self._thinking_frame = (getattr(self, "_thinking_frame", 0) + 1) % 6
+        filled = "●" * self._thinking_frame
+        empty = "○" * (5 - self._thinking_frame)
+        output = self.query_one("#chat-output", RichLog)
+        output.write(f"[bold magenta]🧠 思考中 {filled}{empty}[/]")
+
+    def stop_thinking_animation(self) -> None:
+        """Stop the thinking animation."""
+        self._thinking_active = False
+        if self._thinking_timer is not None:
+            self._thinking_timer.stop()
+            self._thinking_timer = None
+
+    def start_processing_animation(self) -> None:
+        """Start the processing squares animation."""
+        self._processing_active = True
+        self._processing_frame = 0
+        output = self.query_one("#chat-output", RichLog)
+        output.write(f"\n[bold yellow]⏳ {t('chat_processing_state')} □□□□□[/]")
+        if self._processing_timer is not None:
+            self._processing_timer.stop()
+        self._processing_timer = self.set_interval(0.4, self._advance_processing_frame)
+
+    def _advance_processing_frame(self) -> None:
+        """Advance the processing animation by one frame."""
+        if not self._processing_active:
+            return
+        self._processing_frame = (self._processing_frame + 1) % 6
+        filled = "■" * self._processing_frame
+        empty = "□" * (5 - self._processing_frame)
+        output = self.query_one("#chat-output", RichLog)
+        output.write(f"[bold yellow]⏳ {t('chat_processing_state')} {filled}{empty}[/]")
+
+    def stop_processing_animation(self) -> None:
+        """Stop the processing animation."""
+        self._processing_active = False
+        if self._processing_timer is not None:
+            self._processing_timer.stop()
+            self._processing_timer = None
+
+    def append_thinking_content(self, content: str) -> None:
+        """Append streaming thinking content below the animation."""
+        if not content:
+            return
+        output = self.query_one("#chat-output", RichLog)
+        output.write(f"[dim magenta]{safe_display_text(content)}[/]")
 
     def clear_chat(self) -> None:
         """Clear the chat display."""

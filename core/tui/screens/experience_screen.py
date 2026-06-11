@@ -165,6 +165,12 @@ class ExperienceView(Vertical):
         elif event.button.id == "exp-refresh":
             self._load_experiences(refreshed=True)
 
+    def handle_input_submit(self, input_id: str, value: str) -> None:
+        if input_id == "exp-summary-input":
+            self._suggest_classification()
+        elif input_id == "exp-title-input":
+            self._confirm_experience()
+
     def _suggest_classification(self) -> None:
         workspace_id = self._get_selected_workspace()
         if not workspace_id:

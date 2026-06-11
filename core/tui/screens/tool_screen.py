@@ -310,6 +310,14 @@ class ToolView(Vertical):
         elif event.button.id == "self-evolution-cancel":
             self._cancel_self_evolution()
 
+    def handle_input_submit(self, input_id: str, value: str) -> None:
+        if input_id == "self-evolution-instruction-input":
+            self._preview_self_evolution()
+        elif input_id == "self-evolution-output-input":
+            self._preview_self_evolution()
+        elif input_id == "self-evolution-confirm-input":
+            self._confirm_self_evolution_write()
+
     def _init_tools(self) -> None:
         workspace_path = self._get_workspace_path()
         if not workspace_path:

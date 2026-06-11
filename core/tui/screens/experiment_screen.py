@@ -60,15 +60,21 @@ class ExperimentGuideView(Vertical):
         yield Static(
             t("experiment_action_hint"), id="experiment-action-hint", classes="hint"
         )
-        yield DataTable(id="experiment-protocol-table", cursor_type="row")
+        protocol_table: DataTable = DataTable(id="experiment-protocol-table", cursor_type="row")
+        protocol_table.styles.max_height = 12
+        yield protocol_table
         yield Button(
             "切换到下一个实验配置", id="experiment-switch", classes="btn btn-secondary"
         )
         yield Static("", id="experiment-session")
         yield Static("", id="experiment-step")
         yield Static("", id="experiment-instructions")
-        yield DataTable(id="experiment-input-table", cursor_type="row")
-        yield TextArea.code_editor("", language="json", id="experiment-data-input")
+        input_table: DataTable = DataTable(id="experiment-input-table", cursor_type="row")
+        input_table.styles.max_height = 8
+        yield input_table
+        data_input = TextArea.code_editor("", language="json", id="experiment-data-input")
+        data_input.styles.max_height = 10
+        yield data_input
         yield Input(
             placeholder=t("experiment_output_data"), id="experiment-output-input"
         )
@@ -137,6 +143,31 @@ class ExperimentGuideView(Vertical):
             self._save_log()
         elif event.button.id == "experiment-switch":
             self._switch_to_next_protocol()
+
+    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
+        """Handle double-click or Enter on a table row to paste field name."""
+        if event.data_table.id == "experiment-input-table":
+            self._paste_field_name(event.row_key)
+
+    def _paste_field_name(self, row_key: object) -> None:
+        """Append field_name= to the data input TextArea."""
+        table = self.query_one("#experiment-input-table", DataTable)
+        try:
+            row = table.get_row_at(int(str(row_key)))
+        except (ValueError, IndexError):
+            return
+        field_name = str(row[0]) if row else ""
+        if not field_name:
+            return
+        textarea = self.query_one("#experiment-data-input", TextArea)
+        current = textarea.text
+        if current and not current.endswith("\n"):
+            current += "\n"
+        textarea.load_text(current + field_name + "=")
+
+    def handle_input_submit(self, input_id: str, value: str) -> None:
+        if input_id == "experiment-output-input":
+            self._submit_current_step()
 
     def _refresh_protocol_table(self) -> None:
         table = self.query_one("#experiment-protocol-table", DataTable)
@@ -396,11 +427,15 @@ class ExperimentGuideView(Vertical):
         except json.JSONDecodeError:
             parsed = {}
             for line in raw.splitlines():
-                if not line.strip():
+                stripped = line.strip()
+                if not stripped or stripped.startswith("#"):
                     continue
-                if "=" not in line:
-                    raise ValueError(t("experiment_parse_error"))
-                key, value = line.split("=", 1)
+                if "=" not in stripped and ":" not in stripped:
+                    continue  # skip unparseable lines silently
+                if "=" in stripped:
+                    key, value = stripped.split("=", 1)
+                else:
+                    key, value = stripped.split(":", 1)
                 parsed[key.strip()] = value.strip()
         if not isinstance(parsed, dict):
             raise ValueError(t("experiment_parse_error"))

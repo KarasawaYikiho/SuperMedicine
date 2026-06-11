@@ -10,7 +10,8 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Input, Static, TextArea
 
-from core.log_report import LogReportStore, detect_log_severity, format_log_message
+from core.log_report import LogReportStore, detect_log_severity
+from core.log_severity import format_log_message
 from core.redaction import redact_sensitive
 from core.tui.app import apply_status_style
 from core.tui.i18n import t

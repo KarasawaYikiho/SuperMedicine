@@ -168,6 +168,10 @@ class LLMView(Vertical):
         elif event.button.id == "llm-switch":
             self._switch_selected_provider()
 
+    def handle_input_submit(self, input_id: str, value: str) -> None:
+        if input_id == "llm-api-key-input":
+            self._add_provider_from_form()
+
     def _add_provider_from_form(self) -> None:
         provider = self.query_one("#llm-provider-input", Input).value.strip()
         if not provider:

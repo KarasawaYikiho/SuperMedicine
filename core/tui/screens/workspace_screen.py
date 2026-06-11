@@ -70,11 +70,9 @@ class WorkspaceView(Vertical):
             event.stop()
             self.query_one("#workspace-id-input", Input).focus()
 
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        if event.input.id != "workspace-id-input":
-            return
-        event.stop()
-        self._create_workspace(event.value.strip())
+    def handle_input_submit(self, input_id: str, value: str) -> None:
+        if input_id == "workspace-id-input":
+            self._create_workspace(value.strip())
 
     def _get_controller(self):
         from core.tui.screens.workspaces import WorkspaceScreenController

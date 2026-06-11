@@ -169,6 +169,12 @@ class PermissionView(Vertical):
         elif button_id == "permission-remove-root":
             self._remove_selected_root()
 
+    def handle_input_submit(self, input_id: str, value: str) -> None:
+        if input_id == "permission-confirm-input":
+            self._set_mode_from_form()
+        elif input_id == "permission-root-input":
+            self._add_root_from_form()
+
     def _set_mode_from_form(self) -> None:
         select = self.query_one("#permission-mode-select", Select)
         mode = str(select.value or AccessMode.CONSERVATIVE.value)
