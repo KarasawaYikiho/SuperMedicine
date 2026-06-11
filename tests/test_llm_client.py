@@ -281,7 +281,7 @@ class TestStreamingEndToEnd:
         assert chunks[0]["delta"] == "Hello"
         assert chunks[0]["model"] == "claude-fake"
         assert chunks[1]["delta"] == " world"
-        assert chunks[2]["finish_reason"] == "stop"
+        assert chunks[2]["finish_reason"] == "end_turn"
         # Anthropic 累积 usage: message_start 的 input_tokens + message_delta 的 output_tokens
         assert chunks[2]["usage"]["input_tokens"] == 10
         assert chunks[2]["usage"]["output_tokens"] == 15

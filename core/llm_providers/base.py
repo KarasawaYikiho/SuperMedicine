@@ -23,6 +23,15 @@ logger = logging.getLogger(__name__)
 
 MAX_PROVIDER_RESPONSE_BYTES = 10 * 1024 * 1024
 
+ANTHROPIC_API_VERSION = "2023-06-01"
+
+OPENAI_CHAT_COMPLETIONS_PATH = "/chat/completions"
+ANTHROPIC_MESSAGES_PATH = "/messages"
+OPENAI_RESPONSES_PATH = "/responses"
+
+DEFAULT_OPENAI_OPTIONS: dict[str, Any] = {"temperature": 0.7, "max_tokens": 4096}
+DEFAULT_ANTHROPIC_OPTIONS: dict[str, Any] = {"temperature": 0.7, "max_tokens": 4096}
+
 
 class UnsafeProviderURL(ValueError):
     """Raised when a configured provider URL is unsafe before network access."""
@@ -126,15 +135,18 @@ class ConfiguredLLMClient(LLMClient):
                 "frequency_penalty",
                 "presence_penalty",
                 "stop",
+                "tools",
+                "tool_choice",
+                "response_format",
             ),
-            defaults={"temperature": 0.7, "max_tokens": 1024},
+            defaults=DEFAULT_OPENAI_OPTIONS,
         )
         headers = {
             "Authorization": f"Bearer {self.config.api_key}",
             "Content-Type": "application/json",
             **self.config.headers,
         }
-        response = self._post_json("/chat/completions", payload, headers)
+        response = self._post_json(OPENAI_CHAT_COMPLETIONS_PATH, payload, headers)
         if "error" in response:
             return response
         return self._parse_openai_chat_response(response)
@@ -158,9 +170,13 @@ class ConfiguredLLMClient(LLMClient):
                 "frequency_penalty",
                 "presence_penalty",
                 "stop",
+                "tools",
+                "tool_choice",
+                "response_format",
             ),
-            defaults={"temperature": 0.7, "max_tokens": 1024},
+            defaults=DEFAULT_OPENAI_OPTIONS,
         )
+        payload["stream_options"] = {"include_usage": True}
         headers = {
             "Authorization": f"Bearer {self.config.api_key}",
             "Content-Type": "application/json",
@@ -168,7 +184,7 @@ class ConfiguredLLMClient(LLMClient):
         }
         model = self.config.model
         usage: dict[str, Any] = {}
-        for chunk in self._post_json_stream("/chat/completions", payload, headers):
+        for chunk in self._post_json_stream(OPENAI_CHAT_COMPLETIONS_PATH, payload, headers):
             if "error" in chunk:
                 yield chunk
                 return
@@ -206,8 +222,8 @@ class ConfiguredLLMClient(LLMClient):
             kwargs,
             allowed=("temperature", "max_output_tokens", "top_p", "truncation"),
             defaults={
-                "temperature": 0.7,
-                "max_output_tokens": kwargs.get("max_tokens", 1024),
+                "temperature": DEFAULT_OPENAI_OPTIONS["temperature"],
+                "max_output_tokens": kwargs.get("max_tokens", DEFAULT_OPENAI_OPTIONS["max_tokens"]),
             },
         )
         headers = {
@@ -215,7 +231,7 @@ class ConfiguredLLMClient(LLMClient):
             "Content-Type": "application/json",
             **self.config.headers,
         }
-        response = self._post_json("/responses", payload, headers)
+        response = self._post_json(OPENAI_RESPONSES_PATH, payload, headers)
         if "error" in response:
             return response
         return self._parse_openai_responses_response(response)
@@ -237,8 +253,8 @@ class ConfiguredLLMClient(LLMClient):
             kwargs,
             allowed=("temperature", "max_output_tokens", "top_p", "truncation"),
             defaults={
-                "temperature": 0.7,
-                "max_output_tokens": kwargs.get("max_tokens", 1024),
+                "temperature": DEFAULT_OPENAI_OPTIONS["temperature"],
+                "max_output_tokens": kwargs.get("max_tokens", DEFAULT_OPENAI_OPTIONS["max_tokens"]),
             },
         )
         headers = {
@@ -248,7 +264,7 @@ class ConfiguredLLMClient(LLMClient):
         }
         model = self.config.model
         usage: dict[str, Any] = {}
-        for chunk in self._post_json_stream("/responses", payload, headers):
+        for chunk in self._post_json_stream(OPENAI_RESPONSES_PATH, payload, headers):
             if "error" in chunk:
                 yield chunk
                 return
@@ -317,7 +333,7 @@ class ConfiguredLLMClient(LLMClient):
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "model": self.config.model,
-            "max_tokens": kwargs.get("max_tokens", 1024),
+            "max_tokens": kwargs.get("max_tokens", DEFAULT_ANTHROPIC_OPTIONS["max_tokens"]),
             "messages": self._anthropic_messages(messages),
         }
         system = self._combined_system_prompt(messages)
@@ -328,13 +344,17 @@ class ConfiguredLLMClient(LLMClient):
         for option in ("top_p", "top_k", "stop_sequences"):
             if option in kwargs and kwargs[option] is not None:
                 payload[option] = kwargs[option]
+        if "tools" in kwargs and kwargs["tools"] is not None:
+            payload["tools"] = kwargs["tools"]
+        if "tool_choice" in kwargs and kwargs["tool_choice"] is not None:
+            payload["tool_choice"] = kwargs["tool_choice"]
         headers = {
             "x-api-key": self.config.api_key,
-            "anthropic-version": "2023-06-01",
+            "anthropic-version": ANTHROPIC_API_VERSION,
             "Content-Type": "application/json",
             **self.config.headers,
         }
-        response = self._post_json("/messages", payload, headers)
+        response = self._post_json(ANTHROPIC_MESSAGES_PATH, payload, headers)
         if "error" in response:
             return response
         content = self._content_to_text(response.get("content", []))
@@ -354,7 +374,7 @@ class ConfiguredLLMClient(LLMClient):
         """通过 Anthropic Messages API SSE 流式接口发送请求。"""
         payload: dict[str, Any] = {
             "model": self.config.model,
-            "max_tokens": kwargs.get("max_tokens", 1024),
+            "max_tokens": kwargs.get("max_tokens", DEFAULT_ANTHROPIC_OPTIONS["max_tokens"]),
             "messages": self._anthropic_messages(messages),
             "stream": True,
         }
@@ -366,15 +386,20 @@ class ConfiguredLLMClient(LLMClient):
         for option in ("top_p", "top_k", "stop_sequences"):
             if option in kwargs and kwargs[option] is not None:
                 payload[option] = kwargs[option]
+        if "tools" in kwargs and kwargs["tools"] is not None:
+            payload["tools"] = kwargs["tools"]
+        if "tool_choice" in kwargs and kwargs["tool_choice"] is not None:
+            payload["tool_choice"] = kwargs["tool_choice"]
         headers = {
             "x-api-key": self.config.api_key,
-            "anthropic-version": "2023-06-01",
+            "anthropic-version": ANTHROPIC_API_VERSION,
             "Content-Type": "application/json",
             **self.config.headers,
         }
         model = self.config.model
         usage: dict[str, Any] = {}
-        for chunk in self._post_json_stream("/messages", payload, headers):
+        finish_reason = "stop"
+        for chunk in self._post_json_stream(ANTHROPIC_MESSAGES_PATH, payload, headers):
             if "error" in chunk:
                 yield chunk
                 return
@@ -389,14 +414,18 @@ class ConfiguredLLMClient(LLMClient):
                 if text:
                     yield {"delta": text, "model": model, "usage": usage}
             elif event_type == "message_delta":
+                delta = chunk.get("delta") or {}
                 usage_update = chunk.get("usage") or {}
                 usage.update(usage_update)
+                stop_reason = delta.get("stop_reason")
+                if stop_reason:
+                    finish_reason = stop_reason
             elif event_type == "message_stop":
                 yield {
                     "delta": "",
                     "model": model,
                     "usage": usage,
-                    "finish_reason": "stop",
+                    "finish_reason": finish_reason,
                 }
 
     def _post_json(
@@ -609,10 +638,12 @@ class ConfiguredLLMClient(LLMClient):
 
     def _http_error(self, exc: urllib.error.HTTPError) -> dict[str, Any]:
         details = ""
+        native_error: dict[str, Any] | None = None
         try:
             raw = exc.read().decode("utf-8")
             parsed = json.loads(raw) if raw else {}
             details = self._extract_error_message(parsed)
+            native_error = self._extract_native_error(parsed)
         except Exception:
             details = ""
         reason = details or getattr(exc, "reason", "") or "HTTP error"
@@ -626,7 +657,10 @@ class ConfiguredLLMClient(LLMClient):
             exc.code,
             message,
         )
-        return self.config.error(code, message)
+        result = self.config.error(code, message)
+        if native_error:
+            result["error"]["native_error"] = native_error
+        return result
 
     def _provider_url(self, path: str) -> str:
         if not path.startswith("/") or any(ord(character) < 32 for character in path):
@@ -746,6 +780,32 @@ class ConfiguredLLMClient(LLMClient):
                 return error
             return str(parsed.get("message") or parsed.get("detail") or "")
         return ""
+
+    def _extract_native_error(self, parsed: Any) -> dict[str, Any] | None:
+        """Extract and sanitize the native error structure from an HTTP error response.
+
+        Preserves the provider's original error fields (type, code, message, etc.)
+        while ensuring sensitive information like API keys is redacted.
+        """
+        if not isinstance(parsed, dict):
+            return None
+        error = parsed.get("error")
+        if isinstance(error, dict):
+            sanitized: dict[str, Any] = {}
+            for key, value in error.items():
+                if isinstance(value, str):
+                    sanitized[key] = sanitize_error_message(
+                        value, [self.config.api_key]
+                    )
+                elif isinstance(value, (int, float, bool)) or value is None:
+                    sanitized[key] = value
+                # Skip complex types (lists, dicts) to avoid leaking nested sensitive data
+            return sanitized or None
+        if isinstance(error, str):
+            return {
+                "message": sanitize_error_message(error, [self.config.api_key]),
+            }
+        return None
 
 
 class OpenAIClient(ConfiguredLLMClient):
