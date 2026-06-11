@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="assets/logo.jpg" alt="SuperMedicine" width="200">
-</p>
-
 # SuperMedicine
 
 <p align="center"><img src="assets/logo.jpg" alt="SuperMedicine" width="400"></p>

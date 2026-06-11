@@ -88,7 +88,7 @@ def test_beta042_version_contract_is_single_source_consistent_across_release_sur
     )
     changelog = (REPO_ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
-    plan = (REPO_ROOT / "Architecture" / "Beta0.4.2ShortTermPlan.md").read_text(
+    plan = (REPO_ROOT / "docs" / "archive" / "Beta0.4.2ShortTermPlan.md").read_text(
         encoding="utf-8"
     )
 
@@ -146,7 +146,7 @@ def test_release_verification_scripts_use_runner_temp_for_pytest_temp_exhaustion
 def test_beta042_short_term_plan_records_deferred_gaps_with_tracking_owner():
     """Short-term release scope must document unresolved broad gaps rather than hide them."""
 
-    plan = (REPO_ROOT / "Architecture" / "Beta0.4.2ShortTermPlan.md").read_text(
+    plan = (REPO_ROOT / "docs" / "archive" / "Beta0.4.2ShortTermPlan.md").read_text(
         encoding="utf-8"
     )
 
