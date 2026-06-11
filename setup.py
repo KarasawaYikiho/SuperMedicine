@@ -19,7 +19,7 @@ except Exception:  # pragma: no cover - wheel is a build dependency in pyproject
 
 
 LOWERCASE_INSTALL_NAME = "install.py"
-UPPERCASE_INSTALL_NAME = "Install.py"
+UPPERCASE_INSTALL_NAME = "install_entry.py"
 LOWERCASE_INSTALL_BYTES = b'''#!/usr/bin/env python3
 """Lowercase compatibility entrypoint for the SuperMedicine installer."""
 from __future__ import annotations
@@ -85,7 +85,7 @@ def _uppercase_install_bytes() -> bytes:
 
     try:
         result = subprocess.run(
-            ["git", "show", ":Install.py"],
+            ["git", "show", ":install_entry.py"],
             cwd=_repo_root(),
             check=False,
             capture_output=True,

@@ -66,10 +66,10 @@ figure = [
 platform-adapters = []
 
 [project.scripts]
-supermedicine = "Cli:main"
+supermedicine = "cli_entry:main"
 
 [tool.setuptools]
-py-modules = ["Cli", "Uninstall"]
+py-modules = ["cli_entry", "uninstall_entry"]
 
 [tool.setuptools.package-data]
 permission = ["default_policy.yaml"]
