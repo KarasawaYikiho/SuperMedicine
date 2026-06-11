@@ -165,3 +165,37 @@ Across 34 audit passes, the repository optimization has been intentionally conse
 - **Generated artifacts cleaned** on each pass when accessible
 - **All verification gates pass** — install, lint, type, build, test, hygiene, path integrity
 - **Final diff is always audit-document only** — no functional semantic change across any pass
+
+---
+
+## Appendix: Early Audit Step 1 File Classification
+
+*Extracted from OptimizationAudit.md (2026-05-26) for historical reference.*
+
+### Modified Tracked Documentation / Metadata Files
+- `ARCHITECTURE.md`, `Architecture/ExecutionRoadmap.md`, `README.md`, `SECURITY.md`, `pyproject.toml`
+
+### Modified Tracked Application / Plugin Files
+- `Cli.py`, `core/kernel.py`, `plugins/rag/main.py`
+
+### Untracked Architecture / Documentation Files
+- `Architecture/PhaseImplementationPlan.md`, `Architecture/WorkspaceTuiRagGuide.md`
+
+### Untracked Core Implementation Files / Directories
+- `core/experience.py`, `core/operation_guard.py`, `core/paper_import/`, `core/path_safety.py`, `core/tui/`, `core/workspace.py`, `core/workspace_tools.py`
+
+### Untracked Tests
+- `tests/test_backward_compatibility.py`, `tests/test_experience_cli.py`, `tests/test_experience_storage.py`, `tests/test_operation_guard.py`, `tests/test_paper_cli.py`, `tests/test_paper_import_core.py`, `tests/test_path_safety.py`, `tests/test_tui_dialog_history.py`, `tests/test_tui_entrypoint.py`, `tests/test_tui_experience_screens.py`, `tests/test_tui_paper_screens.py`, `tests/test_tui_permissions.py`, `tests/test_tui_state.py`, `tests/test_tui_workspace_screens.py`, `tests/test_workspace.py`, `tests/test_workspace_cli.py`, `tests/test_workspace_tools.py`
+
+---
+
+## Appendix: Platform Documentation Model
+
+*Extracted from OptimizationAudit.md Step 6 (2026-05-26).*
+
+The intended model is **core independent + platform add-ons**:
+- The SuperMedicine Python core is the default runtime and should remain usable without OpenCode, Claude Code, or assistant-platform configuration.
+- User-facing installation examples should include a pure Python path using `pip install -e .`, `python Install.py --init`, `python Cli.py status`, and `python Cli.py run ...`.
+- OpenCode documentation should describe the adapter as optional add-on content with implemented tool mappings and metadata, not as a core requirement or as a complete native subagent runtime bridge.
+- Claude Code documentation should describe a minimal optional adapter with capability/runtime/local CLI invocation support only; native skill loading and native subagent dispatch are not supported.
+- Safety boundaries remain unchanged: runtime PermissionEngine checks are the enforcement path, prompt constraints are advisory, and medical outputs require qualified human review.
