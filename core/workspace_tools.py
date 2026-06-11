@@ -12,517 +12,38 @@ logging are still required for dry-run and prepared invocation paths.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 import re
 import shutil
-from typing import Any, Literal, Sequence
+from typing import Any, Sequence
 
 import yaml
 
 from core.operation_guard import authorize_dangerous_operation
 from core.path_safety import validate_path_in_project_root
 from core.workspace import WorkspaceManager
+from core.workspace_tool_models import (
+    InvalidToolId,
+    MANIFEST_FILE,
+    SUPPORTED_LANGUAGES,
+    TOOLS_DIR,
+    ToolCandidateError,
+    ToolImportCandidate,
+    ToolInvocationPlan,
+    ToolLanguage,
+    ToolManifest,
+    ToolManifestError,
+    ToolNotFoundError,
+    WorkspaceToolError,
+    _load_candidate_metadata,
+    _safe_load_manifest,
+    validate_language,
+    validate_tool_id,
+)
+from core.workspace_tool_spec import TOOL_AUTHORING_SPEC, build_tool_authoring_llm_context  # noqa: F401
+from core.workspace_tool_templates import BUILTIN_TEMPLATES
 from permission.audit import AuditLogger
 from permission.engine import PermissionEngine
-
-
-ToolLanguage = Literal["python", "r"]
-
-TOOLS_DIR = "tools"
-MANIFEST_FILE = "tool.yaml"
-SUPPORTED_LANGUAGES: tuple[ToolLanguage, ...] = ("python", "r")
-BUILTIN_TOOLS: tuple[str, ...] = ("heatmap", "umap")
-TOOL_SOURCE_ROOT = "plugins/tools"
-PYTHON_TOOL_STORAGE = "workspaces/<workspace-id>/tools/python/<tool-id>/"
-R_TOOL_STORAGE = "workspaces/<workspace-id>/tools/r/<tool-id>/"
-
-_TOOL_ID_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")
-MAX_TOOL_MANIFEST_BYTES = 256 * 1024
-
-
-class WorkspaceToolError(ValueError):
-    """Base exception for workspace tool failures."""
-
-
-class InvalidToolId(WorkspaceToolError):
-    """Raised when a tool id is not a safe slug."""
-
-
-class InvalidToolLanguage(WorkspaceToolError):
-    """Raised when a language is not supported."""
-
-
-class ToolNotFoundError(WorkspaceToolError):
-    """Raised when a selected workspace tool does not exist."""
-
-
-class ToolManifestError(WorkspaceToolError):
-    """Raised when a manifest is missing or invalid."""
-
-
-class ToolCandidateError(WorkspaceToolError):
-    """Raised when an import candidate cannot become a workspace tool."""
-
-
-def _read_limited_text(path: Path, *, max_bytes: int = MAX_TOOL_MANIFEST_BYTES) -> str:
-    raw = path.read_bytes()
-    if len(raw) > max_bytes:
-        raise ToolManifestError(f"Tool manifest is too large: {path}")
-    return raw.decode("utf-8")
-
-
-def _safe_load_manifest(path: Path) -> dict[str, Any]:
-    data = yaml.safe_load(_read_limited_text(path)) or {}
-    if not isinstance(data, dict):
-        raise ToolManifestError("Tool manifest must be a mapping")
-    return data
-
-
-def _load_candidate_metadata(path: Path, warnings: list[str]) -> dict[str, Any]:
-    try:
-        return _safe_load_manifest(path)
-    except ToolManifestError as exc:
-        warnings.append(str(exc))
-        return {}
-
-
-TOOL_AUTHORING_SPEC: dict[str, Any] = {
-    "purpose": "Author Python/R workspace tools that SuperMedicine can scan, validate, import, and prepare for guarded execution.",
-    "source_directory": TOOL_SOURCE_ROOT,
-    "storage": {
-        "python": PYTHON_TOOL_STORAGE,
-        "r": R_TOOL_STORAGE,
-    },
-    "tool_folder_format": {
-        "source": "plugins/tools/<tool-directory>/",
-        "required_manifest": MANIFEST_FILE,
-        "required_entrypoint": "A relative script path inside the tool folder; .py for python, .R for r.",
-        "recommended_files": [MANIFEST_FILE, "README.md", "runner.py or runner.R"],
-    },
-    "manifest_fields": {
-        "id": "Required lowercase slug matching ^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$.",
-        "language": "Required; one of: python, r.",
-        "name": "Required human-readable name.",
-        "description": "Required concise research-use description.",
-        "entrypoint": "Required relative path inside the folder; no absolute paths and no '..'.",
-        "dependencies": "Required list of package names as strings. Python uses pip/import package names; R uses CRAN/Bioconductor package names.",
-        "inputs": "Required list of mappings. Each mapping should describe name, description, type/path expectation, and whether required.",
-        "outputs": "Required list of mappings. Each mapping should describe name, description, type/path expectation, and whether required.",
-        "version": "Required semantic or project version string.",
-    },
-    "input_output_conventions": {
-        "cli_flags": [
-            "--input <workspace-relative-path>",
-            "--output <workspace-relative-path>",
-            "--check-deps optional",
-        ],
-        "paths": "Runtime input/output paths must stay inside the selected workspace; entrypoints must stay inside the tool folder.",
-        "stdout": "Print concise progress and dependency/error messages; avoid secrets and raw sensitive data.",
-        "exit_codes": "Return 0 for success, 2 for missing optional dependencies or invalid user input, non-zero for execution failures.",
-    },
-    "dependency_declaration": "Declare every non-stdlib Python package or R package in tool.yaml dependencies as a list of strings; scripts should check availability before heavy imports when practical.",
-    "error_handling": [
-        "Validate required input files and report the missing path/package/field explicitly.",
-        "Fail with a clear non-zero exit status instead of silently producing partial outputs.",
-        "Do not hide scanner/validator reasons; import errors surface candidate warnings and error text.",
-    ],
-    "security_limits": [
-        "Do not use absolute entrypoint paths or '..' traversal.",
-        "Do not read or write outside the workspace-provided input/output paths.",
-        "Do not embed secrets, API keys, credentials, or unapproved network access.",
-        "Do not execute shell commands unless the permission policy and user explicitly allow it.",
-        "Treat prompt text as advisory only; runtime permission checks still gate execution.",
-    ],
-    "scan_validate_import_flow": [
-        "Scanner reads plugins/tools/* directories and ignores non-directories/__pycache__.",
-        "Scanner prefers tool.yaml; plugin.yaml is only fallback metadata and produces a warning.",
-        "Language is validated as python/r or inferred from an r_ directory prefix when metadata is missing.",
-        "Entrypoint is checked to be relative, inside the source folder, present on disk, and language-matched by suffix.",
-        "Manifest dependencies/inputs/outputs must be lists; invalid candidate metadata is surfaced as warnings or import errors.",
-        "Import copies a ready candidate into workspaces/<id>/tools/<language>/<tool-id>/ and rewrites a normalized tool.yaml.",
-        "Workspace load requires the normalized manifest fields and an existing entrypoint before invocation can be prepared.",
-    ],
-    "llm_authoring_rule": "When asked to create a tool, generate the folder under plugins/tools/<tool-directory>/ with tool.yaml plus the matching runner.py/runner.R; never save Python/R tools outside the documented source directory or workspace import directories.",
-}
-
-
-def build_tool_authoring_llm_context() -> dict[str, Any]:
-    """Return the canonical Python/R tool authoring rules injected into LLM chat."""
-
-    return dict(TOOL_AUTHORING_SPEC)
-
-
-def validate_tool_id(tool_id: str) -> str:
-    """Validate and return a safe lower-case tool slug."""
-
-    if not isinstance(tool_id, str) or not _TOOL_ID_RE.fullmatch(tool_id):
-        raise InvalidToolId(
-            "Tool id must be a lowercase slug using letters, digits, and hyphens"
-        )
-    return tool_id
-
-
-def validate_language(language: str) -> ToolLanguage:
-    """Validate a workspace tool language."""
-
-    if language not in SUPPORTED_LANGUAGES:
-        raise InvalidToolLanguage("Tool language must be one of: python, r")
-    return language  # type: ignore[return-value]
-
-
-@dataclass(frozen=True)
-class ToolManifest:
-    id: str
-    language: ToolLanguage
-    name: str
-    description: str
-    entrypoint: str
-    dependencies: list[str]
-    inputs: list[dict[str, Any]]
-    outputs: list[dict[str, Any]]
-    version: str
-
-    @classmethod
-    def from_dict(
-        cls,
-        data: dict[str, Any],
-        *,
-        expected_id: str | None = None,
-        expected_language: str | None = None,
-    ) -> "ToolManifest":
-        if not isinstance(data, dict):
-            raise ToolManifestError("Tool manifest must be a mapping")
-
-        required = (
-            "id",
-            "language",
-            "name",
-            "description",
-            "entrypoint",
-            "dependencies",
-            "inputs",
-            "outputs",
-            "version",
-        )
-        missing = [field for field in required if field not in data]
-        if missing:
-            raise ToolManifestError(
-                f"Tool manifest missing required fields: {', '.join(missing)}"
-            )
-
-        tool_id = validate_tool_id(str(data["id"]))
-        language = validate_language(str(data["language"]))
-        if expected_id is not None and tool_id != validate_tool_id(expected_id):
-            raise ToolManifestError(
-                f"Tool manifest id mismatch: expected {expected_id}, found {tool_id}"
-            )
-        if expected_language is not None and language != validate_language(
-            expected_language
-        ):
-            raise ToolManifestError(
-                f"Tool manifest language mismatch: expected {expected_language}, found {language}"
-            )
-
-        dependencies = data["dependencies"]
-        inputs = data["inputs"]
-        outputs = data["outputs"]
-        if not isinstance(dependencies, list) or not all(
-            isinstance(item, str) for item in dependencies
-        ):
-            raise ToolManifestError(
-                "Tool manifest dependencies must be a list of strings"
-            )
-        if not isinstance(inputs, list) or not all(
-            isinstance(item, dict) for item in inputs
-        ):
-            raise ToolManifestError("Tool manifest inputs must be a list of mappings")
-        if not isinstance(outputs, list) or not all(
-            isinstance(item, dict) for item in outputs
-        ):
-            raise ToolManifestError("Tool manifest outputs must be a list of mappings")
-
-        entrypoint = str(data["entrypoint"])
-        if Path(entrypoint).is_absolute() or ".." in Path(entrypoint).parts:
-            raise ToolManifestError(
-                "Tool manifest entrypoint must be a relative path inside the tool folder"
-            )
-
-        return cls(
-            id=tool_id,
-            language=language,
-            name=str(data["name"]),
-            description=str(data["description"]),
-            entrypoint=entrypoint,
-            dependencies=list(dependencies),
-            inputs=list(inputs),
-            outputs=list(outputs),
-            version=str(data["version"]),
-        )
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "id": self.id,
-            "language": self.language,
-            "name": self.name,
-            "description": self.description,
-            "entrypoint": self.entrypoint,
-            "dependencies": list(self.dependencies),
-            "inputs": list(self.inputs),
-            "outputs": list(self.outputs),
-            "version": self.version,
-        }
-
-
-@dataclass(frozen=True)
-class ToolInvocationPlan:
-    workspace_id: str
-    language: ToolLanguage
-    tool_id: str
-    tool_path: Path
-    entrypoint: Path
-    command: list[str]
-    dry_run: bool
-    input_path: Path | None
-    output_path: Path | None
-    dependencies: list[str]
-    missing_runtime: str | None = None
-    missing_optional_dependencies: list[str] | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "workspace_id": self.workspace_id,
-            "language": self.language,
-            "tool_id": self.tool_id,
-            "tool_path": str(self.tool_path),
-            "entrypoint": str(self.entrypoint),
-            "command": list(self.command),
-            "dry_run": self.dry_run,
-            "input_path": str(self.input_path) if self.input_path else None,
-            "output_path": str(self.output_path) if self.output_path else None,
-            "dependencies": list(self.dependencies),
-            "missing_runtime": self.missing_runtime,
-            "missing_optional_dependencies": list(
-                self.missing_optional_dependencies or []
-            ),
-            "status": "prepared" if self.dry_run else "not_executed",
-            "message": "Command prepared only; workspace tool scripts are not executed by this safe foundation.",
-        }
-
-
-@dataclass(frozen=True)
-class ToolImportCandidate:
-    """A Python/R tool discovered from the project tool source directory."""
-
-    index: int
-    id: str
-    language: ToolLanguage
-    name: str
-    description: str
-    source_path: Path
-    entrypoint: str | None
-    version: str
-    dependencies: list[str]
-    inputs: list[dict[str, Any]]
-    outputs: list[dict[str, Any]]
-    status: str
-    warnings: list[str]
-
-    @property
-    def importable(self) -> bool:
-        return self.status == "ready"
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "index": self.index,
-            "id": self.id,
-            "language": self.language,
-            "name": self.name,
-            "description": self.description,
-            "source_path": str(self.source_path),
-            "entrypoint": self.entrypoint,
-            "version": self.version,
-            "dependencies": list(self.dependencies),
-            "inputs": list(self.inputs),
-            "outputs": list(self.outputs),
-            "status": self.status,
-            "warnings": list(self.warnings),
-            "importable": self.importable,
-        }
-
-    def to_manifest(self) -> ToolManifest:
-        if not self.importable or not self.entrypoint:
-            raise ToolCandidateError(
-                f"Tool candidate is not importable: {self.language}/{self.id}"
-            )
-        return ToolManifest(
-            id=self.id,
-            language=self.language,
-            name=self.name,
-            description=self.description,
-            entrypoint=self.entrypoint,
-            dependencies=list(self.dependencies),
-            inputs=list(self.inputs),
-            outputs=list(self.outputs),
-            version=self.version,
-        )
-
-
-def _manifest_text(
-    tool_id: str,
-    language: ToolLanguage,
-    name: str,
-    description: str,
-    entrypoint: str,
-    dependencies: list[str],
-) -> str:
-    return yaml.safe_dump(
-        {
-            "id": tool_id,
-            "language": language,
-            "name": name,
-            "description": description,
-            "entrypoint": entrypoint,
-            "dependencies": dependencies,
-            "inputs": [
-                {
-                    "name": "input",
-                    "description": "Input matrix/table path",
-                    "required": False,
-                }
-            ],
-            "outputs": [
-                {
-                    "name": "output",
-                    "description": "Output artifact path",
-                    "required": False,
-                }
-            ],
-            "version": "1.0.0",
-        },
-        sort_keys=False,
-        allow_unicode=True,
-    )
-
-
-PYTHON_RUNNER = '''#!/usr/bin/env python3
-"""Workspace-local optional Python visualization runner."""
-from __future__ import annotations
-
-import argparse
-import importlib.util
-import sys
-
-
-def missing(packages: list[str]) -> list[str]:
-    return [package for package in packages if importlib.util.find_spec(package) is None]
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Optional SuperMedicine Python workspace tool")
-    parser.add_argument("--input", default=None)
-    parser.add_argument("--output", default=None)
-    parser.add_argument("--check-deps", action="store_true")
-    parser.add_argument("--tool-kind", default="visualization")
-    args = parser.parse_args()
-    required = ["pandas", "matplotlib", "seaborn"]
-    if args.tool_kind == "umap":
-        required.append("umap")
-    unavailable = missing(required)
-    if unavailable:
-        print("Missing optional Python dependencies: " + ", ".join(unavailable))
-        print("Install them in your workspace environment before running this tool.")
-        return 2
-    if args.check_deps:
-        print("All optional Python dependencies are available.")
-        return 0
-    print("Dependencies are available; implement project-specific data loading before execution.")
-    print(f"input={args.input!r} output={args.output!r}")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
-'''
-
-R_RUNNER = """#!/usr/bin/env Rscript
-args <- commandArgs(trailingOnly = TRUE)
-tool_kind <- "visualization"
-if ("--tool-kind" %in% args) {
-  idx <- match("--tool-kind", args)
-  if (!is.na(idx) && length(args) >= idx + 1) tool_kind <- args[[idx + 1]]
-}
-required <- c("ggplot2", "readr")
-if (tool_kind == "heatmap") required <- c(required, "pheatmap")
-if (tool_kind == "umap") required <- c(required, "umap")
-missing <- required[!vapply(required, requireNamespace, quietly = TRUE, FUN.VALUE = logical(1))]
-if (length(missing) > 0) {
-  cat("Missing optional R dependencies:", paste(missing, collapse = ", "), "\n")
-  cat("Install them in your workspace R library before running this tool.\n")
-  quit(status = 2)
-}
-cat("All optional R dependencies are available. Add project-specific data loading before execution.\n")
-"""
-
-
-BUILTIN_TEMPLATES: dict[tuple[ToolLanguage, str], dict[str, str]] = {
-    ("python", "heatmap"): {
-        MANIFEST_FILE: _manifest_text(
-            "heatmap",
-            "python",
-            "Python heatmap",
-            "Optional Python heatmap template",
-            "runner.py",
-            ["pandas", "matplotlib", "seaborn"],
-        ),
-        "README.md": "# Python heatmap\n\nWorkspace-local heatmap scaffold. Optional dependencies are reported by `runner.py`.\n",
-        "runner.py": PYTHON_RUNNER.replace(
-            '--tool-kind", default="visualization"', '--tool-kind", default="heatmap"'
-        ),
-    },
-    ("python", "umap"): {
-        MANIFEST_FILE: _manifest_text(
-            "umap",
-            "python",
-            "Python UMAP",
-            "Optional Python UMAP template",
-            "runner.py",
-            ["pandas", "matplotlib", "umap-learn"],
-        ),
-        "README.md": "# Python UMAP\n\nWorkspace-local UMAP scaffold. Optional dependencies are reported by `runner.py`.\n",
-        "runner.py": PYTHON_RUNNER.replace(
-            '--tool-kind", default="visualization"', '--tool-kind", default="umap"'
-        ),
-    },
-    ("r", "heatmap"): {
-        MANIFEST_FILE: _manifest_text(
-            "heatmap",
-            "r",
-            "R heatmap",
-            "Optional R heatmap template",
-            "runner.R",
-            ["ggplot2", "readr", "pheatmap"],
-        ),
-        "README.md": "# R heatmap\n\nWorkspace-local R heatmap scaffold. Optional dependencies are reported by `runner.R`.\n",
-        "runner.R": R_RUNNER.replace(
-            'tool_kind <- "visualization"', 'tool_kind <- "heatmap"'
-        ),
-    },
-    ("r", "umap"): {
-        MANIFEST_FILE: _manifest_text(
-            "umap",
-            "r",
-            "R UMAP",
-            "Optional R UMAP template",
-            "runner.R",
-            ["ggplot2", "readr", "umap"],
-        ),
-        "README.md": "# R UMAP\n\nWorkspace-local R UMAP scaffold. Optional dependencies are reported by `runner.R`.\n",
-        "runner.R": R_RUNNER.replace(
-            'tool_kind <- "visualization"', 'tool_kind <- "umap"'
-        ),
-    },
-}
 
 
 def _slug_from_name(value: str) -> str:
@@ -759,10 +280,12 @@ class WorkspaceToolService:
         workspace_manifest = source_path / MANIFEST_FILE
         data: dict[str, Any] = {}
         warnings: list[str] = []
+        used_plugin_fallback = False
         if workspace_manifest.is_file():
             data = _load_candidate_metadata(workspace_manifest, warnings)
         elif plugin_manifest.is_file():
             data = _load_candidate_metadata(plugin_manifest, warnings)
+            used_plugin_fallback = True
             warnings.append("workspace tool.yaml missing; displaying plugin metadata")
         else:
             warnings.append("metadata missing; displaying directory name only")
@@ -781,16 +304,19 @@ class WorkspaceToolService:
             warnings.append("metadata id is invalid; using directory slug")
 
         language_value = str(data.get("language") or "").lower()
-        if source_path.name.lower().startswith("r_") and language_value != "r":
-            language_value = "r"
-            warnings.append("source directory is under R naming convention; inferred r")
-        elif language_value not in SUPPORTED_LANGUAGES:
-            language_value = (
-                "r" if source_path.name.lower().startswith("r_") else "python"
-            )
-            warnings.append(
-                f"metadata language missing/unsupported; inferred {language_value}"
-            )
+        if language_value in SUPPORTED_LANGUAGES:
+            # Language is explicitly provided and valid �?respect it
+            pass
+        elif language_value:
+            # Language is set but not a recognized value �?fall back to directory inference
+            inferred = "r" if source_path.name.lower().startswith("r_") else "python"
+            language_value = inferred
+            warnings.append(f"metadata language unsupported; inferred {inferred}")
+        else:
+            # Language is missing entirely �?infer from directory name prefix
+            inferred = "r" if source_path.name.lower().startswith("r_") else "python"
+            language_value = inferred
+            warnings.append(f"metadata language missing; inferred {inferred}")
         lang = validate_language(language_value)
 
         entrypoint = str(data.get("entrypoint") or data.get("entry") or "")
@@ -815,10 +341,11 @@ class WorkspaceToolService:
             entrypoint_path.relative_to(source_path)
             if not entrypoint_path.is_file():
                 raise ToolManifestError(f"entrypoint not found: {entrypoint}")
-            if lang == "python" and entrypoint_path.suffix != ".py":
-                raise ToolManifestError("python tool entrypoint must be a .py file")
-            if lang == "r" and entrypoint_path.suffix.lower() != ".r":
-                raise ToolManifestError("r tool entrypoint must be an .R file")
+            if not used_plugin_fallback:
+                if lang == "python" and entrypoint_path.suffix != ".py":
+                    raise ToolManifestError("python tool entrypoint must be a .py file")
+                if lang == "r" and entrypoint_path.suffix.lower() != ".r":
+                    raise ToolManifestError("r tool entrypoint must be an .R file")
         except (ValueError, WorkspaceToolError) as exc:
             status = "invalid"
             warnings.append(str(exc))
