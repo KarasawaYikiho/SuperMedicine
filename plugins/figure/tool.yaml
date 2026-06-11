@@ -1,0 +1,24 @@
+id: figure
+language: python
+name: "Scientific Figure Advisor"
+description: "Publication-grade scientific figure advisor with 8-step workflow: data profiling, chart selection, journal style, export, compliance audit, panel alignment, visual QA"
+entrypoint: runner.py
+dependencies: ["matplotlib", "seaborn", "pandas", "numpy", "scipy", "Pillow", "pypdf"]
+inputs:
+  - name: task
+    description: "Figure task description"
+    required: true
+  - name: data_path
+    description: "Data file path (CSV/Excel)"
+    required: false
+  - name: journal
+    description: "Target journal: nature, science, ieee, general"
+    required: false
+  - name: lang
+    description: "Language: en or zh"
+    required: false
+outputs:
+  - name: result
+    description: "Workflow result or tool output"
+    required: true
+version: "1.0.0"
