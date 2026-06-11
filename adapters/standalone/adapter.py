@@ -87,11 +87,17 @@ class StandaloneAdapter(BaseAdapter):
         )
 
     def subagent_dispatch(self, agent_id: str, task: dict[str, Any]) -> dict[str, Any]:
-        """进程内模拟 Dispatch"""
+        """进程内模拟子代理分发（非真正子代理）。
+
+        Standalone 适配器没有外部 AI 平台支持，因此 ``subagent_dispatch``
+        仅在当前进程内模拟分发行为。返回结果中 ``simulated`` 字段为 ``True``
+        ，调用方可据此判断这是模拟而非真正的子代理调度。
+        """
         return {
             "agent_id": agent_id,
             "status": "dispatched",
             "platform": "standalone",
             "task": task,
-            "message": f"Task dispatched to {agent_id} in standalone mode",
+            "simulated": True,
+            "message": f"Task dispatched to {agent_id} in standalone mode (simulated, in-process)",
         }

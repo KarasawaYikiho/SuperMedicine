@@ -329,8 +329,11 @@ def execute_figure_workflow(
                 "labels_placed": [t.get_text() for t in placed],
                 "count": len(placed),
             }
-        except Exception:
-            pass  # single-panel figures don't need labels
+        except Exception as exc:
+            result["steps"]["step_6_layout_labels"] = {
+                "status": "error",
+                "error": str(exc),
+            }
     else:
         result["steps"]["step_6_qa"] = {
             "status": "skipped",

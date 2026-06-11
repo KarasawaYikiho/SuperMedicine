@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 import logging
+from collections.abc import Generator
 from typing import Any, Mapping
 
 from core.redaction import redact_sensitive
@@ -45,6 +46,23 @@ class LLMClient(ABC):
         """
         ...
 
+    def chat_stream(
+        self, messages: list[dict[str, str]], **kwargs: Any
+    ) -> Generator[dict[str, Any], None, None]:
+        """流式发送多轮对话消息（默认回退到非流式 chat）
+
+        Provider 子类可重写此方法以提供原生流式支持。
+        默认实现调用 chat() 并 yield 其结果。
+
+        Args:
+            messages: [{"role": "system|user|assistant", "content": "..."}]
+            **kwargs: 模型特定参数 (temperature, max_tokens, etc.)
+
+        Yields:
+            dict — 至少包含 "content" 键；通常只有一个 chunk。
+        """
+        yield self.chat(messages, **kwargs)
+
 
 class TrackedLLMClient(LLMClient):
     """Decorator that wraps an LLMClient and records token usage after each call.
@@ -75,6 +93,18 @@ class TrackedLLMClient(LLMClient):
         response = self._wrapped.chat(messages, **kwargs)
         self._record_usage(response)
         return response
+
+    def chat_stream(
+        self, messages: list[dict[str, str]], **kwargs: Any
+    ) -> Generator[dict[str, Any], None, None]:
+        """代理底层 client 的流式 chat，流结束后记录 usage。"""
+        last_chunk: dict[str, Any] = {}
+        for chunk in self._wrapped.chat_stream(messages, **kwargs):
+            last_chunk = chunk
+            yield chunk
+        # 流结束后从最后一个 chunk 提取 usage
+        if last_chunk:
+            self._record_usage(last_chunk)
 
     def complete(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
         response = self._wrapped.complete(prompt, **kwargs)

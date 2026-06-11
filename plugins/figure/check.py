@@ -53,10 +53,18 @@ def _check_raster(path: str, ext: str, min_dpi: int,
 
     if dpi is None:
         issues.append(("WARN",
-                       "File has no embedded DPI metadata. Journals often calculate "
-                       "final size from DPI; use fig.savefig(dpi=300) explicitly."))
+                        "File has no embedded DPI metadata. Journals often calculate "
+                        "final size from DPI; use fig.savefig(dpi=300) explicitly."))
     else:
-        dx = dpi[0] if isinstance(dpi, tuple) else dpi
+        if isinstance(dpi, tuple):
+            if len(dpi) == 0:
+                issues.append(("WARN",
+                               "DPI metadata is an empty tuple; cannot determine resolution. "
+                               "Re-export with fig.savefig(dpi=300) explicitly."))
+                return issues, info
+            dx = dpi[0]
+        else:
+            dx = dpi
         dx_rounded = round(float(dx))
         if dx_rounded < min_dpi:
             issues.append(("FAIL",

@@ -27,10 +27,6 @@ dependencies = [
     "pyyaml>=6.0",
     "rich>=13.7,<15",
     "textual>=0.79,<2",
-    "matplotlib>=3.7",
-    "seaborn>=0.13",
-    "Pillow>=10.0",
-    "scipy>=1.10",
 ]
 
 [project.urls]
@@ -56,6 +52,8 @@ r = [
     "rpy2>=3.5",
 ]
 figure = [
+    "numpy>=1.24",
+    "pandas>=2.0",
     "matplotlib>=3.7",
     "seaborn>=0.13",
     "Pillow>=10.0",

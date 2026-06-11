@@ -1,0 +1,390 @@
+"""Integration tests for execute_llm_chat() streaming pipeline.
+
+Validates that when an LLMClient exposes a ``chat_stream()`` method,
+``execute_llm_chat()`` correctly drives the ``progress_callback`` with
+the expected sequence of events (assistant_start, assistant_delta,
+thinking_content, thinking_done, etc.).
+"""
+
+from __future__ import annotations
+
+from typing import Any
+from unittest.mock import patch
+
+from core.kernel_llm_chat import execute_llm_chat
+from core.llm_client import LLMClient
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+class StreamClient(LLMClient):
+    """Minimal LLMClient that exposes ``chat_stream`` returning a fixed sequence."""
+
+    def __init__(self, chunks: list[dict[str, Any] | str]) -> None:
+        self._chunks = chunks
+
+    def chat(self, messages, **kwargs):
+        return {"content": "fallback", "model": "test-model"}
+
+    def complete(self, prompt, **kwargs):
+        return {"content": "fallback", "model": "test-model"}
+
+    def chat_stream(self, messages, **kwargs):
+        for chunk in self._chunks:
+            yield chunk
+
+
+def _fake_config():
+    """Return a minimal ConfigCenter stand-in with required methods."""
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        config_path="/tmp/fake/config.yaml",
+        get_selected_experiment_protocol=lambda: None,
+        get_runtime_state=lambda: {},
+        get_file_access_config=lambda: {"mode": "full", "authorized_external_ropts": []},
+        get_permission_mode_label=lambda: "完全访问",
+        diagnostics=lambda: {"load_error": ""},
+        get=lambda key, default=None: default,
+        get_llm_runtime_provider_name=lambda: "test-provider",
+        get_llm_provider_config=lambda name: {"api_format": "openai"},
+    )
+
+
+def _run_execute(
+    chunks: list[dict[str, Any] | str],
+    *,
+    progress_callback=None,
+):
+    """Run ``execute_llm_chat`` with a StreamClient yielding *chunks*."""
+    client = StreamClient(chunks)
+
+    class FakeManager:
+        def create_client(self):
+            return client
+
+        def get_current_provider(self, redacted=False):
+            return {"provider": "test-provider"}
+
+        def validate_provider(self, name, config):
+            return None
+
+    checkpoint_calls: list[dict[str, Any]] = []
+
+    with patch(
+        "core.kernel_llm_chat.llm_chat_messages",
+        return_value=[{"role": "user", "content": "hello"}],
+    ):
+        result = execute_llm_chat(
+            task="hello",
+            task_id="t1",
+            agent_id="a1",
+            llm_manager=FakeManager(),
+            config=_fake_config(),
+            config_path="/tmp/fake/config.yaml",
+            checkpoint_task_fn=lambda **kw: checkpoint_calls.append(kw),
+            progress_callback=progress_callback,
+        )
+
+    return result, checkpoint_calls
+
+
+def _collect_events() -> tuple[list[dict[str, Any]], Any]:
+    """Return (events_list, callback_fn) that records every emitted event."""
+    events: list[dict[str, Any]] = []
+
+    def callback(event: dict[str, Any]) -> None:
+        events.append(event)
+
+    return events, callback
+
+
+# ---------------------------------------------------------------------------
+# Tests — basic streaming
+# ---------------------------------------------------------------------------
+
+class TestExecuteLLMChatStream:
+    """Verify progress_callback events during streaming chat."""
+
+    def test_stream_emits_assistant_start_before_deltas(self):
+        """assistant_start must arrive before any assistant_delta."""
+        chunks = [
+            {"delta": "Hello", "model": "m"},
+            {"delta": " world", "model": "m"},
+        ]
+        events, cb = _collect_events()
+        result, _ = _run_execute(chunks, progress_callback=cb)
+
+        assert result["status"] == "success"
+        kinds = [e["kind"] for e in events]
+        assert "assistant_start" in kinds
+        start_idx = kinds.index("assistant_start")
+        delta_indices = [i for i, k in enumerate(kinds) if k == "assistant_delta"]
+        assert all(i > start_idx for i in delta_indices)
+
+    def test_stream_emits_all_content_deltas(self):
+        """Every non-empty delta from the stream should reach the callback."""
+        chunks = [
+            {"delta": "A", "model": "m"},
+            {"delta": "B", "model": "m"},
+            {"delta": "C", "model": "m"},
+        ]
+        events, cb = _collect_events()
+        result, _ = _run_execute(chunks, progress_callback=cb)
+
+        assert result["status"] == "success"
+        delta_events = [e for e in events if e["kind"] == "assistant_delta"]
+        assert [e["content"] for e in delta_events] == ["A", "B", "C"]
+
+    def test_stream_joins_deltas_into_final_output(self):
+        """Result content must be the concatenation of all deltas."""
+        chunks = [
+            {"delta": "foo", "model": "m"},
+            {"delta": "bar", "model": "m"},
+        ]
+        _, cb = _collect_events()
+        result, _ = _run_execute(chunks, progress_callback=cb)
+
+        assert result["output"] == "foobar"
+
+    def test_stream_with_string_chunks(self):
+        """Non-dict chunks (plain strings) should still produce deltas."""
+        chunks = ["alpha", "beta"]
+        events, cb = _collect_events()
+        result, _ = _run_execute(chunks, progress_callback=cb)
+
+        assert result["status"] == "success"
+        delta_events = [e for e in events if e["kind"] == "assistant_delta"]
+        assert [e["content"] for e in delta_events] == ["alpha", "beta"]
+
+    def test_stream_without_callback_does_not_raise(self):
+        """No progress_callback → must complete without error."""
+        chunks = [{"delta": "ok", "model": "m"}]
+        result, _ = _run_execute(chunks, progress_callback=None)
+        assert result["status"] == "success"
+
+
+# ---------------------------------------------------------------------------
+# Tests — thinking / reasoning content
+# ---------------------------------------------------------------------------
+
+class TestExecuteLLMChatStreamThinking:
+    """Verify thinking_content and thinking_done events."""
+
+    def test_thinking_content_emitted_before_assistant_delta(self):
+        """reasoning_content deltas should produce thinking_content events."""
+        chunks = [
+            {"reasoning_content": "Let me think...", "model": "m"},
+            {"delta": "The answer is 42.", "model": "m"},
+        ]
+        events, cb = _collect_events()
+        result, _ = _run_execute(chunks, progress_callback=cb)
+
+        assert result["status"] == "success"
+        kinds = [e["kind"] for e in events]
+
+        # thinking_content arrives before assistant_delta
+        assert "thinking_content" in kinds
+        assert "assistant_delta" in kinds
+        thinking_idx = kinds.index("thinking_content")
+        first_delta_idx = kinds.index("assistant_delta")
+        assert thinking_idx < first_delta_idx
+
+    def test_thinking_done_emitted_on_transition_to_content(self):
+        """When thinking transitions to regular content, thinking_done fires."""
+        chunks = [
+            {"reasoning_content": "step 1", "model": "m"},
+            {"reasoning_content": " step 2", "model": "m"},
+            {"delta": "Final answer.", "model": "m"},
+        ]
+        events, cb = _collect_events()
+        _run_execute(chunks, progress_callback=cb)
+
+        kinds = [e["kind"] for e in events]
+        assert "thinking_done" in kinds
+        thinking_done_idx = kinds.index("thinking_done")
+        first_delta_idx = kinds.index("assistant_delta")
+        assert thinking_done_idx < first_delta_idx
+
+    def test_thinking_content_uses_thinking_key_fallback(self):
+        """The 'thinking' key is accepted as thinking content."""
+        chunks = [
+            {"thinking": "pondering...", "model": "m"},
+            {"delta": "Result", "model": "m"},
+        ]
+        events, cb = _collect_events()
+        _run_execute(chunks, progress_callback=cb)
+
+        thinking_events = [e for e in events if e["kind"] == "thinking_content"]
+        assert len(thinking_events) >= 1
+        assert thinking_events[0]["content"] == "pondering..."
+
+    def test_thinking_content_uses_reasoning_key_fallback(self):
+        """The 'reasoning' key is accepted as thinking content."""
+        chunks = [
+            {"reasoning": "analysing...", "model": "m"},
+            {"delta": "Result", "model": "m"},
+        ]
+        events, cb = _collect_events()
+        _run_execute(chunks, progress_callback=cb)
+
+        thinking_events = [e for e in events if e["kind"] == "thinking_content"]
+        assert len(thinking_events) >= 1
+        assert thinking_events[0]["content"] == "analysing..."
+
+    def test_thinking_only_stream_emits_thinking_done_at_end(self):
+        """If the stream is pure thinking with no regular content,
+        thinking_done must still be emitted (post-loop guard)."""
+        chunks = [
+            {"reasoning_content": "only thinking", "model": "m"},
+        ]
+        events, cb = _collect_events()
+        result, _ = _run_execute(chunks, progress_callback=cb)
+
+        kinds = [e["kind"] for e in events]
+        assert "thinking_done" in kinds
+
+    def test_no_thinking_events_when_no_reasoning_content(self):
+        """Pure content stream must not emit thinking_content or thinking_done."""
+        chunks = [
+            {"delta": "Plain answer.", "model": "m"},
+        ]
+        events, cb = _collect_events()
+        _run_execute(chunks, progress_callback=cb)
+
+        kinds = [e["kind"] for e in events]
+        assert "thinking_content" not in kinds
+        assert "thinking_done" not in kinds
+
+
+# ---------------------------------------------------------------------------
+# Tests — error handling in stream
+# ---------------------------------------------------------------------------
+
+class TestExecuteLLMChatStreamError:
+    """Verify error chunk handling during streaming."""
+
+    def test_error_chunk_stops_stream_and_returns_error(self):
+        """An error dict in the stream should halt processing."""
+        chunks = [
+            {"delta": "Partial...", "model": "m"},
+            {"error": {"code": "rate_limit", "message": "Too many requests"}},
+        ]
+        events, cb = _collect_events()
+        result, _ = _run_execute(chunks, progress_callback=cb)
+
+        assert result["status"] == "llm_error"
+        assert result["error"]["code"] == "rate_limit"
+
+    def test_error_chunk_emits_partial_deltas_before_error(self):
+        """Deltas emitted before the error chunk should still reach callback."""
+        chunks = [
+            {"delta": "OK", "model": "m"},
+            {"error": {"code": "timeout", "message": "timed out"}},
+        ]
+        events, cb = _collect_events()
+        _run_execute(chunks, progress_callback=cb)
+
+        delta_events = [e for e in events if e["kind"] == "assistant_delta"]
+        assert len(delta_events) >= 1
+        assert delta_events[0]["content"] == "OK"
+
+
+# ---------------------------------------------------------------------------
+# Tests — no chat_stream fallback
+# ---------------------------------------------------------------------------
+
+class TestExecuteLLMChatNoStream:
+    """When client has no chat_stream, fall back to non-streaming chat()."""
+
+    def test_fallback_to_chat_when_no_stream_method(self):
+        """LLMClient base provides a default chat_stream that wraps chat().
+        To exercise the non-streaming branch the client shadows chat_stream
+        with None so getattr returns None → falls through to chat()."""
+
+        class NoStreamClient(LLMClient):
+            chat_stream = None  # type: ignore[assignment]
+
+            def chat(self, messages, **kwargs):
+                return {"content": "non-stream response", "model": "m"}
+
+            def complete(self, prompt, **kwargs):
+                return {"content": "", "model": "m"}
+
+        class NoStreamManager:
+            def create_client(self):
+                return NoStreamClient()
+
+            def get_current_provider(self, redacted=False):
+                return {"provider": "test-provider"}
+
+            def validate_provider(self, name, config):
+                return None
+
+        events, cb = _collect_events()
+
+        with patch(
+            "core.kernel_llm_chat.llm_chat_messages",
+            return_value=[{"role": "user", "content": "hi"}],
+        ):
+            result = execute_llm_chat(
+                task="hi",
+                task_id="t2",
+                agent_id="a2",
+                llm_manager=NoStreamManager(),
+                config=_fake_config(),
+                config_path="/tmp/fake/config.yaml",
+                checkpoint_task_fn=lambda **kw: None,
+                progress_callback=cb,
+            )
+
+        assert result["status"] == "success"
+        assert result["output"] == "non-stream response"
+        # No assistant_start or assistant_delta in non-stream path
+        kinds = [e["kind"] for e in events]
+        assert "assistant_start" not in kinds
+        assert "assistant_delta" not in kinds
+
+    def test_client_creation_error_returns_config_error(self):
+        """When create_client returns a dict, status should be llm_configuration_error."""
+
+        class BrokenManager:
+            def create_client(self):
+                return {"error": {"code": "missing_api_key", "message": "No key"}}
+
+        events, cb = _collect_events()
+
+        with patch(
+            "core.kernel_llm_chat.llm_chat_messages",
+            return_value=[{"role": "user", "content": "hi"}],
+        ):
+            result = execute_llm_chat(
+                task="hi",
+                task_id="t3",
+                agent_id="a3",
+                llm_manager=BrokenManager(),
+                config=_fake_config(),
+                config_path="/tmp/fake/config.yaml",
+                checkpoint_task_fn=lambda **kw: None,
+                progress_callback=cb,
+            )
+
+        assert result["status"] == "llm_configuration_error"
+
+
+# ---------------------------------------------------------------------------
+# Tests — initial reasoning event
+# ---------------------------------------------------------------------------
+
+class TestExecuteLLMChatInitialReasoning:
+    """The very first event emitted is always a 'reasoning' kind."""
+
+    def test_first_event_is_reasoning(self):
+        chunks = [{"delta": "Hi", "model": "m"}]
+        events, cb = _collect_events()
+        _run_execute(chunks, progress_callback=cb)
+
+        assert len(events) >= 2  # at least reasoning + assistant_start
+        assert events[0]["kind"] == "reasoning"

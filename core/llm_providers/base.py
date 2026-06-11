@@ -8,7 +8,7 @@ import socket
 import urllib.error
 import urllib.parse
 import urllib.request
-from typing import Any, Iterable
+from typing import Any, Generator, Iterable
 
 from core.llm_client import LLMClient
 from core.llm_providers.config import (
@@ -68,6 +68,47 @@ class ConfiguredLLMClient(LLMClient):
     def complete(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
         return self.chat([{"role": "user", "content": prompt}], **kwargs)
 
+    def chat_stream(
+        self, messages: list[dict[str, str]], **kwargs: Any
+    ) -> Generator[dict[str, Any], None, None]:
+        """流式发送多轮对话消息，根据 api_format 路由到对应的流式请求方法。
+
+        每次 yield 一个字典，包含:
+        - ``delta``: 文本增量片段
+        - ``model``: 模型名称
+        - ``usage``: 累计 token 用量（最终块最准确）
+
+        最后一个块可能包含 ``finish_reason`` 键。
+        """
+        validation_error = self.config.validation_error()
+        if validation_error:
+            logger.warning(
+                "LLM provider configuration rejected before stream request: provider=%s code=%s",
+                self.config.provider,
+                validation_error.get("error", {}).get("code"),
+            )
+            yield validation_error
+            return
+
+        if not self._valid_messages(messages):
+            logger.warning(
+                "LLM stream request rejected because messages are empty or malformed: provider=%s",
+                self.config.provider,
+            )
+            yield self.config.error(
+                "invalid_request",
+                "LLM request requires at least one non-empty message with role and content",
+            )
+            return
+
+        api_format = kwargs.pop("api_format", self.config.api_format).lower()
+        if api_format == "anthropic":
+            yield from self._anthropic_stream_request(messages, **kwargs)
+        elif api_format in {"openai_responses", "responses"}:
+            yield from self._openai_responses_stream_request(messages, **kwargs)
+        else:
+            yield from self._openai_stream_request(messages, **kwargs)
+
     def _openai_request(
         self, messages: list[dict[str, str]], **kwargs: Any
     ) -> dict[str, Any]:
@@ -98,6 +139,58 @@ class ConfiguredLLMClient(LLMClient):
             return response
         return self._parse_openai_chat_response(response)
 
+    def _openai_stream_request(
+        self, messages: list[dict[str, str]], **kwargs: Any
+    ) -> Generator[dict[str, Any], None, None]:
+        """通过 OpenAI Chat Completions SSE 流式接口发送请求。"""
+        payload: dict[str, Any] = {
+            "model": self.config.model,
+            "messages": messages,
+            "stream": True,
+        }
+        self._copy_options(
+            payload,
+            kwargs,
+            allowed=(
+                "temperature",
+                "max_tokens",
+                "top_p",
+                "frequency_penalty",
+                "presence_penalty",
+                "stop",
+            ),
+            defaults={"temperature": 0.7, "max_tokens": 1024},
+        )
+        headers = {
+            "Authorization": f"Bearer {self.config.api_key}",
+            "Content-Type": "application/json",
+            **self.config.headers,
+        }
+        model = self.config.model
+        usage: dict[str, Any] = {}
+        for chunk in self._post_json_stream("/chat/completions", payload, headers):
+            if "error" in chunk:
+                yield chunk
+                return
+            model = chunk.get("model", model)
+            chunk_usage = chunk.get("usage")
+            if chunk_usage:
+                usage = chunk_usage
+            choices = chunk.get("choices") or []
+            for choice in choices:
+                delta = choice.get("delta") or {}
+                content = delta.get("content") or ""
+                if content:
+                    yield {"delta": content, "model": model, "usage": usage}
+                finish = choice.get("finish_reason")
+                if finish:
+                    yield {
+                        "delta": "",
+                        "model": model,
+                        "usage": usage,
+                        "finish_reason": finish,
+                    }
+
     def _openai_responses_request(
         self, messages: list[dict[str, str]], **kwargs: Any
     ) -> dict[str, Any]:
@@ -126,6 +219,54 @@ class ConfiguredLLMClient(LLMClient):
         if "error" in response:
             return response
         return self._parse_openai_responses_response(response)
+
+    def _openai_responses_stream_request(
+        self, messages: list[dict[str, str]], **kwargs: Any
+    ) -> Generator[dict[str, Any], None, None]:
+        """通过 OpenAI Responses API SSE 流式接口发送请求。"""
+        payload: dict[str, Any] = {
+            "model": self.config.model,
+            "input": self._openai_responses_input(messages),
+            "stream": True,
+        }
+        system = self._combined_system_prompt(messages)
+        if system:
+            payload["instructions"] = system
+        self._copy_options(
+            payload,
+            kwargs,
+            allowed=("temperature", "max_output_tokens", "top_p", "truncation"),
+            defaults={
+                "temperature": 0.7,
+                "max_output_tokens": kwargs.get("max_tokens", 1024),
+            },
+        )
+        headers = {
+            "Authorization": f"Bearer {self.config.api_key}",
+            "Content-Type": "application/json",
+            **self.config.headers,
+        }
+        model = self.config.model
+        usage: dict[str, Any] = {}
+        for chunk in self._post_json_stream("/responses", payload, headers):
+            if "error" in chunk:
+                yield chunk
+                return
+            event_type = chunk.get("type", "")
+            if event_type == "response.output_text.delta":
+                text = chunk.get("delta") or ""
+                if text:
+                    yield {"delta": text, "model": model, "usage": usage}
+            elif event_type == "response.completed":
+                resp = chunk.get("response") or {}
+                model = resp.get("model", model)
+                usage = resp.get("usage") or usage
+                yield {
+                    "delta": "",
+                    "model": model,
+                    "usage": usage,
+                    "finish_reason": "stop",
+                }
 
     def _parse_openai_chat_response(self, response: dict[str, Any]) -> dict[str, Any]:
         choices = response.get("choices") or [{}]
@@ -206,6 +347,57 @@ class ConfiguredLLMClient(LLMClient):
             "model": response.get("model", self.config.model),
             "usage": response.get("usage", {}),
         }
+
+    def _anthropic_stream_request(
+        self, messages: list[dict[str, str]], **kwargs: Any
+    ) -> Generator[dict[str, Any], None, None]:
+        """通过 Anthropic Messages API SSE 流式接口发送请求。"""
+        payload: dict[str, Any] = {
+            "model": self.config.model,
+            "max_tokens": kwargs.get("max_tokens", 1024),
+            "messages": self._anthropic_messages(messages),
+            "stream": True,
+        }
+        system = self._combined_system_prompt(messages)
+        if system:
+            payload["system"] = system
+        if "temperature" in kwargs:
+            payload["temperature"] = kwargs["temperature"]
+        for option in ("top_p", "top_k", "stop_sequences"):
+            if option in kwargs and kwargs[option] is not None:
+                payload[option] = kwargs[option]
+        headers = {
+            "x-api-key": self.config.api_key,
+            "anthropic-version": "2023-06-01",
+            "Content-Type": "application/json",
+            **self.config.headers,
+        }
+        model = self.config.model
+        usage: dict[str, Any] = {}
+        for chunk in self._post_json_stream("/messages", payload, headers):
+            if "error" in chunk:
+                yield chunk
+                return
+            event_type = chunk.get("type", "")
+            if event_type == "message_start":
+                msg = chunk.get("message") or {}
+                model = msg.get("model", model)
+                usage = msg.get("usage") or usage
+            elif event_type == "content_block_delta":
+                delta = chunk.get("delta") or {}
+                text = delta.get("text") or ""
+                if text:
+                    yield {"delta": text, "model": model, "usage": usage}
+            elif event_type == "message_delta":
+                usage_update = chunk.get("usage") or {}
+                usage.update(usage_update)
+            elif event_type == "message_stop":
+                yield {
+                    "delta": "",
+                    "model": model,
+                    "usage": usage,
+                    "finish_reason": "stop",
+                }
 
     def _post_json(
         self, path: str, payload: dict[str, Any], headers: dict[str, str]
@@ -303,6 +495,117 @@ class ConfiguredLLMClient(LLMClient):
                 message,
             )
             return self.config.error("request_error", message)
+
+    def _post_json_stream(
+        self, path: str, payload: dict[str, Any], headers: dict[str, str]
+    ) -> Generator[dict[str, Any], None, None]:
+        """发送流式 POST 请求并从 SSE data 行中 yield 解析后的 JSON 对象。
+
+        处理 OpenAI 和 Anthropic 通用的 SSE 格式：
+        - ``event: <type>`` 行（忽略，JSON 内的 type 字段已足够）
+        - ``data: <json>`` 行
+        - ``data: [DONE]`` 表示流结束（OpenAI）
+        """
+        try:
+            url = self._provider_url(path)
+        except UnsafeProviderURL as exc:
+            message = sanitize_error_message(str(exc), [self.config.api_key])
+            logger.error(
+                "LLM provider URL rejected: provider=%s reason=%s",
+                self.config.provider,
+                message,
+            )
+            yield self.config.error("invalid_base_url", message)
+            return
+
+        safe_url = redact_sensitive(url)
+        logger.info(
+            "Sending streaming LLM request: provider=%s format=%s model=%s url=%s timeout=%s headers=%s",
+            self.config.provider,
+            self.config.api_format,
+            self.config.model,
+            safe_url,
+            self.config.timeout,
+            sanitized_headers(headers),
+        )
+        try:
+            data = json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+            with urllib.request.urlopen(req, timeout=self.config.timeout) as resp:
+                event_data = ""
+                for raw_line in resp:
+                    line = raw_line.decode("utf-8").rstrip("\r\n")
+                    if line.startswith("event:"):
+                        # Skip event type lines; the JSON payload's "type" field is used.
+                        continue
+                    if line.startswith("data:"):
+                        event_data = line[5:].lstrip()
+                        if event_data == "[DONE]":
+                            return
+                        try:
+                            parsed = json.loads(event_data)
+                            yield parsed
+                        except json.JSONDecodeError:
+                            logger.debug(
+                                "SSE data line is not valid JSON, skipping: provider=%s",
+                                self.config.provider,
+                            )
+                        event_data = ""
+                    elif line == "":
+                        # SSE event boundary — reset (data already yielded inline)
+                        event_data = ""
+                # Handle trailing data if stream closes without final empty line
+                if event_data and event_data != "[DONE]":
+                    try:
+                        parsed = json.loads(event_data)
+                        yield parsed
+                    except json.JSONDecodeError:
+                        pass
+        except urllib.error.HTTPError as exc:
+            yield self._http_error(exc)
+        except socket.timeout as exc:
+            logger.error(
+                "Streaming LLM request timed out: provider=%s url=%s timeout=%s",
+                self.config.provider,
+                safe_url,
+                self.config.timeout,
+            )
+            yield self.config.error(
+                "timeout",
+                f"LLM provider request timed out after {self.config.timeout} seconds: {exc}",
+            )
+        except urllib.error.URLError as exc:
+            reason = sanitize_error_message(
+                str(getattr(exc, "reason", exc)), [self.config.api_key]
+            )
+            logger.error(
+                "Streaming LLM network failure: provider=%s url=%s error=%s",
+                self.config.provider,
+                safe_url,
+                reason,
+            )
+            yield self.config.error(
+                "network_error", f"LLM provider network failure: {reason}"
+            )
+        except json.JSONDecodeError as exc:
+            logger.error(
+                "Streaming LLM provider returned invalid JSON: provider=%s url=%s error=%s",
+                self.config.provider,
+                safe_url,
+                exc,
+            )
+            yield self.config.error(
+                "invalid_response", f"LLM provider returned invalid JSON: {exc}"
+            )
+        except Exception as exc:
+            message = sanitize_error_message(str(exc), [self.config.api_key])
+            logger.error(
+                "Streaming LLM request failed: provider=%s url=%s error=%s",
+                self.config.provider,
+                safe_url,
+                message,
+            )
+            yield self.config.error("request_error", message)
 
     def _http_error(self, exc: urllib.error.HTTPError) -> dict[str, Any]:
         details = ""

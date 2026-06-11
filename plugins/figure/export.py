@@ -59,6 +59,8 @@ def export_figure(
     """
     if formats is None:
         formats = ("pdf", "svg", "png")
+    if isinstance(formats, str):
+        formats = [formats]
     formats = [f.lower().lstrip(".") for f in formats]
     unknown = [f for f in formats if f not in SUPPORTED_FORMATS]
     if unknown:

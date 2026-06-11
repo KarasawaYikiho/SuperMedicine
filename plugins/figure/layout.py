@@ -43,14 +43,18 @@ PANEL_STYLES = {
 
 
 def _letter_sequence(n: int) -> list[str]:
-    """Generate a, b, ..., z, aa, ab, ... label sequence."""
+    """Generate a, b, ..., z, aa, ab, ..., zz, aaa, ... label sequence."""
     letters = string.ascii_lowercase
     out: list[str] = []
     for i in range(n):
-        if i < 26:
-            out.append(letters[i])
-        else:
-            out.append(letters[i // 26 - 1] + letters[i % 26])
+        s = ""
+        x = i
+        while True:
+            s = letters[x % 26] + s
+            x = x // 26 - 1
+            if x < 0:
+                break
+        out.append(s)
     return out
 
 
