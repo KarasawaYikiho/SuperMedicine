@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <!-- Background circle -->
+  <circle cx="100" cy="100" r="96" fill="#111827" stroke="#A7F3D0" stroke-width="2"/>
+  
+  <!-- DNA Helix strands -->
+  <path d="M70 40 C70 40, 130 60, 130 80 C130 100, 70 120, 70 140 C70 160, 130 180, 130 180" 
+        stroke="#A7F3D0" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.9"/>
+  <path d="M130 40 C130 40, 70 60, 70 80 C70 100, 130 120, 130 140 C130 160, 70 180, 70 180" 
+        stroke="#A7F3D0" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.9"/>
+  
+  <!-- DNA base pairs (horizontal bars) -->
+  <line x1="78" y1="55" x2="122" y2="55" stroke="#86EFAC" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+  <line x1="85" y1="70" x2="115" y2="70" stroke="#86EFAC" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+  <line x1="95" y1="85" x2="105" y2="85" stroke="#86EFAC" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+  <line x1="95" y1="100" x2="105" y2="100" stroke="#86EFAC" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+  <line x1="85" y1="115" x2="115" y2="115" stroke="#86EFAC" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+  <line x1="78" y1="130" x2="122" y2="130" stroke="#86EFAC" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+  <line x1="78" y1="145" x2="122" y2="145" stroke="#86EFAC" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+  
+  <!-- Medical cross overlay (subtle) -->
+  <rect x="92" y="60" width="16" height="40" rx="3" fill="#A7F3D0" opacity="0.15"/>
+  <rect x="82" y="70" width="36" height="16" rx="3" fill="#A7F3D0" opacity="0.15"/>
+</svg>

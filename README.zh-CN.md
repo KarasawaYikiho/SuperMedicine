@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.svg" alt="SuperMedicine" width="200">
+</p>
+
 # SuperMedicine
 
 <p align="center"><strong>SuperMedicine</strong><br><sub>minimal medical research workspace</sub></p>
