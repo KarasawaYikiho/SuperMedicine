@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from core.config_center import ConfigCenter
+    from core.database import Database, SessionRepository, AgentRepository
+    from core.effect import Effect
     from core.event_bus import EventBus
     from core.kernel import Kernel
     from core.llm_client import LLMClient
@@ -19,6 +21,10 @@ if TYPE_CHECKING:
 _EXPORTS: dict[str, tuple[str, str]] = {
     "Kernel": ("core.kernel", "Kernel"),
     "ConfigCenter": ("core.config_center", "ConfigCenter"),
+    "Database": ("core.database", "Database"),
+    "SessionRepository": ("core.database", "SessionRepository"),
+    "AgentRepository": ("core.database", "AgentRepository"),
+    "Effect": ("core.effect", "Effect"),
     "EventBus": ("core.event_bus", "EventBus"),
     "PluginRegistry": ("core.plugin_registry", "PluginRegistry"),
     "SessionManager": ("core.session_manager", "SessionManager"),
@@ -44,6 +50,10 @@ def __getattr__(name: str) -> Any:
 __all__ = [
     "Kernel",
     "ConfigCenter",
+    "Database",
+    "SessionRepository",
+    "AgentRepository",
+    "Effect",
     "EventBus",
     "PluginRegistry",
     "SessionManager",
