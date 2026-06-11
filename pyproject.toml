@@ -105,6 +105,20 @@ module = [
     "textual",
     "textual.*",
     "yaml",
+    "matplotlib",
+    "matplotlib.*",
+    "PIL",
+    "PIL.*",
+    "pypdf",
+    "PyPDF2",
+    "scienceplots",
+    "numpy",
+    "pandas",
+    "fitz",
+    "fastapi",
+    "fastapi.*",
+    "uvicorn",
+    "uvicorn.*",
 ]
 ignore_missing_imports = true
 

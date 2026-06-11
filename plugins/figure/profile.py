@@ -299,13 +299,14 @@ def profile_data(source, group_cols: list[str] | None = None) -> dict:
         ctype = _detect_column_type(s)
         n_total = len(s)
         n_null = int(s.isnull().sum())
-        entry = {
+        missing_rate: float = n_null / n_total if n_total else 0.0
+        entry: dict[str, Any] = {
             "type": ctype,
             "n_total": n_total,
             "n_null": n_null,
-            "missing_rate": n_null / n_total if n_total else 0.0,
+            "missing_rate": missing_rate,
         }
-        if entry["missing_rate"] > 0.20:
+        if missing_rate > 0.20:
             warn_list.append(
                 f"Column {c!r} missing rate {entry['missing_rate']:.0%} -- consider imputation, removal, "
                 "or reporting in figure legend before plotting.")

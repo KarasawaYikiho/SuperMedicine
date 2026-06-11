@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 from core.kernel_llm_chat import execute_llm_chat
 from core.llm_client import LLMClient
+from core.llm_manager import LLMConfigManager
 
 
 # ---------------------------------------------------------------------------
@@ -61,7 +62,10 @@ def _run_execute(
     """Run ``execute_llm_chat`` with a StreamClient yielding *chunks*."""
     client = StreamClient(chunks)
 
-    class FakeManager:
+    class FakeManager(LLMConfigManager):
+        def __init__(self):
+            pass  # Skip parent init
+
         def create_client(self):
             return client
 
