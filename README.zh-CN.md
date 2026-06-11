@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="assets/logo.svg" alt="SuperMedicine" width="200">
+  <img src="assets/logo.jpg" alt="SuperMedicine" width="200">
 </p>
 
 # SuperMedicine
 
-<p align="center"><strong>SuperMedicine</strong><br><sub>minimal medical research workspace</sub></p>
+<p align="center"><img src="assets/logo.jpg" alt="SuperMedicine" width="400"></p>
 
 ![Version](https://img.shields.io/badge/version-Beta0.4.2-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)

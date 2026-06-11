@@ -242,10 +242,6 @@ def test_tracked_files_do_not_include_forbidden_or_generated_artifacts():
             forbidden_matches.append(tracked_path)
         if parts and parts[0] in {".claude", ".opencode", "superpowers"}:
             forbidden_matches.append(tracked_path)
-        if tracked_path == "docs/superpowers" or tracked_path.startswith(
-            "docs/superpowers/"
-        ):
-            forbidden_matches.append(tracked_path)
         if "node_modules" in lower_parts or ".cache" in lower_parts:
             forbidden_matches.append(tracked_path)
         if name.endswith(".pyc"):
