@@ -81,3 +81,58 @@ def empty_audit_log(tmp_path) -> Path:
     log_path = tmp_path / "audit.jsonl"
     log_path.write_text("", encoding="utf-8")
     return log_path
+
+
+@pytest.fixture
+def database(tmp_path):
+    """Provide an in-memory-like SQLite database for testing.
+
+    Uses a temporary file-based database so that the full Database lifecycle
+    (connect / disconnect / context manager) can be exercised without
+    polluting the real ``.supermedicine`` directory.
+    """
+    from core.database.database import Database
+
+    db_path = tmp_path / "test.db"
+    db = Database(db_path=db_path)
+    db.connect()
+    yield db
+    db.disconnect()
+
+
+@pytest.fixture
+def kernel(tmp_path):
+    """Provide a fully initialised Kernel instance with temp directories."""
+    import shutil
+    import yaml
+
+    from core.kernel import Kernel
+    from permission.engine import PermissionEngine
+
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.dump({"project": "test"}), encoding="utf-8")
+    (tmp_path / "plugins").mkdir()
+    (tmp_path / "policies").mkdir()
+    shutil.copyfile(
+        PermissionEngine.default_policy_path(),
+        tmp_path / "policies" / PermissionEngine.DEFAULT_POLICY_FILENAME,
+    )
+    return Kernel(
+        config_path=config_path,
+        plugins_dir=tmp_path / "plugins",
+        policies_dir=tmp_path / "policies",
+    )
+
+
+@pytest.fixture
+def tmp_workspace(tmp_path) -> Path:
+    """Create a temporary workspace directory with basic structure.
+
+    Returns the workspace root path.  Useful for tests that need a
+    writable workspace without touching the real project tree.
+    """
+    ws = tmp_path / "workspace"
+    ws.mkdir()
+    (ws / "data").mkdir()
+    (ws / "output").mkdir()
+    return ws

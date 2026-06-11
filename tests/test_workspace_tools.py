@@ -15,7 +15,6 @@ from core.workspace_tools import (
     MANIFEST_FILE,
     TOOL_AUTHORING_SPEC,
     InvalidToolId,
-    InvalidToolLanguage,
     ToolManifest,
     ToolManifestError,
     WorkspaceToolError,
@@ -24,6 +23,7 @@ from core.workspace_tools import (
     validate_language,
     validate_tool_id,
 )
+from core.workspace_tool_models import InvalidToolLanguage
 from permission.audit import AuditLogger
 from permission.policy import PermissionResult, ensure_default_policy
 

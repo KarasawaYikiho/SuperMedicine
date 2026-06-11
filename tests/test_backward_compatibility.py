@@ -247,6 +247,18 @@ def test_plugin_manifest_names_and_action_ids_are_unchanged():
             "harness.monitor.performance",
             "harness.monitor.failure_patterns",
         },
+        "figure": {
+            "figure.workflow",
+            "figure-profile.profile",
+            "figure-style.setup",
+            "figure-style.list-fonts",
+            "figure-export.export",
+            "figure-check.audit",
+            "figure-layout.labels",
+            "figure-layout.finalize",
+            "figure-qa.audit",
+            "figure-qa.preview",
+        },
     }
 
     discovered: dict[str, set[str]] = {}

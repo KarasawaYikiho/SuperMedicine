@@ -9,7 +9,8 @@ from pathlib import Path
 import yaml
 import pytest
 
-from Cli import CLI, _resolve_run_params
+from Cli import CLI
+from cli import _resolve_run_params
 from installer.entrypoint import (
     DEFAULT_CONFIG,
     init_config,

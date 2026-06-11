@@ -9,7 +9,8 @@ from typing import cast
 from textual.widgets import Input, ListView, Static
 
 from Cli import CLI, main
-from core.tui.app import PromptInput, STATUS_STYLE_CLASSES, SuperMedicineTUI, launch_tui
+from core.tui.app import PromptInput, SuperMedicineTUI, launch_tui
+from core.tui.status_helpers import STATUS_STYLE_CLASSES
 from core.tui.i18n import LABELS, t, tui_title_style_inventory
 from scripts.tui_preview_artifact import write_preview_artifact
 
@@ -435,6 +436,7 @@ def test_tui_stylesheet_selectors_match_declared_widgets_and_classes():
         path.read_text(encoding="utf-8")
         for path in [
             root.joinpath("core", "tui", "app.py"),
+            root.joinpath("core", "tui", "menu_screens.py"),
             *root.joinpath("core", "tui", "screens").glob("*_screen.py"),
         ]
     )

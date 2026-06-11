@@ -3,7 +3,8 @@ from __future__ import annotations
 import shutil
 import yaml
 from core.llm_client import LLMClient
-from core.kernel import Kernel, SUPERMEDICINE_SYSTEM_PROMPT
+from core.kernel import Kernel
+from core.kernel_constants import SUPERMEDICINE_SYSTEM_PROMPT
 from permission.engine import PermissionEngine
 from permission.prompt_generator import PromptGenerator
 

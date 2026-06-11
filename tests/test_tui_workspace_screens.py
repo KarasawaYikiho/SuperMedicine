@@ -136,14 +136,14 @@ def test_workspace_view_supports_enter_shortcut_and_keeps_focus_after_create():
     create_source = inspect.getsource(WorkspaceView._create_workspace)
     load_source = inspect.getsource(WorkspaceView._load_workspaces)
     key_source = inspect.getsource(WorkspaceView.on_key)
-    submit_source = inspect.getsource(WorkspaceView.on_input_submitted)
+    submit_source = inspect.getsource(WorkspaceView.handle_input_submit)
     row_source = inspect.getsource(WorkspaceView.on_data_table_row_selected)
 
     assert "workspace_manual_create_hint" in compose_source
     assert "workspace_create_placeholder" in compose_source
     assert "ctrl+n" in key_source
     assert "workspace-id-input" in submit_source
-    assert "_create_workspace(event.value.strip())" in submit_source
+    assert "_create_workspace(value.strip())" in submit_source
     assert "input_widget.focus()" in create_source
     assert "_load_workspaces(preserve_status=True)" in create_source
     assert "_select_table_row" in create_source

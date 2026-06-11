@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 
-from Cli import _RedactingFormatter
+from cli import _RedactingFormatter
 from core.redaction import redact_sensitive
 from core.tui.app import SuperMedicineTUI
 

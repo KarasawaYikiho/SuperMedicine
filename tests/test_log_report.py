@@ -9,12 +9,14 @@ import pytest
 
 from core.log_report import (
     LogReportError,
-    LogReportLoggingHandler,
     LogReportStore,
+)
+from core.log_report_handler import (
+    LogReportLoggingHandler,
     append_tui_stream_output,
     configure_tui_log_storage,
-    format_log_message,
 )
+from core.log_severity import format_log_message
 
 
 def test_log_directory_is_created_and_isolated_log_is_redacted(tmp_path):
@@ -117,15 +119,15 @@ def test_log_report_keeps_business_fields_while_redacting_error_payload(tmp_path
 def test_list_show_and_summary_return_redacted_records(tmp_path):
     store = LogReportStore(tmp_path)
     session_log = store.write("password=hunter2", session_id="session-a")
-    isolated_log = store.write("plain note")
+    store.write("plain note")
 
     listed = store.list()
     shown = store.show(session_log["file"])
     summary = store.export_summary(session_id="session-a")
 
     assert [item["file"] for item in listed] == [
-        isolated_log["file"],
-        session_log["file"],
+        "session-session-a.json",
+        "session-tui-application.json",
     ]
     assert shown["file"] == session_log["file"]
     assert summary["log_count"] == 1

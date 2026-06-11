@@ -177,7 +177,7 @@ def test_kernel_result_format_redacts_secret_strings_and_keeps_stable_chinese_he
 def test_run_kernel_task_emits_running_completion_and_formatted_messages(
     monkeypatch, tmp_path
 ):
-    events: list[tuple[str, str]] = []
+    events: list[tuple[str, ...]] = []
 
     class FakeChat:
         def add_system_message(self, message: str) -> None:
@@ -193,6 +193,12 @@ def test_run_kernel_task_emits_running_completion_and_formatted_messages(
 
         def add_error_message(self, message: str) -> None:
             events.append(("error", message))
+
+        def start_processing_animation(self):
+            events.append(("processing_animation_start",))
+
+        def stop_processing_animation(self):
+            events.append(("processing_animation_stop",))
 
     class FakeKernel:
         def __init__(self, *args, **kwargs):
@@ -217,12 +223,13 @@ def test_run_kernel_task_emits_running_completion_and_formatted_messages(
     asyncio.run(app._run_kernel_task("hello", FakeChat(), turn_id=1))
 
     assert events[0] == ("system", t("thinking"))
-    assert ("status", t("chat_running")) in events
+    assert ("processing_animation_start",) in events
     assert any(
         kind == "assistant" and t("chat_result_status") in message and "ok" in message
-        for kind, message in events
+        for kind, message in (e for e in events if len(e) == 2)
     )
-    assert events[-1] == ("status", t("chat_completed"))
+    assert events[-1] == ("processing_animation_stop",)
+    assert ("status", t("chat_completed")) in events
     assert app._task_running is False
 
 

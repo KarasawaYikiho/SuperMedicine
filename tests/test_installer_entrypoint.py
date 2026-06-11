@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 import textwrap
@@ -152,6 +153,7 @@ def _copy_cli_entrypoint_without_installer_package(workspace: Path) -> Path:
     (workspace / "Install.py").write_text(
         (REPO_ROOT / "Install.py").read_text(encoding="utf-8"), encoding="utf-8"
     )
+    shutil.copytree(REPO_ROOT / "cli", workspace / "cli")
     _write_minimal_import_stubs(workspace)
     assert not (workspace / "installer").exists()
     return cli_path
