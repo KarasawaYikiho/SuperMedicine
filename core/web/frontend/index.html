@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SuperMedicine Web</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <header>
+        <h1>SuperMedicine Web Interface</h1>
+        <div id="status-bar">
+            <span id="status-indicator" class="disconnected" title="Connection status"></span>
+            <span id="status-text">Connecting...</span>
+        </div>
+    </header>
+
+    <nav id="tab-nav">
+        <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
+        <button class="tab-btn" data-tab="chat">Chat</button>
+        <button class="tab-btn" data-tab="workspaces">Workspaces</button>
+        <button class="tab-btn" data-tab="papers">Papers</button>
+        <button class="tab-btn" data-tab="experiences">Experiences</button>
+        <button class="tab-btn" data-tab="tools">Tools</button>
+        <button class="tab-btn" data-tab="experiments">Experiments</button>
+        <button class="tab-btn" data-tab="llm">LLM Config</button>
+        <button class="tab-btn" data-tab="permissions">Permissions</button>
+        <button class="tab-btn" data-tab="logs">Logs</button>
+    </nav>
+
+    <main>
+        <!-- Dashboard Tab -->
+        <section id="tab-dashboard" class="tab-content active">
+            <h2>Project Status</h2>
+            <div id="project-status" class="status-grid">Loading...</div>
+            <div class="dashboard-cards" id="dashboard-cards"></div>
+        </section>
+
+        <!-- Chat Tab -->
+        <section id="tab-chat" class="tab-content">
+            <h2>Chat</h2>
+            <div id="messages" role="log" aria-live="polite"></div>
+            <form id="chat-form" autocomplete="off">
+                <textarea
+                    id="chat-input"
+                    placeholder="Type your message..."
+                    rows="3"
+                    aria-label="Chat input"
+                ></textarea>
+                <button type="submit" id="send-btn">Send</button>
+            </form>
+        </section>
+
+        <!-- Workspaces Tab -->
+        <section id="tab-workspaces" class="tab-content">
+            <h2>Workspace Management</h2>
+            <div class="toolbar">
+                <button id="btn-refresh-workspaces" class="btn btn-secondary">Refresh</button>
+                <button id="btn-add-workspace" class="btn btn-primary">+ New Workspace</button>
+            </div>
+            <div id="workspace-form" class="form-container hidden">
+                <h3>Create Workspace</h3>
+                <div class="form-group">
+                    <label for="ws-id">Workspace ID</label>
+                    <input type="text" id="ws-id" placeholder="e.g. my-project">
+                </div>
+                <div class="form-group">
+                    <label for="ws-name">Name (optional)</label>
+                    <input type="text" id="ws-name" placeholder="e.g. My Project">
+                </div>
+                <div class="form-actions">
+                    <button id="btn-save-workspace" class="btn btn-primary">Create</button>
+                    <button id="btn-cancel-workspace" class="btn btn-secondary">Cancel</button>
+                </div>
+            </div>
+            <div id="workspace-list" class="data-table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="workspace-tbody">
+                        <tr><td colspan="4" class="empty-state">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Papers Tab -->
+        <section id="tab-papers" class="tab-content">
+            <h2>Paper Management</h2>
+            <div class="toolbar">
+                <select id="paper-ws-select" class="select-input">
+                    <option value="">Select Workspace</option>
+                </select>
+                <button id="btn-refresh-papers" class="btn btn-secondary">Refresh</button>
+                <button id="btn-add-paper" class="btn btn-primary">+ Import Paper</button>
+            </div>
+            <div id="paper-form" class="form-container hidden">
+                <h3>Import Paper</h3>
+                <div class="form-group">
+                    <label for="paper-source">Source Path</label>
+                    <input type="text" id="paper-source" placeholder="/path/to/paper.pdf">
+                </div>
+                <div class="form-group">
+                    <label for="paper-title">Title (optional)</label>
+                    <input type="text" id="paper-title" placeholder="Paper title">
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="paper-enrich"> Auto-enrich with LLM
+                    </label>
+                </div>
+                <div class="form-actions">
+                    <button id="btn-save-paper" class="btn btn-primary">Import</button>
+                    <button id="btn-cancel-paper" class="btn btn-secondary">Cancel</button>
+                </div>
+            </div>
+            <div id="paper-list" class="data-table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Title</th>
+                            <th>Authors</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="paper-tbody">
+                        <tr><td colspan="5" class="empty-state">Select a workspace to view papers</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Experiences Tab -->
+        <section id="tab-experiences" class="tab-content">
+            <h2>Experience Management</h2>
+            <div class="toolbar">
+                <select id="exp-ws-select" class="select-input">
+                    <option value="">Select Workspace</option>
+                </select>
+                <button id="btn-refresh-experiences" class="btn btn-secondary">Refresh</button>
+                <button id="btn-add-experience" class="btn btn-primary">+ Add Experience</button>
+            </div>
+            <div id="experience-form" class="form-container hidden">
+                <h3>Add Experience</h3>
+                <div class="form-group">
+                    <label for="exp-scope">Scope</label>
+                    <select id="exp-scope" class="select-input">
+                        <option value="workspace">Workspace</option>
+                        <option value="global">Global</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="exp-title">Title</label>
+                    <input type="text" id="exp-title" placeholder="Experience title">
+                </div>
+                <div class="form-group">
+                    <label for="exp-summary">Summary</label>
+                    <textarea id="exp-summary" rows="4" placeholder="Describe the experience..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="exp-tags">Tags (comma-separated)</label>
+                    <input type="text" id="exp-tags" placeholder="e.g. synthesis, optimization">
+                </div>
+                <div class="form-actions">
+                    <button id="btn-save-experience" class="btn btn-primary">Save</button>
+                    <button id="btn-cancel-experience" class="btn btn-secondary">Cancel</button>
+                </div>
+            </div>
+            <div id="experience-list" class="data-table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Title</th>
+                            <th>Scope</th>
+                            <th>Tags</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="experience-tbody">
+                        <tr><td colspan="5" class="empty-state">Select a workspace to view experiences</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Tools Tab -->
+        <section id="tab-tools" class="tab-content">
+            <h2>Tool Management</h2>
+            <div class="toolbar">
+                <select id="tool-ws-select" class="select-input">
+                    <option value="">Select Workspace</option>
+                </select>
+                <select id="tool-lang-select" class="select-input">
+                    <option value="">All Languages</option>
+                    <option value="python">Python</option>
+                    <option value="r">R</option>
+                    <option value="javascript">JavaScript</option>
+                </select>
+                <button id="btn-refresh-tools" class="btn btn-secondary">Refresh</button>
+                <button id="btn-scan-tools" class="btn btn-primary">Scan Tools</button>
+                <button id="btn-add-tool" class="btn btn-primary">+ Add Tool</button>
+            </div>
+            <div id="tool-scan-results" class="hidden">
+                <h3>Scan Results</h3>
+                <div id="tool-scan-list" class="scan-results"></div>
+                <div class="form-actions">
+                    <button id="btn-add-scanned-tools" class="btn btn-primary">Add Selected</button>
+                    <button id="btn-cancel-scan" class="btn btn-secondary">Close</button>
+                </div>
+            </div>
+            <div id="tool-list" class="data-table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Language</th>
+                            <th>Version</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tool-tbody">
+                        <tr><td colspan="5" class="empty-state">Select a workspace to view tools</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Experiments Tab -->
+        <section id="tab-experiments" class="tab-content">
+            <h2>Experiment Guide</h2>
+            <div class="toolbar">
+                <button id="btn-refresh-experiments" class="btn btn-secondary">Refresh</button>
+                <button id="btn-start-experiment" class="btn btn-primary">+ Start Experiment</button>
+            </div>
+            <div id="experiment-form" class="form-container hidden">
+                <h3>Start New Experiment</h3>
+                <div class="form-group">
+                    <label for="exp-protocol">Protocol</label>
+                    <textarea id="exp-protocol" rows="6" placeholder="Paste experiment protocol..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="exp-session-id">Session ID (optional)</label>
+                    <input type="text" id="exp-session-id" placeholder="Auto-generated if empty">
+                </div>
+                <div class="form-actions">
+                    <button id="btn-save-experiment" class="btn btn-primary">Start</button>
+                    <button id="btn-cancel-experiment" class="btn btn-secondary">Cancel</button>
+                </div>
+            </div>
+            <div id="experiment-list" class="data-table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Session</th>
+                            <th>Protocol</th>
+                            <th>Status</th>
+                            <th>Current Step</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="experiment-tbody">
+                        <tr><td colspan="5" class="empty-state">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div id="experiment-detail" class="hidden">
+                <h3>Experiment Detail</h3>
+                <div id="experiment-steps"></div>
+            </div>
+        </section>
+
+        <!-- LLM Config Tab -->
+        <section id="tab-llm" class="tab-content">
+            <h2>LLM Configuration</h2>
+            <div class="toolbar">
+                <button id="btn-refresh-llm" class="btn btn-secondary">Refresh</button>
+            </div>
+            <div id="llm-current" class="info-card">
+                <h3>Current Provider</h3>
+                <div id="llm-current-info">Loading...</div>
+            </div>
+            <div id="llm-providers" class="data-table-container">
+                <h3>Available Providers</h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Model</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="llm-tbody">
+                        <tr><td colspan="4" class="empty-state">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Permissions Tab -->
+        <section id="tab-permissions" class="tab-content">
+            <h2>Permission Settings</h2>
+            <div class="toolbar">
+                <button id="btn-refresh-permissions" class="btn btn-secondary">Refresh</button>
+            </div>
+            <div id="permission-status" class="info-card">
+                <h3>Current Mode</h3>
+                <div id="permission-mode-info">Loading...</div>
+            </div>
+            <div class="form-container">
+                <h3>Change Permission Mode</h3>
+                <div class="form-group">
+                    <select id="permission-mode-select" class="select-input">
+                        <option value="interactive">Interactive</option>
+                        <option value="auto">Auto</option>
+                        <option value="full">Full (requires confirmation)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="permission-confirm-full"> Confirm full access
+                    </label>
+                </div>
+                <div class="form-actions">
+                    <button id="btn-set-permission" class="btn btn-primary">Apply</button>
+                </div>
+            </div>
+            <div class="form-container">
+                <h3>Authorize External Path</h3>
+                <div class="form-group">
+                    <input type="text" id="permission-path" placeholder="/path/to/authorize">
+                </div>
+                <div class="form-actions">
+                    <button id="btn-authorize-path" class="btn btn-primary">Authorize</button>
+                </div>
+            </div>
+            <div id="permission-policies" class="data-table-container">
+                <h3>Policies</h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Rule</th>
+                            <th>Scope</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="permission-tbody">
+                        <tr><td colspan="3" class="empty-state">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Logs Tab -->
+        <section id="tab-logs" class="tab-content">
+            <h2>Log Viewer</h2>
+            <div class="toolbar">
+                <select id="log-select" class="select-input">
+                    <option value="">Select Log</option>
+                </select>
+                <button id="btn-refresh-logs" class="btn btn-secondary">Refresh</button>
+                <button id="btn-write-log" class="btn btn-primary">+ Write Log</button>
+            </div>
+            <div id="log-write-form" class="form-container hidden">
+                <h3>Write Log Entry</h3>
+                <div class="form-group">
+                    <textarea id="log-message" rows="3" placeholder="Log message..."></textarea>
+                </div>
+                <div class="form-group">
+                    <input type="text" id="log-session-id" placeholder="Session ID (optional)">
+                </div>
+                <div class="form-actions">
+                    <button id="btn-save-log" class="btn btn-primary">Write</button>
+                    <button id="btn-cancel-log" class="btn btn-secondary">Cancel</button>
+                </div>
+            </div>
+            <div id="log-viewer" class="log-viewer">
+                <pre id="log-content">Select a log to view its contents.</pre>
+            </div>
+        </section>
+    </main>
+
+    <div id="toast-container"></div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
