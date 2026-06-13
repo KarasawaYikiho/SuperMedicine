@@ -1,7 +1,7 @@
 # SuperMedicine API Reference
 
 This document provides a concise API reference for SuperMedicine's core modules.
-For full design context, see [ARCHITECTURE.md](../../ARCHITECTURE.md).
+For full design context, see [ARCHITECTURE.md](../architecture/ARCHITECTURE.md).
 
 ## Core Modules (`core/`)
 

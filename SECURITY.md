@@ -1,8 +1,8 @@
 # Security Policy
 
 This policy summarizes SuperMedicine security, privacy, and medical-use
-boundaries for **Beta0.4.2**. Operational setup is in [INSTALL.md](INSTALL.md),
-and architecture boundaries are in [ARCHITECTURE.md](ARCHITECTURE.md).
+boundaries for **Beta0.4.2**. Operational setup is in [INSTALL.md](docs/guides/INSTALL.md),
+and architecture boundaries are in [ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md).
 
 ## Security Model
 

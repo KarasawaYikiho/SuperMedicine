@@ -2,7 +2,7 @@
 
 Thank you for contributing to SuperMedicine. This guide summarizes the local
 development workflow for the **Beta0.4.2** codebase. User installation details
-are in [INSTALL.md](INSTALL.md), and the local quality gate is in
+are in [INSTALL.md](docs/guides/INSTALL.md), and the local quality gate is in
 [README.md](README.md#local-quality-gate).
 
 ## Development Environment

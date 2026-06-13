@@ -259,5 +259,5 @@ supermedicine permission revoke /path/to/allowed-dir
 
 - [ARCHITECTURE.md](../architecture/ARCHITECTURE.md) — full technical reference
 - [SECURITY.md](../../SECURITY.md) — security model and boundaries
-- [FUNCTION_MAP.md](../../FUNCTION_MAP.md) — callable inventory
+- [FUNCTION_MAP.md](../architecture/FUNCTION_MAP.md) — callable inventory
 - [API Reference](../api/README.md) — module and endpoint details
