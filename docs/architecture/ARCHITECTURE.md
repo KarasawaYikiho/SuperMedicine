@@ -181,7 +181,7 @@ core independence.
 ## Function Relationship Inventory
 
 The visible callable inventory is [FUNCTION_MAP.md](FUNCTION_MAP.md). It is kept
-at the repository root because `.gitignore` excludes `docs/`. The map is generated
+alongside this document in `docs/architecture/`. The map is generated
 from Python AST static analysis and is useful for navigation, review, and impact
 assessment, but it is not a complete runtime trace. Dynamic CLI dispatch, Textual
 callbacks, decorators, plugin registries, tests, and reflection can add runtime

@@ -20,13 +20,13 @@ Current public/release label: **Beta0.4.2**. Python package fallback version:
 
 Core references:
 
-- [INSTALL.md](INSTALL.md) — installation, provider setup, release package layout,
+- [INSTALL.md](docs/guides/INSTALL.md) — installation, provider setup, release package layout,
   optional R support, and uninstall behavior.
-- [ARCHITECTURE.md](ARCHITECTURE.md) — microkernel, plugin, permission, adapter,
+- [ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md) — microkernel, plugin, permission, adapter,
   and repository-boundary design.
 - [SECURITY.md](SECURITY.md) — security model, secret handling, medical-use limits,
   and disclosure guidance.
-- [FUNCTION_MAP.md](FUNCTION_MAP.md) — static callable inventory and its limits.
+- [FUNCTION_MAP.md](docs/architecture/FUNCTION_MAP.md) — static callable inventory and its limits.
 - [CHANGELOG.md](CHANGELOG.md) — release history.
 
 ## Project Positioning
@@ -111,7 +111,7 @@ supermedicine log location
 
 For virtual environments, development dependencies, optional R support, advanced
 automation flags, release extraction examples, and uninstall details, see
-[INSTALL.md](INSTALL.md).
+[INSTALL.md](docs/guides/INSTALL.md).
 
 ## Quick Start
 

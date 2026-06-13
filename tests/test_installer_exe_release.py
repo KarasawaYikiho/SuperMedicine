@@ -211,9 +211,7 @@ def _make_release_payload(root: Path) -> Path:
     (payload / "permission").mkdir()
     (payload / "installer").mkdir()
     (payload / "dist").mkdir()
-    shutil.copy2(REPO_ROOT / "Install.py", payload / "Install.py")
-    if _supports_case_distinct_names(payload):
-        shutil.copy2(REPO_ROOT / "install.py", payload / "install.py")
+    shutil.copy2(REPO_ROOT / "install_entry.py", payload / "install_entry.py")
     (payload / "core" / "__init__.py").write_text("", encoding="utf-8")
     (payload / "permission" / "__init__.py").write_text("", encoding="utf-8")
     shutil.copy2(
@@ -244,10 +242,9 @@ def test_release_payload_to_directory_copies_unified_layout(tmp_path, caplog):
 
     assert result["status"] == "copied"
     assert result["reason"] == "created"
-    assert (target_dir / "install.py").exists()
-    assert (target_dir / "Install.py").exists()
-    assert (target_dir / "Install.py").read_text(encoding="utf-8") == (
-        payload / "Install.py"
+    assert (target_dir / "install_entry.py").exists()
+    assert (target_dir / "install_entry.py").read_text(encoding="utf-8") == (
+        payload / "install_entry.py"
     ).read_text(encoding="utf-8")
     assert (target_dir / "installer" / "__init__.py").exists()
     assert (target_dir / "installer" / "entrypoint.py").exists()
@@ -309,7 +306,7 @@ def test_existing_install_detection_priority_uses_record_before_config_payload_a
     (tmp_path / ".supermedicine" / "config.yaml").write_text(
         "project_name: supermedicine\n", encoding="utf-8"
     )
-    (tmp_path / "Cli.py").write_text("print('payload')\n", encoding="utf-8")
+    (tmp_path / "cli_entry.py").write_text("print('payload')\n", encoding="utf-8")
     desktop = tmp_path / "Desktop"
     desktop.mkdir()
     (desktop / "SuperMedicine.exe").write_bytes(b"old exe")

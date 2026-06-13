@@ -1,7 +1,7 @@
 # SuperMedicine Architecture Guide
 
 This guide explains SuperMedicine's architectural design. For the full technical
-reference, see [ARCHITECTURE.md](../../ARCHITECTURE.md).
+reference, see [ARCHITECTURE.md](../architecture/ARCHITECTURE.md).
 
 ## Microkernel Design
 
@@ -257,7 +257,7 @@ supermedicine permission revoke /path/to/allowed-dir
 
 ## Further Reading
 
-- [ARCHITECTURE.md](../../ARCHITECTURE.md) — full technical reference
+- [ARCHITECTURE.md](../architecture/ARCHITECTURE.md) — full technical reference
 - [SECURITY.md](../../SECURITY.md) — security model and boundaries
 - [FUNCTION_MAP.md](../../FUNCTION_MAP.md) — callable inventory
 - [API Reference](../api/README.md) — module and endpoint details

@@ -71,8 +71,6 @@ failure_inventory.md
 *_private_analysis*.md
 *_transient_checklist*.md
 *_uncurated_engineering*.md
-/REQUIREMENTS_TRACEABILITY.md
-
 # Local-only planning notes
 /Planning/NextSteps.md
 
@@ -133,18 +131,25 @@ installer/**/*.py[cod]
 !Install.py
 !Uninstall.py
 !install.json
-!FUNCTION_MAP.md
+!docs/architecture/FUNCTION_MAP.md
 # !Architecture/  # moved to docs/archive/
 # !Architecture/**  # moved to docs/archive/
 !docs/
 !docs/**
 !docs/archive/
 !docs/archive/**
+/docs/archive/REQUIREMENTS_TRACEABILITY.md
+!docs/architecture/
+!docs/architecture/**
+!docs/guides/
+!docs/guides/**
+!docs/references/
+!docs/references/**
 !README.md
-!ARCHITECTURE.md
+!docs/architecture/ARCHITECTURE.md
 !CHANGELOG.md
 !CONTRIBUTING.md
-!INSTALL.md
+!docs/guides/INSTALL.md
 !SECURITY.md
-!SECURITY_HARDENING_CHECKLIST.md
+!docs/archive/SECURITY_HARDENING_CHECKLIST.md
 !.supermedicine/policies/default.yaml

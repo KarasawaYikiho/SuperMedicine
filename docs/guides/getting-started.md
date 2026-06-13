@@ -1,7 +1,7 @@
 # Getting Started with SuperMedicine
 
 This guide walks you through installing, configuring, and using SuperMedicine.
-For detailed installation options, see [INSTALL.md](../../INSTALL.md).
+For detailed installation options, see [INSTALL.md](INSTALL.md).
 
 ## Installation
 

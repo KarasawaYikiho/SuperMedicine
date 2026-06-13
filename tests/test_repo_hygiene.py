@@ -19,17 +19,10 @@ CANONICAL_SUPERMEDICINE_POLICY = ".supermedicine/policies/default.yaml"
 COMMIT_ELIGIBLE_MAINTAINER_DOC_EXAMPLES = {
     "Architecture/ExecutionRoadmap.md",
     "Architecture/ExecutionRoadMap.md",
-    "FUNCTION_MAP.md",
+    "docs/architecture/FUNCTION_MAP.md",
 }
-FORBIDDEN_LOCAL_ONLY_ROOT_DOCS = {"REQUIREMENTS_TRACEABILITY.md"}
-INTENTIONAL_CASE_ONLY_PATH_COLLISIONS = {
-    ("Install.py", "install.py"): (
-        "Intentional installer compatibility pair: Install.py preserves the "
-        "legacy entrypoint while install.py provides the documented lowercase "
-        "command on case-sensitive platforms. Do not rename or delete either "
-        "file without changing the installer compatibility contract."
-    ),
-}
+FORBIDDEN_LOCAL_ONLY_ROOT_DOCS = {"docs/archive/REQUIREMENTS_TRACEABILITY.md"}
+INTENTIONAL_CASE_ONLY_PATH_COLLISIONS = {}
 LOCAL_ONLY_ENGINEERING_ARTIFACT_PATTERNS = {
     "*_audit_dump*.md",
     "*_audit_dump*.json",
@@ -396,7 +389,7 @@ def test_gitignore_excludes_runtime_and_external_platform_config_artifacts():
         "*_private_analysis*.md",
         "*_transient_checklist*.md",
         "*_uncurated_engineering*.md",
-        "/REQUIREMENTS_TRACEABILITY.md",
+        "/docs/archive/REQUIREMENTS_TRACEABILITY.md",
     }
 
     for pattern in required_patterns:
@@ -408,7 +401,7 @@ def test_local_only_files_are_ignored_by_active_gitignore_rules():
         ".supermedicine/config.yaml",
         "EXTERNAL_PROJECT_ANALYSIS.md",
         "failure_inventory.md",
-        "REQUIREMENTS_TRACEABILITY.md",
+        "docs/archive/REQUIREMENTS_TRACEABILITY.md",
     ]
 
     for path in ignored_paths:
@@ -429,17 +422,17 @@ def test_function_map_is_authoritative_root_doc_and_traceability_is_local_only()
     tracked_files = _tracked_files()
     active_patterns = _active_gitignore_patterns()
 
-    assert "FUNCTION_MAP.md" in tracked_files
-    assert (REPO_ROOT / "FUNCTION_MAP.md").is_file()
+    assert "docs/architecture/FUNCTION_MAP.md" in tracked_files
+    assert (REPO_ROOT / "docs" / "architecture" / "FUNCTION_MAP.md").is_file()
     assert "docs/function-map.md" not in tracked_files
     assert not (REPO_ROOT / "docs" / "function-map.md").exists()
     assert "docs/FunctionMap.md" not in tracked_files
     assert "FunctionMap.md" not in tracked_files
 
-    assert "REQUIREMENTS_TRACEABILITY.md" not in tracked_files
-    assert "/REQUIREMENTS_TRACEABILITY.md" in active_patterns
-    rule = _git_check_ignore("REQUIREMENTS_TRACEABILITY.md")
-    assert "/REQUIREMENTS_TRACEABILITY.md" in rule, rule
+    assert "docs/archive/REQUIREMENTS_TRACEABILITY.md" not in tracked_files
+    assert "/docs/archive/REQUIREMENTS_TRACEABILITY.md" in active_patterns
+    rule = _git_check_ignore("docs/archive/REQUIREMENTS_TRACEABILITY.md")
+    assert "/docs/archive/REQUIREMENTS_TRACEABILITY.md" in rule, rule
 
 
 def test_gitignore_keeps_temporary_engineering_artifacts_local_only():
@@ -580,7 +573,7 @@ def test_release_zip_layout_includes_installer_package_for_install_entrypoint():
         encoding="utf-8"
     )
 
-    assert '"Install.py"' in workflow
+    assert '"install_entry.py"' in workflow
     assert (
         'include_dirs = ["core", "permission", "agents", "plugins", "adapters", "installer"]'
         in workflow
@@ -867,7 +860,7 @@ def test_opencode_plugin_version_matches_package_version():
 def test_shebang_lines_are_portable():
     """CLI/install/uninstall entry scripts must use portable shebang."""
     expected = "#!/usr/bin/env python3"
-    for filename in ("Cli.py", "Install.py", "Uninstall.py"):
+    for filename in ("cli_entry.py", "install_entry.py", "uninstall_entry.py"):
         path = REPO_ROOT / filename
         first_line = path.read_text(encoding="utf-8").split("\n")[0]
         assert first_line == expected, (
@@ -882,14 +875,14 @@ def test_distribution_build_forces_exact_lowercase_install_entry():
     setup_py = (REPO_ROOT / "setup.py").read_text(encoding="utf-8")
 
     py_modules = _setuptools_py_modules(pyproject)
-    assert "Cli" in py_modules
-    assert "Uninstall" in py_modules
+    assert "cli_entry" in py_modules
+    assert "uninstall_entry" in py_modules
     assert "install" not in py_modules
     assert "Install" not in py_modules
     assert '["git", "show", ":install.py"]' in setup_py
-    assert '["git", "show", ":Install.py"]' in setup_py
+    assert '["git", "show", ":install_entry.py"]' in setup_py
     assert 'LOWERCASE_INSTALL_NAME = "install.py"' in setup_py
-    assert 'UPPERCASE_INSTALL_NAME = "Install.py"' in setup_py
+    assert 'UPPERCASE_INSTALL_NAME = "install_entry.py"' in setup_py
     assert "class build_py" in setup_py
     assert "class sdist" in setup_py
     assert "class bdist_wheel" in setup_py

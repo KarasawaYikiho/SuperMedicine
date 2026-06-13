@@ -24,7 +24,7 @@ CRITICAL_RELEASE_FILES = {
     "install.json",
     "README.md",
     "CHANGELOG.md",
-    "INSTALL.md",
+    "docs/guides/INSTALL.md",
 }
 CRITICAL_RELEASE_DIRS = {
     "core",

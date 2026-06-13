@@ -64,9 +64,8 @@ CONFIG_RELATIVE = Path(".supermedicine") / "config.yaml"
 INSTALL_RECORD_SCHEMA_VERSION = 1
 INSTALL_RECORD_NAME = "supermedicine"
 PAYLOAD_COLLISION_PATHS: tuple[Path, ...] = (
-    Path("Cli.py"),
-    Path("Install.py"),
-    Path("install.py"),
+    Path("cli_entry.py"),
+    Path("install_entry.py"),
     Path("installer") / "entrypoint.py",
     Path("installer") / "exe_release.py",
     Path("core"),
@@ -1041,6 +1040,7 @@ def _release_entrypoint_dir() -> Path:
 
     script_path = Path(sys.argv[0]).resolve() if sys.argv and sys.argv[0] else None
     if script_path is not None and script_path.name.lower() in {
+        "install_entry.py",
         "install.py",
         "supermedicineinstaller.exe",
     }:
@@ -1160,7 +1160,7 @@ def _uninstall_existing_install(
     try:
         from uninstall_entry import uninstall
     except ImportError as exc:
-        raise SystemExit(f"error: 卸载旧版本失败: Uninstall.py 不可用 ({exc})") from exc
+        raise SystemExit(f"error: 卸载旧版本失败: uninstall_entry.py 不可用 ({exc})") from exc
     try:
         result = uninstall(
             project_dir, force=True, preserve_user_data=preserve_user_data
@@ -1252,10 +1252,10 @@ def main(argv: list[str] | None = None) -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "常用示例:\n"
-            "  python install.py\n"
-            "  python install.py --init --interactive\n"
+            "  python install_entry.py\n"
+            "  python install_entry.py --init --interactive\n"
             "  统一安装示例:\n"
-            "  python install.py --unified-install --release-exe dist/SuperMedicine.exe --provider openai --base-url https://api.openai.com/v1 --model gpt-4o-mini\n"
+            "  python install_entry.py --unified-install --release-exe dist/SuperMedicine.exe --provider openai --base-url https://api.openai.com/v1 --model gpt-4o-mini\n"
             "  SuperMedicineInstaller.exe --extract-release-to C:\\SuperMedicine --init --project-dir C:\\SuperMedicine ...\n\n"
             "说明:\n"
             "  --init 默认只初始化配置；只有显式 --release-exe 才复制桌面 Exe。\n"

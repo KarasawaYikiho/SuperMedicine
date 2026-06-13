@@ -12,7 +12,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RELEASE_DIR_NAME = "SuperMedicine Beta0.4.2"
 CRITICAL_RELEASE_PATHS = (
-    "Install.py",
+    "install_entry.py",
     "core",
     "core/__init__.py",
     "dist/SuperMedicine.exe",
@@ -161,10 +161,7 @@ def _copy_release_tree(tmp_path: Path) -> Path:
 
     release_dir = tmp_path / RELEASE_DIR_NAME
     release_dir.mkdir()
-    shutil.copy2(REPO_ROOT / "Install.py", release_dir / "Install.py")
-    lowercase_source = _read_git_index_file("install.py")
-    if lowercase_source is not None and _supports_case_distinct_names(release_dir):
-        (release_dir / "install.py").write_text(lowercase_source, encoding="utf-8")
+    shutil.copy2(REPO_ROOT / "install_entry.py", release_dir / "install_entry.py")
 
     for package_name in ("core", "permission", "installer"):
         shutil.copytree(
@@ -217,13 +214,6 @@ def test_extracted_release_directory_installer_entrypoint_smoke(tmp_path):
         assert (release_dir / relative_path).exists(), (
             f"Release layout missing required package/file: {relative_path}"
         )
-    if _supports_case_distinct_names(release_dir):
-        assert _has_exact_child_name(release_dir, CANONICAL_LOWERCASE_INSTALL)
-    else:
-        assert _read_git_index_file(CANONICAL_LOWERCASE_INSTALL) is not None, (
-            "Release smoke cannot materialize case-only install.py/Install.py siblings on this filesystem, "
-            "so exact lowercase install.py must remain verified through the git index and CI Zip contract."
-        )
 
     import_result = _run_release_python(
         release_dir,
@@ -238,7 +228,7 @@ def test_extracted_release_directory_installer_entrypoint_smoke(tmp_path):
 
     help_result = _run_release_python(
         release_dir,
-        "Install.py",
+        "install_entry.py",
         "--help",
         env=_cp1252_stdio_env(),
         encoding="cp1252",
@@ -253,7 +243,7 @@ def test_extracted_release_directory_installer_entrypoint_smoke(tmp_path):
     fake_exe.write_bytes(b"fake exe bytes for release smoke dry-run")
     dry_run_result = _run_release_python(
         release_dir,
-        "Install.py",
+        "install_entry.py",
         "--release-exe",
         str(fake_exe),
         "--desktop-dir",
@@ -267,7 +257,7 @@ def test_extracted_release_directory_installer_entrypoint_smoke(tmp_path):
 
     payload_dry_run_result = _run_release_python(
         release_dir,
-        "Install.py",
+        "install_entry.py",
         "--extract-release-to",
         str(tmp_path / "Installed"),
         "--release-payload-root",
@@ -328,7 +318,7 @@ def test_ci_release_artifacts_include_standalone_installer_exe_and_shared_payloa
     )
     assert "./dist/SuperMedicineInstaller.exe --help" in workflow
     assert "./dist/SuperMedicineInstaller.exe --extract-release-to" in workflow
-    assert '["git", "show", ":install.py"]' in workflow
+    assert '["git", "show", ":install_entry.py"]' in workflow
     assert "archive.writestr(lowercase_entry" in workflow
     assert "git archive HEAD" not in workflow
 
@@ -376,8 +366,8 @@ def test_ci_packaging_smoke_installs_runtime_dependencies_before_installer_entry
     )
     packaging_job = workflow[workflow.index("  packaging-smoke:") :]
     installer_smoke_markers = (
-        "python Install.py --release-exe",
-        "python Install.py --extract-release-to",
+        "python install_entry.py --release-exe",
+        "python install_entry.py --extract-release-to",
         "./dist/SuperMedicineInstaller.exe --help",
         "./dist/SuperMedicineInstaller.exe --extract-release-to",
     )
@@ -399,7 +389,7 @@ def test_release_docs_describe_ci_artifact_layout_and_install_py_roles():
     """Docs must keep the user/automation release layout contract visible."""
 
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
-    install = (REPO_ROOT / "INSTALL.md").read_text(encoding="utf-8")
+    install = (REPO_ROOT / "docs" / "guides" / "INSTALL.md").read_text(encoding="utf-8")
     combined = readme + "\n" + install
 
     assert "SuperMedicineInstaller.exe" in combined

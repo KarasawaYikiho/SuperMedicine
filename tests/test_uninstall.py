@@ -267,7 +267,7 @@ def test_uninstall_reports_residuals_and_repair_suggestions_when_delete_fails(
     def fail_delete(path):
         raise OSError("file is locked")
 
-    monkeypatch.setattr("Uninstall._delete_path", fail_delete)
+    monkeypatch.setattr("uninstall_entry._delete_path", fail_delete)
 
     result = uninstall(tmp_path, force=True)
 

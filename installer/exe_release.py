@@ -26,8 +26,7 @@ DEFAULT_EXE_SEARCH_RELATIVE_PATHS = (
     Path(DEFAULT_TARGET_FILENAME),
 )
 RELEASE_PAYLOAD_REQUIRED_PATHS = (
-    Path("install.py"),
-    Path("Install.py"),
+    Path("install_entry.py"),
     Path("installer") / "exe_release.py",
     Path("core"),
     Path("permission"),
@@ -69,7 +68,7 @@ def resolve_exe_path(exe_path: str | os.PathLike[str]) -> Path:
     CI release archives are laid out with the application executable at
     ``dist/SuperMedicine.exe``.  Local builds have historically used either
     ``dist/`` or ``Dist/``, and some manually assembled release archives place
-    ``SuperMedicine.exe`` next to ``Install.py``.  Accept the requested path when
+    ``SuperMedicine.exe`` next to ``install_entry.py``.  Accept the requested path when
     it exists; otherwise search those compatible locations from both the current
     working directory and the extracted release root.
     """
@@ -89,7 +88,7 @@ def resolve_exe_path(exe_path: str | os.PathLike[str]) -> Path:
 
 
 def _release_root() -> Path:
-    """Return the source/release root that contains Install.py and installer/."""
+    """Return the source/release root that contains install_entry.py and installer/."""
 
     return Path(__file__).resolve().parents[1]
 
@@ -288,9 +287,9 @@ def _missing_exe_message(requested: Path, candidates: list[Path]) -> str:
         f"Searched paths: {searched}. "
         f"Expected release executable layout: {expected}. "
         "Regenerate the release package from CI or run the packaging workflow so "
-        "dist/SuperMedicine.exe is produced and included next to Install.py; for "
+        "dist/SuperMedicine.exe is produced and included next to install_entry.py; for "
         "local builds, rebuild the executable into dist/ or Dist/ before rerunning "
-        "Install.py --release-exe."
+        "install_entry.py --release-exe."
     )
 
 

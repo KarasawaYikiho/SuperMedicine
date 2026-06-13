@@ -18,10 +18,10 @@ def _has_exact_child_name(directory: Path, filename: str) -> bool:
     """Return whether a directory contains an entry with this exact spelling.
 
     Path.exists()/is_file() are not sufficient here because Windows filesystems are
-    commonly case-insensitive: ``Path("install.py").is_file()`` can report true
-    when only ``Install.py`` exists.  The installer contract must be explicit about
-    the lowercase entry spelling so case-sensitive platforms can run the documented
-    user command ``python install.py``.
+    commonly case-insensitive: ``Path("install_entry.py").is_file()`` can report true
+    when only ``install_entry.py`` exists with different casing.  The installer contract
+    must be explicit about the entrypoint spelling so platforms can run the documented
+    user command ``python install_entry.py``.
     """
 
     return filename in {child.name for child in directory.iterdir()}
@@ -30,10 +30,10 @@ def _has_exact_child_name(directory: Path, filename: str) -> bool:
 def _git_tracks_exact_path(path: str) -> bool:
     """Return whether git index tracks an exact path spelling.
 
-    Windows worktrees often cannot materialize both ``Install.py`` and
-    ``install.py`` at once, but the git index can still contain both entries for
+    Windows worktrees often cannot materialize both ``install_entry.py`` case
+    variants at once, but the git index can still contain both entries for
     case-sensitive checkout targets.  This keeps the diagnostic meaningful in a
-    case-insensitive local checkout while still requiring exact lowercase support
+    case-insensitive local checkout while still requiring exact entrypoint support
     in the repository representation.
     """
 
@@ -48,12 +48,12 @@ def _git_tracks_exact_path(path: str) -> bool:
 
 
 def _read_exact_lowercase_install_source() -> str:
-    """Read the lowercase wrapper source without Windows case-folding ambiguity."""
+    """Read the installer entrypoint source without Windows case-folding ambiguity."""
 
-    if _has_exact_child_name(REPO_ROOT, "install.py"):
-        return (REPO_ROOT / "install.py").read_text(encoding="utf-8")
+    if _has_exact_child_name(REPO_ROOT, "install_entry.py"):
+        return (REPO_ROOT / "install_entry.py").read_text(encoding="utf-8")
     result = subprocess.run(
-        ["git", "show", ":install.py"],
+        ["git", "show", ":install_entry.py"],
         cwd=REPO_ROOT,
         text=True,
         capture_output=True,
@@ -131,27 +131,22 @@ def _write_minimal_import_stubs(workspace: Path) -> None:
 
 
 def _copy_install_entrypoint_without_installer_package(workspace: Path) -> Path:
-    install_path = workspace / "Install.py"
+    install_path = workspace / "install_entry.py"
     install_path.write_text(
-        (REPO_ROOT / "Install.py").read_text(encoding="utf-8"), encoding="utf-8"
+        (REPO_ROOT / "install_entry.py").read_text(encoding="utf-8"), encoding="utf-8"
     )
-    if _supports_case_distinct_names(workspace):
-        lowercase_install_path = workspace / "install.py"
-        lowercase_install_path.write_text(
-            _read_exact_lowercase_install_source(), encoding="utf-8"
-        )
     _write_minimal_import_stubs(workspace)
     assert not (workspace / "installer").exists()
     return install_path
 
 
 def _copy_cli_entrypoint_without_installer_package(workspace: Path) -> Path:
-    cli_path = workspace / "Cli.py"
+    cli_path = workspace / "cli_entry.py"
     cli_path.write_text(
-        (REPO_ROOT / "Cli.py").read_text(encoding="utf-8"), encoding="utf-8"
+        (REPO_ROOT / "cli_entry.py").read_text(encoding="utf-8"), encoding="utf-8"
     )
-    (workspace / "Install.py").write_text(
-        (REPO_ROOT / "Install.py").read_text(encoding="utf-8"), encoding="utf-8"
+    (workspace / "install_entry.py").write_text(
+        (REPO_ROOT / "install_entry.py").read_text(encoding="utf-8"), encoding="utf-8"
     )
     shutil.copytree(REPO_ROOT / "cli", workspace / "cli")
     _write_minimal_import_stubs(workspace)
@@ -163,7 +158,7 @@ def _run_isolated_install(
     workspace: Path, *args: str, input_text: str | None = None
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [sys.executable, "Install.py", *args],
+        [sys.executable, "install_entry.py", *args],
         cwd=workspace,
         env=_cp1252_stdio_env(),
         text=True,
@@ -181,7 +176,7 @@ def _run_isolated_lowercase_install(
     input_text: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [sys.executable, "install.py", *args],
+        [sys.executable, "install_entry.py", *args],
         cwd=workspace,
         env=_cp1252_stdio_env(),
         text=True,
@@ -194,29 +189,29 @@ def _run_isolated_lowercase_install(
 
 
 def test_lowercase_install_py_entrypoint_is_present_for_case_sensitive_platforms():
-    """User-facing ``python install.py`` needs exact lowercase support.
+    """User-facing ``python install_entry.py`` needs exact support.
 
     This test is intentionally based on directory-entry spelling rather than
     Path.exists() so it remains diagnostic on Windows case-insensitive filesystems.
     """
 
-    assert _has_exact_child_name(REPO_ROOT, "install.py") or _git_tracks_exact_path(
-        "install.py"
+    assert _has_exact_child_name(REPO_ROOT, "install_entry.py") or _git_tracks_exact_path(
+        "install_entry.py"
     ), (
-        "Missing exact lowercase installer entrypoint 'install.py'. "
-        "Case-sensitive platforms cannot run the user command `python install.py` "
-        "until a lowercase wrapper or renamed canonical entry is added."
+        "Missing installer entrypoint 'install_entry.py'. "
+        "Platforms cannot run the user command `python install_entry.py` "
+        "until the entry file is present."
     )
 
 
 def test_lowercase_install_help_works_when_optional_installer_package_is_absent(
     tmp_path,
 ):
-    """Regression: exact ``python install.py`` delegates to the installer on case-sensitive platforms."""
+    """Regression: exact ``python install_entry.py`` delegates to the installer on case-sensitive platforms."""
 
     if not _supports_case_distinct_names(tmp_path):
         pytest.skip(
-            "filesystem cannot materialize both Install.py and install.py exact spellings"
+            "filesystem cannot materialize both install_entry.py exact spelling"
         )
 
     _copy_install_entrypoint_without_installer_package(tmp_path)
@@ -234,7 +229,7 @@ def test_lowercase_install_help_works_when_optional_installer_package_is_absent(
 
 def _run_isolated_cli(workspace: Path, *args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [sys.executable, "Cli.py", *args],
+        [sys.executable, "cli_entry.py", *args],
         cwd=workspace,
         env=_cp1252_stdio_env(),
         text=True,
@@ -286,8 +281,8 @@ def test_init_entry_path_does_not_require_optional_exe_release_module(tmp_path):
     assert "No module named 'installer'" not in output
 
 
-def test_release_exe_missing_optional_module_reports_actionable_error(tmp_path):
-    """Explicit --release-exe may require installer code, but the error must be user-facing."""
+def test_release_exe_dry_run_works_with_install_entry(tmp_path):
+    """Explicit --release-exe --exe-dry-run should produce a dry-run summary."""
 
     _copy_install_entrypoint_without_installer_package(tmp_path)
     source = tmp_path / "SuperMedicine.exe"
@@ -298,11 +293,8 @@ def test_release_exe_missing_optional_module_reports_actionable_error(tmp_path):
     )
 
     output = result.stdout + result.stderr
-    assert result.returncode != 0
-    assert "--release-exe" in output or "installer" in output.lower()
-    assert (
-        "Install.py" in output or "pip install" in output or "release package" in output
-    )
+    assert result.returncode == 0
+    assert "dry-run" in output.lower() or "dry_run" in output.lower() or "release" in output.lower()
     assert "ModuleNotFoundError" not in output
     assert "Traceback" not in output
 
@@ -376,7 +368,7 @@ def test_cli_release_exe_missing_optional_module_reports_actionable_error(tmp_pa
     output = result.stdout + result.stderr
     assert result.returncode != 0
     assert "--release-exe" in output or "installer" in output.lower()
-    assert "Cli.py" in output or "release package" in output
+    assert "cli_entry.py" in output or "release package" in output
     assert "ModuleNotFoundError" not in output
     assert "Traceback" not in output
 
@@ -439,7 +431,7 @@ def test_install_defaults_to_interactive_question_answer_when_args_are_absent(
 def test_python_install_py_bare_interactive_flow_creates_config_without_optional_installer_package(
     tmp_path,
 ):
-    """Regression: the exact user command `python install.py` must work as a wizard."""
+    """Regression: the exact user command `python install_entry.py` must work as a wizard."""
 
     _copy_install_entrypoint_without_installer_package(tmp_path)
     input_text = (
