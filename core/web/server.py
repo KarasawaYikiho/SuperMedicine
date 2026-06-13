@@ -462,6 +462,129 @@ def create_app() -> Any:
             logger.exception("experiment_submit error")
             return {"error": str(exc), "status": "error"}
 
+    # ---- Self Evolution endpoints ----------------------------------------
+
+    @app.get("/api/v1/self-evolution")
+    async def self_evolution_list() -> Any:
+        """List self evolution artifacts."""
+        try:
+            from pathlib import Path as _P
+            project_dir = _P.cwd()
+            artifacts_dir = project_dir / "self_evolution"
+            if not artifacts_dir.exists():
+                return []
+            artifacts = []
+            for f in artifacts_dir.glob("*.json"):
+                try:
+                    import json as _json
+                    data = _json.loads(f.read_text(encoding="utf-8"))
+                    artifacts.append({
+                        "id": f.stem,
+                        "type": data.get("type", "unknown"),
+                        "instruction": data.get("instruction", ""),
+                        "status": data.get("status", "pending"),
+                        "path": str(f),
+                    })
+                except Exception:
+                    continue
+            return artifacts
+        except Exception as exc:
+            logger.exception("self_evolution_list error")
+            return {"error": str(exc), "status": "error"}
+
+    @app.post("/api/v1/self-evolution/generate")
+    async def self_evolution_generate(request: dict[str, Any]) -> dict[str, Any]:
+        """Generate a self evolution artifact."""
+        instruction = request.get("instruction", "")
+        artifact_type = request.get("type", "code")
+        output = request.get("output", "")
+        if not all([instruction, output]):
+            return {"error": "instruction and output are required", "status": "error"}
+        try:
+            return _get_cli().self_evolve(
+                instruction=instruction,
+                artifact_type=artifact_type,
+                output=output,
+                preview=True,
+            )
+        except Exception as exc:
+            logger.exception("self_evolution_generate error")
+            return {"error": str(exc), "status": "error"}
+
+    @app.get("/api/v1/self-evolution/{artifact_id}")
+    async def self_evolution_get(artifact_id: str) -> dict[str, Any]:
+        """View one self evolution artifact."""
+        try:
+            from pathlib import Path as _P
+            project_dir = _P.cwd()
+            artifact_path = project_dir / "self_evolution" / f"{artifact_id}.json"
+            if not artifact_path.exists():
+                return {"error": "Artifact not found", "status": "error"}
+            import json as _json
+            return _json.loads(artifact_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            logger.exception("self_evolution_get error")
+            return {"error": str(exc), "status": "error"}
+
+    @app.delete("/api/v1/self-evolution/{artifact_id}")
+    async def self_evolution_delete(artifact_id: str) -> dict[str, Any]:
+        """Delete one self evolution artifact."""
+        try:
+            from pathlib import Path as _P
+            project_dir = _P.cwd()
+            artifact_path = project_dir / "self_evolution" / f"{artifact_id}.json"
+            if not artifact_path.exists():
+                return {"error": "Artifact not found", "status": "error"}
+            artifact_path.unlink()
+            return {"success": True, "message": f"Artifact {artifact_id} deleted"}
+        except Exception as exc:
+            logger.exception("self_evolution_delete error")
+            return {"error": str(exc), "status": "error"}
+
+    # ---- Diagnose endpoints ----------------------------------------------
+
+    @app.get("/api/v1/diagnose")
+    async def diagnose_all() -> dict[str, Any]:
+        """Get all diagnostics."""
+        try:
+            return _get_cli().diagnose()
+        except Exception as exc:
+            logger.exception("diagnose_all error")
+            return {"error": str(exc), "status": "error"}
+
+    @app.get("/api/v1/diagnose/config")
+    async def diagnose_config() -> dict[str, Any]:
+        """Get config diagnostics."""
+        try:
+            result = _get_cli().diagnose()
+            return result.get("config", {})
+        except Exception as exc:
+            logger.exception("diagnose_config error")
+            return {"error": str(exc), "status": "error"}
+
+    @app.get("/api/v1/diagnose/llm")
+    async def diagnose_llm() -> dict[str, Any]:
+        """Get LLM diagnostics."""
+        try:
+            result = _get_cli().diagnose()
+            return result.get("llm", {})
+        except Exception as exc:
+            logger.exception("diagnose_llm error")
+            return {"error": str(exc), "status": "error"}
+
+    @app.get("/api/v1/diagnose/install")
+    async def diagnose_install() -> dict[str, Any]:
+        """Get install diagnostics."""
+        try:
+            result = _get_cli().diagnose()
+            return {
+                "audit": result.get("audit", {}),
+                "log_storage": result.get("log_storage", {}),
+            }
+        except Exception as exc:
+            logger.exception("diagnose_install error")
+            return {"error": str(exc), "status": "error"}
+
     # ---- WebSocket chat --------------------------------------------------
 
     @app.websocket("/ws/chat")
