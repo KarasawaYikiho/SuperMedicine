@@ -24,12 +24,12 @@ def setup_logging_for_gui() -> None:
     log_dir = Path.home() / ".supermedicine" / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / "gui.log"
-    
+
     if sys.stdout is None:
         sys.stdout = open(log_file, "a", encoding="utf-8")
     if sys.stderr is None:
         sys.stderr = open(log_file, "a", encoding="utf-8")
-    
+
     # Also redirect stdin if needed
     if sys.stdin is None:
         sys.stdin = open(os.devnull, "r")
@@ -45,21 +45,21 @@ def main() -> None:
     """Launch the SuperMedicine web GUI."""
     # Set up logging for GUI mode
     setup_logging_for_gui()
-    
+
     from core.web.server import start_server
-    
+
     host = "127.0.0.1"
     port = 8000
     url = f"http://{host}:{port}"
-    
-    print(f"Starting SuperMedicine Web GUI...")
+
+    print("Starting SuperMedicine Web GUI...")
     print(f"Opening browser to {url}")
-    print(f"Logs are being written to ~/.supermedicine/logs/gui.log")
-    
+    print("Logs are being written to ~/.supermedicine/logs/gui.log")
+
     # Start browser in a separate thread
     browser_thread = threading.Thread(target=open_browser, args=(url,), daemon=True)
     browser_thread.start()
-    
+
     # Start the web server (this will block)
     try:
         start_server(host, port, log_level="warning")

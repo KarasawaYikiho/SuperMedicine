@@ -24,7 +24,7 @@ def setup_gui_logging():
     log_dir = Path.home() / ".supermedicine" / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / "gui_standalone.log"
-    
+
     # Redirect stdout/stderr if None (no console)
     if sys.stdout is None:
         sys.stdout = open(log_file, "a", encoding="utf-8")
@@ -32,7 +32,7 @@ def setup_gui_logging():
         sys.stderr = open(log_file, "a", encoding="utf-8")
     if sys.stdin is None:
         sys.stdin = open(os.devnull, "r")
-    
+
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -56,10 +56,10 @@ def start_web_server(host: str, port: int, ready_event: threading.Event):
     try:
         from core.web.server import create_app
         import uvicorn
-        
+
         app = create_app()
         ready_event.set()
-        
+
         config = uvicorn.Config(
             app,
             host=host,
@@ -78,7 +78,7 @@ def main():
     """Launch the SuperMedicine GUI application."""
     logger = setup_gui_logging()
     logger.info("Starting SuperMedicine GUI...")
-    
+
     import webview
 
     host = "127.0.0.1"
