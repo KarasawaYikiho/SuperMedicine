@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#000000">
-    <meta name="color-scheme" content="dark">
-    <title>SuperMedicine Web</title>
+    <meta name="theme-color" content="#ffffff">
+    <meta name="color-scheme" content="light">
+    <title>SuperMedicine</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -13,7 +13,7 @@
 </head>
 <body>
     <header>
-        <h1>SuperMedicine Web Interface</h1>
+        <h1>SuperMedicine</h1>
         <div id="status-bar">
             <span id="status-indicator" class="disconnected" title="Connection status"></span>
             <span id="status-text">Connecting...</span>
@@ -31,6 +31,8 @@
         <button class="tab-btn" data-tab="llm">LLM Config</button>
         <button class="tab-btn" data-tab="permissions">Permissions</button>
         <button class="tab-btn" data-tab="logs">Logs</button>
+        <button class="tab-btn" data-tab="self-evolution">Self Evolution</button>
+        <button class="tab-btn" data-tab="diagnose">Diagnose</button>
     </nav>
 
     <main>
@@ -391,6 +393,84 @@
             </div>
             <div id="log-viewer" class="log-viewer">
                 <pre id="log-content">Select a log to view its contents.</pre>
+            </div>
+        </section>
+
+        <!-- Self Evolution Tab -->
+        <section id="tab-self-evolution" class="tab-content">
+            <h2>Self Evolution</h2>
+            <div class="toolbar">
+                <button id="btn-refresh-self-evolution" class="btn btn-secondary">Refresh</button>
+                <button id="btn-generate-artifacts" class="btn btn-primary">Generate Artifacts</button>
+            </div>
+            <div id="self-evolution-form" class="form-container hidden">
+                <h3>Generate Artifact</h3>
+                <div class="form-group">
+                    <label for="se-instruction">Instruction</label>
+                    <textarea id="se-instruction" rows="4" placeholder="Describe what to generate..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="se-artifact-type">Artifact Type</label>
+                    <select id="se-artifact-type" class="select-input">
+                        <option value="code">Code</option>
+                        <option value="config">Config</option>
+                        <option value="documentation">Documentation</option>
+                        <option value="test">Test</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="se-output">Output Path</label>
+                    <input type="text" id="se-output" placeholder="/path/to/output">
+                </div>
+                <div class="form-actions">
+                    <button id="btn-save-artifact" class="btn btn-primary">Generate</button>
+                    <button id="btn-cancel-artifact" class="btn btn-secondary">Cancel</button>
+                </div>
+            </div>
+            <div id="self-evolution-list" class="data-table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Type</th>
+                            <th>Instruction</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="self-evolution-tbody">
+                        <tr><td colspan="5" class="empty-state">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Diagnose Tab -->
+        <section id="tab-diagnose" class="tab-content">
+            <h2>Diagnostics</h2>
+            <div class="toolbar">
+                <button id="btn-refresh-diagnose" class="btn btn-secondary">Refresh</button>
+                <button id="btn-run-all-diagnostics" class="btn btn-primary">Run All</button>
+            </div>
+            <div class="dashboard-cards">
+                <div class="info-card">
+                    <h3>Config Diagnostics</h3>
+                    <div id="diagnose-config-info">Loading...</div>
+                    <button id="btn-diagnose-config" class="btn btn-secondary btn-sm" style="margin-top: 0.5rem;">Run Config</button>
+                </div>
+                <div class="info-card">
+                    <h3>LLM Diagnostics</h3>
+                    <div id="diagnose-llm-info">Loading...</div>
+                    <button id="btn-diagnose-llm" class="btn btn-secondary btn-sm" style="margin-top: 0.5rem;">Run LLM</button>
+                </div>
+                <div class="info-card">
+                    <h3>Install Diagnostics</h3>
+                    <div id="diagnose-install-info">Loading...</div>
+                    <button id="btn-diagnose-install" class="btn btn-secondary btn-sm" style="margin-top: 0.5rem;">Run Install</button>
+                </div>
+            </div>
+            <div id="diagnose-results" class="log-viewer" style="margin-top: 1rem;">
+                <pre id="diagnose-content">Click a diagnostic button to run diagnostics.</pre>
             </div>
         </section>
     </main>

@@ -139,6 +139,12 @@
             case "logs":
                 loadLogs();
                 break;
+            case "self-evolution":
+                loadSelfEvolution();
+                break;
+            case "diagnose":
+                loadDiagnostics();
+                break;
         }
     }
 
@@ -774,6 +780,212 @@
         });
     }
 
+    // ---- Self Evolution --------------------------------------------------
+
+    async function loadSelfEvolution() {
+        try {
+            const data = await apiCall("GET", "/api/v1/self-evolution");
+            renderSelfEvolution(Array.isArray(data) ? data : []);
+        } catch (err) {
+            showToast("Failed to load self evolution data: " + err.message, "error");
+        }
+    }
+
+    function renderSelfEvolution(data) {
+        var tbody = document.getElementById("self-evolution-tbody");
+        if (!tbody) return;
+
+        if (!data || data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No self evolution artifacts found</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = data.map(function (item) {
+            return "<tr>" +
+                "<td>" + escapeHtml(item.id || "-") + "</td>" +
+                "<td>" + escapeHtml(item.type || "-") + "</td>" +
+                "<td>" + escapeHtml(item.instruction || "-") + "</td>" +
+                "<td><span class=\"status-badge " + (item.status === "success" ? "success" : item.status === "error" ? "error" : "info") + "\">" + escapeHtml(item.status || "pending") + "</span></td>" +
+                "<td>" +
+                "<button class=\"btn btn-sm btn-secondary\" onclick=\"viewArtifact('" + escapeHtml(item.id) + "')\">View</button> " +
+                "<button class=\"btn btn-sm btn-danger\" onclick=\"deleteArtifact('" + escapeHtml(item.id) + "')\">Delete</button>" +
+                "</td>" +
+                "</tr>";
+        }).join("");
+    }
+
+    async function generateArtifact() {
+        var instruction = document.getElementById("se-instruction").value;
+        var artifactType = document.getElementById("se-artifact-type").value;
+        var output = document.getElementById("se-output").value;
+
+        if (!instruction || !output) {
+            showToast("Please fill in all required fields", "error");
+            return;
+        }
+
+        try {
+            var data = await apiCall("POST", "/api/v1/self-evolution/generate", {
+                instruction: instruction,
+                type: artifactType,
+                output: output
+            });
+            if (data.success) {
+                showToast("Artifact generated successfully", "success");
+                loadSelfEvolution();
+                document.getElementById("self-evolution-form").classList.add("hidden");
+            } else {
+                showToast(data.error || "Failed to generate artifact", "error");
+            }
+        } catch (err) {
+            showToast("Failed to generate artifact: " + err.message, "error");
+        }
+    }
+
+    window.viewArtifact = async function (id) {
+        try {
+            var data = await apiCall("GET", "/api/v1/self-evolution/" + encodeURIComponent(id));
+            alert(JSON.stringify(data, null, 2));
+        } catch (err) {
+            showToast("Failed to view artifact: " + err.message, "error");
+        }
+    };
+
+    window.deleteArtifact = async function (id) {
+        if (!confirm("Are you sure you want to delete this artifact?")) return;
+        try {
+            var data = await apiCall("DELETE", "/api/v1/self-evolution/" + encodeURIComponent(id));
+            if (data.success) {
+                showToast("Artifact deleted successfully", "success");
+                loadSelfEvolution();
+            } else {
+                showToast(data.error || "Failed to delete artifact", "error");
+            }
+        } catch (err) {
+            showToast("Failed to delete artifact: " + err.message, "error");
+        }
+    };
+
+    function setupSelfEvolutionForm() {
+        var refreshBtn = document.getElementById("btn-refresh-self-evolution");
+        if (refreshBtn) refreshBtn.addEventListener("click", loadSelfEvolution);
+
+        var generateBtn = document.getElementById("btn-generate-artifacts");
+        if (generateBtn) generateBtn.addEventListener("click", function () {
+            document.getElementById("self-evolution-form").classList.toggle("hidden");
+        });
+
+        var saveBtn = document.getElementById("btn-save-artifact");
+        if (saveBtn) saveBtn.addEventListener("click", generateArtifact);
+
+        var cancelBtn = document.getElementById("btn-cancel-artifact");
+        if (cancelBtn) cancelBtn.addEventListener("click", function () {
+            document.getElementById("self-evolution-form").classList.add("hidden");
+        });
+    }
+
+    // ---- Diagnose --------------------------------------------------------
+
+    function loadDiagnostics() {
+        fetch('/api/v1/diagnose')
+            .then(function (response) { return response.json(); })
+            .then(function (data) {
+                renderDiagnostics(data);
+            })
+            .catch(function (error) {
+                console.error('Error loading diagnostics:', error);
+                showToast('Failed to load diagnostics', 'error');
+            });
+    }
+
+    function renderDiagnostics(data) {
+        var configInfo = document.getElementById('diagnose-config-info');
+        var llmInfo = document.getElementById('diagnose-llm-info');
+        var installInfo = document.getElementById('diagnose-install-info');
+
+        if (configInfo) {
+            configInfo.innerHTML = data.config ? (
+                '<p><strong>Status:</strong> ' + (data.config.exists ? '✓ Initialized' : '✗ Not Found') + '</p>' +
+                '<p><strong>Path:</strong> ' + escapeHtml(data.config.path || '-') + '</p>'
+            ) : '<p>No config data available</p>';
+        }
+
+        if (llmInfo) {
+            llmInfo.innerHTML = data.llm ? (
+                '<p><strong>Status:</strong> ' + (data.llm.ok ? '✓ Configured' : '✗ Not Configured') + '</p>' +
+                '<p><strong>Provider:</strong> ' + escapeHtml(data.llm.provider || '-') + '</p>'
+            ) : '<p>No LLM data available</p>';
+        }
+
+        if (installInfo) {
+            installInfo.innerHTML = data.install ? (
+                '<p><strong>Status:</strong> ' + (data.install.ok ? '✓ Valid' : '✗ Invalid') + '</p>' +
+                '<p><strong>Version:</strong> ' + escapeHtml(data.install.version || '-') + '</p>'
+            ) : '<p>No install data available</p>';
+        }
+    }
+
+    function runConfigDiagnostics() {
+        fetch('/api/v1/diagnose/config')
+            .then(function (response) { return response.json(); })
+            .then(function (data) {
+                document.getElementById('diagnose-content').textContent = JSON.stringify(data, null, 2);
+                showToast('Config diagnostics complete', 'success');
+            })
+            .catch(function (error) {
+                console.error('Error running config diagnostics:', error);
+                showToast('Failed to run config diagnostics', 'error');
+            });
+    }
+
+    function runLLMDiagnostics() {
+        fetch('/api/v1/diagnose/llm')
+            .then(function (response) { return response.json(); })
+            .then(function (data) {
+                document.getElementById('diagnose-content').textContent = JSON.stringify(data, null, 2);
+                showToast('LLM diagnostics complete', 'success');
+            })
+            .catch(function (error) {
+                console.error('Error running LLM diagnostics:', error);
+                showToast('Failed to run LLM diagnostics', 'error');
+            });
+    }
+
+    function runInstallDiagnostics() {
+        fetch('/api/v1/diagnose/install')
+            .then(function (response) { return response.json(); })
+            .then(function (data) {
+                document.getElementById('diagnose-content').textContent = JSON.stringify(data, null, 2);
+                showToast('Install diagnostics complete', 'success');
+            })
+            .catch(function (error) {
+                console.error('Error running install diagnostics:', error);
+                showToast('Failed to run install diagnostics', 'error');
+            });
+    }
+
+    function runAllDiagnostics() {
+        fetch('/api/v1/diagnose/all')
+            .then(function (response) { return response.json(); })
+            .then(function (data) {
+                document.getElementById('diagnose-content').textContent = JSON.stringify(data, null, 2);
+                renderDiagnostics(data);
+                showToast('All diagnostics complete', 'success');
+            })
+            .catch(function (error) {
+                console.error('Error running all diagnostics:', error);
+                showToast('Failed to run all diagnostics', 'error');
+            });
+    }
+
+    function setupDiagnoseForm() {
+        document.getElementById('btn-refresh-diagnose')?.addEventListener('click', loadDiagnostics);
+        document.getElementById('btn-run-all-diagnostics')?.addEventListener('click', runAllDiagnostics);
+        document.getElementById('btn-diagnose-config')?.addEventListener('click', runConfigDiagnostics);
+        document.getElementById('btn-diagnose-llm')?.addEventListener('click', runLLMDiagnostics);
+        document.getElementById('btn-diagnose-install')?.addEventListener('click', runInstallDiagnostics);
+    }
+
     // ---- WebSocket -------------------------------------------------------
 
     function connect() {
@@ -953,6 +1165,8 @@
     setupExperimentForm();
     setupPermissionForm();
     setupLogForm();
+    setupSelfEvolutionForm();
+    setupDiagnoseForm();
     fetchStatus();
     connect();
 })();
