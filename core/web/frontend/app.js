@@ -1153,6 +1153,39 @@
                 modal.classList.remove("active");
             });
         }
+
+        // Ctrl+Q to quit (sends close request to backend)
+        if (e.ctrlKey && e.key === "q") {
+            e.preventDefault();
+            if (confirm("Are you sure you want to quit SuperMedicine?")) {
+                apiCall("POST", "/api/v1/shutdown").then(function () {
+                    showToast("Shutting down...", "info");
+                    setTimeout(function () { window.close(); }, 1000);
+                }).catch(function () {
+                    window.close();
+                });
+            }
+        }
+
+        // F11 for fullscreen toggle
+        if (e.key === "F11") {
+            e.preventDefault();
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            } else {
+                document.documentElement.requestFullscreen();
+            }
+        }
+
+        // Ctrl+1-9 for tab switching
+        if (e.ctrlKey && e.key >= "1" && e.key <= "9") {
+            e.preventDefault();
+            var tabIndex = parseInt(e.key, 10) - 1;
+            var tabBtns = document.querySelectorAll(".tab-btn");
+            if (tabIndex < tabBtns.length) {
+                tabBtns[tabIndex].click();
+            }
+        }
     });
 
     // ---- Init ------------------------------------------------------------

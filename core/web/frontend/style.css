@@ -840,6 +840,45 @@ html {
     background: transparent;
 }
 
+/* ---- Desktop scaling ---- */
+
+html {
+    height: 100%;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
+body {
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow-x: hidden;
+}
+
+@media (min-width: 1600px) {
+    main {
+        max-width: 1600px;
+    }
+
+    .status-grid {
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+
+    .dashboard-cards {
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    }
+}
+
+@media (min-width: 1920px) {
+    :root {
+        font-size: 16.5px;
+    }
+
+    main {
+        max-width: 1800px;
+        padding: 2.5rem;
+    }
+}
+
 /* ---- Responsive ---- */
 
 @media (max-width: 768px) {

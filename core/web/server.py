@@ -690,3 +690,16 @@ def start_server(
         reload=reload,
         factory=True,
     )
+
+
+def create_server_app():
+    """Create and return the FastAPI application for embedded use."""
+    return create_app()
+
+
+def find_available_port(host: str = "127.0.0.1") -> int:
+    """Find an available port for the web server."""
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind((host, 0))
+        return s.getsockname()[1]
