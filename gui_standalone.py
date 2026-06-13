@@ -80,13 +80,13 @@ def main():
     logger.info("Starting SuperMedicine GUI...")
     
     import webview
-    
+
     host = "127.0.0.1"
     port = find_available_port(host)
     url = f"http://{host}:{port}"
-    
+
     logger.info(f"Server will start on {url}")
-    
+
     # Start web server in background thread
     ready_event = threading.Event()
     server_thread = threading.Thread(
@@ -95,15 +95,15 @@ def main():
         daemon=True
     )
     server_thread.start()
-    
+
     # Wait for server to be ready
     ready_event.wait(timeout=10)
     time.sleep(1)  # Give server a moment to fully start
-    
+
     logger.info(f"Opening GUI window at {url}")
-    
+
     # Create and start the GUI window
-    window = webview.create_window(
+    webview.create_window(
         title="SuperMedicine",
         url=url,
         width=1200,
@@ -112,10 +112,10 @@ def main():
         resizable=True,
         text_select=True
     )
-    
+
     # Start the GUI (this blocks until window is closed)
     webview.start(debug=False)
-    
+
     logger.info("GUI window closed, shutting down...")
 
 
