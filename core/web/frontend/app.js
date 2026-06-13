@@ -896,6 +896,53 @@
         }
     });
 
+    // ---- Smooth scrolling for anchor links --------------------------------
+
+    document.querySelectorAll('a[href^="#"]').forEach(function (anchor) {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var target = document.querySelector(this.getAttribute("href"));
+            if (target) {
+                target.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start"
+                });
+            }
+        });
+    });
+
+    // ---- Toast dismiss on click ------------------------------------------
+
+    document.addEventListener("click", function (e) {
+        if (e.target.classList.contains("toast")) {
+            e.target.style.animation = "toastOut 0.3s ease forwards";
+            setTimeout(function () {
+                e.target.remove();
+            }, 300);
+        }
+    });
+
+    // ---- Keyboard shortcuts ----------------------------------------------
+
+    document.addEventListener("keydown", function (e) {
+        // Ctrl/Cmd + K to focus search (if exists)
+        if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+            e.preventDefault();
+            var searchInput = document.querySelector('input[type="search"]');
+            if (searchInput) {
+                searchInput.focus();
+            }
+        }
+
+        // Escape to close modals
+        if (e.key === "Escape") {
+            var modals = document.querySelectorAll(".modal.active");
+            modals.forEach(function (modal) {
+                modal.classList.remove("active");
+            });
+        }
+    });
+
     // ---- Init ------------------------------------------------------------
 
     initTabs();
