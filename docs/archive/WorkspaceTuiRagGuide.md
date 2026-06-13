@@ -6,8 +6,8 @@ package upload, paper upload, or external artifact upload is part of this work.
 It is tracked even though `Architecture/` is ignored by default; release-critical
 usage should also be reflected in root Markdown.
 
-For installation and command setup, see [../INSTALL.md](../INSTALL.md). For the
-broader architecture model, see [../ARCHITECTURE.md](../ARCHITECTURE.md). This
+For installation and command setup, see [../guides/INSTALL.md](../guides/INSTALL.md). For the
+broader architecture model, see [../architecture/ARCHITECTURE.md](../architecture/ARCHITECTURE.md). This
 guide focuses on workspace-local operation and avoids repeating global setup
 details.
 

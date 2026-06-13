@@ -3,8 +3,8 @@
 Audit artifact for separating SuperMedicine standalone core capability
 from optional OpenCode / Claude Code platform integrations. Documentation
 updates preserve this model as **core independent + platform add-ons**. Current
-user-facing summaries live in [../README.md](../README.md), [../INSTALL.md](../INSTALL.md),
-and [../ARCHITECTURE.md](../ARCHITECTURE.md); this file preserves audit evidence
+user-facing summaries live in [../README.md](../README.md), [../guides/INSTALL.md](../guides/INSTALL.md),
+and [../architecture/ARCHITECTURE.md](../architecture/ARCHITECTURE.md); this file preserves audit evidence
 and final support-status reasoning.
 
 ## 1. Core Standalone Boundary

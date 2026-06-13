@@ -9,10 +9,10 @@ artifact is tracked even though `Architecture/` is ignored by default; root
 documentation remains the release source of truth.
 
 For current user commands, use [../README.md](../README.md) and
-[../INSTALL.md](../INSTALL.md). For detailed component responsibilities, use
-[../ARCHITECTURE.md](../ARCHITECTURE.md). For maintainer reading results, use
+[../guides/INSTALL.md](../guides/INSTALL.md). For detailed component responsibilities, use
+[../architecture/ARCHITECTURE.md](../architecture/ARCHITECTURE.md). For maintainer reading results, use
 [`MaintainerRepositoryReading.md`](MaintainerRepositoryReading.md). For callable,
-side-effect, and impact navigation, use [../FUNCTION_MAP.md](../FUNCTION_MAP.md).
+side-effect, and impact navigation, use [../architecture/FUNCTION_MAP.md](../architecture/FUNCTION_MAP.md).
 This roadmap intentionally keeps curated status, methodology, next actions, and
 release/planning gates; it must not contain raw scratch notes, local private
 analysis, logs, or generated artifact dumps.
@@ -187,7 +187,7 @@ flowchart TD
   tracked by Git.
   Curated results live in
   [`MaintainerRepositoryReading.md`](MaintainerRepositoryReading.md).
-- Function/callable mapping: `../FUNCTION_MAP.md` now combines a maintainer
+- Function/callable mapping: `../architecture/FUNCTION_MAP.md` now combines a maintainer
   curated project map with the AST-generated callable appendix. Treat it as a
   navigation and impact-review aid, not as executable authority.
 - Candidate exact-name status: Nature-Skill, PaperSpine, and
@@ -217,7 +217,7 @@ flowchart TD
    not fully visible in static maps.
 6. Promote only curated conclusions into this roadmap,
    [`MaintainerRepositoryReading.md`](MaintainerRepositoryReading.md),
-   `../FUNCTION_MAP.md`, or other tracked maintainer docs. Do not paste raw
+   `../architecture/FUNCTION_MAP.md`, or other tracked maintainer docs. Do not paste raw
    scratch artifacts or private runtime content.
 
 ## How to Use `FUNCTION_MAP.md` and `MaintainerRepositoryReading.md`
@@ -226,7 +226,7 @@ flowchart TD
   reading ledger: it summarizes every included file's purpose, responsibilities,
   public interface, dependencies, data flow, side effects, configuration
   assumptions, and maintenance risks.
-- Use [../FUNCTION_MAP.md](../FUNCTION_MAP.md) as the impact and call-surface
+- Use [../architecture/FUNCTION_MAP.md](../architecture/FUNCTION_MAP.md) as the impact and call-surface
   guide: begin with the curated sections for architecture, side-effect hotspots,
   candidate skill gaps, and update checklist, then consult the AST callable
   appendix when changing specific functions/classes.
@@ -281,7 +281,7 @@ until code, docs, and verification have been completed in a later approved scope
    files and verification standards.
 5. After implementation in a later scope, update this roadmap,
    [`MaintainerRepositoryReading.md`](MaintainerRepositoryReading.md), and
-   `../FUNCTION_MAP.md` to reflect actual tracked results and remove obsolete
+   `../architecture/FUNCTION_MAP.md` to reflect actual tracked results and remove obsolete
    gap wording only where evidence supports the change.
 
 ## Maintainer Repository Reading Inventory
@@ -291,7 +291,7 @@ maintainers. It records the tracked-file reading scope from `git ls-files`, the
 self-evolution files included in that tracked scope, explicit exclusions, and
 target skill/project candidate anchors. Maintainer-facing repository docs such
 as this roadmap and
-`../FUNCTION_MAP.md` are commit/upload eligible. Scratch notes, raw audits,
+`../architecture/FUNCTION_MAP.md` are commit/upload eligible. Scratch notes, raw audits,
 private analysis, transient runtime logs, local planning files, ignored local
 docs, and generated artifacts remain local-only unless a maintainer explicitly
 promotes sanitized content into a tracked maintainer document.

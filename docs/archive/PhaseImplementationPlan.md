@@ -5,8 +5,8 @@
 This document is a verifiable repository artifact for the phase implementation baseline. It maps the current SuperMedicine repository structure and compatibility boundaries before follow-on phase work. It is tracked despite the default `Architecture/` ignore rule; root Markdown remains the release-facing source of truth.
 
 This baseline avoids repeating full user guidance. Use [../README.md](../README.md)
-for quick-start commands, [../INSTALL.md](../INSTALL.md) for installation detail,
-and [../ARCHITECTURE.md](../ARCHITECTURE.md) for the current design narrative.
+for quick-start commands, [../guides/INSTALL.md](../guides/INSTALL.md) for installation detail,
+and [../architecture/ARCHITECTURE.md](../architecture/ARCHITECTURE.md) for the current design narrative.
 
 Scope for this baseline:
 
