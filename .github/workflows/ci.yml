@@ -97,6 +97,14 @@ jobs:
           test -f dist/SuperMedicine.exe
           python install_entry.py --release-exe dist/SuperMedicine.exe --desktop-dir "$RUNNER_TEMP/Desktop" --exe-dry-run
 
+      - name: Build GUI standalone Exe artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          pip install pywebview
+          python -m PyInstaller --onefile --name SuperMedicineGUI --distpath dist --workpath build-pyinstaller --specpath spec-pyinstaller --add-data "core/tui/app.tcss;core/tui" --add-data "assets;assets" --add-data "core/web/frontend;core/web/frontend" --noconsole gui_standalone.py
+          test -f dist/SuperMedicineGUI.exe
+
       - name: Build standalone installer Exe artifact
         shell: bash
         run: |
@@ -265,6 +273,11 @@ jobs:
           if not installer_exe.is_file():
               raise SystemExit("Missing CI installer executable: dist/SuperMedicineInstaller.exe. Re-run the Build standalone installer Exe artifact step.")
           shutil.copy2(installer_exe, stage / "SuperMedicineInstaller.exe")
+
+          gui_exe = root / "dist" / "SuperMedicineGUI.exe"
+          if not gui_exe.is_file():
+              raise SystemExit("Missing CI GUI executable: dist/SuperMedicineGUI.exe. Re-run the Build GUI standalone Exe artifact step.")
+          shutil.copy2(gui_exe, stage / "SuperMedicineGUI.exe")
 
           for relative_dir in include_dirs:
               source_dir = root / relative_dir
