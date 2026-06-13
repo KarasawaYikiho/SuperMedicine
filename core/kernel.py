@@ -345,6 +345,9 @@ class Kernel:
         multi-agent pipeline (alpha → beta → gamma) coordinated by delta,
         rather than executing a single agent directly.
         """
+        # Reload config from disk to pick up changes made by TUI/CLI
+        # (e.g. permission mode switch via PermissionScreenController).
+        self._config.reload()
         self._plugin_registry.discover()
 
         def emit(kind: str, message: str = "", **payload: Any) -> None:
@@ -694,6 +697,8 @@ class Kernel:
         progress_callback: Callable[[dict[str, Any]], None] | None = None,
     ) -> dict[str, Any]:
         """Execute an unmatched natural-language task through the configured LLM."""
+        # Ensure config is fresh before building LLM messages with permission context.
+        self._config.reload()
         return _execute_llm_chat_fn(
             task,
             task_id=task_id,

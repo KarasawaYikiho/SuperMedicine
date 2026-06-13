@@ -45,6 +45,14 @@ class PromptInput(Input):
 
     def on_key(self, event: events.Key) -> None:
         """Filter terminal control bytes without consuming ordinary input."""
+        # Only process keys when this widget has focus
+        if not self.has_focus:
+            return
+
+        # Don't process keys when a modal screen is active
+        from textual.screen import ModalScreen
+        if isinstance(self.app.screen, ModalScreen):
+            return
 
         if self._is_menu_key(event):
             self._consume_key_event(event)

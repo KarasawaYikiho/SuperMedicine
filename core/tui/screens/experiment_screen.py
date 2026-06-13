@@ -61,6 +61,7 @@ class ExperimentGuideView(Vertical):
             t("experiment_action_hint"), id="experiment-action-hint", classes="hint"
         )
         protocol_table: DataTable = DataTable(id="experiment-protocol-table", cursor_type="row")
+        protocol_table.styles.height = "auto"
         protocol_table.styles.max_height = 12
         yield protocol_table
         yield Button(
@@ -70,9 +71,16 @@ class ExperimentGuideView(Vertical):
         yield Static("", id="experiment-step")
         yield Static("", id="experiment-instructions")
         input_table: DataTable = DataTable(id="experiment-input-table", cursor_type="row")
+        input_table.styles.height = "auto"
         input_table.styles.max_height = 8
         yield input_table
+        yield Button(
+            "粘贴选中字段到输入框",
+            id="experiment-paste-field",
+            classes="btn btn-secondary",
+        )
         data_input = TextArea.code_editor("", language="json", id="experiment-data-input")
+        data_input.styles.height = "auto"
         data_input.styles.max_height = 10
         yield data_input
         yield Input(
@@ -130,6 +138,7 @@ class ExperimentGuideView(Vertical):
                     field.label,
                     t("yes") if field.required else t("no"),
                     field.help_text,
+                    key=field.name,
                 )
         if status_message:
             self._set_status(status_message)
@@ -143,20 +152,30 @@ class ExperimentGuideView(Vertical):
             self._save_log()
         elif event.button.id == "experiment-switch":
             self._switch_to_next_protocol()
+        elif event.button.id == "experiment-paste-field":
+            self._paste_selected_field()
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         """Handle double-click or Enter on a table row to paste field name."""
         if event.data_table.id == "experiment-input-table":
             self._paste_field_name(event.row_key)
 
+    def _paste_selected_field(self) -> None:
+        """Paste the currently highlighted field name into the data input TextArea."""
+        table = self.query_one("#experiment-input-table", DataTable)
+        if table.cursor_row is not None and table.row_count > 0:
+            row_key = table.get_row_at(table.cursor_row)
+            field_name = str(row_key[0]) if row_key else ""
+            if field_name:
+                textarea = self.query_one("#experiment-data-input", TextArea)
+                current = textarea.text
+                if current and not current.endswith("\n"):
+                    current += "\n"
+                textarea.load_text(current + field_name + "=")
+
     def _paste_field_name(self, row_key: object) -> None:
         """Append field_name= to the data input TextArea."""
-        table = self.query_one("#experiment-input-table", DataTable)
-        try:
-            row = table.get_row_at(int(str(row_key)))
-        except (ValueError, IndexError):
-            return
-        field_name = str(row[0]) if row else ""
+        field_name = str(getattr(row_key, "value", row_key))
         if not field_name:
             return
         textarea = self.query_one("#experiment-data-input", TextArea)

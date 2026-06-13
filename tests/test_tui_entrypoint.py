@@ -47,7 +47,6 @@ def test_chinese_labels_available():
     assert LABELS["status_focus_input"] == "输入框"
     assert "Tab/Shift+Tab" in LABELS["status_shortcuts_hint"]
     assert "M 菜单" in LABELS["status_shortcuts_hint"]
-    assert "更多操作" in LABELS["status_shortcuts_hint"]
     assert "F" not in LABELS["status_maximized"]
     assert "M 菜单" in LABELS["status_maximized"]
     assert LABELS["menu_select_view"] == "选择视图"
@@ -358,7 +357,6 @@ def test_tui_help_text_documents_actual_bindings_and_state_meanings():
     for key in {
         "Q",
         "M",
-        "P",
     }:
         assert key in binding_keys
     assert "f" not in binding_keys
@@ -382,10 +380,8 @@ def test_tui_help_text_documents_actual_bindings_and_state_meanings():
         "危险操作",
         "LLM",
         "任务",
-        "Q",
         "M",
         "选择视图",
-        "帮助",
         "最大化/还原",
     ]:
         assert expected in help_text

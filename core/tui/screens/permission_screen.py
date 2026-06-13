@@ -109,7 +109,10 @@ class PermissionView(Vertical):
                 "切换模式", id="permission-set-mode", classes="btn btn-primary"
             )
         yield Static("外部授权目录（保守模式下允许访问这些目录）", classes="hint")
-        yield DataTable(id="permission-roots-table", cursor_type="row")
+        permission_table: DataTable = DataTable(id="permission-roots-table", cursor_type="row")
+        permission_table.styles.height = "auto"
+        permission_table.styles.max_height = 8
+        yield permission_table
         with Horizontal(classes="form-row"):
             yield Input(placeholder="外部目录路径", id="permission-root-input")
             yield Button(

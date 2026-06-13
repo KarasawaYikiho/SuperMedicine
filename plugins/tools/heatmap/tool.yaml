@@ -1,0 +1,24 @@
+id: "heatmap"
+language: "python"
+name: "Python heatmap"
+description: "Optional Python heatmap visualization tool using seaborn and matplotlib. Generates clustered heatmaps from CSV/TSV data matrices."
+entrypoint: "runner.py"
+dependencies:
+  - "pandas"
+  - "matplotlib"
+  - "seaborn"
+inputs:
+  - name: "input"
+    description: "CSV/TSV data matrix path. If omitted, a small built-in sample is used."
+    type: "path:csv_or_tsv"
+    required: false
+  - name: "tool-kind"
+    description: "Visualization kind: heatmap"
+    type: "string"
+    required: false
+outputs:
+  - name: "output"
+    description: "Output image path (PNG). If omitted, result summary is printed to stdout."
+    type: "path:png"
+    required: false
+version: "1.0.0"

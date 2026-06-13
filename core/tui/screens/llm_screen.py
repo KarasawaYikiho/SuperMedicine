@@ -70,6 +70,9 @@ class LLMScreenController:
     def switch_provider(self, provider: str) -> dict[str, Any]:
         return self.manager.switch_provider(provider)
 
+    def delete_provider(self, provider: str) -> dict[str, Any]:
+        return self.manager.delete_provider(provider)
+
     def save_exit_state(self) -> dict[str, Any]:
         return self.manager.save_exit_state()
 
@@ -94,6 +97,9 @@ class LLMView(Vertical):
             )
             yield Button(
                 t("llm_switch_provider"), id="llm-switch", classes="btn btn-primary"
+            )
+            yield Button(
+                t("llm_delete_provider"), id="llm-delete", classes="btn btn-danger"
             )
             yield Button(t("refresh"), id="llm-refresh", classes="btn btn-secondary")
         with Vertical(id="llm-form"):
@@ -167,6 +173,8 @@ class LLMView(Vertical):
             self._add_provider_from_form()
         elif event.button.id == "llm-switch":
             self._switch_selected_provider()
+        elif event.button.id == "llm-delete":
+            self._delete_selected_provider()
 
     def handle_input_submit(self, input_id: str, value: str) -> None:
         if input_id == "llm-api-key-input":
@@ -207,6 +215,20 @@ class LLMView(Vertical):
             self.app.notify(f"{t('llm_provider_switched')}: {provider}")
             self.refresh_llm_state()
             self._set_status(f"{t('llm_provider_switched')}: {provider}")
+        else:
+            self._set_status(self._safe_error_message(result))
+
+    def _delete_selected_provider(self) -> None:
+        select = self.query_one("#llm-provider-select", Select)
+        if select.value is None or select.value == Select.BLANK:
+            self._set_status(t("llm_missing_selection"))
+            return
+        provider = str(select.value)
+        result = self.controller.delete_provider(provider)
+        if result.get("ok"):
+            self._set_status(f"{t('llm_provider_deleted')}: {provider}")
+            self.app.notify(f"{t('llm_provider_deleted')}: {provider}")
+            self.refresh_llm_state()
         else:
             self._set_status(self._safe_error_message(result))
 

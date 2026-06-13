@@ -17,6 +17,7 @@ from typing import Any, Literal, Sequence
 
 from core.experience import ExperienceRecord, ExperienceStore
 from core.log_report import LogReportStore
+from core.log_report_models import TUI_LOG_SESSION_ID
 from core.operation_guard import authorize_dangerous_operation
 from core.path_safety import (
     DangerousOverwriteError,
@@ -44,7 +45,6 @@ ARTIFACT_TYPE_WHITELIST: tuple[ArtifactType, ...] = (
     "r_tool",
 )
 SELF_EVOLUTION_ACTION = "self_evolution.generate"
-SELF_EVOLUTION_LOG_SESSION_ID = "self-evolution"
 ALLOWED_MARKDOWN_EXTENSIONS = (".md",)
 ALLOWED_TOOL_EXTENSIONS = (".py", ".r", ".R", ".md", ".txt")
 SELF_EVOLUTION_WRITABLE_ROOTS = ("self_evolution", "generated", "tools/generated")
@@ -780,7 +780,7 @@ class SelfEvolutionService:
         try:
             LogReportStore(self.project_root).append(
                 json.dumps(event, ensure_ascii=False, sort_keys=True),
-                session_id=SELF_EVOLUTION_LOG_SESSION_ID,
+                session_id=TUI_LOG_SESSION_ID,
                 severity=severity,
             )
         except Exception:

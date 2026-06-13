@@ -650,6 +650,11 @@ class CLI:
         """启动中文 TUI 工作台；不会改变 CLI 默认工作区行为。"""
         from core.tui.app import launch_tui
 
+        # In frozen mode, let launch_tui resolve the project root by
+        # checking the executable's directory first (for .supermedicine
+        # config), falling back to cwd.  In development mode, always use cwd.
+        if getattr(sys, "frozen", False):
+            return launch_tui(dry_run=dry_run)
         return launch_tui(dry_run=dry_run, project_root=Path.cwd())
 
     def web(self, host: str = "127.0.0.1", port: int = 8000, reload: bool = False):

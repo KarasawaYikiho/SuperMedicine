@@ -11,7 +11,7 @@ from rich.markup import escape
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.timer import Timer
-from textual.widgets import RichLog
+from textual.widgets import RichLog, Static
 
 from core.tui.i18n import t
 
@@ -63,6 +63,7 @@ class ChatView(Vertical):
 
     def compose(self) -> ComposeResult:
         yield RichLog(id="chat-output", wrap=True, highlight=True, markup=True)
+        yield Static("", id="thinking-indicator")
 
     def on_mount(self) -> None:
         """Show welcome message."""
@@ -179,8 +180,9 @@ class ChatView(Vertical):
         """Start the thinking animation with 5 circle indicators."""
         self._thinking_active = True
         self._thinking_frame = 0
-        output = self.query_one("#chat-output", RichLog)
-        output.write("\n[bold magenta]🧠 思考中 ○○○○○[/]")
+        indicator = self.query_one("#thinking-indicator", Static)
+        indicator.update("[bold magenta]🧠 思考中 ○○○○○[/]")
+        indicator.visible = True
         if self._thinking_timer is not None:
             self._thinking_timer.stop()
         self._thinking_timer = self.set_interval(0.3, self._advance_thinking_frame)
@@ -192,8 +194,8 @@ class ChatView(Vertical):
         self._thinking_frame = (getattr(self, "_thinking_frame", 0) + 1) % 6
         filled = "●" * self._thinking_frame
         empty = "○" * (5 - self._thinking_frame)
-        output = self.query_one("#chat-output", RichLog)
-        output.write(f"[bold magenta]🧠 思考中 {filled}{empty}[/]")
+        indicator = self.query_one("#thinking-indicator", Static)
+        indicator.update(f"[bold magenta]🧠 思考中 {filled}{empty}[/]")
 
     def stop_thinking_animation(self) -> None:
         """Stop the thinking animation."""
@@ -201,13 +203,16 @@ class ChatView(Vertical):
         if self._thinking_timer is not None:
             self._thinking_timer.stop()
             self._thinking_timer = None
+        indicator = self.query_one("#thinking-indicator", Static)
+        indicator.visible = False
 
     def start_processing_animation(self) -> None:
-        """Start the processing squares animation."""
+        """Start the processing animation with circle indicators."""
         self._processing_active = True
         self._processing_frame = 0
-        output = self.query_one("#chat-output", RichLog)
-        output.write(f"\n[bold yellow]⏳ {t('chat_processing_state')} □□□□□[/]")
+        indicator = self.query_one("#thinking-indicator", Static)
+        indicator.update(f"[bold yellow]⏳ {t('chat_processing_state')} ○○○○○[/]")
+        indicator.visible = True
         if self._processing_timer is not None:
             self._processing_timer.stop()
         self._processing_timer = self.set_interval(0.4, self._advance_processing_frame)
@@ -217,10 +222,10 @@ class ChatView(Vertical):
         if not self._processing_active:
             return
         self._processing_frame = (self._processing_frame + 1) % 6
-        filled = "■" * self._processing_frame
-        empty = "□" * (5 - self._processing_frame)
-        output = self.query_one("#chat-output", RichLog)
-        output.write(f"[bold yellow]⏳ {t('chat_processing_state')} {filled}{empty}[/]")
+        filled = "●" * self._processing_frame
+        empty = "○" * (5 - self._processing_frame)
+        indicator = self.query_one("#thinking-indicator", Static)
+        indicator.update(f"[bold yellow]⏳ {t('chat_processing_state')} {filled}{empty}[/]")
 
     def stop_processing_animation(self) -> None:
         """Stop the processing animation."""
@@ -228,6 +233,8 @@ class ChatView(Vertical):
         if self._processing_timer is not None:
             self._processing_timer.stop()
             self._processing_timer = None
+        indicator = self.query_one("#thinking-indicator", Static)
+        indicator.visible = False
 
     def append_thinking_content(self, content: str) -> None:
         """Append streaming thinking content below the animation."""

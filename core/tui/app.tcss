@@ -133,25 +133,6 @@ Footer {
     text-style: bold;
 }
 
-#sidebar-shortcuts {
-    height: 3;
-    padding: 0 1;
-    color: $text-muted;
-    border-top: solid $border;
-    background: $surface;
-}
-
-#sidebar-permission-entry {
-    height: 2;
-    padding: 0 1;
-    color: $text-muted;
-    background: $surface;
-}
-
-.shortcut-hint {
-    color: $text-muted;
-}
-
 /* Main Area */
 #main-area {
     width: 1fr;
@@ -205,6 +186,7 @@ Footer {
     height: auto;
     border: solid $border;
     background: $background;
+    overflow-x: hidden;
 }
 
 #prompt-input:focus {
@@ -247,6 +229,17 @@ Footer {
 
 #chat-output:focus {
     border: solid $accent;
+}
+
+#thinking-indicator {
+    dock: bottom;
+    align: right middle;
+    width: auto;
+    height: 1;
+    padding: 0 1;
+    background: $surface;
+    border: solid $border;
+    visibility: hidden;
 }
 
 /* Dashboard */
@@ -304,15 +297,28 @@ DataTable:focus {
 
 /* Experiment page - prevent focus enlargement */
 #experiment-protocol-table {
+    height: auto;
     max-height: 12;
+    overflow-y: auto;
 }
 
 #experiment-input-table {
+    height: auto;
     max-height: 8;
+    overflow-y: auto;
 }
 
 #experiment-data-input {
+    height: auto;
     max-height: 10;
+    overflow-y: auto;
+}
+
+/* Permission page - prevent focus enlargement */
+#permission-roots-table {
+    height: auto;
+    max-height: 8;
+    overflow-y: auto;
 }
 
 Input,

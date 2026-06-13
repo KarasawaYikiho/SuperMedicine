@@ -93,7 +93,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m PyInstaller --onefile --name SuperMedicine --distpath dist --workpath .pyinstaller-build --specpath .pyinstaller-spec cli_entry.py
+          python -m PyInstaller --onefile --name SuperMedicine --distpath dist --workpath .pyinstaller-build --specpath .pyinstaller-spec --add-data "core/tui/app.tcss;core/tui" --add-data "assets;assets" cli_entry.py
           test -f dist/SuperMedicine.exe
           python install_entry.py --release-exe dist/SuperMedicine.exe --desktop-dir "$RUNNER_TEMP/Desktop" --exe-dry-run
 

@@ -118,6 +118,44 @@ class ConfigCenter:
         self._config_path.parent.mkdir(parents=True, exist_ok=True)
         with open(self._config_path, "w", encoding="utf-8") as f:
             yaml.dump(self._config, f, allow_unicode=True, default_flow_style=False)
+            f.flush()
+
+    def reload(self) -> None:
+        """从磁盘重新读取配置文件，刷新内存中的配置。
+
+        当 TUI/CLI 等外部入口修改了同一配置文件后，Kernel 等长生命周期
+        组件应调用此方法确保后续执行使用最新配置。
+        """
+        self._load_error = ""
+        if self._config_path.exists():
+            try:
+                with open(self._config_path, "r", encoding="utf-8") as f:
+                    loaded = yaml.safe_load(f) or {}
+                if isinstance(loaded, dict):
+                    self._config = loaded
+                else:
+                    self._load_error = f"config root must be a mapping: {self._config_path}"
+                    logger.error(
+                        "Config reload failed: stage=parse path=%s error=%s",
+                        self._config_path,
+                        self._load_error,
+                    )
+            except yaml.YAMLError as exc:
+                self._load_error = f"invalid YAML in config file {self._config_path}: {exc}"
+                logger.error(
+                    "Config reload failed: stage=parse path=%s error=%s",
+                    self._config_path,
+                    redact_sensitive(str(exc)),
+                )
+            except OSError as exc:
+                self._load_error = f"cannot read config file {self._config_path}: {exc}"
+                logger.error(
+                    "Config reload failed: stage=read path=%s error=%s",
+                    self._config_path,
+                    redact_sensitive(str(exc)),
+                )
+        else:
+            self._config = {}
 
     def all(self) -> dict[str, Any]:
         """获取全部配置（合并环境变量覆盖）"""
@@ -443,6 +481,26 @@ class ConfigCenter:
             providers = {}
             llm_config["providers"] = providers
         providers[provider] = dict(values)
+
+    def delete_llm_provider(self, provider: str) -> bool:
+        """删除指定 LLM provider 配置（仅修改内存）。
+
+        如果删除的是当前 provider 或 last_provider，则同时清除对应字段。
+        返回是否成功删除（provider 不存在时返回 False）。
+        """
+        llm_config = self.ensure_llm_config()
+        providers = llm_config.get("providers", {})
+        if not isinstance(providers, dict):
+            return False
+        provider_name = str(provider or "").strip().lower()
+        if provider_name not in providers:
+            return False
+        del providers[provider_name]
+        if self.get_llm_current_provider_name() == provider_name:
+            llm_config["provider"] = ""
+        if self.get_llm_last_provider_name() == provider_name:
+            llm_config["last_provider"] = ""
+        return True
 
     def set_llm_current_provider(self, provider: str) -> None:
         """设置当前默认 LLM provider（仅修改内存）。"""

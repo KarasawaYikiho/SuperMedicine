@@ -79,6 +79,33 @@ class LLMConfigManager:
             self._config.save()
         return {"ok": True, "provider": self.get_provider(provider_name, redacted=True)}
 
+    def delete_provider(self, provider: str, *, save: bool = True) -> dict[str, Any]:
+        """删除指定 provider 配置；如果该 provider 是当前默认则清除。"""
+        provider_name = self._normalize_provider(provider)
+        if not provider_name:
+            return self._error("missing_provider", "LLM provider name is required")
+        logger.info(
+            "LLM manager delete_provider: stage=config provider=%s path=%s",
+            provider_name,
+            self._config.config_path,
+        )
+        if not self._provider_exists(provider_name):
+            return self._error(
+                "provider_not_found",
+                f"LLM provider not found: {provider_name}",
+                provider=provider_name,
+            )
+        deleted = self._config.delete_llm_provider(provider_name)
+        if not deleted:
+            return self._error(
+                "delete_failed",
+                f"Failed to delete LLM provider: {provider_name}",
+                provider=provider_name,
+            )
+        if save:
+            self._config.save()
+        return {"ok": True, "provider": provider_name}
+
     def switch_provider(self, provider: str, *, save: bool = True) -> dict[str, Any]:
         """切换当前 provider；切换前校验配置完整性。"""
         provider_name = self._normalize_provider(provider)

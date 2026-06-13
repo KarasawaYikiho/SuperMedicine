@@ -1,0 +1,24 @@
+id: "r-umap"
+language: "r"
+name: "R UMAP"
+description: "Optional R UMAP dimensionality reduction tool using the umap package. Produces 2D embeddings from high-dimensional CSV/TSV data."
+entrypoint: "runner.R"
+dependencies:
+  - "ggplot2"
+  - "readr"
+  - "umap"
+inputs:
+  - name: "input"
+    description: "CSV/TSV data matrix path. If omitted, a small built-in sample is used."
+    type: "path:csv_or_tsv"
+    required: false
+  - name: "tool-kind"
+    description: "Visualization kind: umap"
+    type: "string"
+    required: false
+outputs:
+  - name: "output"
+    description: "Output image path (PNG) or JSON embedding. If omitted, result summary is printed to stdout."
+    type: "path:json"
+    required: false
+version: "1.0.0"

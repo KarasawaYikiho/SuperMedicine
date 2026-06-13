@@ -21,6 +21,7 @@ from textual.widgets import Footer, Header, Input, ListView, Static
 from core.config_center import ConfigCenter
 from core.llm_manager import LLMConfigManager
 from core.tui.i18n import LABELS, t
+from core.tui.resources import resolve_tcss
 from core.tui.status_helpers import _console_safe_text, _describe_llm_status, apply_status_style  # noqa: F401
 from core.tui.kernel_output import (
     _KERNEL_OUTPUT_ASSISTANT_KEYS,
@@ -36,10 +37,7 @@ from core.tui.types import DynamicRefreshSurface, NavMetadata, ShellStatusText, 
 
 logger = logging.getLogger(__name__)
 
-
-_CSS_PATH = Path(__file__).parent / "app.tcss"
-
-
+_CSS_PATH = resolve_tcss("app.tcss")
 
 
 class SuperMedicineTUI(App[Any]):
@@ -50,9 +48,8 @@ class SuperMedicineTUI(App[Any]):
     AUTO_FOCUS = "#prompt-input"
 
     BINDINGS = [
-        Binding("Q", "quit", t("nav_quit")),
+        Binding("Q", "quit", t("nav_quit"), show=False),
         Binding("M", "open_menu", t("menu_open"), show=True),
-        Binding("P", "switch_view('permission')", "权限", show=True),
     ]
 
     NAV_ITEMS = (
@@ -91,7 +88,7 @@ class SuperMedicineTUI(App[Any]):
         self.theme = "supermedicine"
         self.project_root = Path(project_root) if project_root else Path.cwd()
         self._config_path = self.project_root / ".supermedicine" / "config.yaml"
-        self._current_view = ConfigCenter(self._config_path).get_current_view()
+        self._current_view = "chat"
         self._views: dict[str, Any] = {}
         self._task_running = False
         self._chat_processing = False
@@ -121,16 +118,7 @@ class SuperMedicineTUI(App[Any]):
                     ),
                     id="nav-list",
                 )
-                yield Static(
-                    f"{t('layout_shortcuts')}\n{self.shortcut_hint_text()}",
-                    id="sidebar-shortcuts",
-                    classes="shortcut-hint",
-                )
-                yield Static(
-                    "P 权限 · 访问模式/授权目录",
-                    id="sidebar-permission-entry",
-                    classes="shortcut-hint",
-                )
+
             with Vertical(id="main-area"):
                 yield Static(t("nav_chat"), id="view-title", classes="view-heading")
                 yield Vertical(id="content-pane")
@@ -782,6 +770,20 @@ class SuperMedicineTUI(App[Any]):
         self._save_llm_exit_state()
 
 
+def _resolve_frozen_project_root() -> Path:
+    """Return a sensible project root when running as a frozen executable.
+
+    In frozen mode the working directory may differ from the executable
+    location.  Prefer the directory that contains the executable, falling
+    back to the current working directory.
+    """
+    if getattr(sys, "frozen", False):
+        exe_dir = Path(sys.executable).resolve().parent
+        if (exe_dir / ".supermedicine").is_dir() or (exe_dir / "core").is_dir():
+            return exe_dir
+    return Path.cwd()
+
+
 def launch_tui(
     *, dry_run: bool = False, project_root: Path | str | None = None
 ) -> TUIStatus:
@@ -791,7 +793,10 @@ def launch_tui(
     message, which keeps command-line tests non-interactive.
     """
 
-    root = Path(project_root) if project_root else Path.cwd()
+    if project_root is not None:
+        root = Path(project_root)
+    else:
+        root = _resolve_frozen_project_root()
     if not dry_run:
         from core.log_report_handler import configure_tui_log_storage
 
