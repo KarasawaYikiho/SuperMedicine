@@ -45,7 +45,7 @@ def main() -> int:
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         import pandas as pd
-        import seaborn as sns
+        import seaborn as sns  # type: ignore[import-untyped]
 
         if args.input:
             input_path = Path(args.input)

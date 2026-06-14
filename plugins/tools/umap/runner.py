@@ -48,7 +48,7 @@ def main() -> int:
         import matplotlib.pyplot as plt
         import numpy as np
         import pandas as pd
-        import umap
+        import umap  # type: ignore[import-not-found]
 
         if args.input:
             input_path = Path(args.input)

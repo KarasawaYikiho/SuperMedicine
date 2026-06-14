@@ -62,7 +62,7 @@ def main() -> None:
 
     # Start the web server (this will block)
     try:
-        start_server(host, port, log_level="warning")
+        start_server(host, port)
     except KeyboardInterrupt:
         print("\nShutting down SuperMedicine...")
         sys.exit(0)

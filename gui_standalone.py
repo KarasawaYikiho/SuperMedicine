@@ -79,7 +79,7 @@ def main():
     logger = setup_gui_logging()
     logger.info("Starting SuperMedicine GUI...")
 
-    import webview
+    import webview  # type: ignore[import-not-found]
 
     host = "127.0.0.1"
     port = find_available_port(host)
