@@ -291,7 +291,7 @@ def test_workspace_view_refresh_button_reads_external_workspace_created_after_en
 
             WorkspaceManager(tmp_path).initialize_workspace("external-a")
             # 直接调用视图刷新方法，避免 pilot.click() 的事件传递问题
-            workspace_view = app.query_one("WorkspaceView")
+            workspace_view = app.query_one("WorkspaceView", WorkspaceView)
             workspace_view._load_workspaces(refreshed=True)
             await pilot.pause()
             await _wait_for_tui_condition(pilot, lambda: table.row_count == 1, timeout=5.0)
