@@ -76,7 +76,7 @@ def test_cli_help_preserves_legacy_commands_and_run_flags(capsys):
 @pytest.mark.core
 def test_core_cli_kernel_imports_do_not_load_platform_adapters():
     for module_name in (
-        "Cli",
+        "cli_entry",
         "core.kernel",
         "adapters.opencode",
         "adapters.opencode.adapter",
@@ -85,7 +85,7 @@ def test_core_cli_kernel_imports_do_not_load_platform_adapters():
     ):
         sys.modules.pop(module_name, None)
 
-    importlib.import_module("Cli")
+    importlib.import_module("cli_entry")
     importlib.import_module("core.kernel")
 
     assert "adapters.opencode" not in sys.modules
@@ -181,9 +181,9 @@ def test_cli_run_without_workspace_preserves_params_identity_and_ignores_tui_rec
 
     class FakeKernel:
         def __init__(self, *args, **kwargs):
-            self._config_path = kwargs["config_path"]
-            self._plugins_dir = kwargs["plugins_dir"]
-            self._policies_dir = kwargs["policies_dir"]
+            self._config_path = kwargs.get("config_path")
+            self._plugins_dir = kwargs.get("plugins_dir")
+            self._policies_dir = kwargs.get("policies_dir")
             self.plugin_registry = FakeRegistry()
             self.checkpoint_manager = FakeCheckpointManager()
 
@@ -201,6 +201,7 @@ def test_cli_run_without_workspace_preserves_params_identity_and_ignores_tui_rec
             }
 
     monkeypatch.setattr("core.kernel.Kernel", FakeKernel)
+    monkeypatch.setattr("cli_entry.Kernel", FakeKernel, raising=False)
     params = {"source_id": "legacy-source", "nested": {"unchanged": True}}
 
     CLI().run(

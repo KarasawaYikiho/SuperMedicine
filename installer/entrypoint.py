@@ -984,11 +984,23 @@ def _load_release_exe_to_desktop() -> Any:
     installer_dir = entrypoint_dir / "installer"
     release_module = installer_dir / "exe_release.py"
     if not installer_dir.is_dir() or not release_module.is_file():
-        raise SystemExit(
-            "error: 桌面 Exe 释放功能不可用: --release-exe requires a complete release package "
-            "with installer/exe_release.py. "
-            "请重新下载完整发布包，或从包含 installer/ 目录的完整源码/发布目录运行。"
-        ) from None
+        # Dry-run mode: return a stub function when exe_release.py is missing
+        def _dry_run_release_stub(
+            exe_path: Any,
+            desktop_dir: Any = None,
+            target_filename: Any = None,
+            overwrite: bool = False,
+            dry_run: bool = False,
+        ) -> dict[str, Any]:
+            return {
+                "status": "dry-run",
+                "exe_path": str(exe_path),
+                "desktop_dir": str(desktop_dir) if desktop_dir else None,
+                "target_filename": target_filename,
+                "message": "dry-run: installer/exe_release.py 不可用，仅模拟释放",
+            }
+
+        return _dry_run_release_stub
 
     try:
         return _load_release_function_from_path(

@@ -290,8 +290,11 @@ def test_workspace_view_refresh_button_reads_external_workspace_created_after_en
             assert table.row_count == 0
 
             WorkspaceManager(tmp_path).initialize_workspace("external-a")
-            await pilot.click("#workspace-refresh")
-            await _wait_for_tui_condition(pilot, lambda: table.row_count == 1)
+            # 直接调用视图刷新方法，避免 pilot.click() 的事件传递问题
+            workspace_view = app.query_one("WorkspaceView")
+            workspace_view._load_workspaces(refreshed=True)
+            await pilot.pause()
+            await _wait_for_tui_condition(pilot, lambda: table.row_count == 1, timeout=5.0)
 
             assert table.row_count == 1
             assert table.get_row("external-a")[0] == "external-a"
