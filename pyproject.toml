@@ -119,6 +119,7 @@ module = [
     "fastapi.*",
     "uvicorn",
     "uvicorn.*",
+    "tomllib",
 ]
 ignore_missing_imports = true
 
