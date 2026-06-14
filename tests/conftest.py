@@ -181,7 +181,7 @@ def read_pyproject() -> dict:
     try:
         import tomllib
     except ModuleNotFoundError:
-        tomllib = None
+        tomllib = None  # type: ignore[assignment]
 
     path = Path(__file__).resolve().parents[1] / "pyproject.toml"
     if tomllib is not None:
