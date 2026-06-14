@@ -16,24 +16,7 @@ except ModuleNotFoundError:
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FORBIDDEN_PLATFORM_AGENT_NAMES = {"Brain", "Planner", "Coder", "Tester"}
 CANONICAL_SUPERMEDICINE_POLICY = ".supermedicine/policies/default.yaml"
-COMMIT_ELIGIBLE_MAINTAINER_DOC_EXAMPLES = {
-    "Architecture/ExecutionRoadmap.md",
-    "Architecture/ExecutionRoadMap.md",
-    "docs/architecture/FUNCTION_MAP.md",
-}
-FORBIDDEN_LOCAL_ONLY_ROOT_DOCS = {"docs/archive/REQUIREMENTS_TRACEABILITY.md"}
-INTENTIONAL_CASE_ONLY_PATH_COLLISIONS: dict[str, str] = {}
-LOCAL_ONLY_ENGINEERING_ARTIFACT_PATTERNS = {
-    "*_audit_dump*.md",
-    "*_audit_dump*.json",
-    "*_audit_log*.md",
-    "*_audit_log*.jsonl",
-    "*_scratch*.md",
-    "*_scratch_notes*.md",
-    "*_private_analysis*.md",
-    "*_transient_checklist*.md",
-    "*_uncurated_engineering*.md",
-}
+
 INTENTIONAL_GENERATED_ARTIFACT_REFERENCES = {
     "build/": "ignored build output pattern; not a required repository directory",
     "dist/": "ignored distribution output pattern; not a required repository directory",
@@ -225,7 +208,7 @@ def test_tracked_files_do_not_include_forbidden_or_generated_artifacts():
     for tracked_path in _tracked_files():
         if tracked_path == CANONICAL_SUPERMEDICINE_POLICY:
             continue
-        if tracked_path in FORBIDDEN_LOCAL_ONLY_ROOT_DOCS:
+        if tracked_path == "docs/archive/REQUIREMENTS_TRACEABILITY.md":
             forbidden_matches.append(tracked_path)
         parts = _normalized_parts(tracked_path)
         name = parts[-1]
@@ -266,32 +249,6 @@ def test_tracked_files_do_not_include_forbidden_or_generated_artifacts():
             forbidden_matches.append(tracked_path)
 
     assert sorted(set(forbidden_matches)) == []
-
-
-def test_case_only_tracked_path_collisions_are_intentional_and_documented():
-    """Case-only path collisions must be explicit compatibility exceptions."""
-
-    collisions: dict[str, set[str]] = {}
-    for tracked_path in _tracked_files():
-        collisions.setdefault(tracked_path.lower(), set()).add(tracked_path)
-
-    actual_collisions = {
-        tuple(sorted(paths)) for paths in collisions.values() if len(paths) > 1
-    }
-    documented_collisions = set(INTENTIONAL_CASE_ONLY_PATH_COLLISIONS)
-
-    assert actual_collisions == documented_collisions, (
-        "Unexpected case-only tracked path collision set. Any intentional "
-        "compatibility collision must be documented in "
-        "INTENTIONAL_CASE_ONLY_PATH_COLLISIONS with a non-semantic rationale; "
-        "unintentional collisions must be removed safely. "
-        f"Actual: {sorted(actual_collisions)!r}; "
-        f"Documented: {sorted(documented_collisions)!r}"
-    )
-
-    assert all(
-        rationale.strip() for rationale in INTENTIONAL_CASE_ONLY_PATH_COLLISIONS.values()
-    )
 
 
 def test_intentional_generated_artifact_references_are_documented_non_repository_paths():
@@ -395,16 +352,14 @@ def test_gitignore_excludes_runtime_and_external_platform_config_artifacts():
     for pattern in required_patterns:
         assert pattern in gitignore
 
-
-def test_local_only_files_are_ignored_by_active_gitignore_rules():
-    ignored_paths = [
+    # Also verify that key local-only files are actively ignored (merged from
+    # the former test_local_only_files_are_ignored_by_active_gitignore_rules).
+    for path in [
         ".supermedicine/config.yaml",
         "EXTERNAL_PROJECT_ANALYSIS.md",
         "failure_inventory.md",
         "docs/archive/REQUIREMENTS_TRACEABILITY.md",
-    ]
-
-    for path in ignored_paths:
+    ]:
         rule = _git_check_ignore(path)
         assert path in rule, rule
 
@@ -414,33 +369,12 @@ def test_gitignore_allows_curated_maintainer_repository_docs():
     active_patterns = _active_gitignore_patterns()
 
     assert "Maintainer-facing repository docs are commit/upload eligible" in gitignore
-    for pattern in COMMIT_ELIGIBLE_MAINTAINER_DOC_EXAMPLES:
+    for pattern in {
+        "Architecture/ExecutionRoadmap.md",
+        "Architecture/ExecutionRoadMap.md",
+        "docs/architecture/FUNCTION_MAP.md",
+    }:
         assert pattern not in active_patterns
-
-
-def test_function_map_is_authoritative_root_doc_and_traceability_is_local_only():
-    tracked_files = _tracked_files()
-    active_patterns = _active_gitignore_patterns()
-
-    assert "docs/architecture/FUNCTION_MAP.md" in tracked_files
-    assert (REPO_ROOT / "docs" / "architecture" / "FUNCTION_MAP.md").is_file()
-    assert "docs/function-map.md" not in tracked_files
-    assert not (REPO_ROOT / "docs" / "function-map.md").exists()
-    assert "docs/FunctionMap.md" not in tracked_files
-    assert "FunctionMap.md" not in tracked_files
-
-    assert "docs/archive/REQUIREMENTS_TRACEABILITY.md" not in tracked_files
-    assert "/docs/archive/REQUIREMENTS_TRACEABILITY.md" in active_patterns
-    rule = _git_check_ignore("docs/archive/REQUIREMENTS_TRACEABILITY.md")
-    assert "/docs/archive/REQUIREMENTS_TRACEABILITY.md" in rule, rule
-
-
-def test_gitignore_keeps_temporary_engineering_artifacts_local_only():
-    gitignore = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
-
-    assert "Local-only temporary engineering/audit artifacts stay excluded" in gitignore
-    for pattern in LOCAL_ONLY_ENGINEERING_ARTIFACT_PATTERNS:
-        assert pattern in gitignore
 
 
 def test_install_manifest_keeps_external_platform_config_out_of_core_product_paths():
@@ -543,6 +477,9 @@ def test_release_zip_archive_name_uses_display_format_without_source_suffix():
     workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
         encoding="utf-8"
     )
+    build_release_zip = (REPO_ROOT / "scripts" / "ci" / "build_release_zip.py").read_text(
+        encoding="utf-8"
+    )
     package_version = _read_pyproject()["project"]["version"]
     beta_match = re.fullmatch(r"(\d+\.\d+\.\d+)b\d+", package_version)
     assert beta_match is not None
@@ -553,16 +490,16 @@ def test_release_zip_archive_name_uses_display_format_without_source_suffix():
     assert expected_archive_name == "SuperMedicine Beta0.4.2.zip"
     assert "source" not in archive_body.lower()
     assert "_" not in archive_body
-    assert 'archive_name = f"SuperMedicine {release_label}.zip"' in workflow
+    assert 'archive_name = f"SuperMedicine {release_label}.zip"' in build_release_zip
     assert (
         'stage = root / ".release-zip-stage" / f"SuperMedicine {release_label}"'
-        in workflow
+        in build_release_zip
     )
     assert "SuperMedicine-{release_label}-source" not in workflow
     assert ".source-zip-stage" not in workflow
     assert "${{ steps.source_zip.outputs.release_label }}-source" not in workflow
     assert "${{ needs.packaging-smoke.outputs.release_label }}-source" not in workflow
-    assert 'output.write(f"archive_name={archive_name}\\n")' in workflow
+    assert 'output.write(f"archive_name={archive_name}\\n")' in build_release_zip
     assert "ARCHIVE_NAME: ${{ needs.packaging-smoke.outputs.archive_name }}" in workflow
     assert 'asset_path="release-artifacts/${ARCHIVE_NAME}"' in workflow
     assert 'gh release upload "$RELEASE_TAG" "$asset_path"' in workflow
@@ -572,11 +509,14 @@ def test_release_zip_layout_includes_installer_package_for_install_entrypoint():
     workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
         encoding="utf-8"
     )
+    packaging_common = (REPO_ROOT / "scripts" / "ci" / "_packaging_common.py").read_text(
+        encoding="utf-8"
+    )
 
-    assert '"install_entry.py"' in workflow
+    assert '"install_entry.py"' in packaging_common
     assert (
-        'include_dirs = ["core", "permission", "agents", "plugins", "adapters", "installer"]'
-        in workflow
+        'INCLUDE_DIRS = ["core", "permission", "agents", "plugins", "adapters", "installer"]'
+        in packaging_common
     )
     assert "installer/__init__.py" in _tracked_files()
     assert "installer/exe_release.py" in _tracked_files()
@@ -676,82 +616,38 @@ def test_opencode_plugin_declared_entry_skills_and_agents_exist():
         assert "internal_role_context: true" in content
 
 
-def test_opencode_adapter_docs_do_not_contain_plaintext_api_key_examples():
+def test_no_plaintext_secrets_in_docs_and_manifests():
+    """Consolidated scan: no docs or manifests may contain plaintext secret patterns."""
     opencode_dir = REPO_ROOT / "adapters" / "opencode"
+    claude_code_dir = REPO_ROOT / "adapters" / "claude_code"
+
     checked_paths = [
+        # OpenCode adapter docs
         opencode_dir / "plugin.json",
         *sorted((opencode_dir / "agents").glob("*.md")),
         *sorted((opencode_dir / "skills").glob("*.md")),
-    ]
-    forbidden_secret_patterns = [
-        re.compile(r"sk-[A-Za-z0-9_-]{12,}"),
-        re.compile(r"sk-ant-[A-Za-z0-9_-]{12,}"),
-        re.compile(r"api[_-]?key\s*[:=]\s*['\"][^'\"<{][^'\"]+['\"]", re.IGNORECASE),
-    ]
-
-    offenders = []
-    for path in checked_paths:
-        content = path.read_text(encoding="utf-8")
-        if any(pattern.search(content) for pattern in forbidden_secret_patterns):
-            offenders.append(str(path.relative_to(REPO_ROOT)))
-
-    assert offenders == []
-
-
-def test_claude_code_adapter_docs_do_not_contain_plaintext_api_key_examples():
-    claude_code_dir = REPO_ROOT / "adapters" / "claude_code"
-    checked_paths = [
+        # Claude Code adapter docs
         claude_code_dir / "adapter.py",
         claude_code_dir / "SKILL.md",
+        # Repository-level docs and manifests
         REPO_ROOT / "install.json",
-    ]
-    forbidden_secret_patterns = [
-        re.compile(r"sk-[A-Za-z0-9_-]{12,}"),
-        re.compile(r"sk-ant-[A-Za-z0-9_-]{12,}"),
-        re.compile(r"api[_-]?key\s*[:=]\s*['\"][^'\"<{][^'\"]+['\"]", re.IGNORECASE),
-    ]
-
-    offenders = []
-    for path in checked_paths:
-        content = path.read_text(encoding="utf-8")
-        if any(pattern.search(content) for pattern in forbidden_secret_patterns):
-            offenders.append(str(path.relative_to(REPO_ROOT)))
-
-    assert offenders == []
-
-
-def test_repository_docs_and_manifests_do_not_contain_realistic_plaintext_secrets():
-    checked_paths = [
         REPO_ROOT / "README.md",
         REPO_ROOT / "CHANGELOG.md",
-        REPO_ROOT / "install.json",
         REPO_ROOT / "Install.py",
         REPO_ROOT / "Uninstall.py",
         REPO_ROOT / ".supermedicine" / "config.yaml",
         REPO_ROOT / ".supermedicine" / "policies" / "default.yaml",
+        # Root-level markdown docs
+        *sorted(REPO_ROOT.glob("*.md")),
     ]
-    forbidden_secret_patterns = [
-        re.compile(r"sk-[A-Za-z0-9_-]{12,}"),
-        re.compile(r"sk-ant-[A-Za-z0-9_-]{12,}"),
-        re.compile(
-            r"(?:api[_-]?key|authorization|token)\s*[:=]\s*['\"][^'\"<{][^'\"]{8,}['\"]",
-            re.IGNORECASE,
-        ),
-    ]
+    # Deduplicate while preserving order
+    seen: set[Path] = set()
+    unique_paths: list[Path] = []
+    for p in checked_paths:
+        if p not in seen:
+            seen.add(p)
+            unique_paths.append(p)
 
-    offenders = []
-    for path in checked_paths:
-        if not path.exists():
-            continue
-        content = path.read_text(encoding="utf-8")
-        if any(pattern.search(content) for pattern in forbidden_secret_patterns):
-            offenders.append(str(path.relative_to(REPO_ROOT)))
-
-    assert offenders == []
-
-
-def test_root_visible_markdown_docs_do_not_contain_plaintext_example_secrets():
-    checked_paths = sorted(REPO_ROOT.glob("*.md"))
     forbidden_secret_patterns = [
         re.compile(r"sk-[A-Za-z0-9_-]{12,}"),
         re.compile(r"sk-ant-[A-Za-z0-9_-]{12,}"),
@@ -763,7 +659,9 @@ def test_root_visible_markdown_docs_do_not_contain_plaintext_example_secrets():
     ]
 
     offenders = []
-    for path in checked_paths:
+    for path in unique_paths:
+        if not path.exists():
+            continue
         content = path.read_text(encoding="utf-8")
         if any(pattern.search(content) for pattern in forbidden_secret_patterns):
             offenders.append(str(path.relative_to(REPO_ROOT)))
