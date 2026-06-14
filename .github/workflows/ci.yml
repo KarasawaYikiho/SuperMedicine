@@ -185,7 +185,7 @@ jobs:
           PY
           )"
           test -d "$payload_source"
-          python -m PyInstaller --onefile --name SuperMedicineInstaller --distpath dist --workpath .pyinstaller-installer-build --hidden-import installer.exe_release --add-data "${payload_source};release_payload" install.py
+          python -m PyInstaller --onefile --name SuperMedicineInstaller --distpath dist --workpath .pyinstaller-installer-build --hidden-import installer.exe_release --add-data "${payload_source};release_payload" install_entry.py
           test -f dist/SuperMedicineInstaller.exe
           python install_entry.py --extract-release-to "$RUNNER_TEMP/InstallerDryRun" --release-payload-root .installer-payload-stage/release_payload --exe-dry-run
           ./dist/SuperMedicineInstaller.exe --help
