@@ -506,9 +506,6 @@ def test_release_zip_archive_name_uses_display_format_without_source_suffix():
 
 
 def test_release_zip_layout_includes_installer_package_for_install_entrypoint():
-    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
-        encoding="utf-8"
-    )
     packaging_common = (REPO_ROOT / "scripts" / "ci" / "_packaging_common.py").read_text(
         encoding="utf-8"
     )

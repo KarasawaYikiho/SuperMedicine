@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 import shlex
 import shutil
@@ -10,10 +9,6 @@ import sys
 from pathlib import Path
 
 from tests.conftest import _cp1252_stdio_env
-from tests.conftest import _has_exact_child_name
-from tests.conftest import _supports_case_distinct_names
-from tests.conftest import read_pyproject
-from tests.conftest import tracked_files
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -478,9 +473,6 @@ def test_beta042_version_contract_is_single_source_consistent_across_release_sur
             encoding="utf-8"
         )
     )
-    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
-        encoding="utf-8"
-    )
     build_release_zip = (REPO_ROOT / "scripts" / "ci" / "build_release_zip.py").read_text(
         encoding="utf-8"
     )
@@ -505,9 +497,6 @@ def test_release_packaging_contract_includes_critical_modules_and_high_risk_surf
     """Step 2/3 high-risk modules must be either packaged or intentionally tracked."""
 
     tracked = tracked_files
-    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
-        encoding="utf-8"
-    )
     packaging_common = (REPO_ROOT / "scripts" / "ci" / "_packaging_common.py").read_text(
         encoding="utf-8"
     )
