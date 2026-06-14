@@ -94,7 +94,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m PyInstaller --onefile --name SuperMedicine --distpath dist --workpath .pyinstaller-build --specpath .pyinstaller-spec --add-data "core/tui/app.tcss;core/tui" --add-data "assets;assets" cli_entry.py
+          python -m PyInstaller --onefile --name SuperMedicine --distpath dist --workpath .pyinstaller-build --add-data "core/tui/app.tcss;core/tui" --add-data "assets;assets" cli_entry.py
           test -f dist/SuperMedicine.exe
           python install_entry.py --release-exe dist/SuperMedicine.exe --desktop-dir "$RUNNER_TEMP/Desktop" --exe-dry-run
 
@@ -103,7 +103,7 @@ jobs:
         run: |
           set -euo pipefail
           pip install pywebview
-          python -m PyInstaller --onefile --name SuperMedicineGUI --distpath dist --workpath build-pyinstaller --specpath spec-pyinstaller --add-data "core/tui/app.tcss;core/tui" --add-data "assets;assets" --add-data "core/web/frontend;core/web/frontend" --noconsole gui_standalone.py
+          python -m PyInstaller --onefile --name SuperMedicineGUI --distpath dist --workpath build-pyinstaller --add-data "core/tui/app.tcss;core/tui" --add-data "assets;assets" --add-data "core/web/frontend;core/web/frontend" --noconsole gui_standalone.py
           test -f dist/SuperMedicineGUI.exe
 
       - name: Build standalone installer Exe artifact
@@ -185,7 +185,7 @@ jobs:
           PY
           )"
           test -d "$payload_source"
-          python -m PyInstaller --onefile --name SuperMedicineInstaller --distpath dist --workpath .pyinstaller-installer-build --specpath .pyinstaller-installer-spec --hidden-import installer.exe_release --add-data "${payload_source};release_payload" install.py
+          python -m PyInstaller --onefile --name SuperMedicineInstaller --distpath dist --workpath .pyinstaller-installer-build --hidden-import installer.exe_release --add-data "${payload_source};release_payload" install.py
           test -f dist/SuperMedicineInstaller.exe
           python install_entry.py --extract-release-to "$RUNNER_TEMP/InstallerDryRun" --release-payload-root .installer-payload-stage/release_payload --exe-dry-run
           ./dist/SuperMedicineInstaller.exe --help
