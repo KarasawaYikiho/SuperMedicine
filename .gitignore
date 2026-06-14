@@ -145,6 +145,9 @@ installer/**/*.py[cod]
 !docs/guides/**
 !docs/references/
 !docs/references/**
+# Re-ignore superpowers engineering files (local-only, must come after !docs/** negation)
+docs/superpowers/
+docs/superpowers/**
 !README.md
 !docs/architecture/ARCHITECTURE.md
 !CHANGELOG.md
