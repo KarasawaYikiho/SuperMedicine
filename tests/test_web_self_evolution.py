@@ -1,5 +1,7 @@
 """Tests for Self Evolution API endpoints."""
 import pytest
+
+fastapi = pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient
 
 
