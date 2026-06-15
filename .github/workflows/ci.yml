@@ -112,6 +112,13 @@ jobs:
           set -euo pipefail
           rm -rf .installer-payload-stage
           python scripts/ci/build_installer_payload.py
+          payload_source="$(python -c "from pathlib import Path; print((Path.cwd() / '.installer-payload-stage' / 'release_payload').resolve().as_posix())")"
+          test -d "$payload_source"
+          python -m PyInstaller --onefile --name SuperMedicineInstaller --distpath dist --workpath .pyinstaller-installer-build --hidden-import installer.exe_release --add-data "${payload_source};release_payload" install_entry.py
+          test -f dist/SuperMedicineInstaller.exe
+          python install_entry.py --extract-release-to "$RUNNER_TEMP/InstallerDryRun" --release-payload-root .installer-payload-stage/release_payload --exe-dry-run
+          ./dist/SuperMedicineInstaller.exe --help
+          ./dist/SuperMedicineInstaller.exe --extract-release-to "$RUNNER_TEMP/InstallerExeDryRun" --exe-dry-run
 
       - name: Build release Zip
         id: source_zip
