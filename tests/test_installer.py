@@ -411,6 +411,7 @@ def test_install_defaults_to_interactive_question_answer_when_args_are_absent(
             for expected in (
                 "安装/项目路径",
                 "释放完整程序文件到该目录",
+                "组件选择",
                 "初始化 .supermedicine 配置",
                 "记录创建快捷方式意向",
                 "显示 PATH 手动配置提示",
@@ -802,7 +803,7 @@ def test_interactive_existing_install_update_branch_prompts_two_main_choices(
     config.parent.mkdir()
     config.write_text("project_name: supermedicine\n", encoding="utf-8")
     prompts: list[str] = []
-    answers = iter([str(tmp_path), "2", "n", "n", "n", "n", "n", ""])
+    answers = iter([str(tmp_path), "2", "n", "", "n", "n", "n", "n", ""])
 
     def fake_input(prompt):
         prompts.append(prompt)
@@ -824,7 +825,7 @@ def test_interactive_uninstall_branch_asks_second_user_data_confirmation(
     config.parent.mkdir()
     config.write_text("project_name: supermedicine\n", encoding="utf-8")
     prompts: list[str] = []
-    answers = iter([str(tmp_path), "1", "1", "n", "n", "n", "n", "n", ""])
+    answers = iter([str(tmp_path), "1", "1", "n", "", "n", "n", "n", "n", ""])
 
     def fake_input(prompt):
         prompts.append(prompt)
@@ -1199,3 +1200,298 @@ def test_uninstall_reports_residuals_and_repair_suggestions_when_delete_fails(
     assert result["status"] == "removed-with-residuals"
     assert result["residuals"]
     assert result["repair_suggestions"]
+
+
+# ═══ Component Integration Tests ═══════════════════════════════════════════════
+
+
+def test_interactive_installer_component_selection_step(tmp_path, monkeypatch, caplog):
+    """Interactive installer prompts for component selection when install.json defines components."""
+    import logging
+
+    from installer import entrypoint as Install
+
+    caplog.set_level(logging.INFO)
+
+    # Create a minimal install.json with components in the workspace
+    source_root = tmp_path / "source"
+    source_root.mkdir()
+    install_json = source_root / "install.json"
+    install_json.write_text(
+        json.dumps(
+            {
+                "name": "supermedicine",
+                "version": "test",
+                "components": {
+                    "cli": {
+                        "name": "cli",
+                        "description": "Command-line interface",
+                        "required": True,
+                        "default": True,
+                        "files": ["cli/"],
+                        "dependencies": [],
+                    },
+                    "web": {
+                        "name": "web",
+                        "description": "Web interface",
+                        "required": False,
+                        "default": False,
+                        "files": ["web/"],
+                        "dependencies": ["cli"],
+                    },
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    prompts: list[str] = []
+    # Sequence: path, extract, components toggle (confirm default), init, llm config, shortcuts, PATH, desktop exe, confirm
+    answers = iter(
+        [
+            str(tmp_path),  # install path
+            "",  # extract release: no
+            "",  # component selection: accept default (cli only)
+            "",  # init config: yes
+            "openai",  # provider
+            "https://openai.local.test/v1",  # base url
+            "gpt-test",  # model
+            "sk-test-component-interactive",  # api key
+            "",  # shortcut: no
+            "",  # PATH: no
+            "",  # desktop exe: no
+            "",  # confirm: yes
+        ]
+    )
+
+    def fake_input(prompt: str) -> str:
+        prompts.append(prompt)
+        return next(answers)
+
+    def fake_getpass(prompt: str) -> str:
+        prompts.append(prompt)
+        return "sk-test-component-interactive"
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("builtins.input", fake_input)
+    monkeypatch.setattr(Install.getpass, "getpass", fake_getpass)
+
+    # Patch the source root resolution to point to our test source
+    monkeypatch.setattr(Install, "_release_entrypoint_dir", lambda: source_root)
+
+    Install.main([])
+
+    assert (tmp_path / ".supermedicine" / "config.yaml").exists()
+    # Verify the component selection prompt appeared
+    assert any("组件选择" in prompt for prompt in prompts)
+    # Verify component info was displayed via logger.info (not input prompts)
+    assert "cli" in caplog.text
+
+
+def test_install_record_contains_installed_components_field(tmp_path, monkeypatch):
+    """After component install, install-record.json includes installed_components list."""
+
+    from installer.component_installer import (
+        load_components,
+        install_components,
+        get_default_selection,
+    )
+
+    # Set up source with install.json and component files
+    source_root = tmp_path / "source"
+    source_root.mkdir()
+    cli_dir = source_root / "cli"
+    cli_dir.mkdir()
+    (cli_dir / "main.py").write_text("# cli main\n", encoding="utf-8")
+    install_json = source_root / "install.json"
+    install_json.write_text(
+        json.dumps(
+            {
+                "name": "supermedicine",
+                "version": "test",
+                "components": {
+                    "cli": {
+                        "name": "cli",
+                        "description": "Command-line interface",
+                        "required": True,
+                        "default": True,
+                        "files": ["cli/"],
+                        "dependencies": [],
+                    },
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    components = load_components(install_json)
+    selected = get_default_selection(components)
+
+    # Install components to target
+    install_path = tmp_path / "installed"
+    result = install_components(components, selected, install_path, source_root)
+    assert result["status"] == "copied"
+
+    # Simulate what the installer does: write install record with installed_components
+    from installer.entrypoint import write_install_record, _install_record_artifacts_from_results
+
+    artifacts = _install_record_artifacts_from_results(selected_components=selected)
+    write_install_record(install_path, artifacts=artifacts, mode="init")
+
+    # Read the written record and verify installed_components is present
+    record_path = install_path / ".supermedicine" / "install-record.json"
+    assert record_path.exists()
+    written_record = json.loads(record_path.read_text(encoding="utf-8"))
+    assert "installed_components" in written_record
+    assert written_record["installed_components"] == ["cli"]
+
+
+def test_component_uninstall_removes_component_files(tmp_path):
+    """Component-based uninstall correctly removes component files."""
+
+    from installer.component_installer import (
+        load_components,
+        install_components,
+    )
+
+    # Set up source with install.json and component files
+    source_root = tmp_path / "source"
+    source_root.mkdir()
+    cli_dir = source_root / "cli"
+    cli_dir.mkdir()
+    (cli_dir / "main.py").write_text("# cli main\n", encoding="utf-8")
+    (cli_dir / "utils.py").write_text("# cli utils\n", encoding="utf-8")
+    web_dir = source_root / "web"
+    web_dir.mkdir()
+    (web_dir / "index.html").write_text("<html>web</html>\n", encoding="utf-8")
+    install_json = source_root / "install.json"
+    install_json.write_text(
+        json.dumps(
+            {
+                "name": "supermedicine",
+                "version": "test",
+                "components": {
+                    "cli": {
+                        "name": "cli",
+                        "description": "Command-line interface",
+                        "required": True,
+                        "default": True,
+                        "files": ["cli/"],
+                        "dependencies": [],
+                    },
+                    "web": {
+                        "name": "web",
+                        "description": "Web interface",
+                        "required": False,
+                        "default": False,
+                        "files": ["web/"],
+                        "dependencies": ["cli"],
+                    },
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    components = load_components(install_json)
+    selected = ["cli", "web"]
+
+    # Install both components
+    install_path = tmp_path / "installed"
+    result = install_components(components, selected, install_path, source_root)
+    assert result["status"] == "copied"
+    assert (install_path / "cli" / "main.py").exists()
+    assert (install_path / "cli" / "utils.py").exists()
+    assert (install_path / "web" / "index.html").exists()
+
+    # Copy install.json into the installed directory for uninstall to find
+    shutil.copy2(install_json, install_path / "install.json")
+
+    # Write an install record with installed_components
+    record_path = install_path / ".supermedicine" / "install-record.json"
+    record_path.parent.mkdir(parents=True, exist_ok=True)
+    record_path.write_text(
+        json.dumps(
+            {
+                "installed_components": ["cli", "web"],
+                "created_paths": [".supermedicine"],
+                "config_dirs": [".supermedicine"],
+                "user_data_paths": [".supermedicine"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    # Uninstall all components
+    uninstall_result = uninstall(install_path, force=True)
+
+    assert uninstall_result["status"] == "removed"
+    # Verify component files were removed
+    assert not (install_path / "cli" / "main.py").exists()
+    assert not (install_path / "cli" / "utils.py").exists()
+    assert not (install_path / "web" / "index.html").exists()
+
+
+def test_init_flag_still_works_without_component_changes(tmp_path):
+    """Original --init installation path is not affected by componentization."""
+
+    _copy_install_entrypoint_without_installer_package(tmp_path)
+
+    result = _run_isolated_install(
+        tmp_path,
+        "--init",
+        "--provider",
+        "openai",
+        "--base-url",
+        "https://openai.local.test/v1",
+        "--api-key",
+        "sk-test-init-no-components",
+        "--model",
+        "gpt-test",
+    )
+
+    output = result.stdout + result.stderr
+    assert result.returncode == 0
+    assert (tmp_path / ".supermedicine" / "config.yaml").exists()
+    assert "ModuleNotFoundError" not in output
+    assert "Traceback" not in output
+
+    # Verify config contains the provider
+    config_text = (tmp_path / ".supermedicine" / "config.yaml").read_text(encoding="utf-8")
+    assert "openai" in config_text
+
+
+def test_unified_install_flag_still_works_without_component_changes(tmp_path, monkeypatch):
+    """Original --unified-install path is not affected by componentization."""
+
+    install = importlib.import_module("installer.entrypoint")
+    source = tmp_path / "dist" / "SuperMedicine.exe"
+    source.parent.mkdir()
+    source.write_bytes(b"fake exe bytes")
+    desktop_dir = tmp_path / "fake-desktop"
+    real_home = tmp_path / "real-home"
+    real_home.mkdir()
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(install.Path, "home", lambda: real_home)
+
+    install.main(
+        [
+            "--unified-install",
+            "--release-exe",
+            str(source),
+            "--desktop-dir",
+            str(desktop_dir),
+            "--exe-dry-run",
+            *_llm_args(),
+        ]
+    )
+
+    assert (tmp_path / ".supermedicine" / "config.yaml").exists()
+    assert not (desktop_dir / "SuperMedicine.exe").exists()
+
+    # Verify the install record does NOT contain installed_components
+    # (since no components were selected in --unified-install mode)
+    record_path = tmp_path / ".supermedicine" / "install-record.json"
+    assert record_path.exists()
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    assert "installed_components" not in record

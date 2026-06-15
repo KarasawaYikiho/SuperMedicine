@@ -30,6 +30,14 @@ import yaml
 from core.llm_providers.config import LLMProviderConfig
 from core.redaction import redact_sensitive
 from permission.policy import ensure_default_policy
+from installer.component_installer import (
+    ComponentDef,
+    ComponentError,
+    load_components,
+    get_default_selection,
+    validate_selection,
+    install_components,
+)
 
 logger = logging.getLogger("Install")
 
@@ -511,6 +519,74 @@ def _prompt_preserve_user_data() -> bool:
         logger.info("提示: 请输入 1、2 或 3。")
 
 
+def _prompt_component_selection(
+    components: dict[str, ComponentDef],
+) -> list[str]:
+    """Interactive component selection with toggle support.
+
+    Required components cannot be deselected.  Dependencies are automatically
+    pulled in when a component is selected.
+    """
+    selected = set(get_default_selection(components))
+
+    while True:
+        logger.info("")
+        for name in sorted(components):
+            comp = components[name]
+            is_selected = name in selected
+            marker = "✓" if is_selected else " "
+            parts: list[str] = []
+            if comp.required:
+                parts.append("必选")
+            if comp.default and not comp.required:
+                parts.append("默认选中")
+            tag = f" ({', '.join(parts)})" if parts else ""
+            logger.info("  [%s] %s - %s%s", marker, name, comp.description, tag)
+
+        logger.info("")
+        logger.info("输入组件名切换选中状态，直接回车确认当前选择。")
+        value = input("组件选择: ").strip().lower()
+
+        if not value:
+            selected_list = sorted(selected)
+            try:
+                validate_selection(components, selected_list)
+                return selected_list
+            except ComponentError as exc:
+                logger.info("选择无效: %s", exc)
+                continue
+
+        if value not in components:
+            logger.info(
+                "未知组件: %s。可用: %s", value, ", ".join(sorted(components))
+            )
+            continue
+
+        if components[value].required:
+            logger.info("组件 '%s' 为必选组件，不可取消。", value)
+            continue
+
+        if value in selected:
+            selected.discard(value)
+            dependents = [
+                n for n in selected if value in components[n].dependencies
+            ]
+            if dependents:
+                logger.info(
+                    "无法取消 '%s'：以下组件依赖它: %s",
+                    value,
+                    ", ".join(dependents),
+                )
+                selected.add(value)
+                continue
+        else:
+            selected.add(value)
+            for dep in components[value].dependencies:
+                if dep not in selected:
+                    selected.add(dep)
+                    logger.info("自动选中依赖组件: %s", dep)
+
+
 def _prompt_path(prompt: str, default: Path) -> Path:
     value = _prompt_value(prompt, str(default))
     return Path(value or str(default)).expanduser().resolve()
@@ -557,12 +633,15 @@ def _log_interactive_summary(
     add_to_path: bool,
     release_exe: Path | None,
     extract_release: bool,
+    selected_components: list[str] | None = None,
 ) -> None:
     logger.info("")
     logger.info("%s", INSTALLER_RULE)
     logger.info("安装摘要")
     logger.info("%s", INSTALLER_RULE)
     logger.info("目标目录      %s", install_path)
+    if selected_components is not None:
+        logger.info("已选组件      %s", ", ".join(selected_components))
     logger.info("初始化配置    %s", "是" if init_config_enabled else "否")
     if init_config_enabled:
         logger.info("Provider      %s", provider or "")
@@ -583,9 +662,22 @@ def _run_interactive_installer(args: argparse.Namespace) -> None:
     logger.info("回车使用默认值；API key 不会显示在屏幕上。")
     logger.info("准备: 建议先执行 pip install -e .；命令不可用时可用 python Cli.py。")
 
+    source_root = _release_entrypoint_dir()
+    install_json_path = source_root / "install.json"
+    components: dict[str, ComponentDef] | None = None
+    try:
+        components = load_components(install_json_path)
+    except (FileNotFoundError, KeyError, ComponentError):
+        components = None
+    has_components = components is not None and bool(components)
+    step_total = 5 if has_components else 4
+
     while True:
+        step = 0
+
+        step += 1
         logger.info("")
-        logger.info("[1/4] 选择安装位置")
+        logger.info("[%d/%d] 选择安装位置", step, step_total)
         install_path = _prompt_path("安装/项目路径", Path.cwd())
         detection = detect_existing_install(install_path, include_payload=False)
         existing_action = "ignore"
@@ -604,8 +696,16 @@ def _run_interactive_installer(args: argparse.Namespace) -> None:
             "释放完整程序文件到该目录", bool(getattr(sys, "frozen", False))
         )
 
+        selected_components: list[str] | None = None
+        if has_components and components is not None:
+            step += 1
+            logger.info("")
+            logger.info("[%d/%d] 选择安装组件", step, step_total)
+            selected_components = _prompt_component_selection(components)
+
+        step += 1
         logger.info("")
-        logger.info("[2/4] 初始化项目配置")
+        logger.info("[%d/%d] 初始化项目配置", step, step_total)
         init_config_enabled = _prompt_yes_no("初始化 .supermedicine 配置", True)
         llm_config: dict[str, str | None] = {
             "provider": None,
@@ -643,8 +743,9 @@ def _run_interactive_installer(args: argparse.Namespace) -> None:
                 model=model,
             )
 
+        step += 1
         logger.info("")
-        logger.info("[3/4] 可选快捷入口")
+        logger.info("[%d/%d] 可选快捷入口", step, step_total)
         create_shortcut = _prompt_yes_no("记录创建快捷方式意向", False)
         add_to_path = _prompt_yes_no("显示 PATH 手动配置提示", False)
 
@@ -653,8 +754,9 @@ def _run_interactive_installer(args: argparse.Namespace) -> None:
             default_exe = args.release_exe or Path("dist") / "SuperMedicine.exe"
             release_exe = _prompt_path("Exe 路径", default_exe)
 
+        step += 1
         logger.info("")
-        logger.info("[4/4] 确认安装")
+        logger.info("[%d/%d] 确认安装", step, step_total)
         _log_interactive_summary(
             install_path=install_path,
             init_config_enabled=init_config_enabled,
@@ -665,6 +767,7 @@ def _run_interactive_installer(args: argparse.Namespace) -> None:
             add_to_path=add_to_path,
             release_exe=release_exe,
             extract_release=extract_release,
+            selected_components=selected_components,
         )
         if not _prompt_yes_no("开始安装", True):
             if _prompt_yes_no("返回重新填写", True):
@@ -703,17 +806,39 @@ def _run_interactive_installer(args: argparse.Namespace) -> None:
             if extract_release:
                 args.extract_release_to = install_path
                 payload_result = _extract_release_from_args(args)
+            if selected_components and components is not None:
+                component_result = install_components(
+                    components,
+                    selected_components,
+                    install_path,
+                    source_root,
+                    overwrite=existing_action == "update",
+                )
+                logger.info(
+                    "组件安装完成: status=%s files=%d",
+                    component_result.get("status"),
+                    component_result.get("file_count", 0),
+                )
             if release_exe:
                 args.release_exe = release_exe
                 if extract_release:
                     _align_release_exe_with_extracted_payload(args)
                 exe_result = _release_exe_from_args(args)
-            if init_config_enabled or extract_release or release_exe:
+            has_install_actions = (
+                init_config_enabled
+                or extract_release
+                or release_exe
+                or bool(selected_components)
+            )
+            if has_install_actions:
+                artifacts = _install_record_artifacts_from_results(
+                    payload_result=payload_result,
+                    exe_result=exe_result,
+                    selected_components=selected_components,
+                )
                 write_install_record(
                     install_path,
-                    artifacts=_install_record_artifacts_from_results(
-                        payload_result=payload_result, exe_result=exe_result
-                    ),
+                    artifacts=artifacts,
                     mode="update" if existing_action == "update" else "init",
                 )
             if add_to_path:
@@ -1243,6 +1368,7 @@ def _install_record_artifacts_from_results(
     *,
     payload_result: dict[str, Any] | None = None,
     exe_result: dict[str, Any] | None = None,
+    selected_components: list[str] | None = None,
 ) -> dict[str, Any]:
     artifacts: dict[str, Any] = {
         "created_paths": [".supermedicine"],
@@ -1253,6 +1379,8 @@ def _install_record_artifacts_from_results(
         artifacts["payload_dir"] = payload_result.get("target_dir")
     if exe_result and exe_result.get("target_path"):
         artifacts["binaries"] = [exe_result.get("target_path")]
+    if selected_components:
+        artifacts["installed_components"] = list(selected_components)
     return artifacts
 
 

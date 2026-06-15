@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 PROJECT_MARKER = "supermedicine"
 INSTALL_RECORD = ".supermedicine/install-record.json"
 INSTALL_MANIFEST = "install.json"
+COMPONENT_DEFINITIONS = "install.json"
 OWNED_DEFAULT_PATHS: tuple[str, ...] = (
     ".supermedicine",
     ".pytest-tmp",
@@ -159,6 +160,51 @@ def _load_install_manifest(project_dir: Path) -> dict[str, Any]:
     return loaded if isinstance(loaded, dict) else {}
 
 
+def _load_component_definitions(project_dir: Path) -> dict[str, dict[str, Any]]:
+    """Load component definitions from ``install.json``.
+
+    Returns a dict mapping component name to its definition dict.
+    Returns empty dict if the file or ``components`` key is missing/invalid.
+    """
+    def_path = project_dir / COMPONENT_DEFINITIONS
+    if not def_path.is_file():
+        return {}
+    try:
+        data = json.loads(def_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        logger.warning(
+            "Ignoring invalid component definitions file: %s",
+            _safe_display(def_path, project_dir),
+        )
+        return {}
+    raw = data.get("components") if isinstance(data, dict) else None
+    return raw if isinstance(raw, dict) else {}
+
+
+def _iter_component_file_paths(
+    component_defs: dict[str, dict[str, Any]],
+    component_names: Iterable[str],
+    project_dir: Path,
+) -> Iterable[str]:
+    """Yield file paths belonging to the given component names.
+
+    Each component's ``files`` list contains relative paths; directories
+    end with ``/`` and are expanded to include all contained files.
+    """
+    for name in component_names:
+        comp = component_defs.get(name)
+        if not isinstance(comp, dict):
+            logger.warning("Unknown component '%s' in definitions, skipping", name)
+            continue
+        raw_files = comp.get("files", [])
+        if not isinstance(raw_files, list):
+            continue
+        for entry in raw_files:
+            if not isinstance(entry, str) or not entry.strip():
+                continue
+            yield entry
+
+
 def _iter_string_values(value: Any) -> Iterable[str]:
     if isinstance(value, str) and value.strip():
         yield value
@@ -216,6 +262,7 @@ def collect_removal_candidates(
     explicit_targets: Iterable[str] = (),
     *,
     preserve_user_data: bool = False,
+    components: Iterable[str] | None = None,
 ) -> tuple[list[RemovalCandidate], list[str]]:
     project_dir = project_dir.resolve()
     record = _load_install_record(project_dir)
@@ -262,6 +309,31 @@ def collect_removal_candidates(
                 recorded=True,
             )
         )
+
+    # --- Component-based removal candidates ---
+    installed_components = record.get("installed_components")
+    if isinstance(installed_components, list) and installed_components:
+        component_defs = _load_component_definitions(project_dir)
+        if component_defs:
+            if components is not None:
+                # User specified a subset; validate against installed
+                requested = [c for c in components if c in installed_components]
+                unknown = [c for c in components if c not in installed_components]
+                for name in unknown:
+                    skipped.append(f"component-not-installed:{name}")
+            else:
+                # Default: uninstall all installed components
+                requested = list(installed_components)
+            for raw_path in _iter_component_file_paths(
+                component_defs, requested, project_dir
+            ):
+                candidates.append(
+                    RemovalCandidate(
+                        _resolve_candidate(project_dir, raw_path),
+                        "component-file",
+                        recorded=True,
+                    )
+                )
 
     for raw_path in explicit_targets:
         candidates.append(
@@ -499,6 +571,7 @@ def uninstall(
     yes: bool = False,
     explicit_targets: Iterable[str] = (),
     preserve_user_data: bool = False,
+    components: Iterable[str] | None = None,
 ) -> dict[str, Any]:
     project_dir = project_dir.resolve()
     logger.info(
@@ -510,7 +583,10 @@ def uninstall(
     )
     record = _load_install_record(project_dir)
     candidates, skipped = collect_removal_candidates(
-        project_dir, explicit_targets, preserve_user_data=preserve_user_data
+        project_dir,
+        explicit_targets,
+        preserve_user_data=preserve_user_data,
+        components=components,
     )
     existing = [
         candidate
@@ -632,7 +708,20 @@ def main() -> None:
         action="store_true",
         help="Keep paths recorded as user data; default uninstall removes them for clean deletion",
     )
+    parser.add_argument(
+        "--components",
+        type=str,
+        default=None,
+        help=(
+            "Comma-separated list of component names to uninstall "
+            "(default: all installed components from install-record.json). "
+            "Only effective when install-record.json contains an 'installed_components' field."
+        ),
+    )
     args = parser.parse_args()
+    component_list: list[str] | None = None
+    if args.components is not None:
+        component_list = [c.strip() for c in args.components.split(",") if c.strip()]
     uninstall(
         args.project_dir,
         dry_run=args.dry_run,
@@ -640,6 +729,7 @@ def main() -> None:
         yes=args.yes,
         explicit_targets=args.target,
         preserve_user_data=args.preserve_user_data,
+        components=component_list,
     )
 
 

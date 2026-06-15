@@ -13,6 +13,12 @@ from installer.entrypoint import (
     _resolve_install_value,
 )
 
+from installer.component_installer import (
+    load_components,
+    install_components,
+    validate_selection,
+)
+
 __all__ = [
     "DEFAULT_CONFIG",
     "INSTALL_ENV_NAMES",
@@ -24,4 +30,7 @@ __all__ = [
     "_normalize_provider",
     "_resolve_api_key",
     "_resolve_install_value",
+    "load_components",
+    "install_components",
+    "validate_selection",
 ]
