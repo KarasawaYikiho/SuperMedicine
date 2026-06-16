@@ -208,6 +208,10 @@ class WorkspaceToolService:
         """Import one or more scanned candidates by list index or displayed slug."""
 
         self.initialize_tools(workspace_id)
+        if not selections:
+            raise ToolCandidateError(
+                "Select one or more tools from the scanned candidate list; tool ID entry is not required."
+            )
         grouped = self.scan_import_candidates(language)
         candidates = [item for items in grouped.values() for item in items]
         if not candidates:

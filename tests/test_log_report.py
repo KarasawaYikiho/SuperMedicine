@@ -8,6 +8,7 @@ import sys
 import pytest
 
 from core.log_report import (
+    DEFAULT_MAX_MESSAGE_LENGTH,
     LogReportError,
     LogReportStore,
 )
@@ -383,6 +384,183 @@ def test_tui_stream_output_redacts_sensitive_stdout_and_stderr_before_persisting
     assert "tui-stream-password" not in log_text
     assert "tui-stream-password" not in entries_text
     assert "[REDACTED]" in log_text
+
+
+def test_session_log_aggregation_across_multiple_severities(tmp_path):
+    """Session-level aggregation: multiple entries with different severities in one session."""
+    store = LogReportStore(tmp_path)
+    store.write("startup info", session_id="agg-session", severity="Info")
+    store.write("detected issue", session_id="agg-session", severity="Warning")
+    store.write("critical failure", session_id="agg-session", severity="Error")
+    store.write("recovered ok", session_id="agg-session", severity="Success")
+
+    entries = store.list_entries(session_id="agg-session")
+    summary = store.summary(session_id="agg-session")
+
+    assert len(entries) == 4
+    assert summary["entry_count"] == 4
+    assert summary["log_count"] == 1
+    assert {e["severity"] for e in entries} == {"Info", "Warning", "Error", "Success"}
+
+
+def test_session_aggregation_statistics_match_entry_counts(tmp_path):
+    """Statistics for a session aggregate severity counts correctly."""
+    store = LogReportStore(tmp_path)
+    for _ in range(3):
+        store.write("info message", session_id="stat-session", severity="Info")
+    store.write("a warning", session_id="stat-session", severity="Warning")
+    store.write("an error", session_id="stat-session", severity="Error")
+
+    entries = store.list_entries(session_id="stat-session")
+    stats = store.statistics_for_entries(entries)
+
+    assert stats["entry_count"] == 5
+    assert stats["severity_counts"]["Info"] == 3
+    assert stats["severity_counts"]["Warning"] == 1
+    assert stats["severity_counts"]["Error"] == 1
+    assert stats["severity_counts"]["Debug"] == 0
+    assert stats["severity_counts"]["Success"] == 0
+    assert stats["time_range"]["start"] is not None
+    assert stats["time_range"]["end"] is not None
+
+
+def test_cross_session_aggregation_respects_session_boundaries(tmp_path):
+    """Aggregating across sessions still respects session isolation per query."""
+    store = LogReportStore(tmp_path)
+    store.write("alpha-1", session_id="cross-a", severity="Info")
+    store.write("alpha-2", session_id="cross-a", severity="Error")
+    store.write("beta-1", session_id="cross-b", severity="Warning")
+
+    alpha_entries = store.list_entries(session_id="cross-a")
+    beta_entries = store.list_entries(session_id="cross-b")
+    all_entries = store.list_entries()
+
+    assert len(alpha_entries) == 2
+    assert len(beta_entries) == 1
+    assert len(all_entries) == 3
+    assert all(e["session_id"] == "cross-a" for e in alpha_entries)
+    assert all(e["session_id"] == "cross-b" for e in beta_entries)
+
+
+def test_follow_snapshot_returns_tail_entries_for_session(tmp_path):
+    """follow_snapshot returns the last N entries in tail-style format."""
+    store = LogReportStore(tmp_path)
+    for i in range(10):
+        store.write(f"log entry {i}", session_id="tail-session", severity="Info")
+
+    snapshot = store.follow_snapshot(
+        session_id="tail-session", max_entries=3
+    )
+
+    assert snapshot["mode"] == "follow_snapshot"
+    assert snapshot["entry_count"] == 10
+    assert snapshot["displayed_entry_count"] == 3
+    assert len(snapshot["entries"]) == 3
+    assert len(snapshot["lines"]) > 0
+    assert snapshot["max_entries"] == 3
+
+
+def test_follow_snapshot_respects_max_lines_limit(tmp_path):
+    """follow_snapshot with max_lines truncates the displayed lines."""
+    store = LogReportStore(tmp_path)
+    for i in range(5):
+        store.write(f"entry {i}", session_id="line-session", severity="Info")
+
+    snapshot = store.follow_snapshot(
+        session_id="line-session", max_entries=5, max_lines=3
+    )
+
+    assert len(snapshot["lines"]) <= 3
+    assert snapshot["max_lines"] == 3
+
+
+def test_log_handler_emits_chunked_messages_for_long_output(tmp_path):
+    """LogReportLoggingHandler chunks messages exceeding max length."""
+    store = LogReportStore(tmp_path)
+    handler = LogReportLoggingHandler(tmp_path, session_id="chunk-test")
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    long_message = "x" * (DEFAULT_MAX_MESSAGE_LENGTH + 500)
+    record = logging.LogRecord(
+        name="test", level=logging.INFO, pathname="", lineno=0,
+        msg=long_message, args=(), exc_info=None,
+    )
+
+    handler.emit(record)
+
+    entries = store.list_entries(session_id="chunk-test")
+    assert len(entries) >= 2
+    reconstructed = "".join(e["raw_message"] for e in entries)
+    assert long_message in reconstructed
+
+
+def test_log_handler_routes_severity_from_log_record(tmp_path):
+    """LogReportLoggingHandler preserves logging level as severity."""
+    store = LogReportStore(tmp_path)
+    handler = LogReportLoggingHandler(tmp_path, session_id="severity-route")
+    handler.setFormatter(logging.Formatter("%(message)s"))
+
+    for level, expected_severity in [
+        (logging.ERROR, "Error"),
+        (logging.WARNING, "Warning"),
+        (logging.DEBUG, "Debug"),
+        (logging.INFO, "Info"),
+    ]:
+        record = logging.LogRecord(
+            name="test", level=level, pathname="", lineno=0,
+            msg=f"test {expected_severity}", args=(), exc_info=None,
+        )
+        handler.emit(record)
+
+    entries = store.list_entries(session_id="severity-route")
+    severities = [e["severity"] for e in entries]
+    assert "Error" in severities
+    assert "Warning" in severities
+    assert "Debug" in severities
+    assert "Info" in severities
+
+
+def test_export_summary_matches_summary_for_session(tmp_path):
+    """export_summary returns the same result as summary for a session."""
+    store = LogReportStore(tmp_path)
+    store.write("export test", session_id="export-session", severity="Info")
+    store.write("export error", session_id="export-session", severity="Error")
+
+    summary = store.summary(session_id="export-session")
+    exported = store.export_summary(session_id="export-session")
+
+    assert exported["entry_count"] == summary["entry_count"]
+    assert exported["log_count"] == summary["log_count"]
+    assert exported["session_id"] == summary["session_id"]
+    assert exported["statistics"]["severity_counts"] == summary["statistics"]["severity_counts"]
+
+
+def test_session_aggregation_preserves_entry_order(tmp_path):
+    """Session log entries maintain insertion order for aggregation."""
+    store = LogReportStore(tmp_path)
+    messages = [f"message-{i}" for i in range(5)]
+    for msg in messages:
+        store.write(msg, session_id="order-session", severity="Info")
+
+    entries = store.list_entries(session_id="order-session")
+
+    assert [e["raw_message"] for e in entries] == messages
+
+
+def test_summary_across_all_sessions_aggregates_correctly(tmp_path):
+    """summary() without session_id aggregates all sessions."""
+    store = LogReportStore(tmp_path)
+    store.write("s1-msg1", session_id="multi-a", severity="Info")
+    store.write("s1-msg2", session_id="multi-a", severity="Error")
+    store.write("s2-msg1", session_id="multi-b", severity="Warning")
+
+    total = store.summary()
+
+    assert total["log_count"] == 2
+    assert total["entry_count"] == 3
+    assert total["session_id"] is None
+    assert total["statistics"]["severity_counts"]["Info"] == 1
+    assert total["statistics"]["severity_counts"]["Error"] == 1
+    assert total["statistics"]["severity_counts"]["Warning"] == 1
 
 
 def test_configure_tui_log_storage_replaces_console_routing_with_log_handler(
