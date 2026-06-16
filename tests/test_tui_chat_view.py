@@ -42,12 +42,15 @@ class CapturingChatView(ChatView):
         super().__init__()
         self.output = CapturingRichLog()
         self._indicator = CapturingStatic()
+        self._processing_indicator = CapturingStatic()
 
     def query_one(self, selector: str, widget_type: Any = None) -> Any:  # type: ignore[override]
         if selector == "#chat-output":
             return self.output
         if selector == "#thinking-indicator":
             return self._indicator
+        if selector == "#processing-indicator":
+            return self._processing_indicator
         raise ValueError(f"Unexpected selector: {selector}")
 
 
@@ -117,12 +120,12 @@ class TestProcessingAnimation:
 
         view._processing_active = True
         view._processing_frame = 0
-        view._indicator.visible = True
-        view._indicator.update(f"[bold yellow]⏳ {t('chat_processing_state')} ○○○○○[/]")
+        view._processing_indicator.visible = True
+        view._processing_indicator.update(f"[bold yellow]⏳ {t('chat_processing_state')} ○○○○○[/]")
 
-        assert view._indicator.visible is True
-        assert t("chat_processing_state") in view._indicator.content
-        assert "○○○○○" in view._indicator.content
+        assert view._processing_indicator.visible is True
+        assert t("chat_processing_state") in view._processing_indicator.content
+        assert "○○○○○" in view._processing_indicator.content
 
     def test_advance_processing_frame_updates_fill_pattern(self):
         view = CapturingChatView()
@@ -131,27 +134,27 @@ class TestProcessingAnimation:
         for frame in range(6):
             view._processing_frame = frame
             view._advance_processing_frame()
-            assert t("chat_processing_state") in view._indicator.content
+            assert t("chat_processing_state") in view._processing_indicator.content
 
     def test_stop_processing_animation_hides_indicator(self):
         view = CapturingChatView()
         view._processing_active = True
-        view._indicator.visible = True
+        view._processing_indicator.visible = True
 
         view._processing_active = False
-        view._indicator.visible = False
+        view._processing_indicator.visible = False
 
         assert view._processing_active is False
-        assert view._indicator.visible is False
+        assert view._processing_indicator.visible is False
 
     def test_processing_animation_inactive_frame_does_nothing(self):
         view = CapturingChatView()
         view._processing_active = False
-        view._indicator.content = "unchanged"
+        view._processing_indicator.content = "unchanged"
 
         view._advance_processing_frame()
 
-        assert view._indicator.content == "unchanged"
+        assert view._processing_indicator.content == "unchanged"
 
 
 # ═══ Thinking Content Tests ═══
