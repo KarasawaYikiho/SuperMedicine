@@ -64,6 +64,7 @@ class ChatView(Vertical):
     def compose(self) -> ComposeResult:
         yield RichLog(id="chat-output", wrap=True, highlight=True, markup=True)
         yield Static("", id="thinking-indicator")
+        yield Static("", id="processing-indicator")
 
     def on_mount(self) -> None:
         """Show welcome message."""
@@ -210,7 +211,7 @@ class ChatView(Vertical):
         """Start the processing animation with circle indicators."""
         self._processing_active = True
         self._processing_frame = 0
-        indicator = self.query_one("#thinking-indicator", Static)
+        indicator = self.query_one("#processing-indicator", Static)
         indicator.update(f"[bold yellow]⏳ {t('chat_processing_state')} ○○○○○[/]")
         indicator.visible = True
         if self._processing_timer is not None:
@@ -224,7 +225,7 @@ class ChatView(Vertical):
         self._processing_frame = (self._processing_frame + 1) % 6
         filled = "●" * self._processing_frame
         empty = "○" * (5 - self._processing_frame)
-        indicator = self.query_one("#thinking-indicator", Static)
+        indicator = self.query_one("#processing-indicator", Static)
         indicator.update(f"[bold yellow]⏳ {t('chat_processing_state')} {filled}{empty}[/]")
 
     def stop_processing_animation(self) -> None:
@@ -233,7 +234,7 @@ class ChatView(Vertical):
         if self._processing_timer is not None:
             self._processing_timer.stop()
             self._processing_timer = None
-        indicator = self.query_one("#thinking-indicator", Static)
+        indicator = self.query_one("#processing-indicator", Static)
         indicator.visible = False
 
     def append_thinking_content(self, content: str) -> None:

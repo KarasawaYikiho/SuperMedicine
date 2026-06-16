@@ -234,8 +234,21 @@ Footer {
 #thinking-indicator {
     dock: bottom;
     align: right middle;
+    layer: overlay;
     width: auto;
-    height: 1;
+    height: auto;
+    padding: 0 1;
+    background: $surface;
+    border: solid $border;
+    visibility: hidden;
+}
+
+#processing-indicator {
+    dock: bottom;
+    align: left middle;
+    layer: overlay;
+    width: auto;
+    height: auto;
     padding: 0 1;
     background: $surface;
     border: solid $border;
@@ -293,6 +306,7 @@ Footer {
 
 DataTable:focus {
     border: solid $accent;
+    max-height: 50%;
 }
 
 /* Experiment page - prevent focus enlargement */
@@ -302,7 +316,19 @@ DataTable:focus {
     overflow-y: auto;
 }
 
+#experiment-protocol-table:focus {
+    height: auto;
+    max-height: 12;
+    overflow-y: auto;
+}
+
 #experiment-input-table {
+    height: auto;
+    max-height: 8;
+    overflow-y: auto;
+}
+
+#experiment-input-table:focus {
     height: auto;
     max-height: 8;
     overflow-y: auto;
@@ -316,6 +342,12 @@ DataTable:focus {
 
 /* Permission page - prevent focus enlargement */
 #permission-roots-table {
+    height: auto;
+    max-height: 8;
+    overflow-y: auto;
+}
+
+#permission-roots-table:focus {
     height: auto;
     max-height: 8;
     overflow-y: auto;

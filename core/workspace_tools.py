@@ -160,7 +160,12 @@ class WorkspaceToolService:
     def scan_import_candidates(
         self, language: str | None = None
     ) -> dict[str, list[dict[str, Any]]]:
-        """Scan Python/R source tool directories and return user-selectable candidates."""
+        """Scan Python/R source tool directories and return user-selectable candidates.
+
+        Scans the ``plugins/tools`` directory under the project root for tool
+        candidates.  This operation does **not** require a workspace to be
+        selected so that tools are discoverable globally.
+        """
 
         languages = (
             [validate_language(language)] if language else list(SUPPORTED_LANGUAGES)
@@ -174,7 +179,27 @@ class WorkspaceToolService:
         for entry in sorted(root.iterdir(), key=lambda item: item.name):
             if not entry.is_dir() or entry.name == "__pycache__":
                 continue
-            candidate = self._candidate_from_source(entry)
+            try:
+                candidate = self._candidate_from_source(entry)
+            except Exception as exc:
+                # Never let a single malformed tool directory abort the
+                # entire scan – record a synthetic invalid candidate so the
+                # user can see which tool failed and why.
+                candidate = ToolImportCandidate(
+                    index=0,
+                    id=entry.name,
+                    language="python",
+                    name=entry.name,
+                    description="Scan failed",
+                    source_path=entry,
+                    entrypoint=None,
+                    version="0.0.0",
+                    dependencies=[],
+                    inputs=[],
+                    outputs=[],
+                    status="invalid",
+                    warnings=[f"scan error: {exc}"],
+                )
             if candidate and candidate.language in languages:
                 candidates.append(candidate)
 

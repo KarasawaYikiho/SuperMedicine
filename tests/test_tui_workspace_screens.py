@@ -149,7 +149,7 @@ def test_workspace_screen_refresh_button_triggers_reload(tmp_path):
 
             # Click the refresh button
             await pilot.click("#workspace-refresh")
-            await pilot.pause()
+            await _wait_for_tui_condition(pilot, lambda: table.row_count == 2)
 
             assert table.row_count == 2
             status = _static_text(app.query_one("#workspace-status", Static))
@@ -252,12 +252,12 @@ def test_workspace_screen_select_updates_status(tmp_path):
         app = SuperMedicineTUI(project_root=tmp_path)
         async with app.run_test(size=(180, 80)) as pilot:
             app.action_switch_view("workspace")
-            await pilot.pause()
+            await _wait_for_tui_condition(pilot, lambda: t("workspace_list") in _static_text(app.query_one("#workspace-status", Static)) or t("workspace_no_workspaces") in _static_text(app.query_one("#workspace-status", Static)))
 
             input_widget = app.query_one("#workspace-id-input", Input)
             input_widget.value = "sel-ws"
             await pilot.click("#workspace-select")
-            await pilot.pause()
+            await _wait_for_tui_condition(pilot, lambda: "已选择工作区" in _static_text(app.query_one("#workspace-status", Static)))
 
             status = _static_text(app.query_one("#workspace-status", Static))
             assert "已选择工作区" in status
