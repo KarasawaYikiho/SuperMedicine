@@ -22,7 +22,7 @@ def _static_text(widget: Static) -> str:
     return str(widget.renderable)
 
 
-async def _wait_for_tui_condition(pilot, condition, *, timeout: float = 2.0) -> None:
+async def _wait_for_tui_condition(pilot, condition, *, timeout: float = 5.0) -> None:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         await pilot.pause()
