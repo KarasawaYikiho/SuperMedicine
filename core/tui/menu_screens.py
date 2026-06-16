@@ -32,6 +32,8 @@ class ViewSelectMenuScreen(ModalScreen[str | None]):
                     MenuOption(f"{item.icon} {item.label}", "view", item.view_id)
                     for item in SuperMedicineTUI.nav_items()
                 ),
+                MenuOption(f"🛡 {t('menu_permission_settings')}", "view", "permission"),
+                MenuOption(f"🤖 {t('menu_llm_settings')}", "view", "llm"),
                 MenuOption(f"← {t('menu_back')}", "back"),
                 id="tui-view-menu-list",
                 classes="tui-menu-list",
@@ -62,8 +64,6 @@ class MainMenuScreen(ModalScreen[str | None]):
                 MenuOption(f"▸ {t('menu_select_view')}", "select-view"),
                 MenuOption(f"◐ {t('menu_change_theme')}", "change-theme"),
                 MenuOption(f"□ {t('menu_toggle_maximize')}", "toggle-maximize"),
-                MenuOption(f"🛡 {t('menu_permission_settings')}", "permission-settings"),
-                MenuOption(f"🤖 {t('menu_llm_settings')}", "llm-settings"),
                 MenuOption(f"📁 {t('menu_workspace_settings')}", "workspace-settings"),
                 MenuOption(f"? {t('menu_show_help')}", "show-help"),
                 MenuOption(f"← {t('menu_close')}", "close"),
@@ -89,10 +89,6 @@ class MainMenuScreen(ModalScreen[str | None]):
         elif event.item.option_id == "toggle-maximize":
             self.dismiss(None)
             app.action_toggle_maximize()
-        elif event.item.option_id == "permission-settings":
-            self.dismiss("permission")
-        elif event.item.option_id == "llm-settings":
-            self.dismiss("llm")
         elif event.item.option_id == "workspace-settings":
             self.dismiss("workspace")
         elif event.item.option_id == "show-help":

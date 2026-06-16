@@ -89,50 +89,133 @@ header h1 {
     box-shadow: 0 0 8px var(--color-error);
 }
 
-/* ---- Tab Navigation ---- */
+/* ---- Hamburger Button ---- */
 
-#tab-nav {
-    background: var(--color-surface);
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0;
-    padding: 0 2rem;
-    border-bottom: 1px solid var(--color-border);
-    overflow-x: auto;
-}
-
-.tab-btn {
+.hamburger {
     background: transparent;
-    color: var(--color-text-muted);
     border: none;
-    padding: 1rem 1.25rem;
+    font-size: 1.5rem;
     cursor: pointer;
-    font-size: 0.85rem;
-    font-weight: 500;
-    border-bottom: 2px solid transparent;
+    color: var(--color-text);
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius);
     transition: var(--transition);
-    white-space: nowrap;
-    position: relative;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.tab-btn:hover {
+.hamburger:hover {
+    background: var(--color-surface-hover);
+}
+
+/* ---- Drawer Menu ---- */
+
+.drawer-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 200;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.drawer-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.drawer-menu {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 260px;
+    height: 100vh;
+    height: 100dvh;
+    background: var(--color-surface);
+    border-right: 1px solid var(--color-border);
+    z-index: 300;
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-lg);
+    overflow-y: auto;
+}
+
+.drawer-menu.open {
+    transform: translateX(0);
+}
+
+.drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--color-border);
+    flex-shrink: 0;
+}
+
+.drawer-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--color-text);
+    letter-spacing: -0.01em;
+}
+
+.drawer-close-btn {
+    background: transparent;
+    border: none;
+    font-size: 1.4rem;
+    cursor: pointer;
+    color: var(--color-text-muted);
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius);
+    transition: var(--transition);
+    line-height: 1;
+}
+
+.drawer-close-btn:hover {
     color: var(--color-text);
     background: var(--color-surface-hover);
 }
 
-.tab-btn.active {
-    color: var(--color-text);
-    border-bottom-color: var(--color-primary);
+.drawer-nav {
+    display: flex;
+    flex-direction: column;
+    padding: 0.5rem 0;
+    flex: 1;
 }
 
-.tab-btn.active::after {
-    content: '';
-    position: absolute;
-    bottom: -1px;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: var(--color-primary);
+/* ---- Tab Buttons (inside drawer) ---- */
+
+.drawer-nav .tab-btn {
+    background: transparent;
+    color: var(--color-text-muted);
+    border: none;
+    padding: 0.75rem 1.25rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-align: left;
+    transition: var(--transition);
+    white-space: nowrap;
+    position: relative;
+    border-left: 3px solid transparent;
+}
+
+.drawer-nav .tab-btn:hover {
+    color: var(--color-text);
+    background: var(--color-surface-hover);
+}
+
+.drawer-nav .tab-btn.active {
+    color: var(--color-text);
+    background: var(--color-surface-hover);
+    border-left-color: var(--color-primary);
+    font-weight: 600;
 }
 
 /* ---- Main layout ---- */
@@ -883,19 +966,18 @@ body {
 
 @media (max-width: 768px) {
     header {
-        flex-direction: column;
+        flex-direction: row;
         gap: 0.75rem;
-        text-align: center;
+        text-align: left;
         padding: 1rem;
     }
 
-    #tab-nav {
-        justify-content: center;
-        padding: 0 1rem;
+    .drawer-menu {
+        width: 240px;
     }
 
-    .tab-btn {
-        padding: 0.75rem 1rem;
+    .drawer-nav .tab-btn {
+        padding: 0.625rem 1rem;
         font-size: 0.8rem;
     }
 
@@ -955,7 +1037,11 @@ body {
         font-size: 1.5rem;
     }
 
-    .tab-btn {
+    .drawer-menu {
+        width: 220px;
+    }
+
+    .drawer-nav .tab-btn {
         padding: 0.5rem 0.75rem;
         font-size: 0.75rem;
     }

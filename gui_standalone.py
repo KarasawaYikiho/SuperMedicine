@@ -102,6 +102,15 @@ def main():
 
     logger.info(f"Opening GUI window at {url}")
 
+    # Resolve icon path
+    # In a frozen PyInstaller executable, bundled data is extracted to sys._MEIPASS.
+    # In development, assets/ lives next to this script.
+    if getattr(sys, "frozen", False):
+        _base = Path(sys._MEIPASS)  # type: ignore[attr-defined]
+    else:
+        _base = Path(__file__).parent
+    icon_path = _base / "assets" / "logo.ico"
+
     # Create and start the GUI window
     webview.create_window(
         title="SuperMedicine",
@@ -110,7 +119,8 @@ def main():
         height=800,
         min_size=(800, 600),
         resizable=True,
-        text_select=True
+        text_select=True,
+        icon=str(icon_path)
     )
 
     # Start the GUI (this blocks until window is closed)

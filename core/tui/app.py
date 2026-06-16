@@ -50,6 +50,7 @@ class SuperMedicineTUI(App[Any]):
     BINDINGS = [
         Binding("Q", "quit", t("nav_quit"), show=False),
         Binding("M", "open_menu", t("menu_open"), show=True),
+        Binding("P", "switch_view('permission')", "权限", show=True),
     ]
 
     NAV_ITEMS = (

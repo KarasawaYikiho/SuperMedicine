@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="format-detection" content="telephone=no">
     <meta name="msapplication-tap-highlight" content="no">
-    <title>SuperMedicine — Desktop</title>
+    <title>SuperMedicine — 桌面版</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -18,71 +18,84 @@
 </head>
 <body>
     <header>
+        <button id="hamburger-btn" class="hamburger" aria-label="切换菜单" title="切换菜单">&#9776;</button>
         <h1>SuperMedicine</h1>
         <div id="status-bar">
-            <span id="status-indicator" class="disconnected" title="Connection status"></span>
-            <span id="status-text">Connecting...</span>
+            <span id="status-indicator" class="disconnected" title="连接状态"></span>
+            <span id="status-text">连接中...</span>
         </div>
     </header>
 
-    <nav id="tab-nav">
-        <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
-        <button class="tab-btn" data-tab="chat">Chat</button>
-        <button class="tab-btn" data-tab="workspaces">Workspaces</button>
-        <button class="tab-btn" data-tab="papers">Papers</button>
-        <button class="tab-btn" data-tab="experiences">Experiences</button>
-        <button class="tab-btn" data-tab="tools">Tools</button>
-        <button class="tab-btn" data-tab="experiments">Experiments</button>
-        <button class="tab-btn" data-tab="llm">LLM Config</button>
-        <button class="tab-btn" data-tab="permissions">Permissions</button>
-        <button class="tab-btn" data-tab="logs">Logs</button>
-        <button class="tab-btn" data-tab="self-evolution">Self Evolution</button>
-        <button class="tab-btn" data-tab="diagnose">Diagnose</button>
-    </nav>
+    <div id="drawer-overlay" class="drawer-overlay"></div>
+    <aside id="drawer-menu" class="drawer-menu">
+        <div class="drawer-header">
+            <span class="drawer-title">菜单</span>
+            <button id="drawer-close-btn" class="drawer-close-btn" aria-label="关闭菜单">&times;</button>
+        </div>
+        <nav class="drawer-nav">
+            <button class="tab-btn active" data-tab="dashboard">状态看板</button>
+            <button class="tab-btn" data-tab="chat">对话</button>
+            <button class="tab-btn" data-tab="workspaces">工作区</button>
+            <button class="tab-btn" data-tab="papers">论文</button>
+            <button class="tab-btn" data-tab="experiences">经验</button>
+            <button class="tab-btn" data-tab="tools">工具</button>
+            <button class="tab-btn" data-tab="experiments">实验</button>
+            <button class="tab-btn" data-tab="llm">LLM配置</button>
+            <button class="tab-btn" data-tab="permissions">权限</button>
+            <button class="tab-btn" data-tab="logs">日志</button>
+            <button class="tab-btn" data-tab="self-evolution">自进化</button>
+            <button class="tab-btn" data-tab="diagnose">诊断</button>
+        </nav>
+    </aside>
 
     <main>
         <!-- Dashboard Tab -->
         <section id="tab-dashboard" class="tab-content active">
-            <h2>Project Status</h2>
-            <div id="project-status" class="status-grid">Loading...</div>
+            <h2>项目状态</h2>
+            <div id="project-status" class="status-grid">加载中...</div>
             <div class="dashboard-cards" id="dashboard-cards"></div>
         </section>
 
         <!-- Chat Tab -->
         <section id="tab-chat" class="tab-content">
-            <h2>Chat</h2>
+            <h2>对话</h2>
+            <div class="toolbar">
+                <select id="chat-ws-select" class="select-input">
+                    <option value="">无工作区（全局）</option>
+                </select>
+            </div>
             <div id="messages" role="log" aria-live="polite"></div>
             <form id="chat-form" autocomplete="off">
                 <textarea
                     id="chat-input"
-                    placeholder="Type your message..."
+                    placeholder="输入消息..."
                     rows="3"
-                    aria-label="Chat input"
+                    aria-label="对话输入"
                 ></textarea>
-                <button type="submit" id="send-btn">Send</button>
+                <button type="submit" id="send-btn">发送</button>
             </form>
         </section>
 
         <!-- Workspaces Tab -->
         <section id="tab-workspaces" class="tab-content">
-            <h2>Workspace Management</h2>
+            <h2>工作区管理</h2>
             <div class="toolbar">
-                <button id="btn-refresh-workspaces" class="btn btn-secondary">Refresh</button>
-                <button id="btn-add-workspace" class="btn btn-primary">+ New Workspace</button>
+                <button id="btn-refresh-workspaces" class="btn btn-secondary">刷新</button>
+                <button id="btn-add-workspace" class="btn btn-primary">+ 新建工作区</button>
             </div>
             <div id="workspace-form" class="form-container hidden">
-                <h3>Create Workspace</h3>
+                <h3>创建工作区</h3>
                 <div class="form-group">
-                    <label for="ws-id">Workspace ID</label>
-                    <input type="text" id="ws-id" placeholder="e.g. my-project">
+                    <label for="ws-id">工作区 ID</label>
+                    <input type="text" id="ws-id" placeholder="例如 my-project">
                 </div>
                 <div class="form-group">
-                    <label for="ws-name">Name (optional)</label>
-                    <input type="text" id="ws-name" placeholder="e.g. My Project">
+                    <label for="ws-name">名称（可选）</label>
+                    <input type="text" id="ws-name" placeholder="例如 我的项目">
                 </div>
                 <div class="form-actions">
-                    <button id="btn-save-workspace" class="btn btn-primary">Create</button>
-                    <button id="btn-cancel-workspace" class="btn btn-secondary">Cancel</button>
+                    <button id="btn-save-workspace" class="btn btn-primary">创建</button>
+                    <button id="btn-cancel-workspace" class="btn btn-secondary">取消</button>
                 </div>
             </div>
             <div id="workspace-list" class="data-table-container">
@@ -90,13 +103,13 @@
                     <thead>
                         <tr>
                             <th>ID</th>
-                            <th>Name</th>
-                            <th>Status</th>
-                            <th>Actions</th>
+                            <th>名称</th>
+                            <th>状态</th>
+                            <th>操作</th>
                         </tr>
                     </thead>
                     <tbody id="workspace-tbody">
-                        <tr><td colspan="4" class="empty-state">Loading...</td></tr>
+                        <tr><td colspan="4" class="empty-state">加载中...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -104,32 +117,32 @@
 
         <!-- Papers Tab -->
         <section id="tab-papers" class="tab-content">
-            <h2>Paper Management</h2>
+            <h2>论文管理</h2>
             <div class="toolbar">
                 <select id="paper-ws-select" class="select-input">
-                    <option value="">Select Workspace</option>
+                    <option value="">选择工作区</option>
                 </select>
-                <button id="btn-refresh-papers" class="btn btn-secondary">Refresh</button>
-                <button id="btn-add-paper" class="btn btn-primary">+ Import Paper</button>
+                <button id="btn-refresh-papers" class="btn btn-secondary">刷新</button>
+                <button id="btn-add-paper" class="btn btn-primary">+ 导入论文</button>
             </div>
             <div id="paper-form" class="form-container hidden">
-                <h3>Import Paper</h3>
+                <h3>导入论文</h3>
                 <div class="form-group">
-                    <label for="paper-source">Source Path</label>
+                    <label for="paper-source">源路径</label>
                     <input type="text" id="paper-source" placeholder="/path/to/paper.pdf">
                 </div>
                 <div class="form-group">
-                    <label for="paper-title">Title (optional)</label>
-                    <input type="text" id="paper-title" placeholder="Paper title">
+                    <label for="paper-title">标题（可选）</label>
+                    <input type="text" id="paper-title" placeholder="论文标题">
                 </div>
                 <div class="form-group">
                     <label>
-                        <input type="checkbox" id="paper-enrich"> Auto-enrich with LLM
+                        <input type="checkbox" id="paper-enrich"> 使用LLM自动充实
                     </label>
                 </div>
                 <div class="form-actions">
-                    <button id="btn-save-paper" class="btn btn-primary">Import</button>
-                    <button id="btn-cancel-paper" class="btn btn-secondary">Cancel</button>
+                    <button id="btn-save-paper" class="btn btn-primary">导入</button>
+                    <button id="btn-cancel-paper" class="btn btn-secondary">取消</button>
                 </div>
             </div>
             <div id="paper-list" class="data-table-container">
@@ -137,14 +150,14 @@
                     <thead>
                         <tr>
                             <th>ID</th>
-                            <th>Title</th>
-                            <th>Authors</th>
-                            <th>Status</th>
-                            <th>Actions</th>
+                            <th>标题</th>
+                            <th>作者</th>
+                            <th>状态</th>
+                            <th>操作</th>
                         </tr>
                     </thead>
                     <tbody id="paper-tbody">
-                        <tr><td colspan="5" class="empty-state">Select a workspace to view papers</td></tr>
+                        <tr><td colspan="5" class="empty-state">选择工作区以查看论文</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -152,38 +165,38 @@
 
         <!-- Experiences Tab -->
         <section id="tab-experiences" class="tab-content">
-            <h2>Experience Management</h2>
+            <h2>经验管理</h2>
             <div class="toolbar">
                 <select id="exp-ws-select" class="select-input">
-                    <option value="">Select Workspace</option>
+                    <option value="">选择工作区</option>
                 </select>
-                <button id="btn-refresh-experiences" class="btn btn-secondary">Refresh</button>
-                <button id="btn-add-experience" class="btn btn-primary">+ Add Experience</button>
+                <button id="btn-refresh-experiences" class="btn btn-secondary">刷新</button>
+                <button id="btn-add-experience" class="btn btn-primary">+ 添加经验</button>
             </div>
             <div id="experience-form" class="form-container hidden">
-                <h3>Add Experience</h3>
+                <h3>添加经验</h3>
                 <div class="form-group">
-                    <label for="exp-scope">Scope</label>
+                    <label for="exp-scope">范围</label>
                     <select id="exp-scope" class="select-input">
-                        <option value="workspace">Workspace</option>
-                        <option value="global">Global</option>
+                        <option value="workspace">工作区</option>
+                        <option value="global">全局</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="exp-title">Title</label>
-                    <input type="text" id="exp-title" placeholder="Experience title">
+                    <label for="exp-title">标题</label>
+                    <input type="text" id="exp-title" placeholder="经验标题">
                 </div>
                 <div class="form-group">
-                    <label for="exp-summary">Summary</label>
-                    <textarea id="exp-summary" rows="4" placeholder="Describe the experience..."></textarea>
+                    <label for="exp-summary">摘要</label>
+                    <textarea id="exp-summary" rows="4" placeholder="描述该经验..."></textarea>
                 </div>
                 <div class="form-group">
-                    <label for="exp-tags">Tags (comma-separated)</label>
-                    <input type="text" id="exp-tags" placeholder="e.g. synthesis, optimization">
+                    <label for="exp-tags">标签（逗号分隔）</label>
+                    <input type="text" id="exp-tags" placeholder="例如 合成, 优化">
                 </div>
                 <div class="form-actions">
-                    <button id="btn-save-experience" class="btn btn-primary">Save</button>
-                    <button id="btn-cancel-experience" class="btn btn-secondary">Cancel</button>
+                    <button id="btn-save-experience" class="btn btn-primary">保存</button>
+                    <button id="btn-cancel-experience" class="btn btn-secondary">取消</button>
                 </div>
             </div>
             <div id="experience-list" class="data-table-container">
@@ -191,14 +204,14 @@
                     <thead>
                         <tr>
                             <th>ID</th>
-                            <th>Title</th>
-                            <th>Scope</th>
-                            <th>Tags</th>
-                            <th>Actions</th>
+                            <th>标题</th>
+                            <th>范围</th>
+                            <th>标签</th>
+                            <th>操作</th>
                         </tr>
                     </thead>
                     <tbody id="experience-tbody">
-                        <tr><td colspan="5" class="empty-state">Select a workspace to view experiences</td></tr>
+                        <tr><td colspan="5" class="empty-state">选择工作区以查看经验</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -206,42 +219,42 @@
 
         <!-- Tools Tab -->
         <section id="tab-tools" class="tab-content">
-            <h2>Tool Management</h2>
+            <h2>工具管理</h2>
             <div class="toolbar">
                 <select id="tool-ws-select" class="select-input">
-                    <option value="">Select Workspace</option>
+                    <option value="">选择工作区</option>
                 </select>
                 <select id="tool-lang-select" class="select-input">
-                    <option value="">All Languages</option>
+                    <option value="">所有语言</option>
                     <option value="python">Python</option>
                     <option value="r">R</option>
                     <option value="javascript">JavaScript</option>
                 </select>
-                <button id="btn-refresh-tools" class="btn btn-secondary">Refresh</button>
-                <button id="btn-scan-tools" class="btn btn-primary">Scan Tools</button>
-                <button id="btn-add-tool" class="btn btn-primary">+ Add Tool</button>
+                <button id="btn-refresh-tools" class="btn btn-secondary">刷新</button>
+                <button id="btn-scan-tools" class="btn btn-primary">扫描工具</button>
+                <button id="btn-add-tool" class="btn btn-primary">+ 添加工具</button>
             </div>
             <div id="tool-scan-results" class="hidden">
-                <h3>Scan Results</h3>
+                <h3>扫描结果</h3>
                 <div id="tool-scan-list" class="scan-results"></div>
                 <div class="form-actions">
-                    <button id="btn-add-scanned-tools" class="btn btn-primary">Add Selected</button>
-                    <button id="btn-cancel-scan" class="btn btn-secondary">Close</button>
+                    <button id="btn-add-scanned-tools" class="btn btn-primary">添加所选</button>
+                    <button id="btn-cancel-scan" class="btn btn-secondary">关闭</button>
                 </div>
             </div>
             <div id="tool-list" class="data-table-container">
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>Name</th>
-                            <th>Language</th>
-                            <th>Version</th>
-                            <th>Status</th>
-                            <th>Actions</th>
+                            <th>名称</th>
+                            <th>语言</th>
+                            <th>版本</th>
+                            <th>状态</th>
+                            <th>操作</th>
                         </tr>
                     </thead>
                     <tbody id="tool-tbody">
-                        <tr><td colspan="5" class="empty-state">Select a workspace to view tools</td></tr>
+                        <tr><td colspan="5" class="empty-state">选择工作区以查看工具</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -249,71 +262,71 @@
 
         <!-- Experiments Tab -->
         <section id="tab-experiments" class="tab-content">
-            <h2>Experiment Guide</h2>
+            <h2>实验指南</h2>
             <div class="toolbar">
-                <button id="btn-refresh-experiments" class="btn btn-secondary">Refresh</button>
-                <button id="btn-start-experiment" class="btn btn-primary">+ Start Experiment</button>
+                <button id="btn-refresh-experiments" class="btn btn-secondary">刷新</button>
+                <button id="btn-start-experiment" class="btn btn-primary">+ 开始实验</button>
             </div>
             <div id="experiment-form" class="form-container hidden">
-                <h3>Start New Experiment</h3>
+                <h3>开始新实验</h3>
                 <div class="form-group">
-                    <label for="exp-protocol">Protocol</label>
-                    <textarea id="exp-protocol" rows="6" placeholder="Paste experiment protocol..."></textarea>
+                    <label for="exp-protocol">实验方案</label>
+                    <textarea id="exp-protocol" rows="6" placeholder="粘贴实验方案..."></textarea>
                 </div>
                 <div class="form-group">
-                    <label for="exp-session-id">Session ID (optional)</label>
-                    <input type="text" id="exp-session-id" placeholder="Auto-generated if empty">
+                    <label for="exp-session-id">会话ID（可选）</label>
+                    <input type="text" id="exp-session-id" placeholder="留空则自动生成">
                 </div>
                 <div class="form-actions">
-                    <button id="btn-save-experiment" class="btn btn-primary">Start</button>
-                    <button id="btn-cancel-experiment" class="btn btn-secondary">Cancel</button>
+                    <button id="btn-save-experiment" class="btn btn-primary">开始</button>
+                    <button id="btn-cancel-experiment" class="btn btn-secondary">取消</button>
                 </div>
             </div>
             <div id="experiment-list" class="data-table-container">
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>Session</th>
-                            <th>Protocol</th>
-                            <th>Status</th>
-                            <th>Current Step</th>
-                            <th>Actions</th>
+                            <th>会话</th>
+                            <th>方案</th>
+                            <th>状态</th>
+                            <th>当前步骤</th>
+                            <th>操作</th>
                         </tr>
                     </thead>
                     <tbody id="experiment-tbody">
-                        <tr><td colspan="5" class="empty-state">Loading...</td></tr>
+                        <tr><td colspan="5" class="empty-state">加载中...</td></tr>
                     </tbody>
                 </table>
             </div>
             <div id="experiment-detail" class="hidden">
-                <h3>Experiment Detail</h3>
+                <h3>实验详情</h3>
                 <div id="experiment-steps"></div>
             </div>
         </section>
 
         <!-- LLM Config Tab -->
         <section id="tab-llm" class="tab-content">
-            <h2>LLM Configuration</h2>
+            <h2>LLM配置</h2>
             <div class="toolbar">
-                <button id="btn-refresh-llm" class="btn btn-secondary">Refresh</button>
+                <button id="btn-refresh-llm" class="btn btn-secondary">刷新</button>
             </div>
             <div id="llm-current" class="info-card">
-                <h3>Current Provider</h3>
-                <div id="llm-current-info">Loading...</div>
+                <h3>当前提供商</h3>
+                <div id="llm-current-info">加载中...</div>
             </div>
             <div id="llm-providers" class="data-table-container">
-                <h3>Available Providers</h3>
+                <h3>可用提供商</h3>
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>Name</th>
-                            <th>Model</th>
-                            <th>Status</th>
-                            <th>Actions</th>
+                            <th>名称</th>
+                            <th>模型</th>
+                            <th>状态</th>
+                            <th>操作</th>
                         </tr>
                     </thead>
                     <tbody id="llm-tbody">
-                        <tr><td colspan="4" class="empty-state">Loading...</td></tr>
+                        <tr><td colspan="4" class="empty-state">加载中...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -321,53 +334,53 @@
 
         <!-- Permissions Tab -->
         <section id="tab-permissions" class="tab-content">
-            <h2>Permission Settings</h2>
+            <h2>权限设置</h2>
             <div class="toolbar">
-                <button id="btn-refresh-permissions" class="btn btn-secondary">Refresh</button>
+                <button id="btn-refresh-permissions" class="btn btn-secondary">刷新</button>
             </div>
             <div id="permission-status" class="info-card">
-                <h3>Current Mode</h3>
-                <div id="permission-mode-info">Loading...</div>
+                <h3>当前模式</h3>
+                <div id="permission-mode-info">加载中...</div>
             </div>
             <div class="form-container">
-                <h3>Change Permission Mode</h3>
+                <h3>更改权限模式</h3>
                 <div class="form-group">
                     <select id="permission-mode-select" class="select-input">
-                        <option value="interactive">Interactive</option>
-                        <option value="auto">Auto</option>
-                        <option value="full">Full (requires confirmation)</option>
+                        <option value="interactive">交互式</option>
+                        <option value="auto">自动</option>
+                        <option value="full">完全（需确认）</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label>
-                        <input type="checkbox" id="permission-confirm-full"> Confirm full access
+                        <input type="checkbox" id="permission-confirm-full"> 确认完全访问权限
                     </label>
                 </div>
                 <div class="form-actions">
-                    <button id="btn-set-permission" class="btn btn-primary">Apply</button>
+                    <button id="btn-set-permission" class="btn btn-primary">应用</button>
                 </div>
             </div>
             <div class="form-container">
-                <h3>Authorize External Path</h3>
+                <h3>授权外部路径</h3>
                 <div class="form-group">
                     <input type="text" id="permission-path" placeholder="/path/to/authorize">
                 </div>
                 <div class="form-actions">
-                    <button id="btn-authorize-path" class="btn btn-primary">Authorize</button>
+                    <button id="btn-authorize-path" class="btn btn-primary">授权</button>
                 </div>
             </div>
             <div id="permission-policies" class="data-table-container">
-                <h3>Policies</h3>
+                <h3>策略</h3>
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>Rule</th>
-                            <th>Scope</th>
-                            <th>Status</th>
+                            <th>规则</th>
+                            <th>范围</th>
+                            <th>状态</th>
                         </tr>
                     </thead>
                     <tbody id="permission-tbody">
-                        <tr><td colspan="3" class="empty-state">Loading...</td></tr>
+                        <tr><td colspan="3" class="empty-state">加载中...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -375,61 +388,61 @@
 
         <!-- Logs Tab -->
         <section id="tab-logs" class="tab-content">
-            <h2>Log Viewer</h2>
+            <h2>日志查看器</h2>
             <div class="toolbar">
                 <select id="log-select" class="select-input">
-                    <option value="">Select Log</option>
+                    <option value="">选择日志</option>
                 </select>
-                <button id="btn-refresh-logs" class="btn btn-secondary">Refresh</button>
-                <button id="btn-write-log" class="btn btn-primary">+ Write Log</button>
+                <button id="btn-refresh-logs" class="btn btn-secondary">刷新</button>
+                <button id="btn-write-log" class="btn btn-primary">+ 写入日志</button>
             </div>
             <div id="log-write-form" class="form-container hidden">
-                <h3>Write Log Entry</h3>
+                <h3>写入日志条目</h3>
                 <div class="form-group">
-                    <textarea id="log-message" rows="3" placeholder="Log message..."></textarea>
+                    <textarea id="log-message" rows="3" placeholder="日志消息..."></textarea>
                 </div>
                 <div class="form-group">
-                    <input type="text" id="log-session-id" placeholder="Session ID (optional)">
+                    <input type="text" id="log-session-id" placeholder="会话ID（可选）">
                 </div>
                 <div class="form-actions">
-                    <button id="btn-save-log" class="btn btn-primary">Write</button>
-                    <button id="btn-cancel-log" class="btn btn-secondary">Cancel</button>
+                    <button id="btn-save-log" class="btn btn-primary">写入</button>
+                    <button id="btn-cancel-log" class="btn btn-secondary">取消</button>
                 </div>
             </div>
             <div id="log-viewer" class="log-viewer">
-                <pre id="log-content">Select a log to view its contents.</pre>
+                <pre id="log-content">选择日志以查看其内容。</pre>
             </div>
         </section>
 
         <!-- Self Evolution Tab -->
         <section id="tab-self-evolution" class="tab-content">
-            <h2>Self Evolution</h2>
+            <h2>自进化</h2>
             <div class="toolbar">
-                <button id="btn-refresh-self-evolution" class="btn btn-secondary">Refresh</button>
-                <button id="btn-generate-artifacts" class="btn btn-primary">Generate Artifacts</button>
+                <button id="btn-refresh-self-evolution" class="btn btn-secondary">刷新</button>
+                <button id="btn-generate-artifacts" class="btn btn-primary">生成制品</button>
             </div>
             <div id="self-evolution-form" class="form-container hidden">
-                <h3>Generate Artifact</h3>
+                <h3>生成制品</h3>
                 <div class="form-group">
-                    <label for="se-instruction">Instruction</label>
-                    <textarea id="se-instruction" rows="4" placeholder="Describe what to generate..."></textarea>
+                    <label for="se-instruction">指令</label>
+                    <textarea id="se-instruction" rows="4" placeholder="描述要生成的内容..."></textarea>
                 </div>
                 <div class="form-group">
-                    <label for="se-artifact-type">Artifact Type</label>
+                    <label for="se-artifact-type">制品类型</label>
                     <select id="se-artifact-type" class="select-input">
-                        <option value="code">Code</option>
-                        <option value="config">Config</option>
-                        <option value="documentation">Documentation</option>
-                        <option value="test">Test</option>
+                        <option value="code">代码</option>
+                        <option value="config">配置</option>
+                        <option value="documentation">文档</option>
+                        <option value="test">测试</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="se-output">Output Path</label>
+                    <label for="se-output">输出路径</label>
                     <input type="text" id="se-output" placeholder="/path/to/output">
                 </div>
                 <div class="form-actions">
-                    <button id="btn-save-artifact" class="btn btn-primary">Generate</button>
-                    <button id="btn-cancel-artifact" class="btn btn-secondary">Cancel</button>
+                    <button id="btn-save-artifact" class="btn btn-primary">生成</button>
+                    <button id="btn-cancel-artifact" class="btn btn-secondary">取消</button>
                 </div>
             </div>
             <div id="self-evolution-list" class="data-table-container">
@@ -437,14 +450,14 @@
                     <thead>
                         <tr>
                             <th>ID</th>
-                            <th>Type</th>
-                            <th>Instruction</th>
-                            <th>Status</th>
-                            <th>Actions</th>
+                            <th>类型</th>
+                            <th>指令</th>
+                            <th>状态</th>
+                            <th>操作</th>
                         </tr>
                     </thead>
                     <tbody id="self-evolution-tbody">
-                        <tr><td colspan="5" class="empty-state">Loading...</td></tr>
+                        <tr><td colspan="5" class="empty-state">加载中...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -452,30 +465,30 @@
 
         <!-- Diagnose Tab -->
         <section id="tab-diagnose" class="tab-content">
-            <h2>Diagnostics</h2>
+            <h2>诊断</h2>
             <div class="toolbar">
-                <button id="btn-refresh-diagnose" class="btn btn-secondary">Refresh</button>
-                <button id="btn-run-all-diagnostics" class="btn btn-primary">Run All</button>
+                <button id="btn-refresh-diagnose" class="btn btn-secondary">刷新</button>
+                <button id="btn-run-all-diagnostics" class="btn btn-primary">运行全部</button>
             </div>
             <div class="dashboard-cards">
                 <div class="info-card">
-                    <h3>Config Diagnostics</h3>
-                    <div id="diagnose-config-info">Loading...</div>
-                    <button id="btn-diagnose-config" class="btn btn-secondary btn-sm" style="margin-top: 0.5rem;">Run Config</button>
+                    <h3>配置诊断</h3>
+                    <div id="diagnose-config-info">加载中...</div>
+                    <button id="btn-diagnose-config" class="btn btn-secondary btn-sm" style="margin-top: 0.5rem;">运行配置</button>
                 </div>
                 <div class="info-card">
-                    <h3>LLM Diagnostics</h3>
-                    <div id="diagnose-llm-info">Loading...</div>
-                    <button id="btn-diagnose-llm" class="btn btn-secondary btn-sm" style="margin-top: 0.5rem;">Run LLM</button>
+                    <h3>LLM诊断</h3>
+                    <div id="diagnose-llm-info">加载中...</div>
+                    <button id="btn-diagnose-llm" class="btn btn-secondary btn-sm" style="margin-top: 0.5rem;">运行LLM</button>
                 </div>
                 <div class="info-card">
-                    <h3>Install Diagnostics</h3>
-                    <div id="diagnose-install-info">Loading...</div>
-                    <button id="btn-diagnose-install" class="btn btn-secondary btn-sm" style="margin-top: 0.5rem;">Run Install</button>
+                    <h3>安装诊断</h3>
+                    <div id="diagnose-install-info">加载中...</div>
+                    <button id="btn-diagnose-install" class="btn btn-secondary btn-sm" style="margin-top: 0.5rem;">运行安装</button>
                 </div>
             </div>
             <div id="diagnose-results" class="log-viewer" style="margin-top: 1rem;">
-                <pre id="diagnose-content">Click a diagnostic button to run diagnostics.</pre>
+                <pre id="diagnose-content">点击诊断按钮以运行诊断。</pre>
             </div>
         </section>
     </main>

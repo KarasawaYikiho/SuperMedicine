@@ -65,7 +65,7 @@ def _safe_load_manifest(path: Path) -> dict[str, Any]:
 def _load_candidate_metadata(path: Path, warnings: list[str]) -> dict[str, Any]:
     try:
         return _safe_load_manifest(path)
-    except ToolManifestError as exc:
+    except (ToolManifestError, yaml.YAMLError) as exc:
         warnings.append(str(exc))
         return {}
 

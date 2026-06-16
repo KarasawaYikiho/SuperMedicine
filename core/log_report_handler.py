@@ -33,7 +33,13 @@ class LogReportLoggingHandler(logging.Handler):
 
 
 def configure_tui_log_storage(project_dir: str | Path) -> None:
-    """Route TUI-mode logs only to Log storage, never console streams."""
+    """Route TUI-mode logs only to Log storage, never console streams.
+
+    All log output is consolidated into a single session file
+    (session-tui-application.json) so that every application launch
+    writes to the same log file.  Different log categories are simply
+    appended as separate entries in that one file.
+    """
 
     root = logging.getLogger()
     root.setLevel(logging.INFO)
@@ -42,7 +48,7 @@ def configure_tui_log_storage(project_dir: str | Path) -> None:
         root.removeHandler(handler)
         handler.close()
 
-    handler = LogReportLoggingHandler(project_dir)
+    handler = LogReportLoggingHandler(project_dir, session_id=TUI_LOG_SESSION_ID)
     handler.setLevel(logging.INFO)
     handler.setFormatter(
         logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")

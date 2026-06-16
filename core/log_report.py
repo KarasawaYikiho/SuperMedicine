@@ -287,7 +287,12 @@ class LogReportStore:
     def _write_isolated(
         self, message: str, *, severity: str | None = None
     ) -> dict[str, Any]:
-        """Route all non-session writes to the TUI session log file."""
+        """Route all non-session writes to the TUI session log file.
+
+        This ensures every write without an explicit session_id is merged
+        into the single ``session-tui-application.json`` file, keeping
+        all application logs in one place regardless of category.
+        """
         return self.append(message, session_id=TUI_LOG_SESSION_ID, severity=severity)
 
     def _new_payload(self, *, session_id: str | None) -> dict[str, Any]:

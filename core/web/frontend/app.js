@@ -17,6 +17,11 @@
     const statusIndicator = document.getElementById("status-indicator");
     const statusText = document.getElementById("status-text");
     const projectStatusEl = document.getElementById("project-status");
+    const hamburgerBtn = document.getElementById("hamburger-btn");
+    const drawerMenu = document.getElementById("drawer-menu");
+    const drawerOverlay = document.getElementById("drawer-overlay");
+    const drawerCloseBtn = document.getElementById("drawer-close-btn");
+    const chatWsSelect = document.getElementById("chat-ws-select");
 
     // ---- State -----------------------------------------------------------
 
@@ -53,7 +58,7 @@
 
         const roleLabel = document.createElement("div");
         roleLabel.className = "role";
-        roleLabel.textContent = role === "user" ? "You" : role === "assistant" ? "SuperMedicine" : role;
+        roleLabel.textContent = role === "user" ? "你" : role === "assistant" ? "SuperMedicine" : role;
         div.appendChild(roleLabel);
 
         const body = document.createElement("div");
@@ -67,8 +72,32 @@
 
     function setConnected(connected) {
         statusIndicator.className = connected ? "connected" : "disconnected";
-        statusText.textContent = connected ? "Connected" : "Disconnected";
+        statusText.textContent = connected ? "已连接" : "已断开";
     }
+
+    // ---- Drawer Menu ----------------------------------------------------
+
+    function openDrawer() {
+        drawerMenu.classList.add("open");
+        drawerOverlay.classList.add("active");
+    }
+
+    function closeDrawer() {
+        drawerMenu.classList.remove("open");
+        drawerOverlay.classList.remove("active");
+    }
+
+    function toggleDrawer() {
+        if (drawerMenu.classList.contains("open")) {
+            closeDrawer();
+        } else {
+            openDrawer();
+        }
+    }
+
+    hamburgerBtn.addEventListener("click", toggleDrawer);
+    drawerCloseBtn.addEventListener("click", closeDrawer);
+    drawerOverlay.addEventListener("click", closeDrawer);
 
     // ---- API Helper ------------------------------------------------------
 
@@ -104,6 +133,9 @@
                 });
                 document.getElementById("tab-" + tabId).classList.add("active");
 
+                // Close drawer on selection
+                closeDrawer();
+
                 // Load data for the tab
                 loadTabData(tabId);
             });
@@ -114,6 +146,9 @@
         switch (tabId) {
             case "dashboard":
                 fetchStatus();
+                break;
+            case "chat":
+                loadChatWorkspaceSelector();
                 break;
             case "workspaces":
                 loadWorkspaces();
@@ -156,24 +191,24 @@
 
             projectStatusEl.innerHTML =
                 '<div class="status-card">' +
-                '<div class="label">Version</div>' +
-                '<div class="value">' + escapeHtml(data.version || "unknown") + "</div>" +
+                '<div class="label">版本</div>' +
+                '<div class="value">' + escapeHtml(data.version || "未知") + "</div>" +
                 "</div>" +
                 '<div class="status-card">' +
-                '<div class="label">Config</div>' +
-                '<div class="value">' + (data.config_initialized ? "Initialized" : "Not initialized") + "</div>" +
+                '<div class="label">配置</div>' +
+                '<div class="value">' + (data.config_initialized ? "已初始化" : "未初始化") + "</div>" +
                 "</div>" +
                 '<div class="status-card">' +
-                '<div class="label">Plugins</div>' +
+                '<div class="label">插件</div>' +
                 '<div class="value">' + (data.plugin_count ?? 0) + "</div>" +
                 "</div>" +
                 '<div class="status-card">' +
-                '<div class="label">LLM Provider</div>' +
-                '<div class="value">' + escapeHtml(data.llm_provider || "N/A") + "</div>" +
+                '<div class="label">LLM提供商</div>' +
+                '<div class="value">' + escapeHtml(data.llm_provider || "无") + "</div>" +
                 "</div>";
         } catch (err) {
             projectStatusEl.innerHTML =
-                '<div style="color:var(--color-error)">Failed to load status: ' +
+                '<div style="color:var(--color-error)">加载状态失败: ' +
                 escapeHtml(err.message) + "</div>";
         }
     }
@@ -185,22 +220,22 @@
             const data = await apiCall("GET", "/api/v1/workspaces");
             renderWorkspaces(Array.isArray(data) ? data : []);
         } catch (err) {
-            showToast("Failed to load workspaces: " + err.message, "error");
+            showToast("加载工作区失败: " + err.message, "error");
         }
     }
 
     function renderWorkspaces(workspaces) {
         var tbody = document.getElementById("workspace-tbody");
         if (!workspaces.length) {
-            tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No workspaces found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="4" class="empty-state">未找到工作区</td></tr>';
             return;
         }
         tbody.innerHTML = workspaces.map(function (ws) {
             return "<tr>" +
                 "<td>" + escapeHtml(ws.id || ws.name || "-") + "</td>" +
                 "<td>" + escapeHtml(ws.name || ws.id || "-") + "</td>" +
-                "<td><span class=\"status-badge success\">Active</span></td>" +
-                "<td><button class=\"btn btn-danger btn-sm\" onclick=\"deleteWorkspace('" + escapeHtml(ws.id || ws.name) + "')\">Delete</button></td>" +
+                "<td><span class=\"status-badge success\">活跃</span></td>" +
+                "<td><button class=\"btn btn-danger btn-sm\" onclick=\"deleteWorkspace('" + escapeHtml(ws.id || ws.name) + "')\">删除</button></td>" +
                 "</tr>";
         }).join("");
     }
@@ -217,18 +252,18 @@
             var id = document.getElementById("ws-id").value.trim();
             var name = document.getElementById("ws-name").value.trim();
             if (!id) {
-                showToast("Workspace ID is required", "warning");
+                showToast("工作区ID为必填项", "warning");
                 return;
             }
             try {
                 await apiCall("POST", "/api/v1/workspaces", { id: id, name: name || undefined });
-                showToast("Workspace created successfully", "success");
+                showToast("工作区创建成功", "success");
                 form.classList.add("hidden");
                 document.getElementById("ws-id").value = "";
                 document.getElementById("ws-name").value = "";
                 loadWorkspaces();
             } catch (err) {
-                showToast("Failed to create workspace: " + err.message, "error");
+                showToast("创建工作区失败: " + err.message, "error");
             }
         });
         document.getElementById("btn-refresh-workspaces").addEventListener("click", loadWorkspaces);
@@ -236,13 +271,13 @@
 
     // Global function for inline onclick
     window.deleteWorkspace = async function (id) {
-        if (!confirm("Delete workspace '" + id + "'?")) return;
+        if (!confirm("确定要删除工作区 '" + id + "' 吗？")) return;
         try {
             await apiCall("DELETE", "/api/v1/workspaces/" + encodeURIComponent(id));
-            showToast("Workspace deleted", "success");
+            showToast("工作区已删除", "success");
             loadWorkspaces();
         } catch (err) {
-            showToast("Failed to delete workspace: " + err.message, "error");
+            showToast("删除工作区失败: " + err.message, "error");
         }
     };
 
@@ -252,11 +287,15 @@
         try {
             const data = await apiCall("GET", "/api/v1/workspaces");
             var workspaces = Array.isArray(data) ? data : [];
-            var selectors = ["paper-ws-select", "exp-ws-select", "tool-ws-select"];
+            var selectors = ["paper-ws-select", "exp-ws-select", "tool-ws-select", "chat-ws-select"];
             selectors.forEach(function (selId) {
                 var sel = document.getElementById(selId);
+                if (!sel) return;
                 var current = sel.value;
-                sel.innerHTML = '<option value="">Select Workspace</option>';
+                var defaultOption = selId === "chat-ws-select"
+                    ? '<option value="">无工作区（全局）</option>'
+                    : '<option value="">选择工作区</option>';
+                sel.innerHTML = defaultOption;
                 workspaces.forEach(function (ws) {
                     var opt = document.createElement("option");
                     opt.value = ws.id || ws.name;
@@ -270,13 +309,33 @@
         }
     }
 
+    // ---- Workspace Selectors ---------------------------------------------
+
+    async function loadChatWorkspaceSelector() {
+        try {
+            const data = await apiCall("GET", "/api/v1/workspaces");
+            var workspaces = Array.isArray(data) ? data : [];
+            var current = chatWsSelect.value;
+            chatWsSelect.innerHTML = '<option value="">无工作区（全局）</option>';
+            workspaces.forEach(function (ws) {
+                var opt = document.createElement("option");
+                opt.value = ws.id || ws.name;
+                opt.textContent = ws.name || ws.id;
+                chatWsSelect.appendChild(opt);
+            });
+            if (current) chatWsSelect.value = current;
+        } catch (err) {
+            // Silently fail
+        }
+    }
+
     // ---- Paper Management ------------------------------------------------
 
     function setupPaperForm() {
         var form = document.getElementById("paper-form");
         document.getElementById("btn-add-paper").addEventListener("click", function () {
             if (!document.getElementById("paper-ws-select").value) {
-                showToast("Select a workspace first", "warning");
+                showToast("请先选择工作区", "warning");
                 return;
             }
             form.classList.toggle("hidden");
@@ -290,21 +349,21 @@
             var title = document.getElementById("paper-title").value.trim();
             var enrich = document.getElementById("paper-enrich").checked;
             if (!source) {
-                showToast("Source path is required", "warning");
+                showToast("源路径为必填项", "warning");
                 return;
             }
             try {
                 var body = { source_path: source, enrich: enrich };
                 if (title) body.metadata = { title: title };
                 await apiCall("POST", "/api/v1/workspaces/" + encodeURIComponent(wsId) + "/papers", body);
-                showToast("Paper imported successfully", "success");
+                showToast("论文导入成功", "success");
                 form.classList.add("hidden");
                 document.getElementById("paper-source").value = "";
                 document.getElementById("paper-title").value = "";
                 document.getElementById("paper-enrich").checked = false;
                 loadPapers(wsId);
             } catch (err) {
-                showToast("Failed to import paper: " + err.message, "error");
+                showToast("导入论文失败: " + err.message, "error");
             }
         });
         document.getElementById("btn-refresh-papers").addEventListener("click", function () {
@@ -321,14 +380,14 @@
             const data = await apiCall("GET", "/api/v1/workspaces/" + encodeURIComponent(wsId) + "/papers");
             renderPapers(Array.isArray(data) ? data : []);
         } catch (err) {
-            showToast("Failed to load papers: " + err.message, "error");
+            showToast("加载论文失败: " + err.message, "error");
         }
     }
 
     function renderPapers(papers) {
         var tbody = document.getElementById("paper-tbody");
         if (!papers.length) {
-            tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No papers found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="empty-state">未找到论文</td></tr>';
             return;
         }
         tbody.innerHTML = papers.map(function (p) {
@@ -336,8 +395,8 @@
                 "<td>" + escapeHtml(p.id || "-") + "</td>" +
                 "<td>" + escapeHtml(p.title || p.metadata?.title || "-") + "</td>" +
                 "<td>" + escapeHtml(p.authors || p.metadata?.authors || "-") + "</td>" +
-                "<td><span class=\"status-badge " + (p.enriched ? "success" : "info") + "\">" + (p.enriched ? "Enriched" : "Imported") + "</span></td>" +
-                "<td><button class=\"btn btn-secondary btn-sm\" onclick=\"enrichPaper('" + escapeHtml(currentWorkspaceId || "") + "','" + escapeHtml(p.id || "") + "')\">Enrich</button></td>" +
+                "<td><span class=\"status-badge " + (p.enriched ? "success" : "info") + "\">" + (p.enriched ? "已充实" : "已导入") + "</span></td>" +
+                "<td><button class=\"btn btn-secondary btn-sm\" onclick=\"enrichPaper('" + escapeHtml(currentWorkspaceId || "") + "','" + escapeHtml(p.id || "") + "')\">充实</button></td>" +
                 "</tr>";
         }).join("");
     }
@@ -346,10 +405,10 @@
         if (!wsId || !paperId) return;
         try {
             await apiCall("POST", "/api/v1/workspaces/" + encodeURIComponent(wsId) + "/papers/" + encodeURIComponent(paperId) + "/enrich", { confirm_enrich: true });
-            showToast("Paper enrichment started", "info");
+            showToast("论文充实已启动", "info");
             loadPapers(wsId);
         } catch (err) {
-            showToast("Failed to enrich paper: " + err.message, "error");
+            showToast("充实论文失败: " + err.message, "error");
         }
     };
 
@@ -359,7 +418,7 @@
         var form = document.getElementById("experience-form");
         document.getElementById("btn-add-experience").addEventListener("click", function () {
             if (!document.getElementById("exp-ws-select").value) {
-                showToast("Select a workspace first", "warning");
+                showToast("请先选择工作区", "warning");
                 return;
             }
             form.classList.toggle("hidden");
@@ -374,21 +433,21 @@
             var summary = document.getElementById("exp-summary").value.trim();
             var tags = document.getElementById("exp-tags").value.trim();
             if (!title || !summary) {
-                showToast("Title and summary are required", "warning");
+                showToast("标题和摘要为必填项", "warning");
                 return;
             }
             try {
                 var body = { scope: scope, title: title, summary: summary };
                 if (tags) body.tags = tags.split(",").map(function (t) { return t.trim(); });
                 await apiCall("POST", "/api/v1/workspaces/" + encodeURIComponent(wsId) + "/experiences", body);
-                showToast("Experience saved successfully", "success");
+                showToast("经验保存成功", "success");
                 form.classList.add("hidden");
                 document.getElementById("exp-title").value = "";
                 document.getElementById("exp-summary").value = "";
                 document.getElementById("exp-tags").value = "";
                 loadExperiences(wsId);
             } catch (err) {
-                showToast("Failed to save experience: " + err.message, "error");
+                showToast("保存经验失败: " + err.message, "error");
             }
         });
         document.getElementById("btn-refresh-experiences").addEventListener("click", function () {
@@ -407,14 +466,14 @@
             const data = await apiCall("GET", "/api/v1/workspaces/" + encodeURIComponent(wsId) + "/experiences");
             renderExperiences(Array.isArray(data) ? data : []);
         } catch (err) {
-            showToast("Failed to load experiences: " + err.message, "error");
+            showToast("加载经验失败: " + err.message, "error");
         }
     }
 
     function renderExperiences(experiences) {
         var tbody = document.getElementById("experience-tbody");
         if (!experiences.length) {
-            tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No experiences found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="empty-state">未找到经验</td></tr>';
             return;
         }
         tbody.innerHTML = experiences.map(function (e) {
@@ -424,19 +483,19 @@
                 "<td>" + escapeHtml(e.title || "-") + "</td>" +
                 "<td>" + escapeHtml(e.scope || "-") + "</td>" +
                 "<td>" + escapeHtml(tags) + "</td>" +
-                "<td><button class=\"btn btn-danger btn-sm\" onclick=\"deleteExperience('" + escapeHtml(currentWorkspaceId || "") + "','" + escapeHtml(e.id || "") + "','" + escapeHtml(e.scope || "") + "')\">Delete</button></td>" +
+                "<td><button class=\"btn btn-danger btn-sm\" onclick=\"deleteExperience('" + escapeHtml(currentWorkspaceId || "") + "','" + escapeHtml(e.id || "") + "','" + escapeHtml(e.scope || "") + "')\">删除</button></td>" +
                 "</tr>";
         }).join("");
     }
 
     window.deleteExperience = async function (wsId, expId, scope) {
-        if (!confirm("Delete this experience?")) return;
+        if (!confirm("确定要删除此经验吗？")) return;
         try {
             await apiCall("DELETE", "/api/v1/workspaces/" + encodeURIComponent(wsId) + "/experiences/" + encodeURIComponent(expId), { scope: scope });
-            showToast("Experience deleted", "success");
+            showToast("经验已删除", "success");
             loadExperiences(wsId);
         } catch (err) {
-            showToast("Failed to delete experience: " + err.message, "error");
+            showToast("删除经验失败: " + err.message, "error");
         }
     };
 
@@ -457,7 +516,7 @@
         document.getElementById("btn-add-tool").addEventListener("click", function () {
             var wsId = document.getElementById("tool-ws-select").value;
             if (!wsId) {
-                showToast("Select a workspace first", "warning");
+                showToast("请先选择工作区", "warning");
                 return;
             }
             document.getElementById("tool-scan-results").classList.toggle("hidden");
@@ -478,14 +537,14 @@
             const data = await apiCall("GET", url);
             renderTools(Array.isArray(data) ? data : []);
         } catch (err) {
-            showToast("Failed to load tools: " + err.message, "error");
+            showToast("加载工具失败: " + err.message, "error");
         }
     }
 
     function renderTools(tools) {
         var tbody = document.getElementById("tool-tbody");
         if (!tools.length) {
-            tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No tools found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="empty-state">未找到工具</td></tr>';
             return;
         }
         tbody.innerHTML = tools.map(function (t) {
@@ -493,7 +552,7 @@
                 "<td>" + escapeHtml(t.name || "-") + "</td>" +
                 "<td>" + escapeHtml(t.language || "-") + "</td>" +
                 "<td>" + escapeHtml(t.version || "-") + "</td>" +
-                "<td><span class=\"status-badge success\">Installed</span></td>" +
+                "<td><span class=\"status-badge success\">已安装</span></td>" +
                 "<td>-</td>" +
                 "</tr>";
         }).join("");
@@ -507,7 +566,7 @@
             const data = await apiCall("GET", url);
             renderScanResults(Array.isArray(data) ? data : []);
         } catch (err) {
-            showToast("Failed to scan tools: " + err.message, "error");
+            showToast("扫描工具失败: " + err.message, "error");
         }
     }
 
@@ -515,13 +574,13 @@
         var container = document.getElementById("tool-scan-list");
         document.getElementById("tool-scan-results").classList.remove("hidden");
         if (!tools.length) {
-            container.innerHTML = '<p class="text-muted">No tools found</p>';
+            container.innerHTML = '<p class="text-muted">未找到工具</p>';
             return;
         }
         container.innerHTML = tools.map(function (t, i) {
             return '<div class="scan-item">' +
                 '<input type="checkbox" id="scan-' + i + '" value="' + escapeHtml(t.name || "") + '">' +
-                '<label for="scan-' + i + '">' + escapeHtml(t.name || "Unknown") + ' (' + escapeHtml(t.language || "?") + ')</label>' +
+                '<label for="scan-' + i + '">' + escapeHtml(t.name || "未知") + ' (' + escapeHtml(t.language || "?") + ')</label>' +
                 "</div>";
         }).join("");
     }
@@ -532,16 +591,16 @@
         var checkboxes = document.querySelectorAll("#tool-scan-list input[type=checkbox]:checked");
         var selections = Array.from(checkboxes).map(function (cb) { return cb.value; });
         if (!selections.length) {
-            showToast("Select tools to add", "warning");
+            showToast("请选择要添加的工具", "warning");
             return;
         }
         try {
             await apiCall("POST", "/api/v1/workspaces/" + encodeURIComponent(wsId) + "/tools", { selections: selections });
-            showToast("Tools added successfully", "success");
+            showToast("工具添加成功", "success");
             document.getElementById("tool-scan-results").classList.add("hidden");
             loadTools(wsId);
         } catch (err) {
-            showToast("Failed to add tools: " + err.message, "error");
+            showToast("添加工具失败: " + err.message, "error");
         }
     }
 
@@ -559,20 +618,20 @@
             var protocol = document.getElementById("exp-protocol").value.trim();
             var sessionId = document.getElementById("exp-session-id").value.trim();
             if (!protocol) {
-                showToast("Protocol is required", "warning");
+                showToast("实验方案为必填项", "warning");
                 return;
             }
             try {
                 var body = { protocol: protocol };
                 if (sessionId) body.session_id = sessionId;
                 await apiCall("POST", "/api/v1/experiments", body);
-                showToast("Experiment started", "success");
+                showToast("实验已启动", "success");
                 form.classList.add("hidden");
                 document.getElementById("exp-protocol").value = "";
                 document.getElementById("exp-session-id").value = "";
                 loadExperiments();
             } catch (err) {
-                showToast("Failed to start experiment: " + err.message, "error");
+                showToast("启动实验失败: " + err.message, "error");
             }
         });
         document.getElementById("btn-refresh-experiments").addEventListener("click", loadExperiments);
@@ -583,30 +642,30 @@
             const data = await apiCall("GET", "/api/v1/experiments");
             renderExperiments(Array.isArray(data) ? data : []);
         } catch (err) {
-            showToast("Failed to load experiments: " + err.message, "error");
+            showToast("加载实验失败: " + err.message, "error");
         }
     }
 
     function renderExperiments(experiments) {
         var tbody = document.getElementById("experiment-tbody");
         if (!experiments.length) {
-            tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No experiments found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="empty-state">未找到实验</td></tr>';
             return;
         }
         tbody.innerHTML = experiments.map(function (e) {
             return "<tr>" +
                 "<td>" + escapeHtml(e.session_id || e.session_file || "-") + "</td>" +
                 "<td>" + escapeHtml((e.protocol || "").substring(0, 50)) + "</td>" +
-                "<td><span class=\"status-badge " + (e.status === "completed" ? "success" : e.status === "error" ? "error" : "info") + "\">" + escapeHtml(e.status || "active") + "</span></td>" +
+                "<td><span class=\"status-badge " + (e.status === "completed" ? "success" : e.status === "error" ? "error" : "info") + "\">" + escapeHtml(e.status || "进行中") + "</span></td>" +
                 "<td>" + escapeHtml(e.current_step || "-") + "</td>" +
-                "<td><button class=\"btn btn-secondary btn-sm\" onclick=\"viewExperiment('" + escapeHtml(e.session_file || e.session_id || "") + "')\">View</button></td>" +
+                "<td><button class=\"btn btn-secondary btn-sm\" onclick=\"viewExperiment('" + escapeHtml(e.session_file || e.session_id || "") + "')\">查看</button></td>" +
                 "</tr>";
         }).join("");
     }
 
     window.viewExperiment = async function (sessionFile) {
         // This could be expanded to show experiment details
-        showToast("Viewing experiment: " + sessionFile, "info");
+        showToast("查看实验: " + sessionFile, "info");
     };
 
     // ---- LLM Configuration ----------------------------------------------
@@ -621,27 +680,27 @@
             try {
                 const status = await apiCall("GET", "/api/v1/status");
                 document.getElementById("llm-current-info").innerHTML =
-                    '<div><span class="text-muted">Provider:</span> ' + escapeHtml(status.llm_provider || "N/A") + "</div>";
+                    '<div><span class="text-muted">提供商:</span> ' + escapeHtml(status.llm_provider || "无") + "</div>";
             } catch (e) {
-                document.getElementById("llm-current-info").innerHTML = '<span class="text-muted">Unable to load current provider</span>';
+                document.getElementById("llm-current-info").innerHTML = '<span class="text-muted">无法加载当前提供商</span>';
             }
         } catch (err) {
-            showToast("Failed to load LLM providers: " + err.message, "error");
+            showToast("加载LLM提供商失败: " + err.message, "error");
         }
     }
 
     function renderLLMProviders(providers) {
         var tbody = document.getElementById("llm-tbody");
         if (!providers.length) {
-            tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No providers configured</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="4" class="empty-state">未配置提供商</td></tr>';
             return;
         }
         tbody.innerHTML = providers.map(function (p) {
             return "<tr>" +
                 "<td>" + escapeHtml(p.name || p.provider || "-") + "</td>" +
                 "<td>" + escapeHtml(p.model || "-") + "</td>" +
-                "<td><span class=\"status-badge " + (p.active ? "success" : "info") + "\">" + (p.active ? "Active" : "Available") + "</span></td>" +
-                "<td><button class=\"btn btn-primary btn-sm\" onclick=\"switchLLM('" + escapeHtml(p.name || p.provider || "") + "')\">Switch</button></td>" +
+                "<td><span class=\"status-badge " + (p.active ? "success" : "info") + "\">" + (p.active ? "活跃" : "可用") + "</span></td>" +
+                "<td><button class=\"btn btn-primary btn-sm\" onclick=\"switchLLM('" + escapeHtml(p.name || p.provider || "") + "')\">切换</button></td>" +
                 "</tr>";
         }).join("");
     }
@@ -649,10 +708,10 @@
     window.switchLLM = async function (provider) {
         try {
             await apiCall("POST", "/api/v1/llm/switch", { provider: provider });
-            showToast("Switched to " + provider, "success");
+            showToast("已切换至 " + provider, "success");
             loadLLMProviders();
         } catch (err) {
-            showToast("Failed to switch provider: " + err.message, "error");
+            showToast("切换提供商失败: " + err.message, "error");
         }
     };
 
@@ -665,27 +724,27 @@
             const data = await apiCall("GET", "/api/v1/permissions");
             renderPermissions(data);
         } catch (err) {
-            showToast("Failed to load permissions: " + err.message, "error");
+            showToast("加载权限失败: " + err.message, "error");
         }
     }
 
     function renderPermissions(data) {
         var modeInfo = document.getElementById("permission-mode-info");
         modeInfo.innerHTML =
-            '<div><span class="text-muted">Mode:</span> <strong>' + escapeHtml(data.mode || "unknown") + "</strong></div>" +
-            '<div><span class="text-muted">Status:</span> ' + escapeHtml(data.status || "N/A") + "</div>";
+            '<div><span class="text-muted">模式:</span> <strong>' + escapeHtml(data.mode || "未知") + "</strong></div>" +
+            '<div><span class="text-muted">状态:</span> ' + escapeHtml(data.status || "无") + "</div>";
 
         var tbody = document.getElementById("permission-tbody");
         var policies = data.policies || [];
         if (!policies.length) {
-            tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No policies configured</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="3" class="empty-state">未配置策略</td></tr>';
             return;
         }
         tbody.innerHTML = policies.map(function (p) {
             return "<tr>" +
                 "<td>" + escapeHtml(p.rule || p.action || "-") + "</td>" +
                 "<td>" + escapeHtml(p.scope || "-") + "</td>" +
-                "<td><span class=\"status-badge " + (p.allowed ? "success" : "warning") + "\">" + (p.allowed ? "Allowed" : "Denied") + "</span></td>" +
+                "<td><span class=\"status-badge " + (p.allowed ? "success" : "warning") + "\">" + (p.allowed ? "允许" : "拒绝") + "</span></td>" +
                 "</tr>";
         }).join("");
     }
@@ -696,25 +755,25 @@
             var confirmFull = document.getElementById("permission-confirm-full").checked;
             try {
                 await apiCall("POST", "/api/v1/permissions/mode", { mode: mode, confirm_full: confirmFull });
-                showToast("Permission mode updated", "success");
+                showToast("权限模式已更新", "success");
                 loadPermissions();
             } catch (err) {
-                showToast("Failed to set permission mode: " + err.message, "error");
+                showToast("设置权限模式失败: " + err.message, "error");
             }
         });
         document.getElementById("btn-authorize-path").addEventListener("click", async function () {
             var path = document.getElementById("permission-path").value.trim();
             if (!path) {
-                showToast("Path is required", "warning");
+                showToast("路径为必填项", "warning");
                 return;
             }
             try {
                 await apiCall("POST", "/api/v1/permissions/authorize", { path: path });
-                showToast("Path authorized", "success");
+                showToast("路径已授权", "success");
                 document.getElementById("permission-path").value = "";
                 loadPermissions();
             } catch (err) {
-                showToast("Failed to authorize path: " + err.message, "error");
+                showToast("授权路径失败: " + err.message, "error");
             }
         });
         document.getElementById("btn-refresh-permissions").addEventListener("click", loadPermissions);
@@ -728,7 +787,7 @@
             var logs = Array.isArray(data) ? data : [];
             var sel = document.getElementById("log-select");
             var current = sel.value;
-            sel.innerHTML = '<option value="">Select Log</option>';
+            sel.innerHTML = '<option value="">选择日志</option>';
             logs.forEach(function (l) {
                 var opt = document.createElement("option");
                 opt.value = l.name || l.id || l;
@@ -737,7 +796,7 @@
             });
             if (current) sel.value = current;
         } catch (err) {
-            showToast("Failed to load logs: " + err.message, "error");
+            showToast("加载日志失败: " + err.message, "error");
         }
     }
 
@@ -749,7 +808,7 @@
                 const data = await apiCall("GET", "/api/v1/logs/" + encodeURIComponent(name));
                 document.getElementById("log-content").textContent = typeof data === "string" ? data : JSON.stringify(data, null, 2);
             } catch (err) {
-                document.getElementById("log-content").textContent = "Error loading log: " + err.message;
+                document.getElementById("log-content").textContent = "加载日志出错: " + err.message;
             }
         });
         document.getElementById("btn-refresh-logs").addEventListener("click", loadLogs);
@@ -763,19 +822,19 @@
             var message = document.getElementById("log-message").value.trim();
             var sessionId = document.getElementById("log-session-id").value.trim();
             if (!message) {
-                showToast("Message is required", "warning");
+                showToast("消息为必填项", "warning");
                 return;
             }
             try {
                 var body = { message: message };
                 if (sessionId) body.session_id = sessionId;
                 await apiCall("POST", "/api/v1/logs", body);
-                showToast("Log entry written", "success");
+                showToast("日志条目已写入", "success");
                 document.getElementById("log-write-form").classList.add("hidden");
                 document.getElementById("log-message").value = "";
                 document.getElementById("log-session-id").value = "";
             } catch (err) {
-                showToast("Failed to write log: " + err.message, "error");
+                showToast("写入日志失败: " + err.message, "error");
             }
         });
     }
@@ -787,7 +846,7 @@
             const data = await apiCall("GET", "/api/v1/self-evolution");
             renderSelfEvolution(Array.isArray(data) ? data : []);
         } catch (err) {
-            showToast("Failed to load self evolution data: " + err.message, "error");
+            showToast("加载自进化数据失败: " + err.message, "error");
         }
     }
 
@@ -796,7 +855,7 @@
         if (!tbody) return;
 
         if (!data || data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No self evolution artifacts found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="empty-state">未找到自进化制品</td></tr>';
             return;
         }
 
@@ -805,10 +864,10 @@
                 "<td>" + escapeHtml(item.id || "-") + "</td>" +
                 "<td>" + escapeHtml(item.type || "-") + "</td>" +
                 "<td>" + escapeHtml(item.instruction || "-") + "</td>" +
-                "<td><span class=\"status-badge " + (item.status === "success" ? "success" : item.status === "error" ? "error" : "info") + "\">" + escapeHtml(item.status || "pending") + "</span></td>" +
+                "<td><span class=\"status-badge " + (item.status === "success" ? "success" : item.status === "error" ? "error" : "info") + "\">" + escapeHtml(item.status || "待处理") + "</span></td>" +
                 "<td>" +
-                "<button class=\"btn btn-sm btn-secondary\" onclick=\"viewArtifact('" + escapeHtml(item.id) + "')\">View</button> " +
-                "<button class=\"btn btn-sm btn-danger\" onclick=\"deleteArtifact('" + escapeHtml(item.id) + "')\">Delete</button>" +
+                "<button class=\"btn btn-sm btn-secondary\" onclick=\"viewArtifact('" + escapeHtml(item.id) + "')\">查看</button> " +
+                "<button class=\"btn btn-sm btn-danger\" onclick=\"deleteArtifact('" + escapeHtml(item.id) + "')\">删除</button>" +
                 "</td>" +
                 "</tr>";
         }).join("");
@@ -820,7 +879,7 @@
         var output = document.getElementById("se-output").value;
 
         if (!instruction || !output) {
-            showToast("Please fill in all required fields", "error");
+            showToast("请填写所有必填字段", "error");
             return;
         }
 
@@ -831,14 +890,14 @@
                 output: output
             });
             if (data.success) {
-                showToast("Artifact generated successfully", "success");
+                showToast("制品生成成功", "success");
                 loadSelfEvolution();
                 document.getElementById("self-evolution-form").classList.add("hidden");
             } else {
-                showToast(data.error || "Failed to generate artifact", "error");
+                showToast(data.error || "生成制品失败", "error");
             }
         } catch (err) {
-            showToast("Failed to generate artifact: " + err.message, "error");
+            showToast("生成制品失败: " + err.message, "error");
         }
     }
 
@@ -847,22 +906,22 @@
             var data = await apiCall("GET", "/api/v1/self-evolution/" + encodeURIComponent(id));
             alert(JSON.stringify(data, null, 2));
         } catch (err) {
-            showToast("Failed to view artifact: " + err.message, "error");
+            showToast("查看制品失败: " + err.message, "error");
         }
     };
 
     window.deleteArtifact = async function (id) {
-        if (!confirm("Are you sure you want to delete this artifact?")) return;
+        if (!confirm("确定要删除此制品吗？")) return;
         try {
             var data = await apiCall("DELETE", "/api/v1/self-evolution/" + encodeURIComponent(id));
             if (data.success) {
-                showToast("Artifact deleted successfully", "success");
+                showToast("制品删除成功", "success");
                 loadSelfEvolution();
             } else {
-                showToast(data.error || "Failed to delete artifact", "error");
+                showToast(data.error || "删除制品失败", "error");
             }
         } catch (err) {
-            showToast("Failed to delete artifact: " + err.message, "error");
+            showToast("删除制品失败: " + err.message, "error");
         }
     };
 
@@ -893,8 +952,8 @@
                 renderDiagnostics(data);
             })
             .catch(function (error) {
-                console.error('Error loading diagnostics:', error);
-                showToast('Failed to load diagnostics', 'error');
+                console.error('加载诊断出错:', error);
+                showToast('加载诊断失败', 'error');
             });
     }
 
@@ -905,23 +964,23 @@
 
         if (configInfo) {
             configInfo.innerHTML = data.config ? (
-                '<p><strong>Status:</strong> ' + (data.config.exists ? '✓ Initialized' : '✗ Not Found') + '</p>' +
-                '<p><strong>Path:</strong> ' + escapeHtml(data.config.path || '-') + '</p>'
-            ) : '<p>No config data available</p>';
+                '<p><strong>状态:</strong> ' + (data.config.exists ? '✓ 已初始化' : '✗ 未找到') + '</p>' +
+                '<p><strong>路径:</strong> ' + escapeHtml(data.config.path || '-') + '</p>'
+            ) : '<p>无配置数据</p>';
         }
 
         if (llmInfo) {
             llmInfo.innerHTML = data.llm ? (
-                '<p><strong>Status:</strong> ' + (data.llm.ok ? '✓ Configured' : '✗ Not Configured') + '</p>' +
-                '<p><strong>Provider:</strong> ' + escapeHtml(data.llm.provider || '-') + '</p>'
-            ) : '<p>No LLM data available</p>';
+                '<p><strong>状态:</strong> ' + (data.llm.ok ? '✓ 已配置' : '✗ 未配置') + '</p>' +
+                '<p><strong>提供商:</strong> ' + escapeHtml(data.llm.provider || '-') + '</p>'
+            ) : '<p>无LLM数据</p>';
         }
 
         if (installInfo) {
             installInfo.innerHTML = data.install ? (
-                '<p><strong>Status:</strong> ' + (data.install.ok ? '✓ Valid' : '✗ Invalid') + '</p>' +
-                '<p><strong>Version:</strong> ' + escapeHtml(data.install.version || '-') + '</p>'
-            ) : '<p>No install data available</p>';
+                '<p><strong>状态:</strong> ' + (data.install.ok ? '✓ 有效' : '✗ 无效') + '</p>' +
+                '<p><strong>版本:</strong> ' + escapeHtml(data.install.version || '-') + '</p>'
+            ) : '<p>无安装数据</p>';
         }
     }
 
@@ -930,11 +989,11 @@
             .then(function (response) { return response.json(); })
             .then(function (data) {
                 document.getElementById('diagnose-content').textContent = JSON.stringify(data, null, 2);
-                showToast('Config diagnostics complete', 'success');
+                showToast('配置诊断完成', 'success');
             })
             .catch(function (error) {
-                console.error('Error running config diagnostics:', error);
-                showToast('Failed to run config diagnostics', 'error');
+                console.error('运行配置诊断出错:', error);
+                showToast('运行配置诊断失败', 'error');
             });
     }
 
@@ -943,11 +1002,11 @@
             .then(function (response) { return response.json(); })
             .then(function (data) {
                 document.getElementById('diagnose-content').textContent = JSON.stringify(data, null, 2);
-                showToast('LLM diagnostics complete', 'success');
+                showToast('LLM诊断完成', 'success');
             })
             .catch(function (error) {
-                console.error('Error running LLM diagnostics:', error);
-                showToast('Failed to run LLM diagnostics', 'error');
+                console.error('运行LLM诊断出错:', error);
+                showToast('运行LLM诊断失败', 'error');
             });
     }
 
@@ -956,11 +1015,11 @@
             .then(function (response) { return response.json(); })
             .then(function (data) {
                 document.getElementById('diagnose-content').textContent = JSON.stringify(data, null, 2);
-                showToast('Install diagnostics complete', 'success');
+                showToast('安装诊断完成', 'success');
             })
             .catch(function (error) {
-                console.error('Error running install diagnostics:', error);
-                showToast('Failed to run install diagnostics', 'error');
+                console.error('运行安装诊断出错:', error);
+                showToast('运行安装诊断失败', 'error');
             });
     }
 
@@ -970,11 +1029,11 @@
             .then(function (data) {
                 document.getElementById('diagnose-content').textContent = JSON.stringify(data, null, 2);
                 renderDiagnostics(data);
-                showToast('All diagnostics complete', 'success');
+                showToast('全部诊断完成', 'success');
             })
             .catch(function (error) {
-                console.error('Error running all diagnostics:', error);
-                showToast('Failed to run all diagnostics', 'error');
+                console.error('运行全部诊断出错:', error);
+                showToast('运行全部诊断失败', 'error');
             });
     }
 
@@ -1036,7 +1095,7 @@
                     } else if (result.output) {
                         text = String(result.output);
                     } else if (result.error) {
-                        text = "Error: " + String(result.error);
+                        text = "错误: " + String(result.error);
                         addMessage("assistant", text, "error");
                         return;
                     } else {
@@ -1047,7 +1106,7 @@
                 }
 
                 case "error":
-                    addMessage("system", data.content || "Unknown error", "error");
+                    addMessage("system", data.content || "未知错误", "error");
                     break;
 
                 default:
@@ -1071,13 +1130,19 @@
 
         addMessage("user", text);
 
+        var selectedWorkspace = chatWsSelect.value || null;
+        var payload = { message: text };
+        if (selectedWorkspace) {
+            payload.workspace_id = selectedWorkspace;
+        }
+
         if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ message: text }));
+            ws.send(JSON.stringify(payload));
         } else {
             fetch("/api/v1/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: text }),
+                body: JSON.stringify(payload),
             })
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
@@ -1087,7 +1152,7 @@
                     addMessage("assistant", out);
                 })
                 .catch(function (err) {
-                    addMessage("system", "Request failed: " + err.message, "error");
+                    addMessage("system", "请求失败: " + err.message, "error");
                 });
         }
     }
@@ -1157,9 +1222,9 @@
         // Ctrl+Q to quit (sends close request to backend)
         if (e.ctrlKey && e.key === "q") {
             e.preventDefault();
-            if (confirm("Are you sure you want to quit SuperMedicine?")) {
+            if (confirm("确定要退出 SuperMedicine 吗？")) {
                 apiCall("POST", "/api/v1/shutdown").then(function () {
-                    showToast("Shutting down...", "info");
+                    showToast("正在关闭...", "info");
                     setTimeout(function () { window.close(); }, 1000);
                 }).catch(function () {
                     window.close();
@@ -1200,6 +1265,7 @@
     setupLogForm();
     setupSelfEvolutionForm();
     setupDiagnoseForm();
+    loadChatWorkspaceSelector();
     fetchStatus();
     connect();
 })();
