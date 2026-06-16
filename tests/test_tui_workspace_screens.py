@@ -6,7 +6,7 @@ import asyncio
 import inspect
 import time
 
-from textual.widgets import DataTable, Input, Static
+from textual.widgets import Button, DataTable, Input, Static
 
 from core.tui.app import SuperMedicineTUI
 from core.tui.i18n import t
@@ -147,8 +147,8 @@ def test_workspace_screen_refresh_button_triggers_reload(tmp_path):
             # Add a workspace externally
             manager.initialize_workspace("added-ws")
 
-            # Click the refresh button
-            await pilot.click("#workspace-refresh")
+            # Trigger the refresh button press directly for CI reliability
+            app.query_one("#workspace-refresh", Button).press()
             await _wait_for_tui_condition(pilot, lambda: table.row_count == 2)
 
             assert table.row_count == 2
