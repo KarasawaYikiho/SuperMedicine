@@ -409,3 +409,199 @@ class TestConfigCenter:
         revoked = cc.revoke_external_file_access_directory(relative_quoted)
 
         assert revoked["authorized_external_roots"] == []
+
+
+# ═══ Path Normalization Tests ═══
+
+
+class TestNormalizeUserDirectoryPath:
+    """Test _normalize_user_directory_path handles diverse user inputs."""
+
+    def test_plain_absolute_path(self, tmp_path):
+        from core.config_center import _normalize_user_directory_path
+
+        target = tmp_path / "data"
+        target.mkdir()
+
+        result = _normalize_user_directory_path(str(target))
+
+        assert result == target.resolve()
+
+    def test_double_quoted_absolute_path(self, tmp_path):
+        from core.config_center import _normalize_user_directory_path
+
+        target = tmp_path / "quoted dir"
+        target.mkdir()
+        quoted = f'"{target}"'
+
+        result = _normalize_user_directory_path(quoted)
+
+        assert result == target.resolve()
+
+    def test_single_quoted_absolute_path(self, tmp_path):
+        from core.config_center import _normalize_user_directory_path
+
+        target = tmp_path / "single quoted"
+        target.mkdir()
+        quoted = f"'{target}'"
+
+        result = _normalize_user_directory_path(quoted)
+
+        assert result == target.resolve()
+
+    def test_relative_path_resolves_from_cwd(self, tmp_path, monkeypatch):
+        from core.config_center import _normalize_user_directory_path
+
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "relative").mkdir()
+
+        result = _normalize_user_directory_path("relative")
+
+        assert result == (tmp_path / "relative").resolve()
+
+    def test_relative_quoted_path_resolves_from_cwd(self, tmp_path, monkeypatch):
+        from core.config_center import _normalize_user_directory_path
+
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "rel quoted").mkdir()
+
+        result = _normalize_user_directory_path("'rel quoted'")
+
+        assert result == (tmp_path / "rel quoted").resolve()
+
+    def test_path_object_passes_through(self, tmp_path):
+        from core.config_center import _normalize_user_directory_path
+
+        target = tmp_path / "pathobj"
+        target.mkdir()
+
+        result = _normalize_user_directory_path(target)
+
+        assert result == target.expanduser().resolve()
+
+    def test_empty_string_resolves_to_cwd(self, tmp_path, monkeypatch):
+        from core.config_center import _normalize_user_directory_path
+
+        monkeypatch.chdir(tmp_path)
+
+        result = _normalize_user_directory_path("")
+
+        assert result == tmp_path.resolve()
+
+    def test_whitespace_stripped(self, tmp_path):
+        from core.config_center import _normalize_user_directory_path
+
+        target = tmp_path / "spaced"
+        target.mkdir()
+        padded = f"  {target}  "
+
+        result = _normalize_user_directory_path(padded)
+
+        assert result == target.resolve()
+
+    def test_path_with_spaces_unquoted(self, tmp_path):
+        from core.config_center import _normalize_user_directory_path
+
+        target = tmp_path / "my data"
+        target.mkdir()
+
+        result = _normalize_user_directory_path(str(target))
+
+        assert result == target.resolve()
+
+    def test_path_with_special_chars(self, tmp_path):
+        from core.config_center import _normalize_user_directory_path
+
+        target = tmp_path / "data-v2.0"
+        target.mkdir()
+
+        result = _normalize_user_directory_path(str(target))
+
+        assert result == target.resolve()
+
+    def test_shlex_quoted_path_with_spaces(self, tmp_path):
+        """shlex-split handles quoted paths with spaces correctly."""
+        from core.config_center import _normalize_user_directory_path
+
+        target = tmp_path / "program files"
+        target.mkdir()
+        # shlex with posix=False preserves the quotes on Windows
+        quoted = f'"{target}"'
+
+        result = _normalize_user_directory_path(quoted)
+
+        assert result == target.resolve()
+
+    def test_normalized_path_deduplicates_different_representations(self, tmp_path):
+        """Different quoting styles for the same path normalize to identical results."""
+        from core.config_center import _normalize_user_directory_path
+
+        target = tmp_path / "shared"
+        target.mkdir()
+        plain = str(target)
+        double_quoted = f'"{target}"'
+        single_quoted = f"'{target}'"
+
+        results = {
+            _normalize_user_directory_path(plain),
+            _normalize_user_directory_path(double_quoted),
+            _normalize_user_directory_path(single_quoted),
+        }
+
+        assert len(results) == 1
+
+    def test_nonexistent_path_resolves_without_error(self, tmp_path):
+        """Normalization resolves even nonexistent paths (no existence check)."""
+        from core.config_center import _normalize_user_directory_path
+
+        nonexistent = tmp_path / "does_not_exist_yet"
+
+        result = _normalize_user_directory_path(str(nonexistent))
+
+        assert result == nonexistent.resolve()
+
+
+class TestAuthorizeExternalRootPathNormalization:
+    """Test that authorize/revoke normalizes paths for consistent deduplication."""
+
+    def test_quoted_and_unquoted_same_directory_dedup(self, tmp_path):
+        """Quoted and unquoted versions of the same directory are deduplicated."""
+        external = tmp_path / "shared data"
+        external.mkdir()
+        config_path = tmp_path / "config.yaml"
+        cc = ConfigCenter(config_path)
+
+        cc.authorize_external_file_access_directory(str(external))
+        cc.authorize_external_file_access_directory(f'"{external}"')
+
+        roots = cc.get_file_access_config()["authorized_external_roots"]
+        assert len(roots) == 1
+        assert roots[0] == str(external.resolve())
+
+    def test_relative_and_absolute_same_directory_dedup(self, tmp_path, monkeypatch):
+        """Relative and absolute paths to the same directory are deduplicated."""
+        external = tmp_path / "relative_test"
+        external.mkdir()
+        monkeypatch.chdir(tmp_path)
+        config_path = tmp_path / "config.yaml"
+        cc = ConfigCenter(config_path)
+
+        cc.authorize_external_file_access_directory(str(external.resolve()))
+        cc.authorize_external_file_access_directory("relative_test")
+
+        roots = cc.get_file_access_config()["authorized_external_roots"]
+        assert len(roots) == 1
+
+    def test_revoke_by_any_normalized_form_removes_directory(self, tmp_path):
+        """Revoking by any valid normalized path form removes the directory."""
+        external = tmp_path / "revoke test"
+        external.mkdir()
+        config_path = tmp_path / "config.yaml"
+        cc = ConfigCenter(config_path)
+
+        cc.authorize_external_file_access_directory(str(external))
+        assert len(cc.get_file_access_config()["authorized_external_roots"]) == 1
+
+        cc.revoke_external_file_access_directory(f'"{external}"')
+
+        assert cc.get_file_access_config()["authorized_external_roots"] == []
