@@ -256,7 +256,7 @@ def test_workspace_screen_select_updates_status(tmp_path):
 
             input_widget = app.query_one("#workspace-id-input", Input)
             input_widget.value = "sel-ws"
-            await pilot.click("#workspace-select")
+            app.query_one("#workspace-select", Button).press()
             await _wait_for_tui_condition(pilot, lambda: "已选择工作区" in _static_text(app.query_one("#workspace-status", Static)))
 
             status = _static_text(app.query_one("#workspace-status", Static))
