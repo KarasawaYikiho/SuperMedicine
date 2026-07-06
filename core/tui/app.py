@@ -15,12 +15,18 @@ from rich.console import Console
 from textual.app import App, ComposeResult
 from textual.theme import Theme
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical
-from textual.widgets import Footer, Header, Input, ListView, Static
+from textual.containers import Horizontal, ScrollableContainer, Vertical
+from textual.widgets import Input, ListView, Static
+from textual.timer import Timer
 
 from core.config_center import ConfigCenter
 from core.llm_manager import LLMConfigManager
 from core.tui.i18n import LABELS, t
+from core.tui.opentui_runtime import (
+    OpenTUIRuntimeError,
+    launch_opentui_runtime,
+    runtime_info,
+)
 from core.tui.resources import resolve_tcss
 from core.tui.status_helpers import _console_safe_text, _describe_llm_status, apply_status_style  # noqa: F401
 from core.tui.kernel_output import (
@@ -32,7 +38,14 @@ from core.tui.menu_screens import MainMenuScreen
 from core.tui.nav_widgets import MenuButton, NavItem
 from core.tui.prompt_input import PromptInput
 from core.tui.stream_capture import _capture_current_thread_tui_streams
-from core.tui.types import DynamicRefreshSurface, NavMetadata, ShellStatusText, TUIStatus
+from core.tui.types import (
+    DynamicRefreshSurface,
+    NavMetadata,
+    OpenTUINavigationRoute,
+    OpenTUINavigationState,
+    ShellStatusText,
+    TUIStatus,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -93,10 +106,11 @@ class SuperMedicineTUI(App[Any]):
         self._views: dict[str, Any] = {}
         self._task_running = False
         self._chat_processing = False
+        self._processing_frame = 0
+        self._processing_timer: Timer | None = None
         self._status_cache: dict[str, str] = {}
 
     def compose(self) -> ComposeResult:
-        yield Header()
         with Horizontal(id="app-body"):
             with Vertical(id="sidebar"):
                 yield MenuButton(
@@ -122,7 +136,8 @@ class SuperMedicineTUI(App[Any]):
 
             with Vertical(id="main-area"):
                 yield Static(t("nav_chat"), id="view-title", classes="view-heading")
-                yield Vertical(id="content-pane")
+                yield ScrollableContainer(id="content-pane")
+                yield Static("", id="processing-indicator")
                 with Horizontal(id="input-bar"):
                     yield Static("> ", id="prompt-prefix")
                     yield PromptInput(
@@ -133,19 +148,20 @@ class SuperMedicineTUI(App[Any]):
             yield Static("", id="status-left")
             yield Static("", id="status-center")
             yield Static("", id="status-right")
-        yield Footer()
 
     def on_mount(self) -> None:
         """Initialize views and show chat by default."""
         from core.tui.screens.chat_view import ChatView
         from core.tui.screens.dashboard import DashboardView
         from core.tui.screens.dialog_screen import DialogView
+        from core.tui.screens.diagnose_screen import DiagnoseView
         from core.tui.screens.experience_screen import ExperienceView
         from core.tui.screens.experiment_screen import ExperimentGuideView
         from core.tui.screens.llm_screen import LLMView
         from core.tui.screens.log_screen import LogReportView
         from core.tui.screens.paper_screen import PaperView
         from core.tui.screens.permission_screen import PermissionView
+        from core.tui.screens.self_evolution_screen import SelfEvolutionView
         from core.tui.screens.tool_screen import ToolView
         from core.tui.screens.workspace_screen import WorkspaceView
 
@@ -160,6 +176,8 @@ class SuperMedicineTUI(App[Any]):
             "llm": LLMView(self.project_root),
             "experiment": ExperimentGuideView(self.project_root),
             "log": LogReportView(self.project_root),
+            "self-evolution": SelfEvolutionView(self.project_root),
+            "diagnose": DiagnoseView(self.project_root),
             "permission": PermissionView(self.project_root),
         }
         if self._current_view not in self._views:
@@ -265,6 +283,86 @@ class SuperMedicineTUI(App[Any]):
         return cls.NAV_ITEMS
 
     @classmethod
+    def opentui_routes(cls) -> tuple[OpenTUINavigationRoute, ...]:
+        """Return the shared OpenTUI page inventory for bridge metadata checks."""
+
+        page_specs = {
+            "chat": (
+                "OpenTUI scrollback + split-footer prompt; Python Kernel/service layer remains the execution boundary.",
+                ("Conversation Scrollback", "Prompt Footer", "Processing / Thinking Status"),
+                ("Enter 提交 prompt", "/ 聚焦页面过滤", "[ ] 滚动 scrollback"),
+            ),
+            "dashboard": (
+                "TextTable-style runtime board for workspace/plugin/LLM/token status.",
+                ("Runtime Health", "Workspace Metrics", "LLM / Token Summary"),
+                ("r 刷新 metrics", "Enter 打开当前指标", "Tab 切换焦点"),
+            ),
+            "workspace": (
+                "OpenTUI selectable workspace list with bordered create/select/delete forms.",
+                ("Workspace Select", "Create Workspace", "Danger Zone"),
+                ("j/k 选择工作区", "Enter 选择", "Ctrl+N 聚焦创建输入"),
+            ),
+            "paper": (
+                "OpenTUI import/list/enrich panels with permission-aware online enrichment.",
+                ("Import Form", "Paper List", "Online Enrichment"),
+                ("Enter 导入/选择", "r 刷新论文", "/ 过滤标题"),
+            ),
+            "experience": (
+                "OpenTUI experience capture, suggestion and export workflow.",
+                ("Suggest", "Records", "Export"),
+                ("Enter 确认写入", "e 导出", "/ 过滤标签"),
+            ),
+            "tool": (
+                "OpenTUI multi-panel tool scan/add/run workflow; permissions stay in Python service layer.",
+                ("Tool Registry", "Scan Candidates", "Sandbox Run"),
+                ("s 扫描", "a 添加", "Enter 运行选中工具"),
+            ),
+            "dialog": (
+                "OpenTUI audit timeline; raw conversation fields remain rejected by Python store.",
+                ("Timeline", "Session Filter", "Privacy Guard"),
+                ("/ 过滤 session", "Enter 查看摘要", "[ ] 滚动时间线"),
+            ),
+            "llm": (
+                "OpenTUI settings panel for provider CRUD with hidden API Key display.",
+                ("Provider List", "Provider Form", "Validation"),
+                ("Enter 切换 Provider", "d 删除", "Ctrl+S 保存"),
+            ),
+            "experiment": (
+                "OpenTUI protocol stepper with JSON/key=value data input and calculation boundary.",
+                ("Protocol", "Step Data", "Reagent Calculation"),
+                ("Enter 保存步骤", "c 计算", "l 保存日志"),
+            ),
+            "log": (
+                "OpenTUI log viewer/writer with redacted report details and list filtering.",
+                ("Report Writer", "Report List", "Detail Viewer"),
+                ("Enter 保存/查看", "r 刷新", "/ 过滤报告"),
+            ),
+        }
+        return tuple(
+            OpenTUINavigationRoute(
+                key=item.key,
+                view_id=item.view_id,
+                label=item.label,
+                icon=item.icon,
+                placeholder=page_specs[item.view_id][0],
+                sections=page_specs[item.view_id][1],
+                actions=page_specs[item.view_id][2],
+            )
+            for item in cls.nav_items()
+        )
+
+    @classmethod
+    def opentui_initial_navigation_state(cls) -> OpenTUINavigationState:
+        """Return the initial OpenTUI navigation state used by bridge metadata checks."""
+
+        return OpenTUINavigationState(
+            current_view="chat",
+            stack=("chat",),
+            focus_target="prompt-input",
+            menu_open=False,
+        )
+
+    @classmethod
     def dynamic_refresh_surfaces(cls) -> tuple[DynamicRefreshSurface, ...]:
         """Return the targeted refresh inventory without broad polling/watchers."""
 
@@ -283,6 +381,8 @@ class SuperMedicineTUI(App[Any]):
 
         title_map = {item.view_id: item.label for item in cls.nav_items()}
         title_map["permission"] = "权限"
+        title_map["self-evolution"] = t("nav_self_evolution")
+        title_map["diagnose"] = t("nav_diagnose")
         return title_map.get(view_id, view_id)
 
     @staticmethod
@@ -362,6 +462,58 @@ class SuperMedicineTUI(App[Any]):
             self._update_status_bar()
         except Exception:
             pass
+
+    def start_processing_animation(self) -> None:
+        """Show the app-level Processing indicator outside the chat dialog."""
+
+        self._processing_frame = 0
+        try:
+            indicator = self.query_one("#processing-indicator", Static)
+        except Exception:
+            return
+        indicator.update(f"[bold yellow]⏳ {t('chat_processing_state')} ○○○○○[/]")
+        indicator.visible = True
+        if self._processing_timer is not None:
+            self._processing_timer.stop()
+        self._processing_timer = self.set_interval(0.4, self._advance_processing_frame)
+
+    def _advance_processing_frame(self) -> None:
+        """Advance the app-level Processing animation by one frame."""
+
+        if not self._chat_processing:
+            return
+        self._processing_frame = (self._processing_frame + 1) % 6
+        filled = "●" * self._processing_frame
+        empty = "○" * (5 - self._processing_frame)
+        try:
+            indicator = self.query_one("#processing-indicator", Static)
+        except Exception:
+            return
+        indicator.update(f"[bold yellow]⏳ {t('chat_processing_state')} {filled}{empty}[/]")
+
+    def stop_processing_animation(self) -> None:
+        """Hide the app-level Processing indicator and stop its timer."""
+
+        if self._processing_timer is not None:
+            self._processing_timer.stop()
+            self._processing_timer = None
+        try:
+            indicator = self.query_one("#processing-indicator", Static)
+        except Exception:
+            return
+        indicator.visible = False
+
+    @staticmethod
+    def _safe_stop_chat_indicator(chat_view: Any, method_name: str) -> None:
+        """Stop a ChatView indicator without blocking request-state cleanup."""
+
+        method = getattr(chat_view, method_name, None)
+        if not callable(method):
+            return
+        try:
+            method()
+        except Exception:
+            logger.debug("Ignoring chat indicator cleanup failure: %s", method_name, exc_info=True)
 
     def _update_prompt_input_lock(self, active: bool) -> None:
         """Lock only the main Chat prompt input while Chat is processing."""
@@ -598,8 +750,13 @@ class SuperMedicineTUI(App[Any]):
                 plugins_dir=plugins_dir,
                 policies_dir=policies_dir,
             )
-            if hasattr(chat_view, "start_processing_animation"):
-                chat_view.start_processing_animation()
+            self.start_processing_animation()
+            legacy_start_processing = getattr(chat_view, "start_processing_animation", None)
+            if callable(legacy_start_processing) and chat_view.__class__.__name__ != "ChatView":
+                try:
+                    legacy_start_processing()
+                except Exception:
+                    pass
             assistant_started = False
 
             def render_progress(event: dict[str, Any]) -> None:
@@ -660,9 +817,12 @@ class SuperMedicineTUI(App[Any]):
         except Exception as e:
             chat_view.add_error_message(f"{t('error')}: {e}")
         finally:
-            if hasattr(chat_view, "stop_processing_animation"):
-                chat_view.stop_processing_animation()
-            self._set_chat_processing(False)
+            try:
+                self._safe_stop_chat_indicator(chat_view, "stop_thinking_animation")
+                self._safe_stop_chat_indicator(chat_view, "stop_processing_animation")
+                self.stop_processing_animation()
+            finally:
+                self._set_chat_processing(False)
 
     @staticmethod
     def _format_kernel_output(output: Any) -> str:
@@ -812,6 +972,7 @@ def launch_tui(
     view_title = shell.view_title_text(restored_view)
     shortcut_hint = shell.shortcut_hint_text()
     status_message = t("dry_run_status") if dry_run else t("welcome")
+    runtime = runtime_info()
     config_load_error = (
         ConfigCenter(root / ".supermedicine" / "config.yaml")
         .diagnostics()
@@ -848,6 +1009,8 @@ def launch_tui(
         status_center=shell_status.center,
         status_right=shell_status.right,
         focus_target="prompt-input",
+        runtime_name=runtime.package,
+        runtime_version=runtime.version,
     )
     if dry_run:
         console = Console()
@@ -879,21 +1042,29 @@ def launch_tui(
         )
         return status
 
-    console = Console()
     try:
-        app = SuperMedicineTUI(project_root=project_root or Path.cwd())
-        app.run(mouse=True)
-    except ImportError:
+        return_code = launch_opentui_runtime(project_root=root)
+    except OpenTUIRuntimeError as exc:
+        console = Console()
         logger.error(
-            "TUI launch failed: stage=import textual_missing project_root=%s",
-            project_root or Path.cwd(),
+            "TUI launch failed: stage=opentui_runtime_missing project_root=%s error=%s",
+            root,
+            exc,
         )
-        console.print("Textual 未安装，无法启动交互界面。")
+        console.print(str(exc))
         return TUIStatus(
             title=status.title,
-            message="Textual 未安装，无法启动交互界面。",
+            message=str(exc),
             labels=status.labels,
             interactive=False,
+            runtime_name=runtime.package,
+            runtime_version=runtime.version,
+        )
+    if return_code:
+        logger.error(
+            "TUI launch failed: stage=opentui_runtime_exit project_root=%s code=%s",
+            root,
+            return_code,
         )
     logger.info("TUI launch: stage=exit project_root=%s", project_root or Path.cwd())
     return status

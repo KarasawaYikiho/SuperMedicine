@@ -285,17 +285,18 @@ class SelfEvolutionService:
                 allowed_extensions=ALLOWED_MARKDOWN_EXTENSIONS,
                 default_filename="self-evolution.md",
             )
-            return self._finalize_artifacts(
-                [
-                    GeneratedArtifact(
-                        path=path,
-                        artifact_type=request.artifact_type,
-                        content=self._render_markdown(request, experience_records),
-                        description="Markdown self-evolution plan/preview artifact",
-                        exists=path.exists(),
-                    )
-                ]
-            )
+            artifacts = [
+                GeneratedArtifact(
+                    path=path,
+                    artifact_type=request.artifact_type,
+                    content=self._render_markdown(request, experience_records),
+                    description="Markdown self-evolution plan/preview artifact",
+                    exists=path.exists(),
+                )
+            ]
+            for artifact in artifacts:
+                reject_sensitive_content(artifact.content)
+            return artifacts
 
         extension = ".py" if request.artifact_type == "python_tool" else ".R"
         filename = f"{self._slug_from_intent(request.user_intent)}{extension}"
@@ -316,30 +317,24 @@ class SelfEvolutionService:
             request,
             allowed_extensions=ALLOWED_TOOL_EXTENSIONS,
         )
-        return self._finalize_artifacts(
-            [
-                GeneratedArtifact(
-                    path=path,
-                    artifact_type=request.artifact_type,
-                    content=content,
-                    description="Generated guarded workspace tool runner",
-                    exists=path.exists(),
+        artifacts = [
+            GeneratedArtifact(
+                path=path,
+                artifact_type=request.artifact_type,
+                content=content,
+                description="Generated guarded workspace tool runner",
+                exists=path.exists(),
+            ),
+            GeneratedArtifact(
+                path=readme,
+                artifact_type=request.artifact_type,
+                content=self._render_tool_readme(
+                    request, experience_records, path.name
                 ),
-                GeneratedArtifact(
-                    path=readme,
-                    artifact_type=request.artifact_type,
-                    content=self._render_tool_readme(
-                        request, experience_records, path.name
-                    ),
-                    description="Generated tool companion Markdown metadata",
-                    exists=readme.exists(),
-                ),
-            ]
-        )
-
-    def _finalize_artifacts(
-        self, artifacts: list[GeneratedArtifact]
-    ) -> list[GeneratedArtifact]:
+                description="Generated tool companion Markdown metadata",
+                exists=readme.exists(),
+            ),
+        ]
         for artifact in artifacts:
             reject_sensitive_content(artifact.content)
         return artifacts

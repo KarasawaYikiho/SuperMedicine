@@ -10,10 +10,18 @@ Python package fallback version: **0.4.2b0**.
 
 ## [Beta0.4.2] - 2026-06-07
 
+### Added
+
+- Added release documentation, CI packaging installation steps, and package
+  manifests for the real OpenTUI runtime bridge pinned to `@opentui/core@0.4.1`.
+- Added third-party notice coverage for the MIT-licensed OpenTUI runtime package.
+
 ### Changed
 
 - Updated public/release display label to `Beta0.4.2`.
 - Python package metadata uses fallback version `0.4.2b0`.
+- Updated TUI usage documentation from the legacy Textual path to the Bun-backed
+  OpenTUI route shell, including all-page navigation and interaction shortcuts.
 
 ## [Beta0.4.1] - 2026-05-31
 

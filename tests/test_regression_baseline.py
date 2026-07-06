@@ -192,42 +192,22 @@ def test_tui_input_submission_clears_input_without_raw_terminal_echo_or_screen_c
 def test_tui_interactive_launch_does_not_print_status_before_alternate_screen(
     tmp_path, capsys, monkeypatch
 ):
-    """Regression baseline: interactive launch lets Textual own terminal output and input mode."""
+    """Regression baseline: interactive launch delegates terminal ownership to OpenTUI."""
 
-    run_kwargs: dict[str, object] = {}
+    launch_kwargs: dict[str, object] = {}
 
-    def fake_run(self, **kwargs):
-        run_kwargs.update(kwargs)
+    def fake_launch(*, project_root):
+        launch_kwargs["project_root"] = project_root
+        return 0
 
-    monkeypatch.setattr(SuperMedicineTUI, "run", fake_run)
+    monkeypatch.setattr("core.tui.app.launch_opentui_runtime", fake_launch)
 
     status = launch_tui(dry_run=False, project_root=tmp_path)
 
     assert status.interactive is True
-    assert run_kwargs == {"mouse": True}
+    assert launch_kwargs == {"project_root": tmp_path}
+    assert status.runtime_name == "@opentui/core"
     assert capsys.readouterr().out == ""
-
-
-@pytest.mark.parametrize("digit", ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"])
-def test_tui_prompt_digits_are_plain_input_and_do_not_switch_views(tmp_path, digit):
-    """REQ-TUI-004: digits are ordinary prompt input, not direct view shortcuts."""
-
-    import asyncio
-
-    async def scenario() -> None:
-        app = SuperMedicineTUI(project_root=tmp_path)
-        async with app.run_test(size=(140, 45)) as pilot:
-            prompt = app.query_one("#prompt-input", PromptInput)
-            assert prompt.value == ""
-
-            await pilot.press(digit)
-            await pilot.pause()
-
-            assert app._current_view == "chat"
-            assert prompt.value == digit
-            assert prompt.has_focus
-
-    asyncio.run(scenario())
 
 
 def test_tui_prompt_filters_terminal_control_sequences_but_preserves_pasted_digits():
@@ -339,6 +319,7 @@ def test_tui_digits_do_not_open_or_navigate_view_menu(tmp_path, digit):
 
             assert app._current_view == "chat"
             assert prompt.value == digit
+            assert prompt.has_focus
             assert not app.screen.query("#tui-main-menu-list")
             assert not app.screen.query("#tui-view-menu-list")
 
@@ -443,6 +424,21 @@ def test_experiment_and_log_tui_views_are_additive_to_existing_navigation():
     assert nav_by_key["0"].view_id == "log"
     assert nav_by_key["0"].label == "Log 报告"
     assert not ({"1", "2", "3", "4", "5", "6", "7", "8", "9", "0"} & binding_keys)
+
+
+def test_opentui_route_shell_metadata_matches_shared_navigation_contract():
+    """Regression baseline: OpenTUI shell and dry-run metadata share the route contract."""
+
+    routes = SuperMedicineTUI.opentui_routes()
+    state = SuperMedicineTUI.opentui_initial_navigation_state()
+
+    assert [route.key for route in routes] == [item.key for item in SuperMedicineTUI.NAV_ITEMS]
+    assert [route.view_id for route in routes] == [item.view_id for item in SuperMedicineTUI.NAV_ITEMS]
+    assert all(route.placeholder for route in routes)
+    assert state.current_view == "chat"
+    assert state.stack == ("chat",)
+    assert state.focus_target == "prompt-input"
+    assert state.menu_open is False
 
 
 def test_install_requires_llm_and_does_not_leave_partial_install_artifacts(tmp_path):

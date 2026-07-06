@@ -5,6 +5,10 @@ __pycache__/
 # Packaging/build artifacts
 dist/
 build/
+.pyinstaller-build/
+.pyinstaller-installer-build/
+build-pyinstaller/
+.installer-payload-stage/
 .release-zip-stage/
 release-artifacts/
 *.egg-info/
@@ -16,6 +20,7 @@ release-artifacts/
 # Test/lint/type-check/coverage artifacts
 .pytest_cache/
 .pytest-tmp/
+.pytest_tmp/
 GITSuperMedicine.pytest_tmp/
 .ruff_cache/
 .mypy_cache/
@@ -43,9 +48,26 @@ htmlcov/
 
 # External assistant platform local config/artifacts
 .claude/
+.agents/
 .opencode/
+.codex/
+.cursor/
+.continue/
+.aider*
+.windsurf/
+.roo/
+.cline/
+CodexTem/
+codex-tem/
+codex_tmp/
 superpowers/
+Superpower/
+Superpowers/
+superpower/
 docs/superpowers/
+docs/Superpower/
+docs/Superpowers/
+docs/superpower/
 
 # Repository documentation boundary:
 # - Maintainer-facing repository docs are commit/upload eligible when curated to
@@ -62,17 +84,36 @@ docs/superpowers/
 #   below for local-only notes instead.
 EXTERNAL_PROJECT_ANALYSIS.md
 failure_inventory.md
+*_plan_draft*.md
+*_planning_draft*.md
 *_audit_dump*.md
 *_audit_dump*.json
 *_audit_log*.md
 *_audit_log*.jsonl
 *_scratch*.md
 *_scratch_notes*.md
+*_machine_notes*.md
+*_codex_notes*.md
+*_codex_cache*.md
+*_gap-analysis*.md
+*_gap_analysis*.md
 *_private_analysis*.md
 *_transient_checklist*.md
 *_uncurated_engineering*.md
+*_validation_notes*.md
 # Local-only planning notes
+/Planning/
 /Planning/NextSteps.md
+/planning/
+/local-plans/
+/local_plan*.md
+/LOCAL_PLAN*.md
+/SUPERPOWER*.md
+/Superpower*.md
+/superpower*.md
+/docs/archive/DebugReviewManualValidation.md
+/docs/archive/PushCleanupClassification.md
+/docs/archive/TestMergeInventory.md
 
 # Environment secrets
 .env
@@ -94,6 +135,9 @@ env/
 
 # Runtime workspace data (not committed)
 workspaces/
+
+# Node dependency install trees
+node_modules/
 
 # Log files
 *.log
@@ -124,6 +168,10 @@ Thumbs.db
 # Re-ignore generated/cache artifacts re-exposed by protected tree negations.
 tests/**/__pycache__/
 tests/**/*.py[cod]
+tests/**/test_tmp_*.py
+tests/**/test_temp_*.py
+tests/**/test_scratch_*.py
+tests/**/test_debug_*.py
 installer/**/__pycache__/
 installer/**/*.py[cod]
 
@@ -139,6 +187,9 @@ installer/**/*.py[cod]
 !docs/archive/
 !docs/archive/**
 /docs/archive/REQUIREMENTS_TRACEABILITY.md
+/docs/archive/DebugReviewManualValidation.md
+/docs/archive/PushCleanupClassification.md
+/docs/archive/TestMergeInventory.md
 !docs/architecture/
 !docs/architecture/**
 !docs/guides/
@@ -148,6 +199,15 @@ installer/**/*.py[cod]
 # Re-ignore superpowers engineering files (local-only, must come after !docs/** negation)
 docs/superpowers/
 docs/superpowers/**
+docs/Superpower/
+docs/Superpower/**
+docs/Superpowers/
+docs/Superpowers/**
+docs/superpower/
+docs/superpower/**
+/docs/**/*gap-analysis*.md
+/docs/**/*gap_analysis*.md
+/docs/**/*validation_notes*.md
 !README.md
 !docs/architecture/ARCHITECTURE.md
 !CHANGELOG.md

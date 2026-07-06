@@ -789,39 +789,39 @@ def test_antibody_dilution_returns_deterministic_reagent_volumes():
     }
 
 
-def test_experiment_wb_invalid_input_is_structured_plugin_error():
-    result = _plugin().execute(
-        "experiment.wb.normalize_loading",
-        {"target_protein_amount": 20, "samples": [{"name": "A", "concentration": 0}]},
-    )
-
-    assert result["status"] == "plugin_error"
-    assert result["output"] is None
-    assert "Invalid experiment-wb input" in result["error"]
-    assert "concentration" in result["error"]
-
-
-def test_experiment_wb_missing_input_is_structured_plugin_error():
-    result = _plugin().execute(
-        "experiment.wb.antibody_dilution", {"total_volume": 1000}
-    )
-
-    assert result["status"] == "plugin_error"
-    assert result["output"] is None
-    assert "dilution_ratio is required" in result["error"]
-
-
-def test_experiment_wb_unknown_action_is_rejected_without_calculation_output():
-    result = _plugin().execute(
-        "experiment.wb.external_lookup",
-        {"query": "should-not-run"},
-    )
+@pytest.mark.parametrize(
+    ("action", "params", "expected_error_parts"),
+    [
+        (
+            "experiment.wb.normalize_loading",
+            {
+                "target_protein_amount": 20,
+                "samples": [{"name": "A", "concentration": 0}],
+            },
+            ("Invalid experiment-wb input", "concentration"),
+        ),
+        (
+            "experiment.wb.antibody_dilution",
+            {"total_volume": 1000},
+            ("dilution_ratio is required",),
+        ),
+        (
+            "experiment.wb.external_lookup",
+            {"query": "should-not-run"},
+            ("Unsupported experiment-wb action",),
+        ),
+    ],
+)
+def test_experiment_wb_plugin_errors_are_structured(
+    action, params, expected_error_parts
+):
+    result = _plugin().execute(action, params)
 
     assert result["status"] == "plugin_error"
     assert result["plugin"] == "experiment-wb"
-    assert result["action"] == "experiment.wb.external_lookup"
+    assert result["action"] == action
     assert result["output"] is None
-    assert "Unsupported experiment-wb action" in result["error"]
+    assert all(part in result["error"] for part in expected_error_parts)
     assert (
         result["metadata"]["contract"]["calculation_scope"]
         == "deterministic_arithmetic"

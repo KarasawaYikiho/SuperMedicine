@@ -93,68 +93,60 @@ def test_redact_sensitive_redacts_plain_auth_keys_in_structured_and_json_text():
     assert "ok=1" in query
 
 
-def test_cli_redacting_formatter_redacts_json_and_error_report_messages():
-    secret = "sk-cli-error-report-secret"
-    cookie_secret = "sid=cookie-secret"
-    password_secret = "pw-secret"
-    formatter = _RedactingFormatter("%(levelname)s:%(message)s")
-    record = logging.LogRecord(
-        name="supermedicine.cli.test",
-        level=logging.ERROR,
-        pathname=__file__,
-        lineno=1,
-        msg="error_report=%s",
-        args=(
-            json.dumps(
-                {
-                    "headers": {"Authorization": f"Bearer {secret}"},
-                    "Cookie": cookie_secret,
-                    "password": password_secret,
-                    "url": f"https://example.test?api_key={secret}",
-                }
-            ),
-        ),
-        exc_info=None,
-    )
-
-    rendered = formatter.format(record)
-
-    assert secret not in rendered
-    assert cookie_secret not in rendered
-    assert password_secret not in rendered
-    assert "[REDACTED]" in rendered
-
-
-def test_cli_redacting_formatter_redacts_exception_log_arguments_and_headers():
-    secret = "sk-cli-exception-secret"
+def test_cli_redacting_formatter_redacts_log_arguments_headers_and_error_reports():
+    error_secret = "sk-cli-error-report-secret"
+    exception_secret = "sk-cli-exception-secret"
     request_id = "public-request-id"
     formatter = _RedactingFormatter("%(levelname)s:%(message)s")
-    record = logging.LogRecord(
-        name="supermedicine.cli.test",
-        level=logging.ERROR,
-        pathname=__file__,
-        lineno=1,
-        msg="request failed headers=%s url=%s request_id=%s",
-        args=(
-            {
-                "authorization": f"Bearer {secret}",
-                "x-api-key": secret,
-                "set-cookie": "session=exception-cookie-secret",
-                "content-type": "application/json",
-            },
-            f"https://example.test/callback?token={secret}&state=visible-state",
-            request_id,
-        ),
-        exc_info=None,
-    )
+    cases = [
+        {
+            "msg": "error_report=%s",
+            "args": (
+                json.dumps(
+                    {
+                        "headers": {"Authorization": f"Bearer {error_secret}"},
+                        "Cookie": "sid=cookie-secret",
+                        "password": "pw-secret",
+                        "url": f"https://example.test?api_key={error_secret}",
+                    }
+                ),
+            ),
+            "forbidden": (error_secret, "sid=cookie-secret", "pw-secret"),
+            "visible": (),
+        },
+        {
+            "msg": "request failed headers=%s url=%s request_id=%s",
+            "args": (
+                {
+                    "authorization": f"Bearer {exception_secret}",
+                    "x-api-key": exception_secret,
+                    "set-cookie": "session=exception-cookie-secret",
+                    "content-type": "application/json",
+                },
+                f"https://example.test/callback?token={exception_secret}&state=visible-state",
+                request_id,
+            ),
+            "forbidden": (exception_secret, "exception-cookie-secret"),
+            "visible": ("visible-state", request_id),
+        },
+    ]
 
-    rendered = formatter.format(record)
+    for case in cases:
+        record = logging.LogRecord(
+            name="supermedicine.cli.test",
+            level=logging.ERROR,
+            pathname=__file__,
+            lineno=1,
+            msg=case["msg"],
+            args=case["args"],
+            exc_info=None,
+        )
 
-    assert secret not in rendered
-    assert "exception-cookie-secret" not in rendered
-    assert "[REDACTED]" in rendered
-    assert "visible-state" in rendered
-    assert request_id in rendered
+        rendered = formatter.format(record)
+
+        assert all(secret not in rendered for secret in case["forbidden"])
+        assert "[REDACTED]" in rendered
+        assert all(value in rendered for value in case["visible"])
 
 
 def test_cli_formatter_and_tui_kernel_format_redact_plain_auth_fields():

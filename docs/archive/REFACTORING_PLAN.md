@@ -354,11 +354,11 @@ core/tui/app    →  core/tui/stream_capture, core/tui/kernel_output, core/tui/p
 
 | Test file | Covers | Risk level |
 |-----------|--------|------------|
-| `test_kernel.py` | Kernel.execute_task, plugin dispatch | **HIGH** — most affected |
+| `tests/test_kernel_full.py` | Kernel.execute_task, plugin dispatch, plus coverage historically split across focused kernel tests | **HIGH** — most affected |
 | `test_log_report.py` | LogReportStore CRUD | **HIGH** — module decomposition |
-| `test_workspace_tools.py` | WorkspaceToolService | **HIGH** — module decomposition |
+| `tests/test_workspace_full.py` | WorkspaceToolService, including coverage historically split across focused workspace-tool tests | **HIGH** — module decomposition |
 | `test_tui_entrypoint.py` | launch_tui, dry-run | **MEDIUM** — import paths change |
-| `test_tui_chat_view.py` | Chat processing | **MEDIUM** — kernel output filtering |
+| `tests/test_tui.py` | Chat processing and other consolidated TUI chat-view coverage | **MEDIUM** — kernel output filtering |
 | `test_workspace_cli.py` | CLI workspace commands | **MEDIUM** — CLI class refactoring |
 | `test_paper_cli.py` | CLI paper commands | **MEDIUM** |
 | `test_experience_cli.py` | CLI experience commands | **MEDIUM** |
@@ -439,23 +439,23 @@ core/tui/app    →  core/tui/stream_capture, core/tui/kernel_output, core/tui/p
 
 **Step 1.4**: Extract `core/workspace_tool_models.py`
 - Move exceptions + constants + dataclasses (lines 30–369)
-- Run `python -m pytest tests/test_workspace_tools.py -x -q`
+- Run `python -m pytest tests/test_workspace_full.py -x -q`
 
 **Step 1.5**: Extract `core/workspace_tool_templates.py`
 - Move `PYTHON_RUNNER`, `R_RUNNER`, `BUILTIN_TEMPLATES`, `_manifest_text` (lines 371–525)
-- Run `python -m pytest tests/test_workspace_tools.py -x -q`
+- Run `python -m pytest tests/test_workspace_full.py -x -q`
 
 **Step 1.6**: Extract `core/workspace_tool_spec.py`
 - Move `TOOL_AUTHORING_SPEC`, `build_tool_authoring_llm_context` (lines 90–153)
-- Run `python -m pytest tests/test_workspace_tools.py -x -q`
+- Run `python -m pytest tests/test_workspace_full.py -x -q`
 
 **Step 1.7**: Extract `core/kernel_constants.py`
 - Move `MEDICAL_BOUNDARY`, `SUPERMEDICINE_SYSTEM_PROMPT` (lines 27–61)
-- Run `python -m pytest tests/test_kernel.py -x -q`
+- Run `python -m pytest tests/test_kernel_full.py -x -q`
 
 **Step 1.8**: Extract `core/kernel_plugin_select.py`
 - Move `_select_plugin_action` as `select_plugin_action(task: str) -> tuple[str | None, str | None]` (lines 810–857)
-- Run `python -m pytest tests/test_kernel.py -x -q`
+- Run `python -m pytest tests/test_kernel_full.py -x -q`
 
 ### Phase 2: TUI Decomposition
 
@@ -469,11 +469,11 @@ core/tui/app    →  core/tui/stream_capture, core/tui/kernel_output, core/tui/p
 
 **Step 2.3**: Extract `core/tui/kernel_output.py`
 - Move `_redact_display_secrets`, `_strip_internal_kernel_output`, related constants (lines 118–222)
-- Run `python -m pytest tests/test_tui_chat_view.py -x -q`
+- Run `python -m pytest tests/test_tui.py -x -q`
 
 **Step 2.4**: Extract `core/tui/prompt_input.py`
 - Move `PromptInput` class (lines 422–553)
-- Run `python -m pytest tests/test_tui_entrypoint.py tests/test_tui_chat_view.py -x -q`
+- Run `python -m pytest tests/test_tui_entrypoint.py tests/test_tui.py -x -q`
 
 **Step 2.5**: Extract `core/tui/nav_widgets.py`
 - Move `NavItem`, `MenuOption`, `MenuButton` (lines 301–324)
@@ -492,12 +492,12 @@ core/tui/app    →  core/tui/stream_capture, core/tui/kernel_output, core/tui/p
 **Step 3.1**: Extract `core/kernel_llm_chat.py`
 - Move `_execute_llm_chat`, `_llm_chat_messages`, `_workspace_tool_runtime_context`, `_llm_runtime_context` (lines 448–808)
 - Convert to standalone functions taking kernel state as parameters
-- Run `python -m pytest tests/test_kernel.py tests/test_tui_chat_view.py -x -q`
+- Run `python -m pytest tests/test_kernel_full.py tests/test_tui.py -x -q`
 
 **Step 3.2**: Decompose `execute_task` internally
 - Break into `_dispatch_plugin_task`, `_build_permission_context`, etc. within `Kernel` class
 - No file extraction — just method decomposition
-- Run `python -m pytest tests/test_kernel.py tests/test_integration.py -x -q`
+- Run `python -m pytest tests/test_kernel_full.py tests/test_integration.py -x -q`
 
 ### Phase 4: CLI Decomposition
 

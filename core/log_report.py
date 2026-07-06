@@ -6,7 +6,6 @@ import json
 import re
 import builtins
 import threading
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -22,6 +21,7 @@ from core.log_report_models import (
     resolve_log_storage_locations,
 )
 from core.redaction import redact_path_for_display, redact_sensitive
+from core.time_utils import utc_now
 
 
 _SAFE_LOG_NAME = re.compile(r"^[A-Za-z0-9_.-]+\.json$")
@@ -33,10 +33,6 @@ DEFAULT_MAX_RECORDS_PER_SESSION = 1000
 DEFAULT_MAX_FILE_BYTES = 1024 * 1024
 _LOG_STORAGE_LOCK = threading.RLock()
 _STAT_DIMENSIONS = ("session_id", "source", "module", "category")
-
-
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 
 class LogReportError(ValueError):
@@ -71,11 +67,14 @@ class LogReportStore:
         *,
         session_id: str | None = None,
         severity: str | None = None,
+        source: str | None = None,
+        module: str | None = None,
+        category: str | None = None,
     ) -> dict[str, Any]:
         """Write a redacted JSON log report.
 
         Session-scoped writes append to one safe session file. Writes without a
-        session route to the shared TUI session log file (session-tui-application.json),
+        session route to the current launch-scoped application session log file,
         consolidating all application logs into a single file per launch.
         """
 
@@ -84,11 +83,32 @@ class LogReportStore:
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
         if safe_session_id:
-            return self.append(message, session_id=safe_session_id, severity=severity)
-        return self._write_isolated(message, severity=severity)
+            return self.append(
+                message,
+                session_id=safe_session_id,
+                severity=severity,
+                source=source,
+                module=module,
+                category=category,
+            )
+        return self.append(
+            message,
+            session_id=TUI_LOG_SESSION_ID,
+            severity=severity,
+            source=source,
+            module=module,
+            category=category,
+        )
 
     def append(
-        self, message: str, *, session_id: str, severity: str | None = None
+        self,
+        message: str,
+        *,
+        session_id: str,
+        severity: str | None = None,
+        source: str | None = None,
+        module: str | None = None,
+        category: str | None = None,
     ) -> dict[str, Any]:
         """Append a redacted message to a session log file."""
 
@@ -100,7 +120,12 @@ class LogReportStore:
             self.log_dir.mkdir(parents=True, exist_ok=True)
             path = self._safe_log_path(f"session-{safe_session_id}.json")
             entry = self._new_record(
-                message, session_id=safe_session_id, severity=severity
+                message,
+                session_id=safe_session_id,
+                severity=severity,
+                source=source,
+                module=module,
+                category=category,
             )
 
             if path.exists():
@@ -230,7 +255,7 @@ class LogReportStore:
         statistics = self._statistics_from_entries(entries)
         return redact_sensitive(
             {
-                "generated_at": _utc_now(),
+                "generated_at": utc_now(),
                 "log_count": len(reports),
                 "entry_count": len(entries),
                 "session_id": session_id,
@@ -260,7 +285,7 @@ class LogReportStore:
         lines = self._tail_display_lines(tail_entries, max_lines=line_limit)
         return redact_sensitive(
             {
-                "generated_at": _utc_now(),
+                "generated_at": utc_now(),
                 "mode": "follow_snapshot",
                 "file": file_name,
                 "session_id": session_id,
@@ -284,19 +309,8 @@ class LogReportStore:
 
         return self.summary(file_name=file_name, session_id=session_id)
 
-    def _write_isolated(
-        self, message: str, *, severity: str | None = None
-    ) -> dict[str, Any]:
-        """Route all non-session writes to the TUI session log file.
-
-        This ensures every write without an explicit session_id is merged
-        into the single ``session-tui-application.json`` file, keeping
-        all application logs in one place regardless of category.
-        """
-        return self.append(message, session_id=TUI_LOG_SESSION_ID, severity=severity)
-
     def _new_payload(self, *, session_id: str | None) -> dict[str, Any]:
-        created_at = _utc_now()
+        created_at = utc_now()
         return {
             "log_type": _LOG_TYPE,
             "schema_version": _SCHEMA_VERSION,
@@ -311,17 +325,32 @@ class LogReportStore:
         }
 
     def _new_record(
-        self, message: str, *, session_id: str | None, severity: str | None = None
+        self,
+        message: str,
+        *,
+        session_id: str | None,
+        severity: str | None = None,
+        source: str | None = None,
+        module: str | None = None,
+        category: str | None = None,
     ) -> dict[str, Any]:
-        return {
+        record: dict[str, Any] = {
             "entry_id": f"entry-{uuid4().hex}",
-            "created_at": _utc_now(),
+            "created_at": utc_now(),
             "session_id": session_id,
             "severity": normalize_log_severity(severity)
             if severity
             else detect_log_severity(message),
             "message": str(redact_sensitive(message)),
         }
+        for key, value in {
+            "source": source,
+            "module": module,
+            "category": category,
+        }.items():
+            if value is not None and str(value).strip():
+                record[key] = str(redact_sensitive(str(value).strip()))
+        return record
 
     def _require_message(self, message: str) -> str:
         if not isinstance(message, str) or not message.strip():

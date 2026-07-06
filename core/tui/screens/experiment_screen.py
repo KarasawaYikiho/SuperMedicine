@@ -53,7 +53,8 @@ class ExperimentGuideView(Vertical):
         self._sessions_by_protocol[self._session.protocol.protocol_id] = self._session
         self._last_calculation: dict[str, Any] | None = None
         self._started_logged = False
-        self._last_selected_field_key: object | None = None
+        self._selected_field_key: object | None = None
+        self._last_activated_field_key: object | None = None
 
     def compose(self) -> ComposeResult:
         yield Static(t("experiment_title"), classes="section-title")
@@ -118,7 +119,8 @@ class ExperimentGuideView(Vertical):
 
     def refresh_session_view(self, status_message: str | None = None) -> None:
         self._refresh_protocol_table()
-        self._last_selected_field_key = None
+        self._selected_field_key = None
+        self._last_activated_field_key = None
         self.query_one("#experiment-session", Static).update(self._session_summary())
         current_step = self._session.current_step
         table = self.query_one("#experiment-input-table", DataTable)
@@ -157,19 +159,33 @@ class ExperimentGuideView(Vertical):
         elif event.button.id == "experiment-paste-field":
             self._paste_selected_field()
 
-    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
-        """Handle double-click or Enter on a table row to paste field name.
+    def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
+        """Track field selection without treating selection changes as paste actions."""
+        if event.data_table.id != "experiment-input-table":
+            return
+        if event.row_key != self._selected_field_key:
+            self._selected_field_key = event.row_key
+            self._last_activated_field_key = None
 
-        Only paste when the row is already selected (i.e. double-click on the
-        same row).  Switching selection merely records the new row key.
+    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
+        """Handle repeated activation of the currently selected field.
+
+        Row selection/highlighting is tracked separately from activation so
+        changing fields can never paste a stale, previously selected row.  The
+        first activation of the selected row arms paste; the next activation of
+        that same still-selected row pastes exactly the current field once.
         """
         if event.data_table.id != "experiment-input-table":
             return
-        if event.row_key == self._last_selected_field_key:
+        if event.row_key != self._selected_field_key:
+            self._selected_field_key = event.row_key
+            self._last_activated_field_key = None
+            return
+        if event.row_key == self._last_activated_field_key:
             self._paste_field_name(event.row_key)
-            self._last_selected_field_key = None
+            self._last_activated_field_key = None
         else:
-            self._last_selected_field_key = event.row_key
+            self._last_activated_field_key = event.row_key
 
     def _paste_selected_field(self) -> None:
         """Paste the currently highlighted field name into the data input TextArea."""

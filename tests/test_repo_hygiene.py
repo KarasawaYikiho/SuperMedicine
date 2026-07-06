@@ -16,6 +16,71 @@ except ModuleNotFoundError:
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FORBIDDEN_PLATFORM_AGENT_NAMES = {"Brain", "Planner", "Coder", "Tester"}
 CANONICAL_SUPERMEDICINE_POLICY = ".supermedicine/policies/default.yaml"
+FORBIDDEN_FRONTEND_STREAMING_HINTS = (
+    "".join(["模型正在", "返回内容，会", "增量", "显示"]),
+    "".join(["模型正在", "返回内容"]),
+    "".join(["界面会", "增量", "显示"]),
+    "".join(["增量", "显示"]),
+    "".join(["助手正在", "生成回复"]),
+)
+FRONTEND_STREAMING_HINT_SCAN_PATHS = (
+    "core/web/frontend/app.js",
+    "core/web/frontend/index.html",
+    "core/web/frontend/style.css",
+    "core/tui/screens/chat_view.py",
+    "core/tui/i18n.py",
+    "core/tui/app.py",
+    "core/kernel_llm_chat.py",
+)
+TEMPORARY_TEST_FILE_PATTERNS = (
+    "test_tmp_*.py",
+    "test_temp_*.py",
+    "test_scratch_*.py",
+    "test_debug_*.py",
+)
+LOCAL_ONLY_MARKERS = (
+    ".agents",
+    ".claude",
+    ".codex",
+    ".continue",
+    ".cursor",
+    ".opencode",
+    ".windsurf",
+    ".roo",
+    ".cline",
+    "codextem",
+    "codex-tem",
+    "codex_tmp",
+    "superpower",
+    "superpowers",
+)
+LOCAL_ONLY_DOCUMENT_PATTERNS = (
+    "*_audit_dump*.md",
+    "*_audit_log*.md",
+    "*_codex_cache*.md",
+    "*_codex_notes*.md",
+    "*_gap-analysis*.md",
+    "*_gap_analysis*.md",
+    "*_machine_notes*.md",
+    "*_plan_draft*.md",
+    "*_planning_draft*.md",
+    "*_private_analysis*.md",
+    "*_scratch*.md",
+    "*_scratch_notes*.md",
+    "*_transient_checklist*.md",
+    "*_uncurated_engineering*.md",
+    "*_validation_notes*.md",
+    "local_plan*.md",
+    "LOCAL_PLAN*.md",
+    "Superpower*.md",
+    "SUPERPOWER*.md",
+    "superpower*.md",
+)
+LOCAL_ONLY_ARCHIVE_DOCUMENTS = {
+    "docs/archive/DebugReviewManualValidation.md",
+    "docs/archive/PushCleanupClassification.md",
+    "docs/archive/TestMergeInventory.md",
+}
 
 INTENTIONAL_GENERATED_ARTIFACT_REFERENCES = {
     "build/": "ignored build output pattern; not a required repository directory",
@@ -156,7 +221,24 @@ def _setuptools_py_modules(pyproject: str) -> set[str]:
 
 
 def _tracked_python_files() -> list[Path]:
-    return [REPO_ROOT / path for path in _tracked_files() if path.endswith(".py")]
+    return [
+        REPO_ROOT / path
+        for path in _tracked_files()
+        if path.endswith(".py") and (REPO_ROOT / path).is_file()
+    ]
+
+
+def _is_temporary_test_file(path: str) -> bool:
+    path_obj = Path(path)
+    parts = path_obj.parts
+    if not parts or parts[0] != "tests":
+        return False
+    return any(path_obj.match(pattern) for pattern in TEMPORARY_TEST_FILE_PATTERNS)
+
+
+def _matches_local_only_document(path: str) -> bool:
+    path_obj = Path(path)
+    return any(path_obj.match(pattern) for pattern in LOCAL_ONLY_DOCUMENT_PATTERNS)
 
 
 def test_python_sources_do_not_import_legacy_uppercase_install_module_outside_compatibility_tests():
@@ -214,9 +296,9 @@ def test_tracked_files_do_not_include_forbidden_or_generated_artifacts():
         name = parts[-1]
         lower_parts = tuple(part.lower() for part in parts)
 
-        if parts and parts[0] in {"Docs", "Superpower", "superpower"}:
+        if parts and parts[0] == "Docs":
             forbidden_matches.append(tracked_path)
-        if parts and parts[0] in {".claude", ".opencode", "superpowers"}:
+        if any(part in LOCAL_ONLY_MARKERS for part in lower_parts):
             forbidden_matches.append(tracked_path)
         if "node_modules" in lower_parts or ".cache" in lower_parts:
             forbidden_matches.append(tracked_path)
@@ -241,14 +323,43 @@ def test_tracked_files_do_not_include_forbidden_or_generated_artifacts():
             forbidden_matches.append(tracked_path)
         if any(part.endswith(".egg-info") for part in parts):
             forbidden_matches.append(tracked_path)
+        if any(
+            part
+            in {
+                ".installer-payload-stage",
+                ".pyinstaller-build",
+                ".pyinstaller-installer-build",
+                "build-pyinstaller",
+            }
+            for part in parts
+        ):
+            forbidden_matches.append(tracked_path)
+        if _matches_local_only_document(tracked_path):
+            forbidden_matches.append(tracked_path)
+        if tracked_path in LOCAL_ONLY_ARCHIVE_DOCUMENTS:
+            forbidden_matches.append(tracked_path)
         if tracked_path == ".supermedicine/policies/audit.jsonl":
             forbidden_matches.append(tracked_path)
         if tracked_path == ".supermedicine/checkpoints" or tracked_path.startswith(
             ".supermedicine/checkpoints/"
         ):
             forbidden_matches.append(tracked_path)
+        if _is_temporary_test_file(tracked_path):
+            forbidden_matches.append(tracked_path)
 
     assert sorted(set(forbidden_matches)) == []
+
+
+def test_frontend_streaming_incremental_hint_copy_is_not_reintroduced():
+    offenders: list[str] = []
+
+    for relative_path in FRONTEND_STREAMING_HINT_SCAN_PATHS:
+        text = (REPO_ROOT / relative_path).read_text(encoding="utf-8")
+        for phrase in FORBIDDEN_FRONTEND_STREAMING_HINTS:
+            if phrase in text:
+                offenders.append(f"{relative_path}: {phrase}")
+
+    assert offenders == []
 
 
 def test_intentional_generated_artifact_references_are_documented_non_repository_paths():
@@ -316,10 +427,15 @@ def test_gitignore_excludes_runtime_and_external_platform_config_artifacts():
         ".supermedicine/",
         ".pytest_cache/",
         ".pytest-tmp/",
+        ".pytest_tmp/",
         ".ruff_cache/",
         ".mypy_cache/",
         "build/",
         "dist/",
+        ".pyinstaller-build/",
+        ".pyinstaller-installer-build/",
+        "build-pyinstaller/",
+        ".installer-payload-stage/",
         ".release-zip-stage/",
         "release-artifacts/",
         "*.exe",
@@ -332,21 +448,58 @@ def test_gitignore_excludes_runtime_and_external_platform_config_artifacts():
         ".supermedicine/cache/",
         ".supermedicine/tmp/",
         ".claude/",
+        ".agents/",
         ".opencode/",
+        ".codex/",
+        ".cursor/",
+        ".continue/",
+        ".aider*",
+        ".windsurf/",
+        ".roo/",
+        ".cline/",
+        "CodexTem/",
+        "codex-tem/",
+        "codex_tmp/",
         "superpowers/",
+        "Superpower/",
+        "Superpowers/",
+        "superpower/",
         "EXTERNAL_PROJECT_ANALYSIS.md",
         "failure_inventory.md",
         "docs/superpowers/",
+        "docs/Superpower/",
+        "docs/Superpowers/",
+        "docs/superpower/",
+        "tests/**/test_tmp_*.py",
+        "tests/**/test_temp_*.py",
+        "tests/**/test_scratch_*.py",
+        "tests/**/test_debug_*.py",
         "*_audit_dump*.md",
         "*_audit_dump*.json",
         "*_audit_log*.md",
         "*_audit_log*.jsonl",
+        "*_plan_draft*.md",
+        "*_planning_draft*.md",
         "*_scratch*.md",
         "*_scratch_notes*.md",
+        "*_machine_notes*.md",
+        "*_codex_notes*.md",
+        "*_codex_cache*.md",
+        "*_gap-analysis*.md",
+        "*_gap_analysis*.md",
         "*_private_analysis*.md",
         "*_transient_checklist*.md",
         "*_uncurated_engineering*.md",
+        "*_validation_notes*.md",
+        "/Planning/",
+        "node_modules/",
+        "/docs/**/*gap-analysis*.md",
+        "/docs/**/*gap_analysis*.md",
+        "/docs/**/*validation_notes*.md",
+        "/docs/archive/DebugReviewManualValidation.md",
+        "/docs/archive/PushCleanupClassification.md",
         "/docs/archive/REQUIREMENTS_TRACEABILITY.md",
+        "/docs/archive/TestMergeInventory.md",
     }
 
     for pattern in required_patterns:
@@ -359,9 +512,35 @@ def test_gitignore_excludes_runtime_and_external_platform_config_artifacts():
         "EXTERNAL_PROJECT_ANALYSIS.md",
         "failure_inventory.md",
         "docs/archive/REQUIREMENTS_TRACEABILITY.md",
+        "tests/test_tmp_example.py",
+        ".codex/session.json",
+        ".agents/session.json",
+        ".cursor/session.json",
+        ".continue/config.json",
+        ".aider.chat.history.md",
+        ".windsurf/state.json",
+        ".roo/state.json",
+        ".cline/state.json",
+        "Superpowers/local.md",
+        "docs/Superpowers/local.md",
+        "docs/tui-opentui-gap-analysis.md",
+        "docs/archive/release_validation_notes.md",
+        "docs/archive/DebugReviewManualValidation.md",
+        "docs/archive/PushCleanupClassification.md",
+        "docs/archive/TestMergeInventory.md",
+        "local_plan_next.md",
+        "analysis_codex_notes.md",
     ]:
         rule = _git_check_ignore(path)
         assert path in rule, rule
+
+
+def test_gitattributes_normalizes_text_and_marks_binary_assets():
+    gitattributes = (REPO_ROOT / ".gitattributes").read_text(encoding="utf-8")
+
+    assert "* text=auto eol=lf" in gitattributes
+    for pattern in {"*.png binary", "*.jpg binary", "*.jpeg binary", "*.ico binary"}:
+        assert pattern in gitattributes
 
 
 def test_gitignore_allows_curated_maintainer_repository_docs():

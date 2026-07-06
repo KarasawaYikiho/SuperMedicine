@@ -20,15 +20,14 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 def setup_logging_for_gui() -> None:
     """Set up logging when running without a console window."""
-    # Redirect stdout/stderr to a log file if they are None (no console)
-    log_dir = Path.home() / ".supermedicine" / "logs"
-    log_dir.mkdir(parents=True, exist_ok=True)
-    log_file = log_dir / "gui.log"
+    from core.log_report_handler import (
+        configure_application_log_storage,
+        install_log_report_streams,
+    )
 
-    if sys.stdout is None:
-        sys.stdout = open(log_file, "a", encoding="utf-8")
-    if sys.stderr is None:
-        sys.stderr = open(log_file, "a", encoding="utf-8")
+    project_dir = Path(__file__).parent
+    session_id = configure_application_log_storage(project_dir)
+    install_log_report_streams(project_dir, session_id=session_id)
 
     # Also redirect stdin if needed
     if sys.stdin is None:
@@ -54,7 +53,7 @@ def main() -> None:
 
     print("Starting SuperMedicine Web GUI...")
     print(f"Opening browser to {url}")
-    print("Logs are being written to ~/.supermedicine/logs/gui.log")
+    print("Logs are being written to the current .supermedicine/logs session file")
 
     # Start browser in a separate thread
     browser_thread = threading.Thread(target=open_browser, args=(url,), daemon=True)

@@ -189,7 +189,7 @@ def execute_llm_chat(
         stream_method = getattr(client_or_error, "chat_stream", None)
         if callable(stream_method):
             emit("assistant_start", "")
-            emit("status", "模型正在返回内容，界面会增量显示。")
+            emit("status", "正在接收回复。")
             parts: list[str] = []
             thinking_parts: list[str] = []
             thinking_done_emitted = False

@@ -495,7 +495,7 @@ maintenance risks while preserving the exclusions in this inventory.
 - `tests/test_installer_entrypoint.py`
 - `tests/test_installer_exe_release.py`
 - `tests/test_integration.py`
-- `tests/test_kernel.py`
+- `tests/test_kernel_full.py`
 - `tests/test_llm_client.py`
 - `tests/test_llm_manager.py`
 - `tests/test_local_rag.py`
@@ -513,7 +513,7 @@ maintenance risks while preserving the exclusions in this inventory.
 - `tests/test_permission_modes.py`
 - `tests/test_plugin_registry.py`
 - `tests/test_policy.py`
-- `tests/test_prisma.py`
+- `tests/test_medical_writing.py`
 - `tests/test_prompt_generator.py`
 - `tests/test_python_stats.py`
 - `tests/test_r_survival.py`
@@ -525,26 +525,26 @@ maintenance risks while preserving the exclusions in this inventory.
 - `tests/test_self_evolution_cli.py`
 - `tests/test_session_manager.py`
 - `tests/test_standalone_adapter.py`
-- `tests/test_stard.py`
+- `tests/test_medical_writing.py`
 - `tests/test_state_machine.py`
 - `tests/test_token_tracker.py`
-- `tests/test_tui_chat_view.py`
-- `tests/test_tui_dashboard.py`
+- `tests/test_tui.py`
+- `tests/test_tui.py`
 - `tests/test_tui_dialog_history.py`
 - `tests/test_tui_entrypoint.py`
 - `tests/test_tui_experience_screens.py`
 - `tests/test_tui_experiment_screen.py`
 - `tests/test_tui_invalid_table_actions.py`
 - `tests/test_tui_llm_screen.py`
-- `tests/test_tui_log_screen.py`
+- `tests/test_tui.py`
 - `tests/test_tui_paper_screens.py`
-- `tests/test_tui_permissions.py`
+- `tests/test_tui.py`
 - `tests/test_tui_state.py`
-- `tests/test_tui_workspace_screens.py`
+- `tests/test_tui.py`
 - `tests/test_uninstall.py`
 - `tests/test_workspace.py`
 - `tests/test_workspace_cli.py`
-- `tests/test_workspace_tools.py`
+- `tests/test_workspace_full.py`
 
 ### Self-evolution files included in tracked reading scope
 

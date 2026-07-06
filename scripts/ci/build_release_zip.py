@@ -98,10 +98,10 @@ def main() -> None:
         # in the staging directory, but release archives must keep the
         # canonical lowercase entry alongside the legacy uppercase entry
         # for case-sensitive extraction targets.
-        lowercase_entry = f"SuperMedicine {release_label}/install_entry.py"
+        lowercase_entry = f"SuperMedicine {release_label}/install.py"
         if lowercase_entry not in archive.namelist():
             lowercase_source = subprocess.check_output(
-                ["git", "show", ":install_entry.py"], cwd=root, text=True
+                ["git", "show", ":install.py"], cwd=root, text=True
             )
             archive.writestr(lowercase_entry, lowercase_source)
 

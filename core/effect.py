@@ -65,9 +65,7 @@ class Effect(Generic[T, E]):
 
     def map(self, f: Callable[[T], Any]) -> Effect[Any, E]:
         """Apply a function to the value if successful, propagating failures."""
-        if self.success:
-            return Effect.succeed(f(self.value))
-        return self  # type: ignore[return-value]
+        return Effect.succeed(f(self.value)) if self.success else self  # type: ignore[return-value]
 
     def flat_map(self, f: Callable[[T], Effect[Any, E]]) -> Effect[Any, E]:
         """Apply a function that returns an Effect to the value if successful.
@@ -75,15 +73,11 @@ class Effect(Generic[T, E]):
         This is the monadic bind operation, allowing composition of
         effectful operations.
         """
-        if self.success:
-            return f(self.value)
-        return self  # type: ignore[return-value]
+        return f(self.value) if self.success else self  # type: ignore[return-value]
 
     def get_or_else(self, default: T) -> T:
         """Return the value if successful, otherwise return the default."""
-        if self.success:
-            return self.value  # type: ignore[return-value]
-        return default
+        return self.value if self.success else default  # type: ignore[return-value]
 
     def is_success(self) -> bool:
         """Check if this Effect represents a success."""

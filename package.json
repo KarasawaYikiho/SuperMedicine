@@ -1,0 +1,11 @@
+{
+  "name": "supermedicine-opentui-runtime",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "opentui:smoke": "bun core/tui/opentui_runtime.mjs --smoke"
+  },
+  "dependencies": {
+    "@opentui/core": "0.4.1"
+  }
+}

@@ -18,17 +18,22 @@ EXCLUDED_SUFFIXES = {".pyc", ".pyo", ".tmp", ".token"}
 
 INCLUDE_FILES = [
     "cli_entry.py",
+    "install.py",
     "install_entry.py",
     "uninstall_entry.py",
     "pyproject.toml",
+    "package.json",
+    "package-lock.json",
     "requirements.txt",
     "install.json",
     "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
     "README.md",
     "CHANGELOG.md",
     "CONTRIBUTING.md",
     "SECURITY.md",
     "docs/guides/INSTALL.md",
+    "assets/logo.ico",
 ]
 INCLUDE_DIRS = ["core", "permission", "agents", "plugins", "adapters", "installer"]
 

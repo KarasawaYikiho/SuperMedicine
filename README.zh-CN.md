@@ -10,7 +10,7 @@
 
 SuperMedicine 是一个面向医学科研辅助的独立 Python 框架。它提供独立 CLI、Kernel、
 受权限控制的插件执行、工作区和论文管理、本地 RAG 工具、医学写作/引文辅助、LLM
-Provider 管理、日志报告、多 Agent 编排组件，以及基于 Textual 的中文终端 TUI。OpenCode
+Provider 管理、日志报告、多 Agent 编排组件，以及基于 OpenTUI 的中文终端 TUI。OpenCode
 和 Claude Code 集成属于可选适配层，不是默认 Python 运行时的必需条件。
 
 当前公开/发布标签：**Beta0.4.2**。Python 包 fallback 版本：**0.4.2b0**。
@@ -45,7 +45,7 @@ Code 运行时能力。
   工具资产；CLI 不会隐式复用 TUI 最近工作区。
 - **插件生态** — RAG、harness 监控、Python/R 工具原型、实验计算、医学写作清单和
   AMA/Vancouver 引文格式化。
-- **中文 TUI** — Textual 界面覆盖对话、仪表盘、工作区、论文、经验、工具、对话历史、
+- **中文 TUI** — OpenTUI 界面覆盖对话、仪表盘、工作区、论文、经验、工具、对话历史、
   LLM、实验指导器、权限模式和日志报告页面。
 - **自进化预览** — 仅在预览、显式确认、路径检查、权限检查和覆盖控制后生成
   Markdown/Python/R 产物。
@@ -61,6 +61,8 @@ Code 运行时能力。
 | Python | >= 3.10 | 必需 |
 | Git | 任意 | 克隆源码时必需 |
 | pip | >= 21.0 | 安装 Python 包时必需 |
+| Bun | 最新稳定版 | 交互式 OpenTUI 运行时必需 |
+| npm | 兼容 lockfile | 按 `package-lock.json` 安装 `@opentui/core@0.4.1` 必需 |
 | R | >= 4.3 | 可选，用于 R survival 后端 |
 
 从源码快速安装：
@@ -69,6 +71,7 @@ Code 运行时能力。
 git clone https://github.com/KarasawaYikiho/SuperMedicine.git
 cd SuperMedicine
 pip install -e .
+npm ci
 python Install.py
 supermedicine status
 ```
@@ -80,7 +83,8 @@ supermedicine status
 
 Windows 发布包可能包含 **SuperMedicineInstaller.exe**。无参数运行即可进入同样的控制台
 向导，并额外执行发布 payload 释放。完整发布布局应把 `SuperMedicineInstaller.exe`、
-`dist/SuperMedicine.exe`、`Install.py`、`installer/`、运行时包、资源和文档放在一起。不要
+`dist/SuperMedicine.exe`、`Install.py`、`installer/`、运行时包、`package.json`、
+`package-lock.json`、`THIRD_PARTY_NOTICES.md`、资源和文档放在一起。不要
 只把 `Install.py` 单独复制到其他目录运行。
 
 安装后常用检查：
@@ -188,15 +192,19 @@ supermedicine tool add --workspace demo --select 1
 
 ## TUI
 
-启动中文 Textual 终端工作台：
+启动中文 OpenTUI 终端工作台：
 
 ```bash
 supermedicine tui
 supermedicine tui --dry-run
+npm run opentui:smoke
 ```
 
-`--dry-run` 只输出就绪信息，不启动交互界面。TUI 读取项目本地 `.supermedicine/`、
-`workspaces/` 和 `plugins/` 状态。
+`--dry-run` 只输出就绪信息，不启动交互界面。非 dry-run 路径通过 Bun 启动
+`core/tui/opentui_runtime.mjs`，并使用固定的 `@opentui/core@0.4.1` 依赖。源码检出或
+发布包解压后，需要先在根目录运行 `npm ci`；Bun 需要位于 `PATH`，或通过
+`SUPERMEDICINE_OPENTUI_JS_RUNTIME` 指向兼容 Bun 的可执行文件。TUI 读取项目本地
+`.supermedicine/`、`workspaces/` 和 `plugins/` 状态。
 
 全局快捷键：
 
@@ -205,14 +213,18 @@ supermedicine tui --dry-run
 | `Tab` | 在交互控件之间向前移动焦点。 |
 | `Shift+Tab` | 在交互控件之间向后移动焦点。 |
 | `Enter` | 提交当前焦点输入或确认所选操作。 |
-| `M` | 打开主菜单，其中包含 `选择视图`、`切换主题`、`帮助` 和 `最大化/还原`。 |
-| `P` | 打开权限模式视图。 |
-| `Esc` | 退出最大化模式。 |
+| `M` | 切换 OpenTUI route/menu shell。 |
+| `P` / `Ctrl+P` | 打开权限模式视图。 |
+| `Esc` / `B` | 从当前 route/menu 状态返回。 |
+| `↑↓` / `j k` | 在可用位置移动 route/action/list 选择。 |
+| `/` | 在可用页面进入过滤输入。 |
+| `[` / `]` | 在可用页面滚动内容。 |
+| `Ctrl+1` ... `Ctrl+0` | 直接跳转到主要 OpenTUI route。 |
 | `Q` | 退出 TUI。 |
 
-主菜单可通过大写 `M` 或左上侧边栏入口 `≡ 菜单 (M)` 打开。菜单中的 `选择视图` 用于
-切换视图，`切换主题`、`帮助`、`最大化/还原` 等次要操作也从 `M` 菜单进入；状态栏继续
-显示 `LLM 状态` 和 `任务运行状态` 等信息。
+OpenTUI 运行时为 Chat、Dashboard、Workspace、Paper、Experience、Tool、Dialog、LLM、
+Experiment、Log、Permission、Self-evolution 和 Diagnose 页面提供共享的顶部/底部/侧边
+route shell；状态栏继续显示 `LLM 状态` 和 `任务运行状态` 等信息。
 全局字母快捷键按大写策略记录为 `M`、`P`、`Q`；输入框获得焦点时，小写文本和输入法
 组合内容按普通输入保留。数字键 `1-0` 不是直接视图切换快捷键；当输入框获得焦点时，它们作为普通输入保留。
 `Backspace`、`Ctrl+H` 和常见删除控制字节会交给输入框处理，不会被全局快捷键吞掉。

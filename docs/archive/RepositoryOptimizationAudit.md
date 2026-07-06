@@ -185,7 +185,7 @@ Across 34 audit passes, the repository optimization has been intentionally conse
 - `core/experience.py`, `core/operation_guard.py`, `core/paper_import/`, `core/path_safety.py`, `core/tui/`, `core/workspace.py`, `core/workspace_tools.py`
 
 ### Untracked Tests
-- `tests/test_backward_compatibility.py`, `tests/test_experience_cli.py`, `tests/test_experience_storage.py`, `tests/test_operation_guard.py`, `tests/test_paper_cli.py`, `tests/test_paper_import_core.py`, `tests/test_path_safety.py`, `tests/test_tui_dialog_history.py`, `tests/test_tui_entrypoint.py`, `tests/test_tui_experience_screens.py`, `tests/test_tui_paper_screens.py`, `tests/test_tui_permissions.py`, `tests/test_tui_state.py`, `tests/test_tui_workspace_screens.py`, `tests/test_workspace.py`, `tests/test_workspace_cli.py`, `tests/test_workspace_tools.py`
+- `tests/test_backward_compatibility.py`, `tests/test_experience_cli.py`, `tests/test_experience_storage.py`, `tests/test_operation_guard.py`, `tests/test_paper_cli.py`, `tests/test_paper_import_core.py`, `tests/test_path_safety.py`, `tests/test_tui_dialog_history.py`, `tests/test_tui_entrypoint.py`, `tests/test_tui_experience_screens.py`, `tests/test_tui_paper_screens.py`, `tests/test_tui.py`, `tests/test_tui_state.py`, `tests/test_tui.py`, `tests/test_workspace.py`, `tests/test_workspace_cli.py`, `tests/test_workspace_full.py`
 
 ---
 

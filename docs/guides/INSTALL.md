@@ -17,6 +17,8 @@ and [Architecture/MaintainerRepositoryReading.md](Architecture/MaintainerReposit
 | Python | >= 3.10 | Required |
 | Git | Any | Required for cloning |
 | pip | >= 21.0 | Required for installation |
+| Bun | Latest stable | Required for the interactive OpenTUI runtime |
+| npm | Lockfile-compatible | Required to install `@opentui/core@0.4.1` from `package-lock.json` |
 | R | >= 4.3 | Optional, for R survival backend |
 
 OpenCode, Claude Code, and other assistant platforms are optional add-ons, not
@@ -28,6 +30,7 @@ requirements for the standalone Python core.
 git clone https://github.com/KarasawaYikiho/SuperMedicine.git
 cd SuperMedicine
 pip install -e .
+npm ci
 python install.py
 python Cli.py status
 ```
@@ -62,13 +65,23 @@ chosen target directory; the later steps initialize `.supermedicine`, collect LL
 settings, show optional shortcut/PATH/Desktop Exe choices, and ask for final
 confirmation. The installer Exe contains the same unified release layout as the
 Zip: `install.py`, `Install.py`, the Python packages, documentation/config
-templates, resources, and the application Exe at `dist/SuperMedicine.exe`.
+templates, OpenTUI runtime manifests (`package.json`, `package-lock.json`),
+`THIRD_PARTY_NOTICES.md`, resources, and the application Exe at
+`dist/SuperMedicine.exe`. After extracting a release package, run `npm ci` from
+the release root before launching the interactive TUI; Bun must be installed and
+available on `PATH`.
 
 For development tooling:
 
 ```bash
 pip install -e ".[dev]"
+npm ci
 ```
+
+`supermedicine tui` starts the real OpenTUI bridge (`core/tui/opentui_runtime.mjs`)
+through Bun with `@opentui/core@0.4.1`. `supermedicine tui --dry-run` checks the
+Python-side entrypoint without starting the interactive renderer. `npm run
+opentui:smoke` exercises the JS runtime prerequisites after `npm ci`.
 
 Installation and initialization are intentionally LLM-complete. A provider must
 have `provider`, `base_url`, `model`, and an API key source. The interactive wizard
@@ -241,13 +254,15 @@ different packaging responsibilities:
 CI/GitHub Release artifacts should preserve this structure when uploaded or
 unzipped: `SuperMedicineInstaller.exe` at the release root, the application Exe at
 `dist/SuperMedicine.exe`, and the shared payload (`install.py`, `Install.py`, `installer/`,
-`core/`, `permission/`, docs/templates/resources). `install.py --release-exe`
+`core/`, `permission/`, `package.json`, `package-lock.json`,
+`THIRD_PARTY_NOTICES.md`, docs/templates/resources). `install.py --release-exe`
 uses the packaged `dist/SuperMedicine.exe` path by default when the flag is passed
 without a value; `SuperMedicineInstaller.exe` and `install.py --extract-release-to`
 use the same payload extraction contract.
 
 Executable build/run verification is CI-backed: the Windows packaging smoke job
-installs PyInstaller, builds `dist/SuperMedicine.exe` and
+installs Python runtime dependencies, PyInstaller, Node/npm dependencies from
+`package-lock.json`, and Bun; builds `dist/SuperMedicine.exe` and
 `dist/SuperMedicineInstaller.exe`, runs `SuperMedicineInstaller.exe --help`, and
 dry-runs installer payload extraction. Local checks can use the CI/package smoke
 result as the fallback when PyInstaller is not installed on the developer machine.
@@ -356,6 +371,12 @@ export OPENAI_API_KEY=<OPENAI_API_KEY>
 Run `supermedicine tui`, open **LLM 管理**, enter provider name, BaseURL, model,
 API Key, and optional API format, then add or switch the provider. Key fields are
 password-style and cleared after submission.
+
+The interactive TUI uses OpenTUI navigation: `Tab`/`Shift+Tab` change focus,
+`↑↓` or `j/k` move selections, `Enter` activates, `/` enters page filtering where
+available, `[`/`]` scroll page content, `M` toggles the route/menu shell,
+`P`/`Ctrl+P` opens permissions, `Esc`/`B` returns, and `Ctrl+1` ... `Ctrl+0`
+jump to primary routes.
 
 ## Optional R Support
 

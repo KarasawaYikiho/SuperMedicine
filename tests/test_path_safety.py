@@ -33,24 +33,16 @@ def test_path_inside_project_root_is_accepted(tmp_path):
     assert validate_path_in_project_root("data/notes.txt", tmp_path) == target.resolve()
 
 
-def test_parent_traversal_outside_project_root_is_rejected(tmp_path):
-    outside = tmp_path.parent / "outside.txt"
-    outside.write_text("outside", encoding="utf-8")
-
-    traversal = os.path.relpath(outside, tmp_path)
-
-    with pytest.raises(PathOutsideProjectRootError):
-        validate_path_in_project_root(traversal, tmp_path)
-
-
-def test_absolute_path_outside_project_root_is_rejected(tmp_path):
+@pytest.mark.parametrize("path_mode", ["parent-traversal", "absolute"])
+def test_paths_outside_project_root_are_rejected(tmp_path, path_mode):
     outside_dir = tmp_path.parent / f"{tmp_path.name}_outside"
     outside_dir.mkdir()
     outside = outside_dir / "outside.txt"
     outside.write_text("outside", encoding="utf-8")
+    candidate = os.path.relpath(outside, tmp_path) if path_mode == "parent-traversal" else outside
 
     with pytest.raises(PathOutsideProjectRootError):
-        validate_path_in_project_root(outside, tmp_path)
+        validate_path_in_project_root(candidate, tmp_path)
 
 
 def test_symlink_target_outside_project_root_is_rejected(tmp_path):
@@ -71,20 +63,17 @@ def test_symlink_target_outside_project_root_is_rejected(tmp_path):
         validate_path_in_project_root(link, tmp_path)
 
 
-def test_protected_directories_are_rejected_for_destructive_operations(tmp_path):
+@pytest.mark.parametrize("target_kind", ["protected-file", "project-root"])
+def test_protected_targets_are_rejected_for_destructive_operations(tmp_path, target_kind):
     protected = tmp_path / ".supermedicine" / "policies"
     protected.mkdir(parents=True)
     target = protected / "default.yaml"
     target.write_text("policy", encoding="utf-8")
 
     assert is_protected_path(target, tmp_path)
+    destructive_target = target if target_kind == "protected-file" else tmp_path
     with pytest.raises(ProtectedPathError):
-        validate_destructive_path(target, tmp_path)
-
-
-def test_project_root_is_rejected_for_destructive_operations(tmp_path):
-    with pytest.raises(ProtectedPathError):
-        validate_destructive_path(tmp_path, tmp_path)
+        validate_destructive_path(destructive_target, tmp_path)
 
 
 def test_control_character_path_value_is_rejected_before_resolution(tmp_path):

@@ -1,4 +1,4 @@
-/* SuperMedicine Web Interface Styles */
+/* SuperMedicine 网页界面样式 */
 
 :root {
     --color-bg: #ffffff;
@@ -42,7 +42,7 @@ body {
     flex-direction: column;
 }
 
-/* ---- Header ---- */
+/* ---- 顶栏 ---- */
 
 header {
     background: var(--color-surface);
@@ -89,7 +89,7 @@ header h1 {
     box-shadow: 0 0 8px var(--color-error);
 }
 
-/* ---- Hamburger Button ---- */
+/* ---- 菜单按钮 ---- */
 
 .hamburger {
     background: transparent;
@@ -110,7 +110,7 @@ header h1 {
     background: var(--color-surface-hover);
 }
 
-/* ---- Drawer Menu ---- */
+/* ---- 抽屉菜单 ---- */
 
 .drawer-overlay {
     position: fixed;
@@ -119,12 +119,14 @@ header h1 {
     z-index: 200;
     opacity: 0;
     visibility: hidden;
+    pointer-events: none;
     transition: opacity 0.3s ease, visibility 0.3s ease;
 }
 
 .drawer-overlay.active {
     opacity: 1;
     visibility: visible;
+    pointer-events: auto;
 }
 
 .drawer-menu {
@@ -139,6 +141,7 @@ header h1 {
     z-index: 300;
     transform: translateX(-100%);
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform;
     display: flex;
     flex-direction: column;
     box-shadow: var(--shadow-lg);
@@ -189,7 +192,7 @@ header h1 {
     flex: 1;
 }
 
-/* ---- Tab Buttons (inside drawer) ---- */
+/* ---- 抽屉内页面按钮 ---- */
 
 .drawer-nav .tab-btn {
     background: transparent;
@@ -218,7 +221,7 @@ header h1 {
     font-weight: 600;
 }
 
-/* ---- Main layout ---- */
+/* ---- 主布局 ---- */
 
 main {
     flex: 1;
@@ -226,6 +229,7 @@ main {
     max-width: 1400px;
     width: 100%;
     margin: 0 auto;
+    transition: none;
 }
 
 section {
@@ -246,7 +250,7 @@ section h2 {
     letter-spacing: -0.01em;
 }
 
-/* ---- Tab Content ---- */
+/* ---- 页面内容 ---- */
 
 .tab-content {
     display: none;
@@ -262,7 +266,7 @@ section h2 {
     to { opacity: 1; transform: translateY(0); }
 }
 
-/* ---- Dashboard ---- */
+/* ---- 状态看板 ---- */
 
 .status-grid {
     display: grid;
@@ -330,7 +334,7 @@ section h2 {
     font-weight: 500;
 }
 
-/* ---- Toolbar ---- */
+/* ---- 工具栏 ---- */
 
 .toolbar {
     display: flex;
@@ -340,7 +344,7 @@ section h2 {
     align-items: center;
 }
 
-/* ---- Buttons ---- */
+/* ---- 按钮 ---- */
 
 .btn {
     padding: 0.625rem 1.25rem;
@@ -406,7 +410,7 @@ section h2 {
     cursor: not-allowed;
 }
 
-/* ---- Forms ---- */
+/* ---- 表单 ---- */
 
 .form-container {
     background: var(--color-surface);
@@ -490,7 +494,7 @@ section h2 {
     box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
 }
 
-/* ---- Data Tables ---- */
+/* ---- 数据表 ---- */
 
 .data-table-container {
     overflow-x: auto;
@@ -542,7 +546,7 @@ section h2 {
     padding: 2rem;
 }
 
-/* ---- Status Indicators ---- */
+/* ---- 状态标记 ---- */
 
 .status-badge {
     display: inline-block;
@@ -577,7 +581,7 @@ section h2 {
     border: 1px solid var(--color-info);
 }
 
-/* ---- Log Viewer ---- */
+/* ---- 日志查看器 ---- */
 
 .log-viewer {
     background: var(--color-bg);
@@ -616,7 +620,7 @@ section h2 {
     background: var(--color-border-light);
 }
 
-/* ---- Scan Results ---- */
+/* ---- 扫描结果 ---- */
 
 .scan-results {
     display: grid;
@@ -652,7 +656,7 @@ section h2 {
     color: var(--color-text);
 }
 
-/* ---- Toast Notifications ---- */
+/* ---- 提示通知 ---- */
 
 #toast-container {
     position: fixed;
@@ -718,15 +722,15 @@ section h2 {
     }
 }
 
-/* ---- Chat panel ---- */
+/* ---- 对话面板 ---- */
 
-#tab-chat {
-    display: flex;
-    flex-direction: column;
+#tab-chat.tab-content {
+    display: none;
 }
 
 #tab-chat.active {
     display: flex;
+    flex-direction: column;
 }
 
 #messages {
@@ -797,7 +801,7 @@ section h2 {
     letter-spacing: 0.05em;
 }
 
-/* ---- Chat form ---- */
+/* ---- 对话表单 ---- */
 
 #chat-form {
     display: flex;
@@ -852,7 +856,7 @@ section h2 {
     color: var(--color-text-dim);
 }
 
-/* ---- Utility ---- */
+/* ---- 工具类 ---- */
 
 .hidden {
     display: none !important;
@@ -882,24 +886,24 @@ section h2 {
     color: var(--color-info);
 }
 
-/* Selection color */
+/* 选中文本颜色 */
 ::selection {
     background: rgba(255, 255, 255, 0.2);
     color: var(--color-text);
 }
 
-/* Focus visible */
+/* 焦点可见性 */
 :focus-visible {
     outline: 2px solid var(--color-primary);
     outline-offset: 2px;
 }
 
-/* Smooth scrolling */
+/* 平滑滚动 */
 html {
     scroll-behavior: smooth;
 }
 
-/* ---- Scrollbar ---- */
+/* ---- 滚动条 ---- */
 
 ::-webkit-scrollbar {
     width: 6px;
@@ -923,7 +927,7 @@ html {
     background: transparent;
 }
 
-/* ---- Desktop scaling ---- */
+/* ---- 桌面缩放 ---- */
 
 html {
     height: 100%;
@@ -962,7 +966,7 @@ body {
     }
 }
 
-/* ---- Responsive ---- */
+/* ---- 响应式 ---- */
 
 @media (max-width: 768px) {
     header {

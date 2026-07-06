@@ -22,6 +22,8 @@ class TUIStatus:
     status_center: str = ""
     status_right: str = ""
     focus_target: str = "prompt-input"
+    runtime_name: str = "@opentui/core"
+    runtime_version: str = "0.4.1"
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,6 +34,29 @@ class NavMetadata:
     view_id: str
     label: str
     icon: str
+
+
+@dataclass(frozen=True, slots=True)
+class OpenTUINavigationRoute:
+    """Shared metadata for OpenTUI route-shell navigation."""
+
+    key: str
+    view_id: str
+    label: str
+    icon: str
+    placeholder: str
+    sections: tuple[str, ...] = ()
+    actions: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class OpenTUINavigationState:
+    """Test-friendly snapshot of OpenTUI navigation state."""
+
+    current_view: str
+    stack: tuple[str, ...]
+    focus_target: str
+    menu_open: bool = False
 
 
 @dataclass(frozen=True, slots=True)

@@ -39,58 +39,51 @@ def test_experience_learning_enabled_by_default_constant():
     assert EXPERIENCE_LEARNING_ENABLED_BY_DEFAULT is True
 
 
-def test_raw_conversation_field_rejected_and_not_persisted(tmp_path):
+@pytest.mark.parametrize(
+    ("payload", "expected_exception"),
+    [
+        (
+            {
+                "scope": "general",
+                "title": "Unsafe",
+                "summary": "A confirmed summary",
+                "raw_conversation": "user said private details",
+            },
+            ExperiencePrivacyError,
+        ),
+        (
+            ExperienceRecord(
+                scope="general",
+                title="Unsafe",
+                summary="A confirmed summary",
+                raw_conversation_stored=True,
+            ),
+            ExperiencePrivacyError,
+        ),
+        (
+            {
+                "scope": "general",
+                "title": "Draft",
+                "summary": "Suggested but not approved",
+                "confirmed": False,
+            },
+            ExperienceValidationError,
+        ),
+    ],
+)
+def test_unsafe_or_unconfirmed_experience_is_rejected_without_persisting(
+    tmp_path, payload, expected_exception
+):
     temp_path = tmp_path / "temp"
     store = _store(tmp_path, temp_path)
 
     with patch("core.experience.tempfile.gettempdir", return_value=str(temp_path)):
-        with pytest.raises(ExperiencePrivacyError):
-            store.store_confirmed_experience(
-                {
-                    "scope": "general",
-                    "title": "Unsafe",
-                    "summary": "A confirmed summary",
-                    "raw_conversation": "user said private details",
-                }
-            )
-
-    assert not (temp_path / "supermedicine-rag-interface").exists()
-
-
-def test_raw_conversation_stored_true_rejected(tmp_path):
-    temp_path = tmp_path / "temp"
-    store = _store(tmp_path, temp_path)
-
-    with patch("core.experience.tempfile.gettempdir", return_value=str(temp_path)):
-        with pytest.raises(ExperiencePrivacyError):
-            store.store_confirmed_experience(
-                ExperienceRecord(
-                    scope="general",
-                    title="Unsafe",
-                    summary="A confirmed summary",
-                    raw_conversation_stored=True,
-                )
-            )
+        with pytest.raises(expected_exception):
+            store.store_confirmed_experience(payload)
 
     assert store.list_general_experiences() == []
-
-
-def test_unconfirmed_summary_is_not_persisted(tmp_path):
-    temp_path = tmp_path / "temp"
-    store = _store(tmp_path, temp_path)
-
-    with patch("core.experience.tempfile.gettempdir", return_value=str(temp_path)):
-        with pytest.raises(ExperienceValidationError):
-            store.store_confirmed_experience(
-                {
-                    "scope": "general",
-                    "title": "Draft",
-                    "summary": "Suggested but not approved",
-                    "confirmed": False,
-                }
-            )
-
-    assert store.list_general_experiences() == []
+    if isinstance(payload, dict) and "raw_conversation" in payload:
+        assert not (temp_path / "supermedicine-rag-interface").exists()
 
 
 def test_general_method_experience_writes_to_tempdir_layer(tmp_path):

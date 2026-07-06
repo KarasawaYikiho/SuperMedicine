@@ -236,6 +236,113 @@ class TestKernel:
         assert messages[4] == {"role": "user", "content": "根据当前配置说明下一步"}
 
 
+class TestKernelProgressCallback:
+    """Verify Kernel.execute_task emits progress_callback events."""
+
+    def test_execute_task_emits_status_events(self, tmp_path, monkeypatch):
+        """Kernel should emit 'status' kind events during task execution."""
+        kernel = TestKernel()._create_kernel(tmp_path)
+        events: list[dict[str, Any]] = []
+
+        def callback(event: dict[str, Any]) -> None:
+            events.append(event)
+
+        class FakeClient(LLMClient):
+            def chat(self, messages, **kwargs):
+                return {"content": "result", "model": "test"}
+
+            def complete(self, prompt, **kwargs):
+                return {"content": "result", "model": "test"}
+
+            def chat_stream(self, messages, **kwargs):
+                yield {"delta": "result", "model": "test"}
+
+        monkeypatch.setattr(kernel.llm_manager, "create_client", lambda: FakeClient())
+        monkeypatch.setattr(
+            kernel.llm_manager,
+            "get_current_provider",
+            lambda redacted=True: {"provider": "fake", "api_key": "<redacted>"},
+        )
+        monkeypatch.setattr(
+            kernel.llm_manager, "validate_provider", lambda name, config: None
+        )
+
+        result = kernel.execute_task("test task", progress_callback=callback)
+
+        assert result["status"] == "success"
+        kinds = [e["kind"] for e in events]
+        assert "status" in kinds
+        assert "reasoning" in kinds
+
+    def test_execute_task_emits_reasoning_event_before_llm_stream(
+        self, tmp_path, monkeypatch
+    ):
+        """A 'reasoning' event must be emitted before any streaming events."""
+        kernel = TestKernel()._create_kernel(tmp_path)
+        events: list[dict[str, Any]] = []
+
+        def callback(event: dict[str, Any]) -> None:
+            events.append(event)
+
+        class FakeClient(LLMClient):
+            def chat(self, messages, **kwargs):
+                return {"content": "result", "model": "test"}
+
+            def complete(self, prompt, **kwargs):
+                return {"content": "result", "model": "test"}
+
+            def chat_stream(self, messages, **kwargs):
+                yield {"delta": "result", "model": "test"}
+
+        monkeypatch.setattr(kernel.llm_manager, "create_client", lambda: FakeClient())
+        monkeypatch.setattr(
+            kernel.llm_manager,
+            "get_current_provider",
+            lambda redacted=True: {"provider": "fake", "api_key": "<redacted>"},
+        )
+        monkeypatch.setattr(
+            kernel.llm_manager, "validate_provider", lambda name, config: None
+        )
+
+        kernel.execute_task("test task", progress_callback=callback)
+
+        kinds = [e["kind"] for e in events]
+        assert "status" in kinds
+        assert "reasoning" in kinds
+        reasoning_idx = kinds.index("reasoning")
+        if "assistant_start" in kinds:
+            start_idx = kinds.index("assistant_start")
+            assert reasoning_idx < start_idx
+
+    def test_execute_task_no_callback_does_not_raise(self, tmp_path, monkeypatch):
+        """No progress_callback should not raise errors."""
+        kernel = TestKernel()._create_kernel(tmp_path)
+
+        class FakeClient(LLMClient):
+            def chat(self, messages, **kwargs):
+                return {"content": "result", "model": "test"}
+
+            def complete(self, prompt, **kwargs):
+                return {"content": "result", "model": "test"}
+
+            def chat_stream(self, messages, **kwargs):
+                yield {"delta": "result", "model": "test"}
+
+        monkeypatch.setattr(kernel.llm_manager, "create_client", lambda: FakeClient())
+        monkeypatch.setattr(
+            kernel.llm_manager,
+            "get_current_provider",
+            lambda redacted=True: {"provider": "fake", "api_key": "<redacted>"},
+        )
+        monkeypatch.setattr(
+            kernel.llm_manager, "validate_provider", lambda name, config: None
+        )
+
+        result = kernel.execute_task("test task", progress_callback=None)
+
+        assert result["status"] == "success"
+
+
 # ═══ Kernel LLM Chat Tests ═══
 
 

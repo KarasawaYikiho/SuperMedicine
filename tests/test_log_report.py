@@ -13,10 +13,12 @@ from core.log_report import (
     LogReportStore,
 )
 from core.log_report_handler import (
+    LogReportStream,
     LogReportLoggingHandler,
     append_tui_stream_output,
     configure_tui_log_storage,
 )
+from core.log_report_models import TUI_LOG_SESSION_ID
 from core.log_severity import format_log_message
 
 
@@ -128,7 +130,7 @@ def test_list_show_and_summary_return_redacted_records(tmp_path):
 
     assert [item["file"] for item in listed] == [
         "session-session-a.json",
-        "session-tui-application.json",
+        f"session-{TUI_LOG_SESSION_ID}.json",
     ]
     assert shown["file"] == session_log["file"]
     assert summary["log_count"] == 1
@@ -148,19 +150,22 @@ def test_show_rejects_unsafe_file_names(tmp_path, file_name):
         store.show(file_name)
 
 
-@pytest.mark.parametrize("message", ["", "   "])
-def test_write_rejects_empty_messages(tmp_path, message):
+@pytest.mark.parametrize(
+    ("operation", "message"),
+    [
+        ("write", ""),
+        ("write", "   "),
+        ("append", "   "),
+    ],
+)
+def test_write_and_append_reject_empty_messages(tmp_path, operation, message):
     store = LogReportStore(tmp_path)
 
     with pytest.raises(LogReportError, match="--message cannot be empty"):
-        store.write(message)
-
-
-def test_append_rejects_empty_messages(tmp_path):
-    store = LogReportStore(tmp_path)
-
-    with pytest.raises(LogReportError, match="--message cannot be empty"):
-        store.append("   ", session_id="empty-session")
+        if operation == "append":
+            store.append(message, session_id="empty-session")
+        else:
+            store.write(message)
 
 
 @pytest.mark.parametrize(
@@ -247,20 +252,17 @@ def test_session_record_limit_is_enforced(tmp_path):
         store.write("second", session_id="limited-session")
 
 
-def test_file_size_limit_is_enforced_without_overwriting_existing_log(tmp_path):
-    store = LogReportStore(tmp_path, max_file_bytes=220)
+def test_file_size_limit_is_enforced_without_creating_or_mutating_logs(tmp_path):
+    store = LogReportStore(tmp_path / "isolated", max_file_bytes=220)
 
     with pytest.raises(LogReportError, match="file size limit"):
         store.write("message large enough for json envelope")
 
-    log_dir = tmp_path / ".supermedicine" / "logs"
+    log_dir = tmp_path / "isolated" / ".supermedicine" / "logs"
     assert not list(log_dir.glob("*.json"))
-
-
-def test_file_size_limit_is_enforced_for_session_append_without_mutating_file(tmp_path):
-    store = LogReportStore(tmp_path, max_file_bytes=700)
+    store = LogReportStore(tmp_path / "session", max_file_bytes=700)
     first = store.write("first", session_id="size-session")
-    log_path = tmp_path / ".supermedicine" / "logs" / first["file"]
+    log_path = tmp_path / "session" / ".supermedicine" / "logs" / first["file"]
     before = log_path.read_text(encoding="utf-8")
 
     with pytest.raises(LogReportError, match="file size limit"):
@@ -346,21 +348,10 @@ def test_statistics_deduplicates_same_entry_identity(tmp_path):
     assert statistics["severity_counts"]["Warning"] == 1
 
 
-def test_tui_stream_output_is_routed_by_stream_severity_and_session(tmp_path):
-    append_tui_stream_output(tmp_path, "stdout", "normal output")
-    append_tui_stream_output(tmp_path, "stderr", "problem output")
-
-    entries = LogReportStore(tmp_path).list_entries(session_id="tui-application")
-
-    assert [entry["severity"] for entry in entries] == ["Info", "Error"]
-    assert all(entry["session_id"] == "tui-application" for entry in entries)
-    assert entries[0]["raw_message"] == "captured stdout: normal output"
-    assert entries[1]["raw_message"] == "captured stderr: problem output"
-
-
-def test_tui_stream_output_redacts_sensitive_stdout_and_stderr_before_persisting(
+def test_tui_stream_output_routes_severity_session_and_redacts_before_persisting(
     tmp_path,
 ):
+    """TUI stream output keeps routing metadata while redacting stream payloads."""
     secret = "sk-tui-stream-secret"
 
     append_tui_stream_output(
@@ -370,15 +361,20 @@ def test_tui_stream_output_redacts_sensitive_stdout_and_stderr_before_persisting
     )
     append_tui_stream_output(tmp_path, "stderr", "password=tui-stream-password")
 
+    entries = LogReportStore(tmp_path).list_entries(session_id=TUI_LOG_SESSION_ID)
     log_text = "\n".join(
         path.read_text(encoding="utf-8")
         for path in (tmp_path / ".supermedicine" / "logs").glob("*.json")
     )
-    entries_text = json.dumps(
-        LogReportStore(tmp_path).list_entries(session_id="tui-application"),
-        ensure_ascii=False,
-    )
+    entries_text = json.dumps(entries, ensure_ascii=False)
 
+    assert [entry["severity"] for entry in entries] == ["Info", "Error"]
+    assert all(entry["session_id"] == TUI_LOG_SESSION_ID for entry in entries)
+    assert entries[0]["source"] == "stream"
+    assert entries[0]["category"] == "stdout"
+    assert entries[1]["category"] == "stderr"
+    assert entries[0]["raw_message"].startswith("[stream:stdout:stdout]\n")
+    assert entries[1]["raw_message"].startswith("[stream:stderr:stderr]\n")
     assert secret not in log_text
     assert secret not in entries_text
     assert "tui-stream-password" not in log_text
@@ -386,8 +382,8 @@ def test_tui_stream_output_redacts_sensitive_stdout_and_stderr_before_persisting
     assert "[REDACTED]" in log_text
 
 
-def test_session_log_aggregation_across_multiple_severities(tmp_path):
-    """Session-level aggregation: multiple entries with different severities in one session."""
+def test_session_log_aggregation_and_statistics_match_entry_counts(tmp_path):
+    """Session aggregation preserves entries and severity counts."""
     store = LogReportStore(tmp_path)
     store.write("startup info", session_id="agg-session", severity="Info")
     store.write("detected issue", session_id="agg-session", severity="Warning")
@@ -396,30 +392,18 @@ def test_session_log_aggregation_across_multiple_severities(tmp_path):
 
     entries = store.list_entries(session_id="agg-session")
     summary = store.summary(session_id="agg-session")
+    stats = store.statistics_for_entries(entries)
 
     assert len(entries) == 4
     assert summary["entry_count"] == 4
     assert summary["log_count"] == 1
     assert {e["severity"] for e in entries} == {"Info", "Warning", "Error", "Success"}
-
-
-def test_session_aggregation_statistics_match_entry_counts(tmp_path):
-    """Statistics for a session aggregate severity counts correctly."""
-    store = LogReportStore(tmp_path)
-    for _ in range(3):
-        store.write("info message", session_id="stat-session", severity="Info")
-    store.write("a warning", session_id="stat-session", severity="Warning")
-    store.write("an error", session_id="stat-session", severity="Error")
-
-    entries = store.list_entries(session_id="stat-session")
-    stats = store.statistics_for_entries(entries)
-
-    assert stats["entry_count"] == 5
-    assert stats["severity_counts"]["Info"] == 3
+    assert stats["entry_count"] == 4
+    assert stats["severity_counts"]["Info"] == 1
     assert stats["severity_counts"]["Warning"] == 1
     assert stats["severity_counts"]["Error"] == 1
     assert stats["severity_counts"]["Debug"] == 0
-    assert stats["severity_counts"]["Success"] == 0
+    assert stats["severity_counts"]["Success"] == 1
     assert stats["time_range"]["start"] is not None
     assert stats["time_range"]["end"] is not None
 
@@ -434,16 +418,23 @@ def test_cross_session_aggregation_respects_session_boundaries(tmp_path):
     alpha_entries = store.list_entries(session_id="cross-a")
     beta_entries = store.list_entries(session_id="cross-b")
     all_entries = store.list_entries()
+    total = store.summary()
 
     assert len(alpha_entries) == 2
     assert len(beta_entries) == 1
     assert len(all_entries) == 3
     assert all(e["session_id"] == "cross-a" for e in alpha_entries)
     assert all(e["session_id"] == "cross-b" for e in beta_entries)
+    assert total["log_count"] == 2
+    assert total["entry_count"] == 3
+    assert total["session_id"] is None
+    assert total["statistics"]["severity_counts"]["Info"] == 1
+    assert total["statistics"]["severity_counts"]["Error"] == 1
+    assert total["statistics"]["severity_counts"]["Warning"] == 1
 
 
-def test_follow_snapshot_returns_tail_entries_for_session(tmp_path):
-    """follow_snapshot returns the last N entries in tail-style format."""
+def test_follow_snapshot_returns_tail_entries_and_respects_line_limit(tmp_path):
+    """follow_snapshot returns tail entries and applies display-line limits."""
     store = LogReportStore(tmp_path)
     for i in range(10):
         store.write(f"log entry {i}", session_id="tail-session", severity="Info")
@@ -458,20 +449,11 @@ def test_follow_snapshot_returns_tail_entries_for_session(tmp_path):
     assert len(snapshot["entries"]) == 3
     assert len(snapshot["lines"]) > 0
     assert snapshot["max_entries"] == 3
-
-
-def test_follow_snapshot_respects_max_lines_limit(tmp_path):
-    """follow_snapshot with max_lines truncates the displayed lines."""
-    store = LogReportStore(tmp_path)
-    for i in range(5):
-        store.write(f"entry {i}", session_id="line-session", severity="Info")
-
-    snapshot = store.follow_snapshot(
-        session_id="line-session", max_entries=5, max_lines=3
+    line_limited = store.follow_snapshot(
+        session_id="tail-session", max_entries=5, max_lines=3
     )
-
-    assert len(snapshot["lines"]) <= 3
-    assert snapshot["max_lines"] == 3
+    assert len(line_limited["lines"]) <= 3
+    assert line_limited["max_lines"] == 3
 
 
 def test_log_handler_emits_chunked_messages_for_long_output(tmp_path):
@@ -546,23 +528,6 @@ def test_session_aggregation_preserves_entry_order(tmp_path):
     assert [e["raw_message"] for e in entries] == messages
 
 
-def test_summary_across_all_sessions_aggregates_correctly(tmp_path):
-    """summary() without session_id aggregates all sessions."""
-    store = LogReportStore(tmp_path)
-    store.write("s1-msg1", session_id="multi-a", severity="Info")
-    store.write("s1-msg2", session_id="multi-a", severity="Error")
-    store.write("s2-msg1", session_id="multi-b", severity="Warning")
-
-    total = store.summary()
-
-    assert total["log_count"] == 2
-    assert total["entry_count"] == 3
-    assert total["session_id"] is None
-    assert total["statistics"]["severity_counts"]["Info"] == 1
-    assert total["statistics"]["severity_counts"]["Error"] == 1
-    assert total["statistics"]["severity_counts"]["Warning"] == 1
-
-
 def test_configure_tui_log_storage_replaces_console_routing_with_log_handler(
     tmp_path, monkeypatch
 ):
@@ -594,9 +559,11 @@ def test_configure_tui_log_storage_replaces_console_routing_with_log_handler(
         assert named_logger.handlers == []
         assert named_logger.propagate is True
         assert console_capture.getvalue() == ""
-        entries = LogReportStore(tmp_path).list_entries(session_id="tui-application")
+        entries = LogReportStore(tmp_path).list_entries(session_id=TUI_LOG_SESSION_ID)
         assert len(entries) == 1
         assert entries[0]["severity"] == "Error"
+        assert entries[0]["source"] == "logging"
+        assert entries[0]["category"] == "ERROR"
         assert "console isolated failure" in entries[0]["raw_message"]
     finally:
         for handler in list(root.handlers):
@@ -611,3 +578,31 @@ def test_configure_tui_log_storage_replaces_console_routing_with_log_handler(
         for handler in original_named_handlers:
             named_logger.addHandler(handler)
         named_logger.propagate = original_named_propagate
+
+
+def test_application_log_session_id_is_launch_scoped_and_single_file(tmp_path):
+    first = LogReportStore(tmp_path).write("first launch message")
+    second = LogReportStore(tmp_path).write("second launch category", category="manual")
+    log_files = list((tmp_path / ".supermedicine" / "logs").glob("*.json"))
+
+    assert first["file"] == second["file"] == f"session-{TUI_LOG_SESSION_ID}.json"
+    assert len(log_files) == 1
+    entries = LogReportStore(tmp_path).list_entries(session_id=TUI_LOG_SESSION_ID)
+    assert [entry["raw_message"] for entry in entries] == [
+        "first launch message",
+        "second launch category",
+    ]
+
+
+def test_log_report_stream_flushes_buffered_gui_output_into_single_session(tmp_path):
+    stream = LogReportStream(tmp_path, "stdout", session_id="gui-session")
+    stream.write("partial")
+    stream.write(" line\nnext line")
+    stream.flush()
+
+    entries = LogReportStore(tmp_path).list_entries(session_id="gui-session")
+    assert len(entries) == 2
+    assert {entry["category"] for entry in entries} == {"stdout"}
+    assert len(list((tmp_path / ".supermedicine" / "logs").glob("*.json"))) == 1
+    assert entries[0]["raw_message"] == "[stream:stdout:stdout]\npartial line"
+    assert entries[1]["raw_message"] == "[stream:stdout:stdout]\nnext line"

@@ -18,7 +18,7 @@
 </head>
 <body>
     <header>
-        <button id="hamburger-btn" class="hamburger" aria-label="切换菜单" title="切换菜单">&#9776;</button>
+        <button id="hamburger-btn" class="hamburger" aria-label="切换菜单" aria-controls="drawer-menu" aria-expanded="false" title="切换菜单">&#9776;</button>
         <h1>SuperMedicine</h1>
         <div id="status-bar">
             <span id="status-indicator" class="disconnected" title="连接状态"></span>
@@ -26,8 +26,8 @@
         </div>
     </header>
 
-    <div id="drawer-overlay" class="drawer-overlay"></div>
-    <aside id="drawer-menu" class="drawer-menu">
+    <div id="drawer-overlay" class="drawer-overlay" aria-hidden="true"></div>
+    <aside id="drawer-menu" class="drawer-menu" aria-label="主菜单" aria-hidden="true">
         <div class="drawer-header">
             <span class="drawer-title">菜单</span>
             <button id="drawer-close-btn" class="drawer-close-btn" aria-label="关闭菜单">&times;</button>
@@ -40,7 +40,8 @@
             <button class="tab-btn" data-tab="experiences">经验</button>
             <button class="tab-btn" data-tab="tools">工具</button>
             <button class="tab-btn" data-tab="experiments">实验</button>
-            <button class="tab-btn" data-tab="llm">LLM配置</button>
+            <button class="tab-btn" data-tab="dialog">对话历史</button>
+            <button class="tab-btn" data-tab="llm">LLM 配置</button>
             <button class="tab-btn" data-tab="permissions">权限</button>
             <button class="tab-btn" data-tab="logs">日志</button>
             <button class="tab-btn" data-tab="self-evolution">自进化</button>
@@ -179,7 +180,7 @@
                     <label for="exp-scope">范围</label>
                     <select id="exp-scope" class="select-input">
                         <option value="workspace">工作区</option>
-                        <option value="global">全局</option>
+                        <option value="general">通用</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -304,11 +305,78 @@
             </div>
         </section>
 
+        <!-- Dialog History Tab -->
+        <section id="tab-dialog" class="tab-content">
+            <h2>对话历史</h2>
+            <div class="toolbar">
+                <select id="dialog-ws-select" class="select-input">
+                    <option value="">选择工作区</option>
+                </select>
+                <button id="btn-refresh-dialog" class="btn btn-secondary">刷新</button>
+            </div>
+            <p class="text-muted">选择工作区后可查看审计友好的对话事件摘要；敏感内容会在展示前隐藏。</p>
+            <div id="dialog-list" class="data-table-container" style="margin-top: 1rem;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>事件</th>
+                            <th>摘要</th>
+                            <th>时间</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dialog-tbody">
+                        <tr><td colspan="3" class="empty-state">选择工作区以查看对话历史</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
         <!-- LLM Config Tab -->
         <section id="tab-llm" class="tab-content">
-            <h2>LLM配置</h2>
+            <h2>LLM 配置</h2>
             <div class="toolbar">
                 <button id="btn-refresh-llm" class="btn btn-secondary">刷新</button>
+                <button id="btn-add-llm" class="btn btn-primary">+ 添加提供商</button>
+            </div>
+            <div id="llm-form" class="form-container hidden">
+                <h3>添加或更新 LLM 提供商</h3>
+                <div class="form-group">
+                    <label for="llm-provider-name">提供商名称</label>
+                    <input type="text" id="llm-provider-name" placeholder="例如 openai">
+                </div>
+                <div class="form-group">
+                    <label for="llm-api-format">接口格式（可选）</label>
+                    <input type="text" id="llm-api-format" placeholder="例如 openai、anthropic 或留空">
+                </div>
+                <div class="form-group">
+                    <label for="llm-base-url">Base URL（可选）</label>
+                    <input type="text" id="llm-base-url" placeholder="例如 https://api.example.com/v1">
+                </div>
+                <div class="form-group">
+                    <label for="llm-model">模型（可选）</label>
+                    <input type="text" id="llm-model" placeholder="例如 gpt-4.1">
+                </div>
+                <div class="form-group">
+                    <label for="llm-api-key-env">API Key 环境变量（推荐）</label>
+                    <input type="text" id="llm-api-key-env" placeholder="例如 OPENAI_API_KEY">
+                </div>
+                <div class="form-group">
+                    <label for="llm-api-key">API Key（可选，将由后端按安全策略处理）</label>
+                    <input type="text" id="llm-api-key" placeholder="不建议在共享环境填写明文密钥">
+                </div>
+                <div class="form-group">
+                    <label for="llm-timeout">超时秒数（可选）</label>
+                    <input type="text" id="llm-timeout" placeholder="例如 60">
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="llm-set-current"> 添加后设为当前提供商
+                    </label>
+                </div>
+                <div class="form-actions">
+                    <button id="btn-save-llm" class="btn btn-primary">保存</button>
+                    <button id="btn-cancel-llm" class="btn btn-secondary">取消</button>
+                </div>
             </div>
             <div id="llm-current" class="info-card">
                 <h3>当前提供商</h3>
@@ -346,8 +414,8 @@
                 <h3>更改权限模式</h3>
                 <div class="form-group">
                     <select id="permission-mode-select" class="select-input">
-                        <option value="interactive">交互式</option>
-                        <option value="auto">自动</option>
+                        <option value="sandbox">沙盒</option>
+                        <option value="conservative">保守</option>
                         <option value="full">完全（需确认）</option>
                     </select>
                 </div>
@@ -367,6 +435,7 @@
                 </div>
                 <div class="form-actions">
                     <button id="btn-authorize-path" class="btn btn-primary">授权</button>
+                    <button id="btn-revoke-path" class="btn btn-danger">撤销授权</button>
                 </div>
             </div>
             <div id="permission-policies" class="data-table-container">

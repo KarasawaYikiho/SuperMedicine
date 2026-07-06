@@ -16,6 +16,7 @@ from cli_entry import CLI, main
 from core.config_center import ConfigCenter
 from core.llm_manager import LLMConfigManager
 from core.log_report import LogReportStore
+from core.log_report_models import TUI_LOG_SESSION_ID
 from core.tui.app import PromptInput, SuperMedicineTUI, launch_tui
 from core.tui.dialog_history import DialogHistoryPrivacyError, DialogHistoryStore
 from core.tui.i18n import LABELS, t, tui_title_style_inventory
@@ -30,11 +31,12 @@ from core.tui.screens.dashboard import (
 from core.tui.screens.dialog_screen import DialogView
 from core.tui.screens.experience import ExperienceScreenController
 from core.tui.screens.experience_screen import ExperienceView
+from core.tui.screens.experiment_screen import ExperimentGuideView
 from core.tui.screens.llm_screen import LLMScreenController, LLMView
 from core.tui.screens.log_screen import LogReportView
 from core.tui.screens.paper_screen import PaperView
 from core.tui.screens.papers import PaperScreenController
-from core.tui.screens.permission_screen import PermissionScreenController
+from core.tui.screens.permission_screen import PermissionScreenController, PermissionView
 from core.tui.screens.tool_screen import ToolView
 from core.tui.screens.workspace_screen import WorkspaceView
 from core.tui.screens.workspaces import WorkspaceScreenController
@@ -50,6 +52,18 @@ from permission.policy import PermissionResult
 
 def _static_text(widget: Static) -> str:
     return str(widget.renderable)
+
+
+def _read_app_tcss() -> str:
+    return (Path(__file__).resolve().parents[1] / "core" / "tui" / "app.tcss").read_text(
+        encoding="utf-8"
+    )
+
+
+def _css_block(css: str, selector: str) -> str:
+    match = re.search(rf"{re.escape(selector)}\s*\{{(?P<body>.*?)\}}", css, re.DOTALL)
+    assert match is not None
+    return match.group("body")
 
 
 async def _wait_for_tui_condition(pilot, condition, *, timeout: float = 2.0) -> None:
@@ -95,20 +109,40 @@ def _assert_same_view_intact(app: SuperMedicineTUI, view_name: str) -> None:
 class CapturingRichLog:
     def __init__(self) -> None:
         self.lines: list[str] = []
+        self.write_options: list[dict[str, Any]] = []
 
-    def write(self, value: str) -> None:
+    def write(self, value: str, **_: Any) -> None:
         self.lines.append(value)
+        self.write_options.append(_)
 
     def clear(self) -> None:
         self.lines.clear()
+        self.write_options.clear()
+
+
+class CapturingStatic:
+    def __init__(self) -> None:
+        self.content: str = ""
+        self.visible: bool = False
+
+    def update(self, value: str) -> None:
+        self.content = value
 
 
 class CapturingChatView(ChatView):
     def __init__(self) -> None:
         super().__init__()
         self.output = CapturingRichLog()
+        self._indicator = CapturingStatic()
+        self._processing_indicator = CapturingStatic()
 
     def query_one(self, selector, widget_type=None):
+        if selector == "#chat-output":
+            return self.output
+        if selector == "#thinking-indicator":
+            return self._indicator
+        if selector == "#processing-indicator":
+            return self._processing_indicator
         return self.output
 
 
@@ -200,6 +234,269 @@ def _allow_delete_policy(tmp_path):
 
 
 # ═══ test_tui_chat_view ═══
+
+
+class TestThinkingAnimation:
+    def test_thinking_indicator_is_composed_inside_chat_dialog(self):
+        compose_source = inspect.getsource(ChatView.compose)
+
+        assert 'with Container(id="chat-dialog")' in compose_source
+        assert 'yield RichLog(id="chat-output"' in compose_source
+        assert 'yield Static("", id="thinking-indicator")' in compose_source
+        assert compose_source.index('with Container(id="chat-dialog")') < compose_source.index(
+            'yield Static("", id="thinking-indicator")'
+        )
+
+    def test_processing_indicator_is_not_composed_inside_chat_view(self):
+        compose_source = inspect.getsource(ChatView.compose)
+
+        assert 'yield Static("", id="processing-indicator")' not in compose_source
+
+    def test_thinking_indicator_css_anchors_lower_right_inside_chat_dialog(self):
+        css = _read_app_tcss()
+        dialog = _css_block(css, "#chat-dialog")
+        thinking = _css_block(css, "#thinking-indicator")
+
+        assert "height: 1fr" in dialog
+        assert "width: 100%" in dialog
+        assert "min-width: 0" in dialog
+        assert "layers: base overlay" in dialog
+        assert "dock: bottom" in thinking
+        assert "align: right bottom" in thinking
+        assert "layer: overlay" in thinking
+        assert "margin: 0 2 1 0" in thinking
+
+    def test_start_thinking_animation_sets_indicator_visible(self):
+        view = CapturingChatView()
+
+        view._thinking_active = True
+        view._thinking_frame = 0
+        view._indicator.visible = True
+        view._indicator.update("[bold magenta]🧠 思考中 ○○○○○[/]")
+
+        assert view._indicator.visible is True
+        assert "思考中" in view._indicator.content
+        assert "○○○○○" in view._indicator.content
+
+    def test_advance_thinking_frame_updates_fill_pattern(self):
+        view = CapturingChatView()
+        view._thinking_active = True
+
+        for frame in range(6):
+            view._thinking_frame = frame
+            view._advance_thinking_frame()
+            filled = "●" * ((frame + 1) % 6)
+            empty = "○" * (5 - (frame + 1) % 6)
+            assert filled + empty in view._indicator.content
+            assert "思考中" in view._indicator.content
+
+    def test_stop_thinking_animation_hides_indicator(self):
+        view = CapturingChatView()
+        view._thinking_active = True
+        view._indicator.visible = True
+
+        view._thinking_active = False
+        view._indicator.visible = False
+
+        assert view._thinking_active is False
+        assert view._indicator.visible is False
+
+    def test_thinking_animation_inactive_frame_does_nothing(self):
+        view = CapturingChatView()
+        view._thinking_active = False
+        view._indicator.content = "unchanged"
+
+        view._advance_thinking_frame()
+
+        assert view._indicator.content == "unchanged"
+
+
+class TestProcessingAnimation:
+    def test_app_compose_places_processing_indicator_before_input_bar(self):
+        compose_source = inspect.getsource(SuperMedicineTUI.compose)
+
+        assert 'yield Static("", id="processing-indicator")' in compose_source
+        assert compose_source.index('yield Static("", id="processing-indicator")') < compose_source.index(
+            'with Horizontal(id="input-bar")'
+        )
+
+    def test_processing_indicator_css_has_no_extra_frame(self):
+        css = _read_app_tcss()
+        processing = _css_block(css, "#processing-indicator")
+
+        assert "border:" not in processing
+        assert "dock:" not in processing
+        assert "layer:" not in processing
+        assert "background:" not in processing
+
+    def test_start_processing_animation_sets_indicator_visible(self):
+        view = CapturingChatView()
+
+        view._processing_active = True
+        view._processing_frame = 0
+        view._processing_indicator.visible = True
+        view._processing_indicator.update(
+            f"[bold yellow]⏳ {t('chat_processing_state')} ○○○○○[/]"
+        )
+
+        assert view._processing_indicator.visible is True
+        assert t("chat_processing_state") in view._processing_indicator.content
+        assert "○○○○○" in view._processing_indicator.content
+
+    def test_advance_processing_frame_updates_fill_pattern(self):
+        view = CapturingChatView()
+        view._processing_active = True
+
+        for frame in range(6):
+            view._processing_frame = frame
+            view._advance_processing_frame()
+            assert t("chat_processing_state") in view._processing_indicator.content
+
+    def test_stop_processing_animation_hides_indicator(self):
+        view = CapturingChatView()
+        view._processing_active = True
+        view._processing_indicator.visible = True
+
+        view._processing_active = False
+        view._processing_indicator.visible = False
+
+        assert view._processing_active is False
+        assert view._processing_indicator.visible is False
+
+    def test_processing_animation_inactive_frame_does_nothing(self):
+        view = CapturingChatView()
+        view._processing_active = False
+        view._processing_indicator.content = "unchanged"
+
+        view._advance_processing_frame()
+
+        assert view._processing_indicator.content == "unchanged"
+
+
+class TestThinkingContent:
+    def test_append_thinking_content_writes_to_output(self):
+        view = CapturingChatView()
+
+        view.append_thinking_content("Let me think about this...")
+
+        rendered = "\n".join(view.output.lines)
+        assert "Let me think about this..." in rendered
+        assert "dim magenta" in rendered
+
+    def test_append_thinking_content_skips_empty_string(self):
+        view = CapturingChatView()
+
+        view.append_thinking_content("")
+
+        assert view.output.lines == []
+
+    def test_append_thinking_content_redacts_secrets(self):
+        view = CapturingChatView()
+
+        view.append_thinking_content("api_key=sk-secret123456789")
+
+        rendered = "\n".join(view.output.lines)
+        assert "sk-secret123456789" not in rendered
+        assert "[已隐藏]" in rendered
+
+    def test_add_reasoning_status_shows_magenta_label(self):
+        view = CapturingChatView()
+
+        view.add_reasoning_status("模型正在处理请求")
+
+        rendered = "\n".join(view.output.lines)
+        assert "推理状态" in rendered
+        assert "🧠" in rendered
+        assert "模型正在处理请求" in rendered
+
+
+class TestStreamingAssistantMessage:
+    def test_begin_assistant_message_shows_assistant_label_only(self):
+        view = CapturingChatView()
+        view.add_user_message("hello")
+
+        view.begin_assistant_message(turn_id=1)
+
+        rendered = "\n".join(view.output.lines)
+        assert f"{t('chat_assistant_label')} #1" in rendered
+        assert rendered.rstrip().endswith(f"{t('chat_assistant_label')} #1[/]")
+
+    def test_append_assistant_delta_writes_content(self):
+        view = CapturingChatView()
+
+        view.append_assistant_delta("Hello ")
+        view.append_assistant_delta("world")
+
+        rendered = "\n".join(view.output.lines)
+        assert "Hello " in rendered
+        assert "world" in rendered
+
+    def test_append_assistant_delta_skips_empty(self):
+        view = CapturingChatView()
+
+        view.append_assistant_delta("")
+
+        assert view.output.lines == []
+
+    def test_append_assistant_delta_redacts_secrets(self):
+        view = CapturingChatView()
+
+        view.append_assistant_delta("Bearer sk-stream-secret123456789")
+
+        rendered = "\n".join(view.output.lines)
+        assert "sk-stream-secret123456789" not in rendered
+
+    def test_streaming_flow_begin_then_deltas_then_reasoning(self):
+        view = CapturingChatView()
+        view.add_user_message("test")
+
+        view.begin_assistant_message(turn_id=1)
+        view.append_assistant_delta("Part 1 ")
+        view.append_assistant_delta("Part 2")
+        view.add_reasoning_status("推理完成")
+
+        rendered = "\n".join(view.output.lines)
+        assert f"{t('chat_user_label')} #1" in rendered
+        assert f"{t('chat_assistant_label')} #1" in rendered
+        assert "Part 1 " in rendered
+        assert "Part 2" in rendered
+        assert "推理状态" in rendered
+
+    def test_streaming_writes_use_full_chat_dialog_width(self):
+        view = CapturingChatView()
+
+        view.begin_assistant_message(turn_id=1)
+        view.append_assistant_delta("A long streamed assistant response chunk ")
+        view.append_assistant_delta("continues without narrowing the renderable.")
+
+        assert view.output.write_options
+        assert all(options.get("expand") is True for options in view.output.write_options)
+        assert all(options.get("shrink") is False for options in view.output.write_options)
+
+
+class TestSafeDisplayText:
+    def test_safe_display_text_escapes_html_tags(self):
+        result = safe_display_text("<script>alert('xss')</script>")
+        assert "<script>" not in result
+        assert "&lt;script&gt;" in result
+
+    def test_safe_display_text_escapes_rich_markup(self):
+        result = safe_display_text("[bold]text[/bold]")
+        assert "\\[bold]" in result
+
+    def test_safe_display_text_redacts_api_keys(self):
+        result = safe_display_text("api_key=sk-my-secret-key-12345678")
+        assert "sk-my-secret-key-12345678" not in result
+        assert "[已隐藏]" in result
+
+    def test_safe_display_text_redacts_bearer_tokens(self):
+        result = safe_display_text("Authorization: Bearer abc.def.ghi")
+        assert "Bearer abc" not in result
+        assert "Bearer [已隐藏]" in result
+
+    def test_safe_display_text_handles_none_value(self):
+        result = safe_display_text(None)
+        assert result == ""
 
 
 def test_chat_messages_are_escaped_redacted_and_stably_prefixed():
@@ -475,7 +772,6 @@ def test_chat_processing_status_refreshes_when_switching_views(tmp_path):
     assert updates
     assert t("chat_processing_state") in updates[-1]
 
-
 def test_chat_processing_unlocks_on_exception(monkeypatch, tmp_path):
     class FakeKernel:
         def __init__(self, *args, **kwargs):
@@ -497,7 +793,6 @@ def test_chat_processing_unlocks_on_exception(monkeypatch, tmp_path):
     assert app.is_chat_processing is False
     assert prompt.disabled is False
     assert chat.error_messages
-
 
 def test_chat_streaming_methods_keep_assistant_turn_and_append_safe_deltas():
     view = CapturingChatView()
@@ -691,6 +986,274 @@ def test_dashboard_view_exposes_activation_refresh_hook():
     assert "_load_data" in inspect.getsource(DashboardView.refresh_view_data)
 
 
+class TestDashboardRefresh:
+    def test_dashboard_view_uses_targeted_refresh_without_polling(self):
+        source = inspect.getsource(DashboardView)
+
+        assert "refresh_view_data" in source
+        assert "set_interval" not in source
+
+    def test_dashboard_view_compose_declares_required_widgets(self):
+        source = inspect.getsource(DashboardView.compose)
+
+        assert 'id="dashboard-table"' in source
+        assert 'id="dashboard-advice"' in source
+        assert 'id="dashboard-summary"' in source
+        assert 'id="dashboard-shortcuts"' in source
+
+    def test_dashboard_view_loads_data_on_mount(self, tmp_path):
+        (tmp_path / ".supermedicine").mkdir()
+
+        async def scenario() -> None:
+            app = SuperMedicineTUI(project_root=tmp_path)
+            async with app.run_test(size=(180, 50)) as pilot:
+                app.action_switch_view("dashboard")
+                await pilot.pause()
+
+                table = app.query_one("#dashboard-table", DataTable)
+                assert table.row_count > 0
+                rows = [str(table.get_row_at(i)) for i in range(table.row_count)]
+                assert t("dashboard_init_status") in " ".join(rows)
+
+        asyncio.run(scenario())
+
+    def test_dashboard_view_refresh_view_data_reloads_table(self, tmp_path):
+        (tmp_path / ".supermedicine").mkdir()
+
+        async def scenario() -> None:
+            app = SuperMedicineTUI(project_root=tmp_path)
+            async with app.run_test(size=(180, 50)) as pilot:
+                app.action_switch_view("dashboard")
+                await pilot.pause()
+
+                table = app.query_one("#dashboard-table", DataTable)
+                initial_rows = table.row_count
+
+                WorkspaceManager(tmp_path).initialize_workspace("dash-ws")
+                app._views["dashboard"].refresh_view_data()
+                await pilot.pause()
+
+                assert table.row_count == initial_rows
+                rows = [str(table.get_row_at(i)) for i in range(table.row_count)]
+                assert "1" in " ".join(rows)
+
+        asyncio.run(scenario())
+
+    def test_dashboard_view_switch_back_and_forth_refreshes_data(self, tmp_path):
+        manager = WorkspaceManager(tmp_path)
+        manager.initialize_workspace("switch-ws")
+
+        async def scenario() -> None:
+            app = SuperMedicineTUI(project_root=tmp_path)
+            async with app.run_test(size=(180, 50)) as pilot:
+                app.action_switch_view("dashboard")
+                await pilot.pause()
+
+                table = app.query_one("#dashboard-table", DataTable)
+                rows = [str(table.get_row_at(i)) for i in range(table.row_count)]
+                assert "1" in " ".join(rows)
+
+                app.action_switch_view("chat")
+                await pilot.pause()
+
+                manager.initialize_workspace("switch-ws-2")
+                app.action_switch_view("dashboard")
+                await pilot.pause()
+
+                rows = [str(table.get_row_at(i)) for i in range(table.row_count)]
+                assert "2" in " ".join(rows)
+
+        asyncio.run(scenario())
+
+    def test_dashboard_view_advice_text_updates_on_refresh(self, tmp_path):
+        async def scenario() -> None:
+            app = SuperMedicineTUI(project_root=tmp_path)
+            async with app.run_test(size=(180, 50)) as pilot:
+                app.action_switch_view("dashboard")
+                await pilot.pause()
+
+                advice = _static_text(app.query_one("#dashboard-advice", Static))
+                assert advice.startswith(t("dashboard_action_hint"))
+                assert t("dashboard_action_create_workspace") in advice
+
+                WorkspaceManager(tmp_path).initialize_workspace("adv-ws")
+                app._views["dashboard"].refresh_view_data()
+                await pilot.pause()
+
+                advice = _static_text(app.query_one("#dashboard-advice", Static))
+                assert advice.startswith(t("dashboard_action_hint"))
+                assert t("dashboard_action_configure_llm") in advice
+
+        asyncio.run(scenario())
+
+    def test_dashboard_view_advice_shows_ready_when_fully_configured(self, tmp_path):
+        (tmp_path / ".supermedicine").mkdir()
+        WorkspaceManager(tmp_path).initialize_workspace("ready-ws")
+        (tmp_path / ".supermedicine" / "config.yaml").write_text(
+            yaml.safe_dump(
+                {
+                    "llm": {
+                        "provider": "openai",
+                        "providers": {
+                            "openai": {
+                                "api_format": "openai",
+                                "base_url": "https://llm.test/v1",
+                                "api_key": "sk-ready-test-key",
+                                "model": "gpt-test",
+                            }
+                        },
+                    }
+                },
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
+
+        async def scenario() -> None:
+            app = SuperMedicineTUI(project_root=tmp_path)
+            async with app.run_test(size=(180, 50)) as pilot:
+                app.action_switch_view("dashboard")
+                await pilot.pause()
+
+                advice = _static_text(app.query_one("#dashboard-advice", Static))
+                assert t("dashboard_action_ready") in advice
+
+        asyncio.run(scenario())
+
+    def test_dashboard_controller_overview_rows_returns_metric_value_pairs(self, tmp_path):
+        controller = DashboardOverviewController(tmp_path)
+
+        rows = controller.overview_rows()
+
+        assert len(rows) == 8
+        labels = [label for label, _ in rows]
+        assert t("dashboard_init_status") in labels
+        assert t("dashboard_workspaces") in labels
+        assert t("dashboard_plugins") in labels
+        assert t("dashboard_modules") in labels
+        assert t("dashboard_llm_status") in labels
+        assert t("dashboard_token_stats") in labels
+        assert t("dashboard_recent_hint") in labels
+        assert t("dashboard_version") in labels
+
+    def test_dashboard_controller_context_reflects_state_changes(self, tmp_path):
+        context_before = collect_dashboard_context(tmp_path)
+        assert context_before["initialized"] is False
+        assert context_before["workspace_count"] == 0
+
+        (tmp_path / ".supermedicine").mkdir()
+        WorkspaceManager(tmp_path).initialize_workspace("ctx-ws")
+
+        context_after = collect_dashboard_context(tmp_path)
+        assert context_after["initialized"] is True
+        assert context_after["workspace_count"] == 1
+
+    def test_dashboard_controller_context_no_secret_leak(self, tmp_path):
+        secret = "sk-dashboard-refresh-secret"
+        (tmp_path / ".supermedicine").mkdir()
+        (tmp_path / ".supermedicine" / "config.yaml").write_text(
+            yaml.safe_dump(
+                {
+                    "llm": {
+                        "provider": "openai",
+                        "providers": {
+                            "openai": {
+                                "api_format": "openai",
+                                "base_url": "https://llm.test/v1",
+                                "api_key": secret,
+                                "model": "gpt-test",
+                            }
+                        },
+                    }
+                },
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
+
+        context = collect_dashboard_context(tmp_path)
+        rows = DashboardOverviewController(tmp_path).overview_rows()
+
+        rendered = str(context) + str(rows)
+        assert secret not in rendered
+
+    def test_dashboard_view_table_has_two_columns(self, tmp_path):
+        async def scenario() -> None:
+            app = SuperMedicineTUI(project_root=tmp_path)
+            async with app.run_test(size=(180, 50)) as pilot:
+                app.action_switch_view("dashboard")
+                await pilot.pause()
+
+                table = app.query_one("#dashboard-table", DataTable)
+                columns = [str(col.label) for col in table.columns.values()]
+                assert len(columns) == 2
+                assert t("dashboard_metric") in columns
+                assert t("dashboard_value") in columns
+
+        asyncio.run(scenario())
+
+    def test_dashboard_view_shows_llm_status_in_table(self, tmp_path):
+        (tmp_path / ".supermedicine").mkdir()
+        (tmp_path / ".supermedicine" / "config.yaml").write_text(
+            yaml.safe_dump(
+                {
+                    "llm": {
+                        "provider": "openai",
+                        "providers": {
+                            "openai": {
+                                "api_format": "openai",
+                                "base_url": "https://llm.test/v1",
+                                "api_key": "sk-llm-status-test",
+                                "model": "gpt-dash",
+                            }
+                        },
+                    }
+                },
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
+
+        async def scenario() -> None:
+            app = SuperMedicineTUI(project_root=tmp_path)
+            async with app.run_test(size=(180, 50)) as pilot:
+                app.action_switch_view("dashboard")
+                await pilot.pause()
+
+                table = app.query_one("#dashboard-table", DataTable)
+                rows = [str(table.get_row_at(i)) for i in range(table.row_count)]
+                combined = " ".join(rows)
+                assert "openai" in combined
+                assert "gpt-dash" in combined
+                assert "LLM 已就绪" in combined
+
+        asyncio.run(scenario())
+
+    def test_dashboard_view_no_polling_timer(self):
+        source = inspect.getsource(DashboardView)
+
+        assert "set_interval" not in source
+        assert "Timer" not in source
+
+    def test_dashboard_context_action_hint_varies_by_state(self, tmp_path):
+        context = collect_dashboard_context(tmp_path)
+        assert t("dashboard_action_init") in context["action_hint"]
+
+        (tmp_path / ".supermedicine").mkdir()
+        context = collect_dashboard_context(tmp_path)
+        assert t("dashboard_action_create_workspace") in context["action_hint"]
+
+        WorkspaceManager(tmp_path).initialize_workspace("hint-ws")
+        context = collect_dashboard_context(tmp_path)
+        assert t("dashboard_action_configure_llm") in context["action_hint"]
+
+    def test_dashboard_controller_advice_text_returns_action_hint(self, tmp_path):
+        controller = DashboardOverviewController(tmp_path)
+        context = controller.context()
+
+        assert controller.advice_text() == context["action_hint"]
+
+
 # ═══ test_tui_dialog_history ═══
 
 
@@ -863,6 +1426,36 @@ def test_tui_startup_metadata_covers_all_primary_views_and_shortcuts():
     assert "? 帮助" not in SuperMedicineTUI.shortcut_hint_text()
 
 
+def test_opentui_page_inventory_covers_all_primary_pages_and_interactions():
+    routes = SuperMedicineTUI.opentui_routes()
+    by_view = {route.view_id: route for route in routes}
+
+    assert set(by_view) == {
+        "chat",
+        "dashboard",
+        "workspace",
+        "paper",
+        "experience",
+        "tool",
+        "dialog",
+        "llm",
+        "experiment",
+        "log",
+    }
+    for view_id in [item.view_id for item in SuperMedicineTUI.nav_items()]:
+        route = by_view[view_id]
+        assert route.placeholder
+        assert route.sections
+        assert route.actions
+        assert "OpenTUI" in route.placeholder or "TextTable-style" in route.placeholder
+    assert by_view["chat"].sections == (
+        "Conversation Scrollback",
+        "Prompt Footer",
+        "Processing / Thinking Status",
+    )
+    assert "隐藏" not in " ".join(by_view["llm"].actions)
+
+
 def test_tui_labels_follow_chinese_first_policy_with_reasonable_english_terms():
     chinese_first_expectations = {
         "nav_dashboard": "状态看板",
@@ -943,6 +1536,27 @@ def test_tui_theme_layout_and_status_text_are_testable_without_terminal(tmp_path
     running_status = app.status_text("llm")
     assert "任务执行中" in running_status.center
     assert "当前视图：LLM 配置" in running_status.right
+
+
+def test_tui_small_window_layout_uses_bounded_scrollable_regions():
+    stylesheet = Path(SuperMedicineTUI.CSS_PATH).read_text(encoding="utf-8")
+    compose_source = inspect.getsource(SuperMedicineTUI.compose)
+
+    assert "ScrollableContainer(id=\"content-pane\")" in compose_source
+    for selector in ["#app-body", "#sidebar", "#main-area", "#content-pane"]:
+        block = re.search(
+            rf"{re.escape(selector)}\s*\{{(?P<body>.*?)\}}", stylesheet, re.DOTALL
+        )
+        assert block is not None, selector
+        body = block.group("body")
+        assert "min-height: 0" in body, selector
+    for selector in ["#sidebar", "#main-area", "#content-pane", "#chat-output"]:
+        block = re.search(
+            rf"{re.escape(selector)}\s*\{{(?P<body>.*?)\}}", stylesheet, re.DOTALL
+        )
+        assert block is not None, selector
+        assert "overflow-y: auto" in block.group("body"), selector
+    assert "min-height: 8" not in stylesheet
 
 
 def test_tui_dynamic_refresh_inventory_documents_targeted_boundary():
@@ -1225,9 +1839,12 @@ def test_tui_menu_binding_opens_view_submenu_and_theme_entry(tmp_path, menu_key)
                 for static in app.screen.query("#tui-main-menu-list Static")
             )
             assert "选择视图" in menu_text
+            assert "权限设置" in menu_text
             assert "切换主题" in menu_text
             assert "帮助" in menu_text
             assert "最大化/还原" in menu_text
+            assert "工作区设置" not in menu_text
+            assert "LLM 设置" not in menu_text
 
             await pilot.press("enter")
             await pilot.pause()
@@ -1236,7 +1853,10 @@ def test_tui_menu_binding_opens_view_submenu_and_theme_entry(tmp_path, menu_key)
                 for static in app.screen.query("#tui-view-menu-list Static")
             )
             assert "对话" in view_text
+            assert "工作区" in view_text
+            assert "LLM 配置" in view_text
             assert "Log 报告" in view_text
+            assert "权限设置" not in view_text
 
             await pilot.press("down", "enter")
             await pilot.pause()
@@ -1253,11 +1873,46 @@ def test_tui_upper_left_menu_button_opens_menu(tmp_path):
             button = app.query_one("#menu-button", Static)
             assert "菜单" in str(button.renderable)
             assert "M" in str(button.renderable)
+            assert list(app.query("Header")) == []
+            assert list(app.query("Footer")) == []
 
             await pilot.click("#menu-button")
             await pilot.pause()
 
             assert app.screen.query_one("#tui-main-menu-list", ListView)
+
+    asyncio.run(scenario())
+
+
+def test_tui_menu_permission_entry_matches_permission_shortcut(tmp_path):
+    async def scenario() -> None:
+        app = SuperMedicineTUI(project_root=tmp_path)
+        async with app.run_test(size=(140, 45)) as pilot:
+            await pilot.press("M")
+            await pilot.pause()
+
+            menu_text = "\n".join(
+                str(cast(Static, static).renderable)
+                for static in app.screen.query("#tui-main-menu-list Static")
+            )
+            assert "权限设置" in menu_text
+            assert "工作区设置" not in menu_text
+            assert "LLM 设置" not in menu_text
+
+            await pilot.press("down", "enter")
+            await pilot.pause()
+            assert app._current_view == "permission"
+            assert app.view_title_text(app._current_view) == "权限"
+
+            await pilot.press("M", "enter")
+            await pilot.pause()
+            view_text = "\n".join(
+                str(cast(Static, static).renderable)
+                for static in app.screen.query("#tui-view-menu-list Static")
+            )
+            assert "LLM 配置" in view_text
+            assert "工作区" in view_text
+            assert "权限设置" not in view_text
 
     asyncio.run(scenario())
 
@@ -1420,6 +2075,90 @@ def test_experience_view_empty_success_error_copy_and_secret_redaction_are_expli
 
 
 # ═══ test_tui_experiment_screen ═══
+
+
+class _FakeExperimentFieldTextArea:
+    def __init__(self) -> None:
+        self.text = ""
+
+    def load_text(self, value: str) -> None:
+        self.text = value
+
+
+class _FakeExperimentFieldTableEvent:
+    def __init__(self, row_key: str) -> None:
+        self.data_table = type("FakeExperimentInputTable", (), {"id": "experiment-input-table"})()
+        self.row_key = row_key
+
+
+def _fake_experiment_field_highlighted(row_key: str) -> DataTable.RowHighlighted:
+    return cast(DataTable.RowHighlighted, _FakeExperimentFieldTableEvent(row_key))
+
+
+def _fake_experiment_field_selected(row_key: str) -> DataTable.RowSelected:
+    return cast(DataTable.RowSelected, _FakeExperimentFieldTableEvent(row_key))
+
+
+def _experiment_view_for_field_paste() -> tuple[Any, _FakeExperimentFieldTextArea]:
+    textarea = _FakeExperimentFieldTextArea()
+    view = type(
+        "FieldPasteExperimentView",
+        (),
+        {
+            "_selected_field_key": None,
+            "_last_activated_field_key": None,
+            "query_one": lambda self, selector, widget_type=None: textarea,
+        },
+    )()
+    view._paste_field_name = lambda row_key: ExperimentGuideView._paste_field_name(
+        view, row_key
+    )
+    return view, textarea
+
+
+def test_experiment_field_switch_does_not_paste_previous_selected_field() -> None:
+    view, textarea = _experiment_view_for_field_paste()
+
+    ExperimentGuideView.on_data_table_row_highlighted(
+        view, _fake_experiment_field_highlighted("sample_id")
+    )
+    ExperimentGuideView.on_data_table_row_selected(
+        view, _fake_experiment_field_selected("sample_id")
+    )
+    ExperimentGuideView.on_data_table_row_highlighted(
+        view, _fake_experiment_field_highlighted("target_protein")
+    )
+    ExperimentGuideView.on_data_table_row_selected(
+        view, _fake_experiment_field_selected("target_protein")
+    )
+
+    assert textarea.text == ""
+    assert view._selected_field_key == "target_protein"
+    assert view._last_activated_field_key == "target_protein"
+
+
+def test_experiment_field_double_activation_pastes_current_field_once() -> None:
+    view, textarea = _experiment_view_for_field_paste()
+
+    ExperimentGuideView.on_data_table_row_highlighted(
+        view, _fake_experiment_field_highlighted("sample_id")
+    )
+    ExperimentGuideView.on_data_table_row_selected(
+        view, _fake_experiment_field_selected("sample_id")
+    )
+    ExperimentGuideView.on_data_table_row_highlighted(
+        view, _fake_experiment_field_highlighted("target_protein")
+    )
+    ExperimentGuideView.on_data_table_row_selected(
+        view, _fake_experiment_field_selected("target_protein")
+    )
+    ExperimentGuideView.on_data_table_row_selected(
+        view, _fake_experiment_field_selected("target_protein")
+    )
+
+    assert textarea.text == "target_protein="
+    assert "sample_id=" not in textarea.text
+    assert view._last_activated_field_key is None
 
 
 def test_tui_explicit_switch_opens_experiment_screen_and_preserves_prompt_focus(
@@ -2176,6 +2915,353 @@ def test_log_screen_severity_label_uses_explicit_mapping_for_each_level():
         assert style_token in str(rendered.style)
 
 
+class TestLogScreenRefreshAndAggregation:
+    def test_log_screen_refresh_view_data_populates_table_from_store(self, tmp_path):
+        store = LogReportStore(tmp_path)
+        store.write("pre-existing log", session_id="pre-session", severity="Info")
+
+        async def scenario() -> None:
+            app = SuperMedicineTUI(project_root=tmp_path)
+            async with app.run_test(size=(140, 45)) as pilot:
+                app.action_switch_view("log")
+                await pilot.pause()
+
+                table = app.query_one("#log-table", DataTable)
+                assert table.row_count == 1
+                assert "pre-session" in str(table.get_row_at(0))
+                assert t("log_list") in _static_text(app.query_one("#log-status", Static))
+
+        asyncio.run(scenario())
+
+    def test_log_screen_refresh_after_external_write_updates_table(self, tmp_path):
+        store = LogReportStore(tmp_path)
+
+        async def scenario() -> None:
+            app = SuperMedicineTUI(project_root=tmp_path)
+            async with app.run_test(size=(140, 45)) as pilot:
+                app.action_switch_view("log")
+                await pilot.pause()
+
+                table = app.query_one("#log-table", DataTable)
+                assert table.row_count == 0
+
+                store.write("external entry", session_id="ext-session", severity="Info")
+
+                app._views["log"].refresh_view_data()
+                await pilot.pause()
+
+                assert table.row_count == 1
+                assert "ext-session" in str(table.get_row_at(0))
+                assert t("log_refreshed") in _static_text(app.query_one("#log-status", Static))
+
+        asyncio.run(scenario())
+
+    def test_log_screen_auto_follow_toggle_announces_state_change(self, tmp_path):
+        store = LogReportStore(tmp_path)
+        for i in range(3):
+            store.write(f"entry {i}", session_id="follow-test", severity="Info")
+
+        async def scenario() -> None:
+            app = SuperMedicineTUI(project_root=tmp_path)
+            async with app.run_test(size=(140, 45)) as pilot:
+                app.action_switch_view("log")
+                await pilot.pause()
+
+                view = app._views["log"]
+                assert view._auto_follow is True
+
+                await pilot.click("#log-auto-follow")
+                await pilot.pause()
+
+                assert view._auto_follow is False
+                status = _static_text(app.query_one("#log-status", Static))
+                assert "自动跟随：关" in status
+
+        asyncio.run(scenario())
+
+    def test_log_screen_auto_follow_scrolls_to_last_entry(self, tmp_path):
+        store = LogReportStore(tmp_path)
+        for i in range(5):
+            store.write(f"entry {i}", session_id="scroll-test", severity="Info")
+
+        async def scenario() -> None:
+            app = SuperMedicineTUI(project_root=tmp_path)
+            async with app.run_test(size=(140, 45)) as pilot:
+                app.action_switch_view("log")
+                await pilot.pause()
+
+                table = app.query_one("#log-table", DataTable)
+                assert table.row_count == 5
+                assert table.cursor_row == 4
+
+        asyncio.run(scenario())
+
+    def test_log_screen_multi_session_aggregated_statistics_in_status(self, tmp_path):
+        store = LogReportStore(tmp_path)
+        store.write("alpha error", session_id="stat-alpha", severity="Error")
+        store.write("alpha info", session_id="stat-alpha", severity="Info")
+        store.write("beta warning", session_id="stat-beta", severity="Warning")
+
+        async def scenario() -> None:
+            app = SuperMedicineTUI(project_root=tmp_path)
+            async with app.run_test(size=(140, 45)) as pilot:
+                app.action_switch_view("log")
+                await pilot.pause()
+
+                status = _static_text(app.query_one("#log-status", Static))
+                assert "entries=3" in status
+                assert "Error=1" in status
+                assert "Warning=1" in status
+                assert "Info=1" in status
+
+        asyncio.run(scenario())
+
+    def test_log_screen_detail_statistics_match_selected_session_entry(self, tmp_path):
+        store = LogReportStore(tmp_path)
+        store.write("alpha error", session_id="detail-alpha", severity="Error")
+        store.write("alpha info", session_id="detail-alpha", severity="Info")
+        store.write("beta success", session_id="detail-beta", severity="Success")
+
+        async def scenario() -> None:
+            app = SuperMedicineTUI(project_root=tmp_path)
+            async with app.run_test(size=(140, 45)) as pilot:
+                app.action_switch_view("log")
+                await pilot.pause()
+
+                table = app.query_one("#log-table", DataTable)
+                beta_row = next(
+                    i
+                    for i in range(table.row_count)
+                    if "detail-beta" in str(table.get_row_at(i))
+                )
+                table.move_cursor(row=beta_row, column=0)
+                await pilot.click("#log-show")
+                await pilot.pause()
+
+                detail = _static_text(app.query_one("#log-detail", Static))
+                assert t("log_loaded") in detail
+                assert "detail-beta" in detail
+                assert "Statistics: entries=1" in detail
+                assert "Success=1" in detail
+                assert "Error=0" in detail
+
+        asyncio.run(scenario())
+
+    def test_log_screen_write_with_session_refreshes_and_displays_new_entry(self, tmp_path):
+        async def scenario() -> None:
+            app = SuperMedicineTUI(project_root=tmp_path)
+            async with app.run_test(size=(140, 45)) as pilot:
+                app.action_switch_view("log")
+                await pilot.pause()
+
+                app.query_one("#log-session-id-input", Input).value = "ui-write-session"
+                app.query_one("#log-message-input", TextArea).load_text("UI log entry")
+
+                await pilot.click("#log-write")
+                await pilot.pause()
+
+                table = app.query_one("#log-table", DataTable)
+                assert table.row_count == 1
+                assert "ui-write-session" in str(table.get_row_at(0))
+                status = _static_text(app.query_one("#log-status", Static))
+                assert t("log_saved") in status
+
+                log_dir = tmp_path / ".supermedicine" / "logs"
+                assert len(list(log_dir.glob("*.json"))) == 1
+
+        asyncio.run(scenario())
+
+    def test_log_screen_write_without_session_routes_to_tui_application(self, tmp_path):
+        async def scenario() -> None:
+            app = SuperMedicineTUI(project_root=tmp_path)
+            async with app.run_test(size=(140, 45)) as pilot:
+                app.action_switch_view("log")
+                await pilot.pause()
+
+                app.query_one("#log-message-input", TextArea).load_text("no session entry")
+
+                await pilot.click("#log-write")
+                await pilot.pause()
+
+                table = app.query_one("#log-table", DataTable)
+                assert table.row_count == 1
+                assert TUI_LOG_SESSION_ID in str(table.get_row_at(0))
+
+        asyncio.run(scenario())
+
+    def test_log_screen_severity_text_redacts_secrets_in_displayed_detail(self, tmp_path):
+        secret = "sk-log-detail-secret"
+        store = LogReportStore(tmp_path)
+        store.write(f"api failure api_key={secret}", session_id="redact-detail", severity="Error")
+
+        async def scenario() -> None:
+            app = SuperMedicineTUI(project_root=tmp_path)
+            async with app.run_test(size=(140, 45)) as pilot:
+                app.action_switch_view("log")
+                await pilot.pause()
+
+                table = app.query_one("#log-table", DataTable)
+                table.move_cursor(row=0, column=0)
+                await pilot.click("#log-show")
+                await pilot.pause()
+
+                detail = _static_text(app.query_one("#log-detail", Static))
+                assert secret not in detail
+                assert "[REDACTED]" in detail
+
+        asyncio.run(scenario())
+
+    def test_log_screen_preview_text_truncates_long_messages(self):
+        preview = LogReportView._preview_text("a" * 200, limit=50)
+
+        assert len(preview) <= 51
+        assert preview.endswith("…")
+
+    def test_log_screen_wrapped_detail_text_line_wraps_long_lines(self):
+        wrapped = LogReportView._wrapped_detail_text("b" * 400, line_limit=100)
+
+        for line in wrapped.splitlines():
+            assert len(line) <= 100
+
+    def test_log_screen_statistics_text_format(self):
+        text = LogReportView._statistics_text(
+            {
+                "entry_count": 5,
+                "severity_counts": {
+                    "Error": 2,
+                    "Warning": 1,
+                    "Info": 1,
+                    "Debug": 0,
+                    "Success": 1,
+                },
+            }
+        )
+
+        assert "entries=5" in text
+        assert "Error=2" in text
+        assert "Warning=1" in text
+        assert "Info=1" in text
+        assert "Debug=0" in text
+        assert "Success=1" in text
+
+    def test_log_screen_statistics_text_handles_empty_statistics(self):
+        text = LogReportView._statistics_text({})
+
+        assert "entries=0" in text
+        assert "Error=0" in text
+
+    def test_log_screen_entry_severity_uses_explicit_over_detected(self):
+        entry = {"severity": "Success", "raw_message": "operation failed"}
+
+        assert LogReportView._entry_severity(entry) == "Success"
+
+    def test_log_screen_entry_severity_falls_back_to_detection(self):
+        entry = {"severity": "", "raw_message": "operation failed"}
+
+        assert LogReportView._entry_severity(entry) == "Error"
+
+    def test_log_screen_entry_message_formats_with_severity_label(self):
+        entry = {"raw_message": "saved data", "severity": "Success"}
+        message = LogReportView._entry_message(entry, severity="Success")
+
+        assert message == "【Success】 saved data"
+
+    def test_log_screen_storage_location_displays_log_and_audit_paths(self, tmp_path):
+        store = LogReportStore(tmp_path)
+        store.write("test", session_id="path-test")
+
+        async def scenario() -> None:
+            app = SuperMedicineTUI(project_root=tmp_path)
+            async with app.run_test(size=(140, 45)) as pilot:
+                app.action_switch_view("log")
+                await pilot.pause()
+
+                location = _static_text(app.query_one("#log-storage-location", Static))
+                assert "存储位置" in location
+                assert "Log/Report=" in location
+                assert "Audit=" in location
+                assert "audit.jsonl" in location
+                assert "logs" in location
+
+        asyncio.run(scenario())
+
+    def test_log_screen_show_on_no_selection_shows_error(self, tmp_path):
+        async def scenario() -> None:
+            app = SuperMedicineTUI(project_root=tmp_path)
+            async with app.run_test(size=(140, 45)) as pilot:
+                app.action_switch_view("log")
+                await pilot.pause()
+
+                view = app._views["log"]
+                table = view.query_one("#log-table", DataTable)
+                assert table.row_count == 0
+
+                view._show_selected_log()
+
+                status = _static_text(app.query_one("#log-status", Static))
+                assert t("error") in status
+                assert t("log_no_reports") in status
+
+        asyncio.run(scenario())
+
+    def test_log_screen_refresh_preserves_cursor_position_when_auto_follow_off(self, tmp_path):
+        store = LogReportStore(tmp_path)
+        for i in range(5):
+            store.write(f"entry {i}", session_id="cursor-test", severity="Info")
+
+        async def scenario() -> None:
+            app = SuperMedicineTUI(project_root=tmp_path)
+            async with app.run_test(size=(140, 45)) as pilot:
+                app.action_switch_view("log")
+                await pilot.pause()
+
+                view = app._views["log"]
+                table = app.query_one("#log-table", DataTable)
+
+                view._set_auto_follow(False)
+                table.move_cursor(row=1, column=0)
+                await pilot.pause()
+
+                store.write("new entry", session_id="cursor-test", severity="Info")
+                view.refresh_logs(refreshed=True)
+                await pilot.pause()
+
+                assert table.cursor_row <= 2
+
+        asyncio.run(scenario())
+
+    def test_log_screen_compose_declares_required_widgets(self):
+        compose_source = inspect.getsource(LogReportView.compose)
+
+        assert 'id="log-redaction-hint"' in compose_source
+        assert 'id="log-action-hint"' in compose_source
+        assert 'id="log-session-id-input"' in compose_source
+        assert 'id="log-message-input"' in compose_source
+        assert 'id="log-write"' in compose_source
+        assert 'id="log-show"' in compose_source
+        assert 'id="log-refresh"' in compose_source
+        assert 'id="log-auto-follow"' in compose_source
+        assert 'id="log-table"' in compose_source
+        assert 'id="log-detail"' in compose_source
+        assert 'id="log-status"' in compose_source
+
+    def test_log_screen_uses_targeted_refresh_without_polling(self):
+        source = inspect.getsource(LogReportView)
+
+        assert "refresh_view_data" in source
+        assert "set_interval" not in source
+        assert "Timer" not in source
+
+    def test_log_screen_store_property_creates_fresh_store(self, tmp_path):
+        view = LogReportView(project_root=tmp_path)
+
+        store1 = view.store
+        store2 = view.store
+
+        assert store1 is not store2
+        assert store1.project_dir == store2.project_dir
+
+
 # ═══ test_tui_paper_screens ═══
 
 
@@ -2284,6 +3370,258 @@ def test_paper_view_empty_success_error_copy_and_secret_redaction_are_explicit()
 
 
 # ═══ test_tui_permissions ═══
+
+
+class TestPermissionScreenController:
+    def test_set_mode_conservative_without_confirmation(self, tmp_path):
+        controller = PermissionScreenController(tmp_path)
+
+        result = controller.set_mode("conservative")
+
+        assert result["mode"] == "conservative"
+        assert result["full_mode_confirmed"] is False
+
+    def test_set_mode_full_requires_full_confirmation_text(self, tmp_path):
+        controller = PermissionScreenController(tmp_path)
+
+        result = controller.set_mode("full", confirmation_text="FULL")
+
+        assert result["mode"] == "full"
+        assert result["full_mode_confirmed"] is True
+
+    def test_set_mode_full_without_confirmation_text_raises(self, tmp_path):
+        controller = PermissionScreenController(tmp_path)
+
+        with pytest.raises(FullAccessConfirmationRequired):
+            controller.set_mode("full", confirmation_text="")
+
+    def test_set_mode_full_with_wrong_confirmation_text_raises(self, tmp_path):
+        controller = PermissionScreenController(tmp_path)
+
+        with pytest.raises(FullAccessConfirmationRequired):
+            controller.set_mode("full", confirmation_text="full")
+
+    def test_set_mode_full_with_whitespace_confirmation_raises(self, tmp_path):
+        controller = PermissionScreenController(tmp_path)
+
+        with pytest.raises(FullAccessConfirmationRequired):
+            controller.set_mode("full", confirmation_text="   ")
+
+    def test_set_mode_conservative_ignores_confirmation_text(self, tmp_path):
+        controller = PermissionScreenController(tmp_path)
+
+        result = controller.set_mode("conservative", confirmation_text="anything")
+
+        assert result["mode"] == "conservative"
+        assert result["full_mode_confirmed"] is False
+
+    def test_set_mode_persists_to_config_file(self, tmp_path):
+        controller = PermissionScreenController(tmp_path)
+        controller.set_mode("full", confirmation_text="FULL")
+
+        reloaded = PermissionScreenController(tmp_path)
+        config = reloaded.current_config()
+
+        assert config["mode"] == "full"
+        assert config["full_mode_confirmed"] is True
+
+    def test_set_mode_switches_from_full_back_to_conservative(self, tmp_path):
+        controller = PermissionScreenController(tmp_path)
+        controller.set_mode("full", confirmation_text="FULL")
+        result = controller.set_mode("conservative")
+
+        assert result["mode"] == "conservative"
+        assert result["full_mode_confirmed"] is False
+
+    def test_authorize_directory_adds_to_config(self, tmp_path):
+        external = tmp_path / "external"
+        external.mkdir()
+        controller = PermissionScreenController(tmp_path)
+
+        result = controller.authorize_directory(external)
+
+        assert str(external.resolve()) in result["authorized_external_roots"]
+
+    def test_revoke_directory_removes_from_config(self, tmp_path):
+        external = tmp_path / "external"
+        external.mkdir()
+        controller = PermissionScreenController(tmp_path)
+        controller.authorize_directory(external)
+
+        result = controller.revoke_directory(external)
+
+        assert str(external.resolve()) not in result["authorized_external_roots"]
+
+    def test_access_decision_returns_correct_structure(self, tmp_path):
+        project = tmp_path / "project"
+        project.mkdir()
+        controller = PermissionScreenController(project)
+
+        decision = controller.access_decision(project / "notes.md", "write")
+
+        assert decision["status"] == "allowed"
+        assert decision["mode"] == "conservative"
+        assert isinstance(decision["reason"], str)
+        assert isinstance(decision["path"], str)
+        assert isinstance(decision["helper"], str)
+
+    def test_access_decision_external_write_denied_in_conservative(self, tmp_path):
+        project = tmp_path / "project"
+        external = tmp_path / "external"
+        project.mkdir()
+        external.mkdir()
+        controller = PermissionScreenController(project)
+
+        decision = controller.access_decision(external / "out.csv", "write")
+
+        assert decision["status"] == "denied"
+
+    def test_access_decision_external_read_prompts_in_conservative(self, tmp_path):
+        project = tmp_path / "project"
+        external = tmp_path / "external"
+        project.mkdir()
+        external.mkdir()
+        controller = PermissionScreenController(project)
+
+        decision = controller.access_decision(external / "data.csv", "read")
+
+        assert decision["status"] == "prompt_required"
+
+    def test_current_config_returns_default_when_no_config_file(self, tmp_path):
+        controller = PermissionScreenController(tmp_path)
+        config = controller.current_config()
+
+        assert config["mode"] == "conservative"
+        assert config["full_mode_confirmed"] is False
+        assert config["authorized_external_roots"] == []
+
+    def test_project_root_defaults_to_cwd(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        controller = PermissionScreenController()
+
+        assert controller.project_root == tmp_path
+
+
+class TestPermissionViewComposition:
+    def test_permission_view_has_separate_mode_select_and_confirm_input(self):
+        source = inspect.getsource(PermissionView.compose)
+
+        assert "permission-mode-select" in source
+        assert "permission-confirm-input" in source
+        assert "Select" in source
+        assert "Input" in source
+
+    def test_permission_view_has_add_and_remove_root_controls(self):
+        source = inspect.getsource(PermissionView.compose)
+
+        assert "permission-root-input" in source
+        assert "permission-add-root" in source
+        assert "permission-remove-root" in source
+
+    def test_permission_view_has_refresh_button(self):
+        source = inspect.getsource(PermissionView.compose)
+
+        assert "permission-refresh" in source
+
+    def test_permission_view_has_status_and_risk_notice(self):
+        source = inspect.getsource(PermissionView.compose)
+
+        assert "permission-status" in source
+        assert "permission-risk" in source
+        assert "permission-current" in source
+
+    def test_permission_risk_notice_mentions_full_confirmation(self):
+        from core.tui.screens.permission_screen import PERMISSION_RISK_NOTICE
+
+        assert "FULL" in PERMISSION_RISK_NOTICE
+        assert "显式确认" in PERMISSION_RISK_NOTICE
+
+    def test_permission_risk_notice_mentions_no_silent_escalation(self):
+        from core.tui.screens.permission_screen import PERMISSION_RISK_NOTICE
+
+        assert "不会静默提权" in PERMISSION_RISK_NOTICE
+        assert "不会绕过" in PERMISSION_RISK_NOTICE
+
+
+class TestPermissionInputSeparation:
+    def test_mode_select_widget_offers_conservative_and_full(self):
+        source = inspect.getsource(PermissionView.compose)
+
+        assert '"conservative"' in source
+        assert '"full"' in source
+
+    def test_confirm_input_placeholder_documents_full_requirement(self):
+        source = inspect.getsource(PermissionView.compose)
+
+        assert "FULL" in source
+
+    def test_controller_uses_separate_mode_and_confirmation(self, tmp_path):
+        controller = PermissionScreenController(tmp_path)
+
+        result1 = controller.set_mode("conservative")
+        assert result1["mode"] == "conservative"
+
+        result2 = controller.set_mode("full", confirmation_text="FULL")
+        assert result2["mode"] == "full"
+
+        with pytest.raises(FullAccessConfirmationRequired):
+            controller.set_mode("full", confirmation_text="")
+
+    def test_handle_input_submit_routes_confirm_input_to_set_mode(self):
+        source = inspect.getsource(PermissionView.handle_input_submit)
+
+        assert "permission-confirm-input" in source
+        assert "_set_mode_from_form" in source
+
+    def test_handle_input_submit_routes_root_input_to_add_root(self):
+        source = inspect.getsource(PermissionView.handle_input_submit)
+
+        assert "permission-root-input" in source
+        assert "_add_root_from_form" in source
+
+    def test_set_mode_from_form_clears_confirmation_input_after_success(self):
+        source = inspect.getsource(PermissionView._set_mode_from_form)
+
+        assert 'permission-confirm-input' in source
+        assert '.value = ""' in source
+
+
+class TestPermissionControllerSaveIntegration:
+    def test_authorize_then_access_decision_allows(self, tmp_path):
+        external = tmp_path / "external"
+        external.mkdir()
+        project = tmp_path / "project"
+        project.mkdir()
+        controller = PermissionScreenController(project)
+
+        controller.authorize_directory(external)
+        decision = controller.access_decision(external / "file.txt", "write")
+
+        assert decision["status"] == "allowed"
+
+    def test_revoke_then_access_decision_denies(self, tmp_path):
+        external = tmp_path / "external"
+        external.mkdir()
+        project = tmp_path / "project"
+        project.mkdir()
+        controller = PermissionScreenController(project)
+
+        controller.authorize_directory(external)
+        controller.revoke_directory(external)
+        decision = controller.access_decision(external / "file.txt", "write")
+
+        assert decision["status"] == "denied"
+
+    def test_full_mode_access_decision_allows_external(self, tmp_path):
+        project = tmp_path / "project"
+        project.mkdir()
+        controller = PermissionScreenController(project)
+
+        controller.set_mode("full", confirmation_text="FULL")
+        decision = controller.access_decision(tmp_path / "anywhere" / "file.txt", "write")
+
+        assert decision["status"] == "allowed"
+        assert decision["mode"] == "full"
 
 
 def test_high_risk_action_refuses_unconfirmed_request_without_permission_call():
@@ -2583,6 +3921,302 @@ def test_tui_navigation_metadata_preserves_numeric_shortcuts_and_minimal_titles(
 
 
 # ═══ test_tui_workspace_screens ═══
+
+
+class TestWorkspaceRefresh:
+    def test_workspace_view_exposes_refresh_view_data_hook(self):
+        assert hasattr(WorkspaceView, "refresh_view_data")
+        source = inspect.getsource(WorkspaceView.refresh_view_data)
+        assert "_load_workspaces" in source
+        assert "refreshed=True" in source
+
+    def test_workspace_view_compose_declares_required_widgets(self):
+        source = inspect.getsource(WorkspaceView.compose)
+
+        assert 'id="workspace-table"' in source
+        assert 'id="workspace-id-input"' in source
+        assert 'id="workspace-create"' in source
+        assert 'id="workspace-select"' in source
+        assert 'id="workspace-refresh"' in source
+        assert 'id="workspace-delete"' in source
+        assert 'id="workspace-status"' in source
+
+    def test_workspace_view_uses_targeted_refresh_without_polling(self):
+        source = inspect.getsource(WorkspaceView)
+
+        assert "refresh_view_data" in source
+        assert "set_interval" not in source
+
+    def test_workspace_screen_loads_data_on_mount(self, tmp_path):
+        manager = WorkspaceManager(tmp_path)
+        manager.initialize_workspace("test-ws")
+
+        async def scenario() -> None:
+            app = SuperMedicineTUI(project_root=tmp_path)
+            async with app.run_test(size=(180, 80)) as pilot:
+                app.action_switch_view("workspace")
+                await pilot.pause()
+
+                table = app.query_one("#workspace-table", DataTable)
+                assert table.row_count == 1
+                assert "test-ws" in str(table.get_row_at(0))
+                status = _static_text(app.query_one("#workspace-status", Static))
+                assert t("workspace_list") in status
+
+        asyncio.run(scenario())
+
+    def test_workspace_screen_shows_empty_state_when_no_workspaces(self, tmp_path):
+        async def scenario() -> None:
+            app = SuperMedicineTUI(project_root=tmp_path)
+            async with app.run_test(size=(180, 80)) as pilot:
+                app.action_switch_view("workspace")
+                await pilot.pause()
+
+                table = app.query_one("#workspace-table", DataTable)
+                assert table.row_count == 0
+                status = _static_text(app.query_one("#workspace-status", Static))
+                assert t("workspace_no_workspaces") in status
+
+        asyncio.run(scenario())
+
+    def test_workspace_screen_refresh_view_data_updates_table(self, tmp_path):
+        manager = WorkspaceManager(tmp_path)
+        manager.initialize_workspace("initial-ws")
+
+        async def scenario() -> None:
+            app = SuperMedicineTUI(project_root=tmp_path)
+            async with app.run_test(size=(180, 80)) as pilot:
+                app.action_switch_view("workspace")
+                await pilot.pause()
+
+                table = app.query_one("#workspace-table", DataTable)
+                assert table.row_count == 1
+
+                manager.initialize_workspace("external-ws")
+                app._views["workspace"].refresh_view_data()
+                await pilot.pause()
+
+                assert table.row_count == 2
+                status = _static_text(app.query_one("#workspace-status", Static))
+                assert t("workspace_refreshed") in status
+
+        asyncio.run(scenario())
+
+    def test_workspace_screen_refresh_button_triggers_reload(self, tmp_path):
+        manager = WorkspaceManager(tmp_path)
+        manager.initialize_workspace("btn-ws")
+
+        async def scenario() -> None:
+            app = SuperMedicineTUI(project_root=tmp_path)
+            async with app.run_test(size=(180, 80)) as pilot:
+                app.action_switch_view("workspace")
+                await pilot.pause()
+
+                table = app.query_one("#workspace-table", DataTable)
+                assert table.row_count == 1
+
+                manager.initialize_workspace("added-ws")
+                app.query_one("#workspace-refresh", Button).press()
+                await _wait_for_tui_condition(pilot, lambda: table.row_count == 2)
+
+                assert table.row_count == 2
+                status = _static_text(app.query_one("#workspace-status", Static))
+                assert t("workspace_refreshed") in status
+
+        asyncio.run(scenario())
+
+    def test_workspace_screen_refresh_preserves_selected_row(self, tmp_path):
+        manager = WorkspaceManager(tmp_path)
+        manager.initialize_workspace("alpha")
+        manager.initialize_workspace("beta")
+
+        async def scenario() -> None:
+            app = SuperMedicineTUI(project_root=tmp_path)
+            async with app.run_test(size=(180, 80)) as pilot:
+                app.action_switch_view("workspace")
+                await pilot.pause()
+
+                table = app.query_one("#workspace-table", DataTable)
+                beta_index = next(
+                    i for i in range(table.row_count) if "beta" in str(table.get_row_at(i))
+                )
+                table.move_cursor(row=beta_index, column=0)
+                await pilot.pause()
+
+                manager.initialize_workspace("gamma")
+                app._views["workspace"].refresh_view_data()
+                await pilot.pause()
+
+                assert table.row_count == 3
+                row_key = table.coordinate_to_cell_key(table.cursor_coordinate).row_key
+                assert str(row_key.value) == "beta"
+
+        asyncio.run(scenario())
+
+    def test_workspace_screen_create_then_refresh_shows_new_workspace(self, tmp_path):
+        async def scenario() -> None:
+            app = SuperMedicineTUI(project_root=tmp_path)
+            async with app.run_test(size=(180, 80)) as pilot:
+                app.action_switch_view("workspace")
+                await pilot.pause()
+
+                table = app.query_one("#workspace-table", DataTable)
+                assert table.row_count == 0
+
+                input_widget = app.query_one("#workspace-id-input", Input)
+                input_widget.value = "new-ws"
+                input_widget.focus()
+                await pilot.pause()
+                await pilot.press("enter")
+                await pilot.pause()
+
+                assert table.row_count == 1
+                assert "new-ws" in str(table.get_row_at(0))
+                status = _static_text(app.query_one("#workspace-status", Static))
+                assert "已创建并选择工作区" in status
+
+        asyncio.run(scenario())
+
+    def test_workspace_screen_create_empty_id_shows_error(self, tmp_path):
+        async def scenario() -> None:
+            app = SuperMedicineTUI(project_root=tmp_path)
+            async with app.run_test(size=(180, 80)) as pilot:
+                app.action_switch_view("workspace")
+                await pilot.pause()
+
+                input_widget = app.query_one("#workspace-id-input", Input)
+                input_widget.focus()
+                await pilot.pause()
+                await pilot.press("enter")
+                await pilot.pause()
+
+                status = _static_text(app.query_one("#workspace-status", Static))
+                assert t("error") in status
+
+        asyncio.run(scenario())
+
+    def test_workspace_screen_select_updates_status(self, tmp_path):
+        WorkspaceManager(tmp_path).initialize_workspace("sel-ws")
+
+        async def scenario() -> None:
+            app = SuperMedicineTUI(project_root=tmp_path)
+            async with app.run_test(size=(180, 80)) as pilot:
+                app.action_switch_view("workspace")
+                await _wait_for_tui_condition(
+                    pilot,
+                    lambda: t("workspace_list") in _static_text(app.query_one("#workspace-status", Static))
+                    or t("workspace_no_workspaces") in _static_text(app.query_one("#workspace-status", Static)),
+                )
+
+                input_widget = app.query_one("#workspace-id-input", Input)
+                input_widget.value = "sel-ws"
+                app.query_one("#workspace-select", Button).press()
+                await _wait_for_tui_condition(
+                    pilot,
+                    lambda: "已选择工作区" in _static_text(app.query_one("#workspace-status", Static)),
+                )
+
+                status = _static_text(app.query_one("#workspace-status", Static))
+                assert "已选择工作区" in status
+
+        asyncio.run(scenario())
+
+    def test_workspace_screen_refresh_view_data_shows_refreshed_prefix(self, tmp_path):
+        manager = WorkspaceManager(tmp_path)
+        manager.initialize_workspace("refresh-prefix-ws")
+
+        async def scenario() -> None:
+            app = SuperMedicineTUI(project_root=tmp_path)
+            async with app.run_test(size=(180, 80)) as pilot:
+                app.action_switch_view("workspace")
+                await pilot.pause()
+
+                status_initial = _static_text(app.query_one("#workspace-status", Static))
+                assert t("workspace_list") in status_initial
+
+                app._views["workspace"].refresh_view_data()
+                await pilot.pause()
+
+                status_refreshed = _static_text(app.query_one("#workspace-status", Static))
+                assert t("workspace_refreshed") in status_refreshed
+                assert status_refreshed.startswith(t("workspace_refreshed"))
+
+        asyncio.run(scenario())
+
+    def test_workspace_screen_refresh_empty_shows_refreshed_empty_message(self, tmp_path):
+        async def scenario() -> None:
+            app = SuperMedicineTUI(project_root=tmp_path)
+            async with app.run_test(size=(180, 80)) as pilot:
+                app.action_switch_view("workspace")
+                await pilot.pause()
+
+                app._views["workspace"].refresh_view_data()
+                await pilot.pause()
+
+                status = _static_text(app.query_one("#workspace-status", Static))
+                assert t("workspace_refreshed") in status
+                assert t("workspace_no_workspaces") in status
+
+        asyncio.run(scenario())
+
+    def test_workspace_screen_controller_list_returns_expected_format(self, tmp_path):
+        WorkspaceManager(tmp_path).initialize_workspace("ctrl-ws")
+        controller = WorkspaceScreenController(project_root=tmp_path)
+
+        workspaces = controller.list_workspaces()
+
+        assert len(workspaces) == 1
+        ws = workspaces[0]
+        assert "id" in ws
+        assert "path" in ws
+        assert "metadata" in ws
+        assert ws["id"] == "ctrl-ws"
+
+    def test_workspace_screen_compose_declares_hint_and_title_widgets(self):
+        source = inspect.getsource(WorkspaceView.compose)
+
+        assert 'classes="section-title"' in source
+        assert 'id="workspace-create-hint"' in source
+        assert 'id="workspace-action-hint"' in source
+
+    def test_workspace_screen_ctrl_n_focuses_input(self, tmp_path):
+        async def scenario() -> None:
+            app = SuperMedicineTUI(project_root=tmp_path)
+            async with app.run_test(size=(180, 80)) as pilot:
+                app.action_switch_view("workspace")
+                await pilot.pause()
+
+                await pilot.press("ctrl+n")
+                await pilot.pause()
+
+                input_widget = app.query_one("#workspace-id-input", Input)
+                assert input_widget.has_focus
+
+        asyncio.run(scenario())
+
+    def test_workspace_view_refresh_reads_external_workspace_with_condition_wait(self, tmp_path):
+        async def scenario() -> None:
+            app = SuperMedicineTUI(project_root=tmp_path)
+            async with app.run_test(size=(180, 80)) as pilot:
+                app.action_switch_view("workspace")
+                await pilot.pause()
+
+                table = app.query_one("#workspace-table", DataTable)
+                assert table.row_count == 0
+
+                WorkspaceManager(tmp_path).initialize_workspace("external-a")
+
+                workspace_view = app.query_one("WorkspaceView", WorkspaceView)
+                workspace_view._load_workspaces(refreshed=True)
+                await pilot.pause()
+                await _wait_for_tui_condition(pilot, lambda: table.row_count == 1, timeout=5.0)
+
+                assert table.row_count == 1
+                assert table.get_row("external-a")[0] == "external-a"
+                status = _static_text(app.query_one("#workspace-status", Static))
+                assert t("workspace_refreshed") in status
+
+        asyncio.run(scenario())
 
 
 def test_workspace_screen_create_select_and_recent_state(tmp_path):

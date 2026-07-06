@@ -2196,7 +2196,7 @@ tests/* and .github/workflows/ci.yml cover unit/integration/regression/release h
 - Configuration assumptions: standard project/runtime assumptions only.
 - Maintenance risks: coverage can become stale if target behavior changes.
 
-### `tests/test_kernel.py`
+### `tests/test_kernel_full.py`
 - Lines read: 215.
 - Purpose: Test coverage for kernel behavior.
 - Key responsibilities: classes: TestKernel, ExplodingClient, CapturingClient; callables: _create_kernel, test_init, test_config, test_plugin_registry, test_event_bus, test_kernel_permission_engine_is_runtime_gate_not_prompt_generator, test_llm_chat_provider_exception_returns_structured_error_and_checkpoint, test_llm_chat_injects_supermedicine_system_prompt_before_user_message
@@ -2394,7 +2394,7 @@ tests/* and .github/workflows/ci.yml cover unit/integration/regression/release h
 - Configuration assumptions: standard project/runtime assumptions only.
 - Maintenance risks: coverage can become stale if target behavior changes.
 
-### `tests/test_prisma.py`
+### `tests/test_medical_writing.py`
 - Lines read: 47.
 - Purpose: Test coverage for prisma behavior.
 - Key responsibilities: classes: TestPRISMAChecklist; callables: test_checklist_loaded, test_check_with_good_text, test_check_empty_text
@@ -2526,7 +2526,7 @@ tests/* and .github/workflows/ci.yml cover unit/integration/regression/release h
 - Configuration assumptions: standard project/runtime assumptions only.
 - Maintenance risks: coverage can become stale if target behavior changes.
 
-### `tests/test_stard.py`
+### `tests/test_medical_writing.py`
 - Lines read: 27.
 - Purpose: Test coverage for stard behavior.
 - Key responsibilities: classes: TestSTARDChecklist; callables: test_checklist_loaded, test_check_with_good_text, test_check_empty_text
@@ -2559,7 +2559,7 @@ tests/* and .github/workflows/ci.yml cover unit/integration/regression/release h
 - Configuration assumptions: standard project/runtime assumptions only.
 - Maintenance risks: coverage can become stale if target behavior changes.
 
-### `tests/test_tui_chat_view.py`
+### `tests/test_tui.py`
 - Lines read: 199.
 - Purpose: Test coverage for tui chat view behavior.
 - Key responsibilities: classes: CapturingRichLog, CapturingChatView, FakeChat, FakeKernel; callables: test_chat_messages_are_escaped_redacted_and_stably_prefixed, test_chat_status_message_uses_status_prefix_and_escaping, test_chat_empty_success_and_error_copy_stays_localized_and_secret_safe, test_kernel_result_format_handles_success_error_empty_and_non_dict_outputs, test_kernel_result_format_redacts_secret_strings_and_keeps_stable_chinese_headings, test_run_kernel_task_emits_running_completion_and_formatted_messages, test_chat_streaming_methods_keep_assistant_turn_and_append_safe_deltas, test_safe_display_text_escapes_markup_and_redacts_secrets
@@ -2570,7 +2570,7 @@ tests/* and .github/workflows/ci.yml cover unit/integration/regression/release h
 - Configuration assumptions: Textual optional UI dependency available for TUI paths.
 - Maintenance risks: coverage can become stale if target behavior changes.
 
-### `tests/test_tui_dashboard.py`
+### `tests/test_tui.py`
 - Lines read: 162.
 - Purpose: Test coverage for tui dashboard behavior.
 - Key responsibilities: callables: test_dashboard_context_for_uninitialized_project_is_chinese_and_stable, test_dashboard_context_for_initialized_project_with_workspace_and_ready_llm_redacts_secret, test_dashboard_context_reports_initialized_project_without_workspace_or_provider, test_dashboard_context_collects_counts_recent_hint_and_ready_advice_without_network, test_dashboard_context_reports_incomplete_llm_without_api_key_leak
@@ -2647,7 +2647,7 @@ tests/* and .github/workflows/ci.yml cover unit/integration/regression/release h
 - Configuration assumptions: Textual optional UI dependency available for TUI paths; external runtime/API configuration may be absent and must degrade safely.
 - Maintenance risks: coverage can become stale if target behavior changes.
 
-### `tests/test_tui_log_screen.py`
+### `tests/test_tui.py`
 - Lines read: 226.
 - Purpose: Test coverage for tui log screen behavior.
 - Key responsibilities: callables: _static_text, test_tui_explicit_switch_opens_log_screen_and_global_shortcuts_remain, test_log_screen_writes_lists_and_shows_redacted_report, test_log_screen_empty_message_sets_status_without_creating_report, test_log_screen_initial_empty_copy_and_safe_layout_are_visible, test_log_screen_severity_text_uses_distinct_styles, test_log_screen_empty_and_refreshed_status_include_zero_statistics, test_log_screen_populated_table_and_detail_statistics_match_selected_entry
@@ -2669,7 +2669,7 @@ tests/* and .github/workflows/ci.yml cover unit/integration/regression/release h
 - Configuration assumptions: Textual optional UI dependency available for TUI paths.
 - Maintenance risks: coverage can become stale if target behavior changes.
 
-### `tests/test_tui_permissions.py`
+### `tests/test_tui.py`
 - Lines read: 105.
 - Purpose: Test coverage for tui permissions behavior.
 - Key responsibilities: classes: FakePermissionEngine; callables: test_high_risk_action_refuses_unconfirmed_request_without_permission_call, test_high_risk_action_requires_permission_engine_allow, test_low_risk_action_still_uses_permission_engine_but_not_confirmation_gate, test_permission_screen_controller_requires_full_confirmation_and_updates_policy, __init__, check
@@ -2691,7 +2691,7 @@ tests/* and .github/workflows/ci.yml cover unit/integration/regression/release h
 - Configuration assumptions: Textual optional UI dependency available for TUI paths.
 - Maintenance risks: coverage can become stale if target behavior changes.
 
-### `tests/test_tui_workspace_screens.py`
+### `tests/test_tui.py`
 - Lines read: 265.
 - Purpose: Test coverage for tui workspace screens behavior.
 - Key responsibilities: classes: FakeStatus, FakeApp, TestWorkspaceView; callables: _allow_delete_policy, test_workspace_screen_create_select_and_recent_state, test_workspace_screen_create_rejects_duplicate_and_invalid_ids, test_workspace_screen_create_does_not_enter_kernel_or_llm, test_workspace_screen_empty_state_is_chinese_and_non_destructive, test_workspace_screen_delete_requires_exact_confirmation, test_workspace_screen_hard_delete_uses_policy_and_removes_workspace, test_workspace_view_delete_does_not_auto_confirm_source
@@ -2735,7 +2735,7 @@ tests/* and .github/workflows/ci.yml cover unit/integration/regression/release h
 - Configuration assumptions: standard project/runtime assumptions only.
 - Maintenance risks: coverage can become stale if target behavior changes.
 
-### `tests/test_workspace_tools.py`
+### `tests/test_workspace_full.py`
 - Lines read: 566.
 - Purpose: Test coverage for workspace tools behavior.
 - Key responsibilities: classes: RecordingPermissionEngine, FakeRegistry, FakeCheckpointManager, FakeKernel; callables: _copy_default_policy, test_language_validation_accepts_supported_languages, test_language_validation_rejects_invalid_languages, test_tool_id_validation_accepts_safe_slugs, test_tool_id_validation_rejects_traversal_and_unsafe_ids, test_tool_init_creates_python_and_r_directories_under_workspace, test_builtin_templates_can_be_scaffolded_and_loaded, test_manifest_schema_requires_expected_fields_and_validates_identity; constants: REPO_ROOT

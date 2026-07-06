@@ -56,12 +56,34 @@ class WorkspaceToolService:
     """Manage modular tools inside explicit workspace directories."""
 
     def __init__(self, project_root: str | Path | None = None) -> None:
-        self.project_root = (
-            Path.cwd().resolve()
-            if project_root is None
-            else Path(project_root).resolve()
-        )
+        self.project_root = self._resolve_service_project_root(project_root)
         self.workspace_manager = WorkspaceManager(self.project_root)
+
+    @classmethod
+    def _resolve_service_project_root(cls, project_root: str | Path | None) -> Path:
+        """Resolve the repository root used for global tool discovery.
+
+        Tool scanning is intentionally project-global: selecting a workspace or
+        launching from a nested/workspace directory must not make
+        ``plugins/tools`` disappear.  Explicit non-workspace roots stay scoped
+        to the caller-provided directory so isolated tests and temporary
+        projects do not accidentally scan the checkout containing this module.
+        """
+
+        start = Path.cwd() if project_root is None else Path(project_root)
+        resolved = start.expanduser().resolve()
+
+        if (resolved / "plugins" / TOOLS_DIR).is_dir():
+            return resolved
+
+        should_walk_up = project_root is None or "workspaces" in resolved.parts
+        if not should_walk_up:
+            return resolved
+
+        for candidate in (resolved, *resolved.parents):
+            if (candidate / "plugins" / TOOLS_DIR).is_dir():
+                return candidate
+        return resolved
 
     def tool_source_root(self) -> Path:
         """Return the project directory scanned for importable Python/R tools."""

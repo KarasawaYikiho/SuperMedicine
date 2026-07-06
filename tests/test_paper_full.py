@@ -526,28 +526,55 @@ def test_import_duplicate_sha256_reuses_existing_original_metadata_and_logs_atte
     assert duplicate_log_record["duplicate_reason"] == "sha256_already_imported"
 
 
-def test_import_duplicate_doi_reuses_existing_metadata_without_copying_new_original(
+@pytest.mark.parametrize(
+    (
+        "workspace_id",
+        "first_title",
+        "second_title",
+        "first_metadata",
+        "second_metadata",
+        "expected_reason",
+    ),
+    [
+        (
+            "doi-duplicate-study",
+            "Original DOI title",
+            "Duplicate DOI title",
+            {"doi": "  https://doi.org/10.1234/SuperMedicine.DOI  "},
+            {"doi": "10.1234/supermedicine.doi"},
+            "doi_already_imported",
+        ),
+        (
+            "pmid-duplicate-study",
+            "Original PMID title",
+            "Duplicate PMID title",
+            {"pmid": " PMID: 12345678 "},
+            {"pmid": "12345678"},
+            "pmid_already_imported",
+        ),
+    ],
+)
+def test_import_duplicate_external_ids_reuse_existing_metadata_without_new_original(
     tmp_path,
+    workspace_id,
+    first_title,
+    second_title,
+    first_metadata,
+    second_metadata,
+    expected_reason,
 ):
     manager = WorkspaceManager(tmp_path)
-    workspace = manager.initialize_workspace("doi-duplicate-study")
+    workspace = manager.initialize_workspace(workspace_id)
     first_source = tmp_path / "first.md"
     second_source = tmp_path / "second.md"
-    first_source.write_text(
-        "# First DOI paper\n\nOriginal source bytes.\n", encoding="utf-8"
-    )
-    second_source.write_text(
-        "# Second DOI paper\n\nDifferent source bytes.\n", encoding="utf-8"
-    )
+    first_source.write_text("# First paper\n\nOriginal source bytes.\n", encoding="utf-8")
+    second_source.write_text("# Second paper\n\nDifferent source bytes.\n", encoding="utf-8")
 
     importer = PaperImporter(manager)
     first_result = importer.import_paper(
         workspace.id,
         first_source,
-        metadata={
-            "title": "Original DOI title",
-            "doi": "  https://doi.org/10.1234/SuperMedicine.DOI  ",
-        },
+        metadata={"title": first_title, **first_metadata},
     )
     metadata_path = (
         workspace.path / "papers" / "metadata" / f"{first_result.metadata.id}.json"
@@ -559,7 +586,7 @@ def test_import_duplicate_doi_reuses_existing_metadata_without_copying_new_origi
     second_result = importer.import_paper(
         workspace.id,
         second_source,
-        metadata={"title": "Duplicate DOI title", "doi": "10.1234/supermedicine.doi"},
+        metadata={"title": second_title, **second_metadata},
     )
 
     metadata_files = list((workspace.path / "papers" / "metadata").glob("*.json"))
@@ -572,69 +599,15 @@ def test_import_duplicate_doi_reuses_existing_metadata_without_copying_new_origi
     duplicate_log_record = json.loads(log_lines[-1])
 
     assert second_result.duplicate is True
-    assert second_result.duplicate_reason == "doi_already_imported"
+    assert second_result.duplicate_reason == expected_reason
     assert second_result.metadata.id == first_result.metadata.id
-    assert second_result.metadata.title == "Original DOI title"
+    assert second_result.metadata.title == first_title
     assert metadata_files == [metadata_path]
     assert original_files == [stored_path]
     assert len(log_lines) == 2
     assert duplicate_log_record["paper_id"] == first_result.metadata.id
     assert duplicate_log_record["duplicate"] is True
-    assert duplicate_log_record["duplicate_reason"] == "doi_already_imported"
-
-
-def test_import_duplicate_pmid_reuses_existing_metadata_without_copying_new_original(
-    tmp_path,
-):
-    manager = WorkspaceManager(tmp_path)
-    workspace = manager.initialize_workspace("pmid-duplicate-study")
-    first_source = tmp_path / "first.md"
-    second_source = tmp_path / "second.md"
-    first_source.write_text(
-        "# First PMID paper\n\nOriginal source bytes.\n", encoding="utf-8"
-    )
-    second_source.write_text(
-        "# Second PMID paper\n\nDifferent source bytes.\n", encoding="utf-8"
-    )
-
-    importer = PaperImporter(manager)
-    first_result = importer.import_paper(
-        workspace.id,
-        first_source,
-        metadata={"title": "Original PMID title", "pmid": " PMID: 12345678 "},
-    )
-    metadata_path = (
-        workspace.path / "papers" / "metadata" / f"{first_result.metadata.id}.json"
-    )
-    stored_path = (
-        workspace.path / "papers" / "originals" / f"{first_result.metadata.sha256}.md"
-    )
-
-    second_result = importer.import_paper(
-        workspace.id,
-        second_source,
-        metadata={"title": "Duplicate PMID title", "pmid": "12345678"},
-    )
-
-    metadata_files = list((workspace.path / "papers" / "metadata").glob("*.json"))
-    original_files = list((workspace.path / "papers" / "originals").glob("*"))
-    log_lines = (
-        (workspace.path / "papers" / "imports" / "import-log.jsonl")
-        .read_text(encoding="utf-8")
-        .splitlines()
-    )
-    duplicate_log_record = json.loads(log_lines[-1])
-
-    assert second_result.duplicate is True
-    assert second_result.duplicate_reason == "pmid_already_imported"
-    assert second_result.metadata.id == first_result.metadata.id
-    assert second_result.metadata.title == "Original PMID title"
-    assert metadata_files == [metadata_path]
-    assert original_files == [stored_path]
-    assert len(log_lines) == 2
-    assert duplicate_log_record["paper_id"] == first_result.metadata.id
-    assert duplicate_log_record["duplicate"] is True
-    assert duplicate_log_record["duplicate_reason"] == "pmid_already_imported"
+    assert duplicate_log_record["duplicate_reason"] == expected_reason
 
 
 def test_import_rejects_unsupported_extension_without_partial_writes(tmp_path):

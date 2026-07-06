@@ -9,7 +9,7 @@ from typing import Any
 
 from rich.markup import escape
 from textual.app import ComposeResult
-from textual.containers import Vertical
+from textual.containers import Container, Vertical
 from textual.timer import Timer
 from textual.widgets import RichLog, Static
 
@@ -62,9 +62,15 @@ class ChatView(Vertical):
         self._processing_timer: Timer | None = None
 
     def compose(self) -> ComposeResult:
-        yield RichLog(id="chat-output", wrap=True, highlight=True, markup=True)
-        yield Static("", id="thinking-indicator")
-        yield Static("", id="processing-indicator")
+        with Container(id="chat-dialog"):
+            yield RichLog(id="chat-output", wrap=True, highlight=True, markup=True)
+            yield Static("", id="thinking-indicator")
+
+    def _write_chat_output(self, content: str) -> None:
+        """Write content using the full available chat dialog width."""
+
+        output = self.query_one("#chat-output", RichLog)
+        output.write(content, expand=True, shrink=False)
 
     def on_mount(self) -> None:
         """Show welcome message."""
@@ -74,7 +80,11 @@ class ChatView(Vertical):
         self.add_status_message(t("chat_empty_hint"))
 
     def _write_separator(self, output: RichLog) -> None:
-        output.write(f"[dim]{safe_display_text(t('chat_separator'))}[/dim]")
+        output.write(
+            f"[dim]{safe_display_text(t('chat_separator'))}[/dim]",
+            expand=True,
+            shrink=False,
+        )
 
     def _write_block(
         self,
@@ -85,7 +95,6 @@ class ChatView(Vertical):
         *,
         blank_after: bool = True,
     ) -> None:
-        output = self.query_one("#chat-output", RichLog)
         lines = [
             f"[dim]{safe_display_text(t('chat_separator'))}[/dim]",
             f"[{style}]{icon} {safe_display_text(label)}[/]",
@@ -94,7 +103,7 @@ class ChatView(Vertical):
         if blank_after:
             lines.append("")
         block = "\n".join(lines)
-        output.write(block)
+        self._write_chat_output(block)
 
     def add_user_message(self, message: str) -> int:
         """Add a user message to the chat display."""
@@ -139,13 +148,11 @@ class ChatView(Vertical):
     def begin_assistant_message(self, turn_id: int | None = None) -> int:
         """Start an assistant message block before streaming deltas arrive."""
         assistant_turn = self._next_assistant_turn(turn_id)
-        output = self.query_one("#chat-output", RichLog)
-        output.write(
+        self._write_chat_output(
             "\n".join(
                 [
                     f"[dim]{safe_display_text(t('chat_separator'))}[/dim]",
                     f"[bold green]🤖 {safe_display_text(t('chat_assistant_label') + f' #{assistant_turn}')}[/]",
-                    safe_display_text("助手正在生成回复..."),
                 ]
             )
         )
@@ -155,8 +162,7 @@ class ChatView(Vertical):
         """Append an assistant streaming delta without changing input focus/state."""
         if not message:
             return
-        output = self.query_one("#chat-output", RichLog)
-        output.write(safe_display_text(message))
+        self._write_chat_output(safe_display_text(message))
 
     def add_error_message(self, message: str) -> None:
         """Add an error message to the chat display."""
@@ -178,7 +184,7 @@ class ChatView(Vertical):
         self._write_block("推理状态", "🧠", "bold magenta", message, blank_after=False)
 
     def start_thinking_animation(self) -> None:
-        """Start the thinking animation with 5 circle indicators."""
+        """Start the lower-right in-dialog thinking animation."""
         self._thinking_active = True
         self._thinking_frame = 0
         indicator = self.query_one("#thinking-indicator", Static)
@@ -238,11 +244,10 @@ class ChatView(Vertical):
         indicator.visible = False
 
     def append_thinking_content(self, content: str) -> None:
-        """Append streaming thinking content below the animation."""
+        """Append streaming thinking content without moving the fixed animation."""
         if not content:
             return
-        output = self.query_one("#chat-output", RichLog)
-        output.write(f"[dim magenta]{safe_display_text(content)}[/]")
+        self._write_chat_output(f"[dim magenta]{safe_display_text(content)}[/]")
 
     def clear_chat(self) -> None:
         """Clear the chat display."""

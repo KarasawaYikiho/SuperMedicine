@@ -77,12 +77,26 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Set up Node.js for OpenTUI dependency install
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Set up Bun for OpenTUI runtime smoke prerequisites
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
       - name: Install dependencies
         shell: bash
         run: |
           python -m pip install --upgrade pip setuptools wheel
           python -m pip cache purge || true
           python -m pip install -e . build pyinstaller
+          npm ci
+          bun --version
+          npm run opentui:smoke
 
       - name: Build sdist for validation only
         shell: bash
@@ -94,8 +108,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m PyInstaller --onefile --name SuperMedicine --distpath dist --workpath .pyinstaller-build --add-data "core/tui/app.tcss;core/tui" --add-data "assets;assets" cli_entry.py
+          python -m PyInstaller --onefile --name SuperMedicine --distpath dist --workpath .pyinstaller-build --icon "assets/logo.ico" --add-data "core/tui/app.tcss;core/tui" --add-data "core/tui/opentui_runtime.mjs;core/tui" --add-data "assets;assets" cli_entry.py
           test -f dist/SuperMedicine.exe
+          ./dist/SuperMedicine.exe tui --dry-run
           python install_entry.py --release-exe dist/SuperMedicine.exe --desktop-dir "$RUNNER_TEMP/Desktop" --exe-dry-run
 
       - name: Build GUI standalone Exe artifact
@@ -103,7 +118,7 @@ jobs:
         run: |
           set -euo pipefail
           pip install pywebview
-          python -m PyInstaller --onefile --name SuperMedicineGUI --distpath dist --workpath build-pyinstaller --add-data "core/tui/app.tcss;core/tui" --add-data "assets;assets" --add-data "core/web/frontend;core/web/frontend" --noconsole gui_standalone.py
+          python -m PyInstaller --onefile --name SuperMedicineGUI --distpath dist --workpath build-pyinstaller --icon "assets/logo.ico" --add-data "core/tui/app.tcss;core/tui" --add-data "assets;assets" --add-data "core/web/frontend;core/web/frontend" --noconsole gui_standalone.py
           test -f dist/SuperMedicineGUI.exe
 
       - name: Build standalone installer Exe artifact
@@ -114,7 +129,7 @@ jobs:
           python scripts/ci/build_installer_payload.py
           payload_source="$(python -c "from pathlib import Path; print((Path.cwd() / '.installer-payload-stage' / 'release_payload').resolve().as_posix())")"
           test -d "$payload_source"
-          python -m PyInstaller --onefile --name SuperMedicineInstaller --distpath dist --workpath .pyinstaller-installer-build --hidden-import installer.exe_release --add-data "${payload_source};release_payload" install_entry.py
+          python -m PyInstaller --onefile --name SuperMedicineInstaller --distpath dist --workpath .pyinstaller-installer-build --icon "assets/logo.ico" --hidden-import installer.exe_release --add-data "${payload_source};release_payload" install_entry.py
           test -f dist/SuperMedicineInstaller.exe
           python install_entry.py --extract-release-to "$RUNNER_TEMP/InstallerDryRun" --release-payload-root .installer-payload-stage/release_payload --exe-dry-run
           ./dist/SuperMedicineInstaller.exe --help

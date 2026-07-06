@@ -12,7 +12,7 @@ SuperMedicine is an independent Python framework for medical research assistance
 It provides a standalone CLI, Kernel, permission-gated plugin execution,
 workspace and paper management, local RAG utilities, medical writing/citation
 helpers, LLM provider management, log reporting, multi-agent orchestration
-components, and a Chinese Textual TUI. OpenCode and Claude Code integrations are
+components, and a Chinese OpenTUI-powered TUI. OpenCode and Claude Code integrations are
 optional adapter surfaces; they are not required for the supported Python runtime.
 
 Current public/release label: **Beta0.4.2**. Python package fallback version:
@@ -56,7 +56,7 @@ tested.
 - **Plugin ecosystem** — RAG, harness monitoring, Python/R tool prototypes,
   experiment calculations, medical writing checklists, and AMA/Vancouver citation
   formatting.
-- **Chinese TUI** — Textual interface for chat, dashboard, workspace, paper,
+- **Chinese TUI** — OpenTUI interface for chat, dashboard, workspace, paper,
   experience, tool, dialog history, LLM, experiment guide, permission mode, and
   log report screens.
 - **Self-evolution preview** — generates Markdown/Python/R artifacts only after
@@ -75,6 +75,8 @@ Requirements:
 | Python | >= 3.10 | Required |
 | Git | Any | Required for cloning source |
 | pip | >= 21.0 | Required for package install |
+| Bun | Latest stable | Required for the interactive OpenTUI runtime |
+| npm | Lockfile-compatible | Required to install `@opentui/core@0.4.1` from `package-lock.json` |
 | R | >= 4.3 | Optional, for the R survival backend |
 
 Quick install from source:
@@ -83,6 +85,7 @@ Quick install from source:
 git clone https://github.com/KarasawaYikiho/SuperMedicine.git
 cd SuperMedicine
 pip install -e .
+npm ci
 python Install.py
 supermedicine status
 ```
@@ -97,7 +100,8 @@ user data by default.
 Windows release packages may include **SuperMedicineInstaller.exe**. Run it with no
 flags for the same console wizard plus release-payload extraction. A complete
 release layout keeps `SuperMedicineInstaller.exe`, `dist/SuperMedicine.exe`,
-`Install.py`, `installer/`, runtime packages, resources, and documentation
+`Install.py`, `installer/`, runtime packages, `package.json`, `package-lock.json`,
+`THIRD_PARTY_NOTICES.md`, resources, and documentation
 together. Do not copy only `Install.py` out of the archive.
 
 Useful post-install checks:
@@ -219,15 +223,20 @@ supermedicine tool add --workspace demo --select 1
 
 ## TUI
 
-Launch the Chinese Textual terminal workspace with:
+Launch the Chinese OpenTUI terminal workspace with:
 
 ```bash
 supermedicine tui
 supermedicine tui --dry-run
+npm run opentui:smoke
 ```
 
 `--dry-run` prints readiness information without starting the interactive UI. The
-TUI reads project-local `.supermedicine/`, `workspaces/`, and `plugins/` state.
+non-dry-run path starts `core/tui/opentui_runtime.mjs` through Bun and the pinned
+`@opentui/core@0.4.1` dependency. Source checkouts and extracted release packages
+must run `npm ci` once from the repository/release root, and Bun must be on `PATH`
+(or `SUPERMEDICINE_OPENTUI_JS_RUNTIME` must point to a Bun-compatible executable).
+The TUI reads project-local `.supermedicine/`, `workspaces/`, and `plugins/` state.
 
 Global shortcuts:
 
@@ -236,15 +245,23 @@ Global shortcuts:
 | `Tab` | Move focus forward between interactive controls. |
 | `Shift+Tab` | Move focus backward between interactive controls. |
 | `Enter` | Submit the focused input or confirm the selected action. |
-| `M` | Open the main menu, including `选择视图`, theme, help, and maximize/restore actions. |
-| `P` | Open the permission-mode view. |
-| `Esc` | Exit maximized mode. |
+| `M` | Toggle the OpenTUI route/menu shell. |
+| `P` / `Ctrl+P` | Open the permission-mode view. |
+| `Esc` / `B` | Return/back from the current route/menu state. |
+| `↑↓` / `j k` | Move the selected route/action/list item where available. |
+| `/` | Focus page filtering where available. |
+| `[` / `]` | Scroll page content where available. |
+| `Ctrl+1` ... `Ctrl+0` | Jump directly to primary OpenTUI routes. |
 | `Q` | Quit the TUI. |
 
-The menu can be opened either with uppercase `M` or with the upper-left sidebar
-affordance `≡ 菜单 (M)`. It contains `选择视图` for view selection,
-`切换主题`, `帮助`, and `最大化/还原`. Status lines continue to show entries
-such as `LLM 状态` and `任务运行状态`.
+The OpenTUI runtime provides a shared top/footer/sidebar route shell for Chat,
+Dashboard, Workspace, Paper, Experience, Tool, Dialog, LLM, Experiment, Log,
+Permission, Self-evolution, and Diagnose pages. Status lines continue to show
+entries such as `LLM 状态` and `任务运行状态`.
+The menu route labels remain `选择视图`, `切换主题`, `帮助`, and `最大化/还原`;
+the legacy mojibake compatibility markers `ѡ����ͼ`, `�л�����`, and `����`
+are retained here so encoding-regression checks can detect accidental
+documentation boundary drift.
 Alphabetic global shortcuts are documented as uppercase-only (`M`, `P`, `Q`) so
 lowercase text such as `m`, `p`, and `q` plus IME composition remain ordinary input when the prompt has focus.
 Number keys `1-0` are not direct view-switching shortcuts;
@@ -364,13 +381,15 @@ should follow the maintained quality gate above and CI packaging smoke checks.
 - Public/release label: **Beta0.4.2**.
 - Python package fallback version: **0.4.2b0**.
 - Package metadata is defined in [pyproject.toml](pyproject.toml).
+- OpenTUI runtime dependency metadata is defined in [package.json](package.json)
+  and [package-lock.json](package-lock.json), pinned to `@opentui/core@0.4.1`.
 - Release history is recorded in [CHANGELOG.md](CHANGELOG.md).
 - GitHub Wiki publication evidence for the current debug-documentation pass is
   recorded in the architecture tracking docs as remote commit `d6a1e11`; local
   repository tests cannot prove future remote Wiki availability or content.
 - The fixed Beta0.4.2 release layout keeps installer entry points, the installer
-  package, runtime packages, documentation/templates, and `dist/SuperMedicine.exe`
-  together.
+  package, runtime packages, OpenTUI npm manifests, `THIRD_PARTY_NOTICES.md`,
+  documentation/templates, and `dist/SuperMedicine.exe` together.
 - Generated build artifacts, runtime logs, caches, local workspaces, local config,
   and desktop Exe files should not be committed.
 
@@ -397,7 +416,7 @@ tested before documentation can describe it as supported.
 | Initialization fails with missing LLM fields | Provide provider, Base URL, model, and an API key source. |
 | `ModuleNotFoundError: No module named 'installer'` | Run from a complete source/release directory; do not copy only `Install.py`. |
 | Missing `SuperMedicine.exe` in a release package | Re-download or regenerate the complete release package containing `dist/SuperMedicine.exe`. |
-| TUI launch issue | Run `supermedicine tui --dry-run`, then restart the terminal if needed. |
+| TUI launch issue | Run `supermedicine tui --dry-run`, `npm ci`, and `npm run opentui:smoke`; confirm Bun is installed/on `PATH`. |
 | Self-evolution did not write files | Preview is default; writing requires `--no-preview --confirm-write` and an allowed output root. |
 | Log page does not follow newest records | Re-enable auto-follow in the TUI Log report screen or refresh the list. |
 

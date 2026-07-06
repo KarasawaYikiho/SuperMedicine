@@ -1,14 +1,13 @@
 /**
- * SuperMedicine Web Interface — Client Logic
- *
- * Manages WebSocket connection, tab navigation, API calls,
- * data rendering, and real-time updates.
+     * SuperMedicine 网页界面 — 客户端逻辑
+     *
+     * 管理 WebSocket 连接、页面导航、API 调用、数据渲染和实时更新。
  */
 
 (function () {
     "use strict";
 
-    // ---- DOM References --------------------------------------------------
+    // ---- DOM 引用 ---------------------------------------------------------
 
     const messagesEl = document.getElementById("messages");
     const chatForm = document.getElementById("chat-form");
@@ -23,19 +22,28 @@
     const drawerCloseBtn = document.getElementById("drawer-close-btn");
     const chatWsSelect = document.getElementById("chat-ws-select");
 
-    // ---- State -----------------------------------------------------------
+    // ---- 状态 -------------------------------------------------------------
 
     let ws = null;
     let reconnectTimer = null;
     const RECONNECT_DELAY = 3000;
     let currentWorkspaceId = null;
+    let chatProcessing = false;
 
-    // ---- Helpers ---------------------------------------------------------
+    // ---- 辅助函数 ---------------------------------------------------------
 
     function escapeHtml(text) {
         const div = document.createElement("div");
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    function escapeJsString(text) {
+        return JSON.stringify(String(text == null ? "" : text));
+    }
+
+    function inlineJsArg(text) {
+        return escapeHtml(escapeJsString(text));
     }
 
     function showToast(message, type) {
@@ -75,16 +83,79 @@
         statusText.textContent = connected ? "已连接" : "已断开";
     }
 
-    // ---- Drawer Menu ----------------------------------------------------
+    function setChatProcessing(active) {
+        chatProcessing = Boolean(active);
+        if (chatInput) chatInput.disabled = chatProcessing;
+        if (sendBtn) sendBtn.disabled = chatProcessing;
+        if (chatWsSelect) chatWsSelect.disabled = chatProcessing;
+    }
+
+    function selectedChatWorkspace() {
+        return chatWsSelect ? (chatWsSelect.value || null) : null;
+    }
+
+    function localizeStatus(value) {
+        var statusMap = {
+            completed: "已完成",
+            complete: "已完成",
+            success: "成功",
+            error: "错误",
+            failed: "失败",
+            pending: "待处理",
+            running: "运行中",
+            active: "活跃",
+            available: "可用",
+            configured: "已配置",
+            unknown: "未知",
+            sandbox: "沙盒",
+            conservative: "保守",
+            full: "完全",
+            general: "通用",
+            workspace: "工作区",
+            global: "全局"
+        };
+        var key = String(value || "").toLowerCase();
+        return statusMap[key] || value || "未知";
+    }
+
+    function syncWorkspaceSelectors(workspaceId) {
+        var normalized = workspaceId || "";
+        ["chat-ws-select", "paper-ws-select", "exp-ws-select", "tool-ws-select", "dialog-ws-select"].forEach(function (selId) {
+            var sel = document.getElementById(selId);
+            if (sel) sel.value = normalized;
+        });
+        currentWorkspaceId = normalized || null;
+    }
+
+    function refreshWorkspaceBoundViews(workspaceId) {
+        var normalized = workspaceId || "";
+        if (!normalized) return;
+        var activeTab = document.querySelector(".tab-content.active");
+        if (activeTab && activeTab.id === "tab-tools") loadTools(normalized);
+        if (activeTab && activeTab.id === "tab-papers") loadPapers(normalized);
+        if (activeTab && activeTab.id === "tab-experiences") loadExperiences(normalized);
+        if (activeTab && activeTab.id === "tab-dialog") loadDialogHistory(normalized);
+    }
+
+    function handleWorkspaceSelection(workspaceId) {
+        syncWorkspaceSelectors(workspaceId);
+        refreshWorkspaceBoundViews(workspaceId);
+    }
+
+    // ---- 抽屉菜单 ---------------------------------------------------------
 
     function openDrawer() {
         drawerMenu.classList.add("open");
         drawerOverlay.classList.add("active");
+        hamburgerBtn.setAttribute("aria-expanded", "true");
+        drawerMenu.setAttribute("aria-hidden", "false");
     }
 
     function closeDrawer() {
         drawerMenu.classList.remove("open");
         drawerOverlay.classList.remove("active");
+        hamburgerBtn.setAttribute("aria-expanded", "false");
+        drawerMenu.setAttribute("aria-hidden", "true");
     }
 
     function toggleDrawer() {
@@ -99,7 +170,7 @@
     drawerCloseBtn.addEventListener("click", closeDrawer);
     drawerOverlay.addEventListener("click", closeDrawer);
 
-    // ---- API Helper ------------------------------------------------------
+    // ---- API 辅助 ---------------------------------------------------------
 
     async function apiCall(method, url, body) {
         const opts = {
@@ -113,7 +184,7 @@
         return resp.json();
     }
 
-    // ---- Tab Navigation --------------------------------------------------
+    // ---- 页面导航 ---------------------------------------------------------
 
     function initTabs() {
         var tabBtns = document.querySelectorAll(".tab-btn");
@@ -121,22 +192,22 @@
             btn.addEventListener("click", function () {
                 var tabId = this.getAttribute("data-tab");
 
-                // Update button states
+                // 更新按钮状态
                 tabBtns.forEach(function (b) {
                     b.classList.remove("active");
                 });
                 this.classList.add("active");
 
-                // Update content visibility
+                // 更新内容可见性
                 document.querySelectorAll(".tab-content").forEach(function (c) {
                     c.classList.remove("active");
                 });
                 document.getElementById("tab-" + tabId).classList.add("active");
 
-                // Close drawer on selection
+                // 选择后关闭抽屉菜单
                 closeDrawer();
 
-                // Load data for the tab
+                // 加载当前页面数据
                 loadTabData(tabId);
             });
         });
@@ -165,6 +236,12 @@
             case "experiments":
                 loadExperiments();
                 break;
+            case "dialog":
+                loadWorkspaceSelectors().then(function () {
+                    var wsId = document.getElementById("dialog-ws-select").value;
+                    if (wsId) loadDialogHistory(wsId);
+                });
+                break;
             case "llm":
                 loadLLMProviders();
                 break;
@@ -183,7 +260,7 @@
         }
     }
 
-    // ---- Status fetch ----------------------------------------------------
+    // ---- 状态获取 ---------------------------------------------------------
 
     async function fetchStatus() {
         try {
@@ -203,7 +280,7 @@
                 '<div class="value">' + (data.plugin_count ?? 0) + "</div>" +
                 "</div>" +
                 '<div class="status-card">' +
-                '<div class="label">LLM提供商</div>' +
+                '<div class="label">LLM 提供商</div>' +
                 '<div class="value">' + escapeHtml(data.llm_provider || "无") + "</div>" +
                 "</div>";
         } catch (err) {
@@ -213,7 +290,7 @@
         }
     }
 
-    // ---- Workspace Management --------------------------------------------
+    // ---- 工作区管理 -------------------------------------------------------
 
     async function loadWorkspaces() {
         try {
@@ -235,7 +312,7 @@
                 "<td>" + escapeHtml(ws.id || ws.name || "-") + "</td>" +
                 "<td>" + escapeHtml(ws.name || ws.id || "-") + "</td>" +
                 "<td><span class=\"status-badge success\">活跃</span></td>" +
-                "<td><button class=\"btn btn-danger btn-sm\" onclick=\"deleteWorkspace('" + escapeHtml(ws.id || ws.name) + "')\">删除</button></td>" +
+                "<td><button class=\"btn btn-danger btn-sm\" onclick=\"deleteWorkspace(" + inlineJsArg(ws.id || ws.name) + ")\">删除</button></td>" +
                 "</tr>";
         }).join("");
     }
@@ -262,6 +339,7 @@
                 document.getElementById("ws-id").value = "";
                 document.getElementById("ws-name").value = "";
                 loadWorkspaces();
+                loadWorkspaceSelectors().then(function () { handleWorkspaceSelection(id); });
             } catch (err) {
                 showToast("创建工作区失败: " + err.message, "error");
             }
@@ -269,29 +347,33 @@
         document.getElementById("btn-refresh-workspaces").addEventListener("click", loadWorkspaces);
     }
 
-    // Global function for inline onclick
+    // 供内联 onclick 使用的全局函数
     window.deleteWorkspace = async function (id) {
         if (!confirm("确定要删除工作区 '" + id + "' 吗？")) return;
         try {
             await apiCall("DELETE", "/api/v1/workspaces/" + encodeURIComponent(id));
             showToast("工作区已删除", "success");
             loadWorkspaces();
+            if (currentWorkspaceId === id || selectedChatWorkspace() === id) {
+                handleWorkspaceSelection("");
+            }
+            loadWorkspaceSelectors();
         } catch (err) {
             showToast("删除工作区失败: " + err.message, "error");
         }
     };
 
-    // ---- Workspace Selectors ---------------------------------------------
+    // ---- 工作区选择器 -----------------------------------------------------
 
     async function loadWorkspaceSelectors() {
         try {
             const data = await apiCall("GET", "/api/v1/workspaces");
             var workspaces = Array.isArray(data) ? data : [];
-            var selectors = ["paper-ws-select", "exp-ws-select", "tool-ws-select", "chat-ws-select"];
+            var selectors = ["paper-ws-select", "exp-ws-select", "tool-ws-select", "chat-ws-select", "dialog-ws-select"];
             selectors.forEach(function (selId) {
                 var sel = document.getElementById(selId);
                 if (!sel) return;
-                var current = sel.value;
+                var current = sel.value || currentWorkspaceId || "";
                 var defaultOption = selId === "chat-ws-select"
                     ? '<option value="">无工作区（全局）</option>'
                     : '<option value="">选择工作区</option>';
@@ -305,17 +387,17 @@
                 if (current) sel.value = current;
             });
         } catch (err) {
-            // Silently fail for selectors
+            // 选择器加载失败时保持静默
         }
     }
 
-    // ---- Workspace Selectors ---------------------------------------------
+    // ---- 对话工作区选择器 -------------------------------------------------
 
     async function loadChatWorkspaceSelector() {
         try {
             const data = await apiCall("GET", "/api/v1/workspaces");
             var workspaces = Array.isArray(data) ? data : [];
-            var current = chatWsSelect.value;
+            var current = selectedChatWorkspace() || currentWorkspaceId || "";
             chatWsSelect.innerHTML = '<option value="">无工作区（全局）</option>';
             workspaces.forEach(function (ws) {
                 var opt = document.createElement("option");
@@ -324,12 +406,13 @@
                 chatWsSelect.appendChild(opt);
             });
             if (current) chatWsSelect.value = current;
+            currentWorkspaceId = chatWsSelect.value || null;
         } catch (err) {
-            // Silently fail
+            // 加载失败时保持静默
         }
     }
 
-    // ---- Paper Management ------------------------------------------------
+    // ---- 论文管理 ---------------------------------------------------------
 
     function setupPaperForm() {
         var form = document.getElementById("paper-form");
@@ -371,6 +454,7 @@
             if (wsId) loadPapers(wsId);
         });
         document.getElementById("paper-ws-select").addEventListener("change", function () {
+            handleWorkspaceSelection(this.value);
             if (this.value) loadPapers(this.value);
         });
     }
@@ -396,7 +480,7 @@
                 "<td>" + escapeHtml(p.title || p.metadata?.title || "-") + "</td>" +
                 "<td>" + escapeHtml(p.authors || p.metadata?.authors || "-") + "</td>" +
                 "<td><span class=\"status-badge " + (p.enriched ? "success" : "info") + "\">" + (p.enriched ? "已充实" : "已导入") + "</span></td>" +
-                "<td><button class=\"btn btn-secondary btn-sm\" onclick=\"enrichPaper('" + escapeHtml(currentWorkspaceId || "") + "','" + escapeHtml(p.id || "") + "')\">充实</button></td>" +
+                "<td><button class=\"btn btn-secondary btn-sm\" onclick=\"enrichPaper(" + inlineJsArg(currentWorkspaceId || "") + "," + inlineJsArg(p.id || "") + ")\">充实</button></td>" +
                 "</tr>";
         }).join("");
     }
@@ -412,7 +496,7 @@
         }
     };
 
-    // ---- Experience Management -------------------------------------------
+    // ---- 经验管理 ---------------------------------------------------------
 
     function setupExperienceForm() {
         var form = document.getElementById("experience-form");
@@ -455,6 +539,7 @@
             if (wsId) loadExperiences(wsId);
         });
         document.getElementById("exp-ws-select").addEventListener("change", function () {
+            handleWorkspaceSelection(this.value);
             if (this.value) loadExperiences(this.value);
         });
     }
@@ -481,9 +566,9 @@
             return "<tr>" +
                 "<td>" + escapeHtml(e.id || "-") + "</td>" +
                 "<td>" + escapeHtml(e.title || "-") + "</td>" +
-                "<td>" + escapeHtml(e.scope || "-") + "</td>" +
+                "<td>" + escapeHtml(localizeStatus(e.scope || "-")) + "</td>" +
                 "<td>" + escapeHtml(tags) + "</td>" +
-                "<td><button class=\"btn btn-danger btn-sm\" onclick=\"deleteExperience('" + escapeHtml(currentWorkspaceId || "") + "','" + escapeHtml(e.id || "") + "','" + escapeHtml(e.scope || "") + "')\">删除</button></td>" +
+                "<td><button class=\"btn btn-danger btn-sm\" onclick=\"deleteExperience(" + inlineJsArg(currentWorkspaceId || "") + "," + inlineJsArg(e.id || "") + "," + inlineJsArg(e.scope || "") + ")\">删除</button></td>" +
                 "</tr>";
         }).join("");
     }
@@ -499,7 +584,7 @@
         }
     };
 
-    // ---- Tool Management -------------------------------------------------
+    // ---- 工具管理 ---------------------------------------------------------
 
     function setupToolForm() {
         document.getElementById("btn-refresh-tools").addEventListener("click", function () {
@@ -507,8 +592,8 @@
             if (wsId) loadTools(wsId);
         });
         document.getElementById("tool-ws-select").addEventListener("change", function () {
+            handleWorkspaceSelection(this.value);
             if (this.value) {
-                currentWorkspaceId = this.value;
                 loadTools(this.value);
             }
         });
@@ -535,10 +620,25 @@
             var url = "/api/v1/workspaces/" + encodeURIComponent(wsId) + "/tools";
             if (lang) url += "?language=" + encodeURIComponent(lang);
             const data = await apiCall("GET", url);
-            renderTools(Array.isArray(data) ? data : []);
+            renderTools(flattenToolGroups(data));
         } catch (err) {
             showToast("加载工具失败: " + err.message, "error");
         }
+    }
+
+    function flattenToolGroups(data) {
+        if (Array.isArray(data)) return data;
+        if (!data || typeof data !== "object") return [];
+        return Object.keys(data).reduce(function (items, language) {
+            var group = data[language];
+            if (!Array.isArray(group)) return items;
+            group.forEach(function (tool) {
+                if (!tool || typeof tool !== "object") return;
+                if (!tool.language) tool.language = language;
+                items.push(tool);
+            });
+            return items;
+        }, []);
     }
 
     function renderTools(tools) {
@@ -564,7 +664,7 @@
             var url = "/api/v1/tools/scan";
             if (lang) url += "?language=" + encodeURIComponent(lang);
             const data = await apiCall("GET", url);
-            renderScanResults(Array.isArray(data) ? data : []);
+            renderScanResults(flattenToolGroups(data));
         } catch (err) {
             showToast("扫描工具失败: " + err.message, "error");
         }
@@ -578,9 +678,11 @@
             return;
         }
         container.innerHTML = tools.map(function (t, i) {
+            var selection = t.index ? String(t.index) : ((t.language || "") + "/" + (t.id || ""));
+            var label = (t.name || "未知") + " [" + (t.language + "/" + t.id) + "]";
             return '<div class="scan-item">' +
-                '<input type="checkbox" id="scan-' + i + '" value="' + escapeHtml(t.name || "") + '">' +
-                '<label for="scan-' + i + '">' + escapeHtml(t.name || "未知") + ' (' + escapeHtml(t.language || "?") + ')</label>' +
+                '<input type="checkbox" id="scan-' + i + '" value="' + escapeHtml(selection) + '">' +
+                '<label for="scan-' + i + '">' + escapeHtml(label) + ' #' + escapeHtml(t.index || "-") + '</label>' +
                 "</div>";
         }).join("");
     }
@@ -604,7 +706,7 @@
         }
     }
 
-    // ---- Experiment Management -------------------------------------------
+    // ---- 实验管理 ---------------------------------------------------------
 
     function setupExperimentForm() {
         var form = document.getElementById("experiment-form");
@@ -656,36 +758,82 @@
             return "<tr>" +
                 "<td>" + escapeHtml(e.session_id || e.session_file || "-") + "</td>" +
                 "<td>" + escapeHtml((e.protocol || "").substring(0, 50)) + "</td>" +
-                "<td><span class=\"status-badge " + (e.status === "completed" ? "success" : e.status === "error" ? "error" : "info") + "\">" + escapeHtml(e.status || "进行中") + "</span></td>" +
+                "<td><span class=\"status-badge " + (e.status === "completed" ? "success" : e.status === "error" ? "error" : "info") + "\">" + escapeHtml(localizeStatus(e.status || "running")) + "</span></td>" +
                 "<td>" + escapeHtml(e.current_step || "-") + "</td>" +
-                "<td><button class=\"btn btn-secondary btn-sm\" onclick=\"viewExperiment('" + escapeHtml(e.session_file || e.session_id || "") + "')\">查看</button></td>" +
+                "<td><button class=\"btn btn-secondary btn-sm\" onclick=\"viewExperiment(" + inlineJsArg(e.session_file || e.session_id || "") + ")\">查看</button></td>" +
                 "</tr>";
         }).join("");
     }
 
     window.viewExperiment = async function (sessionFile) {
-        // This could be expanded to show experiment details
+        // 可扩展为展示实验详情
         showToast("查看实验: " + sessionFile, "info");
     };
 
-    // ---- LLM Configuration ----------------------------------------------
+    // ---- 对话历史 ---------------------------------------------------------
+
+    function setupDialogHistoryForm() {
+        var refreshBtn = document.getElementById("btn-refresh-dialog");
+        if (refreshBtn) refreshBtn.addEventListener("click", function () {
+            var wsId = document.getElementById("dialog-ws-select").value;
+            if (wsId) loadDialogHistory(wsId);
+        });
+        var wsSelect = document.getElementById("dialog-ws-select");
+        if (wsSelect) wsSelect.addEventListener("change", function () {
+            handleWorkspaceSelection(this.value);
+            if (this.value) loadDialogHistory(this.value);
+        });
+    }
+
+    async function loadDialogHistory(wsId) {
+        var tbody = document.getElementById("dialog-tbody");
+        if (!wsId) {
+            if (tbody) tbody.innerHTML = '<tr><td colspan="3" class="empty-state">选择工作区以查看对话历史</td></tr>';
+            return;
+        }
+        try {
+            var data = await apiCall("GET", "/api/v1/workspaces/" + encodeURIComponent(wsId) + "/dialog-history");
+            renderDialogHistory(Array.isArray(data) ? data : []);
+        } catch (err) {
+            showToast("加载对话历史失败: " + err.message, "error");
+        }
+    }
+
+    function renderDialogHistory(events) {
+        var tbody = document.getElementById("dialog-tbody");
+        if (!tbody) return;
+        if (!events.length) {
+            tbody.innerHTML = '<tr><td colspan="3" class="empty-state">暂无对话历史</td></tr>';
+            return;
+        }
+        tbody.innerHTML = events.map(function (event) {
+            return "<tr>" +
+                "<td>" + escapeHtml(event.event || "-") + "</td>" +
+                "<td>" + escapeHtml(event.summary || "-") + "</td>" +
+                "<td>" + escapeHtml(event.created_at || "-") + "</td>" +
+                "</tr>";
+        }).join("");
+    }
+
+    // ---- LLM 配置 ---------------------------------------------------------
 
     async function loadLLMProviders() {
         try {
             const data = await apiCall("GET", "/api/v1/llm/providers");
-            var providers = Array.isArray(data) ? data : [];
+            var providers = Array.isArray(data) ? data : (data.providers || []);
             renderLLMProviders(providers);
 
-            // Try to get current provider info
+            // 同步当前提供商信息
             try {
                 const status = await apiCall("GET", "/api/v1/status");
                 document.getElementById("llm-current-info").innerHTML =
-                    '<div><span class="text-muted">提供商:</span> ' + escapeHtml(status.llm_provider || "无") + "</div>";
+                    '<div><span class="text-muted">提供商：</span> ' + escapeHtml(status.llm_provider || data.current_provider || "无") + "</div>" +
+                    '<div><span class="text-muted">上一提供商：</span> ' + escapeHtml(data.last_provider || "无") + "</div>";
             } catch (e) {
                 document.getElementById("llm-current-info").innerHTML = '<span class="text-muted">无法加载当前提供商</span>';
             }
         } catch (err) {
-            showToast("加载LLM提供商失败: " + err.message, "error");
+            showToast("加载 LLM 提供商失败: " + err.message, "error");
         }
     }
 
@@ -696,14 +844,28 @@
             return;
         }
         tbody.innerHTML = providers.map(function (p) {
+            var providerName = p.name || p.provider || "";
             return "<tr>" +
-                "<td>" + escapeHtml(p.name || p.provider || "-") + "</td>" +
+                "<td>" + escapeHtml(providerName || "-") + "</td>" +
                 "<td>" + escapeHtml(p.model || "-") + "</td>" +
-                "<td><span class=\"status-badge " + (p.active ? "success" : "info") + "\">" + (p.active ? "活跃" : "可用") + "</span></td>" +
-                "<td><button class=\"btn btn-primary btn-sm\" onclick=\"switchLLM('" + escapeHtml(p.name || p.provider || "") + "')\">切换</button></td>" +
+                "<td><span class=\"status-badge " + (p.active || p.current ? "success" : "info") + "\">" + (p.active || p.current ? "当前" : "可用") + "</span></td>" +
+                "<td>" +
+                "<button class=\"btn btn-secondary btn-sm\" onclick=\"showLLM(" + inlineJsArg(providerName) + ")\">详情</button> " +
+                "<button class=\"btn btn-primary btn-sm\" onclick=\"switchLLM(" + inlineJsArg(providerName) + ")\">切换</button>" +
+                "</td>" +
                 "</tr>";
         }).join("");
     }
+
+    window.showLLM = async function (provider) {
+        if (!provider) return;
+        try {
+            var data = await apiCall("GET", "/api/v1/llm/providers/" + encodeURIComponent(provider));
+            alert(JSON.stringify(data, null, 2));
+        } catch (err) {
+            showToast("加载提供商详情失败: " + err.message, "error");
+        }
+    };
 
     window.switchLLM = async function (provider) {
         try {
@@ -715,9 +877,48 @@
         }
     };
 
-    document.getElementById("btn-refresh-llm").addEventListener("click", loadLLMProviders);
+    function setupLLMForm() {
+        document.getElementById("btn-refresh-llm").addEventListener("click", loadLLMProviders);
+        var form = document.getElementById("llm-form");
+        document.getElementById("btn-add-llm").addEventListener("click", function () {
+            form.classList.toggle("hidden");
+        });
+        document.getElementById("btn-cancel-llm").addEventListener("click", function () {
+            form.classList.add("hidden");
+        });
+        document.getElementById("btn-save-llm").addEventListener("click", async function () {
+            var provider = document.getElementById("llm-provider-name").value.trim();
+            if (!provider) {
+                showToast("提供商名称为必填项", "warning");
+                return;
+            }
+            var timeoutRaw = document.getElementById("llm-timeout").value.trim();
+            var body = {
+                provider: provider,
+                api_format: document.getElementById("llm-api-format").value.trim() || undefined,
+                base_url: document.getElementById("llm-base-url").value.trim() || undefined,
+                model: document.getElementById("llm-model").value.trim() || undefined,
+                api_key_env: document.getElementById("llm-api-key-env").value.trim() || undefined,
+                api_key: document.getElementById("llm-api-key").value.trim() || undefined,
+                set_current: document.getElementById("llm-set-current").checked
+            };
+            if (timeoutRaw) body.timeout = Number(timeoutRaw);
+            try {
+                await apiCall("POST", "/api/v1/llm/providers", body);
+                showToast("LLM 提供商已保存", "success");
+                form.classList.add("hidden");
+                ["llm-provider-name", "llm-api-format", "llm-base-url", "llm-model", "llm-api-key-env", "llm-api-key", "llm-timeout"].forEach(function (id) {
+                    document.getElementById(id).value = "";
+                });
+                document.getElementById("llm-set-current").checked = false;
+                loadLLMProviders();
+            } catch (err) {
+                showToast("保存 LLM 提供商失败: " + err.message, "error");
+            }
+        });
+    }
 
-    // ---- Permissions -----------------------------------------------------
+    // ---- 权限 -------------------------------------------------------------
 
     async function loadPermissions() {
         try {
@@ -776,10 +977,25 @@
                 showToast("授权路径失败: " + err.message, "error");
             }
         });
+        document.getElementById("btn-revoke-path").addEventListener("click", async function () {
+            var path = document.getElementById("permission-path").value.trim();
+            if (!path) {
+                showToast("路径为必填项", "warning");
+                return;
+            }
+            try {
+                await apiCall("POST", "/api/v1/permissions/revoke", { path: path });
+                showToast("路径授权已撤销", "success");
+                document.getElementById("permission-path").value = "";
+                loadPermissions();
+            } catch (err) {
+                showToast("撤销路径授权失败: " + err.message, "error");
+            }
+        });
         document.getElementById("btn-refresh-permissions").addEventListener("click", loadPermissions);
     }
 
-    // ---- Log Viewer ------------------------------------------------------
+    // ---- 日志查看器 -------------------------------------------------------
 
     async function loadLogs() {
         try {
@@ -839,7 +1055,7 @@
         });
     }
 
-    // ---- Self Evolution --------------------------------------------------
+    // ---- 自进化 -----------------------------------------------------------
 
     async function loadSelfEvolution() {
         try {
@@ -864,10 +1080,10 @@
                 "<td>" + escapeHtml(item.id || "-") + "</td>" +
                 "<td>" + escapeHtml(item.type || "-") + "</td>" +
                 "<td>" + escapeHtml(item.instruction || "-") + "</td>" +
-                "<td><span class=\"status-badge " + (item.status === "success" ? "success" : item.status === "error" ? "error" : "info") + "\">" + escapeHtml(item.status || "待处理") + "</span></td>" +
+                "<td><span class=\"status-badge " + (item.status === "success" ? "success" : item.status === "error" ? "error" : "info") + "\">" + escapeHtml(localizeStatus(item.status || "pending")) + "</span></td>" +
                 "<td>" +
-                "<button class=\"btn btn-sm btn-secondary\" onclick=\"viewArtifact('" + escapeHtml(item.id) + "')\">查看</button> " +
-                "<button class=\"btn btn-sm btn-danger\" onclick=\"deleteArtifact('" + escapeHtml(item.id) + "')\">删除</button>" +
+                "<button class=\"btn btn-sm btn-secondary\" onclick=\"viewArtifact(" + inlineJsArg(item.id) + ")\">查看</button> " +
+                "<button class=\"btn btn-sm btn-danger\" onclick=\"deleteArtifact(" + inlineJsArg(item.id) + ")\">删除</button>" +
                 "</td>" +
                 "</tr>";
         }).join("");
@@ -943,7 +1159,7 @@
         });
     }
 
-    // ---- Diagnose --------------------------------------------------------
+    // ---- 诊断 -------------------------------------------------------------
 
     function loadDiagnostics() {
         fetch('/api/v1/diagnose')
@@ -1002,11 +1218,11 @@
             .then(function (response) { return response.json(); })
             .then(function (data) {
                 document.getElementById('diagnose-content').textContent = JSON.stringify(data, null, 2);
-                showToast('LLM诊断完成', 'success');
+                showToast('LLM 诊断完成', 'success');
             })
             .catch(function (error) {
-                console.error('运行LLM诊断出错:', error);
-                showToast('运行LLM诊断失败', 'error');
+                console.error('运行 LLM 诊断出错:', error);
+                showToast('运行 LLM 诊断失败', 'error');
             });
     }
 
@@ -1024,7 +1240,7 @@
     }
 
     function runAllDiagnostics() {
-        fetch('/api/v1/diagnose/all')
+        fetch('/api/v1/diagnose')
             .then(function (response) { return response.json(); })
             .then(function (data) {
                 document.getElementById('diagnose-content').textContent = JSON.stringify(data, null, 2);
@@ -1038,11 +1254,16 @@
     }
 
     function setupDiagnoseForm() {
-        document.getElementById('btn-refresh-diagnose')?.addEventListener('click', loadDiagnostics);
-        document.getElementById('btn-run-all-diagnostics')?.addEventListener('click', runAllDiagnostics);
-        document.getElementById('btn-diagnose-config')?.addEventListener('click', runConfigDiagnostics);
-        document.getElementById('btn-diagnose-llm')?.addEventListener('click', runLLMDiagnostics);
-        document.getElementById('btn-diagnose-install')?.addEventListener('click', runInstallDiagnostics);
+        var refreshBtn = document.getElementById('btn-refresh-diagnose');
+        var runAllBtn = document.getElementById('btn-run-all-diagnostics');
+        var configBtn = document.getElementById('btn-diagnose-config');
+        var llmBtn = document.getElementById('btn-diagnose-llm');
+        var installBtn = document.getElementById('btn-diagnose-install');
+        if (refreshBtn) refreshBtn.addEventListener('click', loadDiagnostics);
+        if (runAllBtn) runAllBtn.addEventListener('click', runAllDiagnostics);
+        if (configBtn) configBtn.addEventListener('click', runConfigDiagnostics);
+        if (llmBtn) llmBtn.addEventListener('click', runLLMDiagnostics);
+        if (installBtn) installBtn.addEventListener('click', runInstallDiagnostics);
     }
 
     // ---- WebSocket -------------------------------------------------------
@@ -1066,11 +1287,13 @@
 
         ws.onclose = function () {
             setConnected(false);
+            setChatProcessing(false);
             scheduleReconnect();
         };
 
         ws.onerror = function () {
             setConnected(false);
+            setChatProcessing(false);
         };
 
         ws.onmessage = function (event) {
@@ -1088,6 +1311,7 @@
                     break;
 
                 case "result": {
+                    setChatProcessing(false);
                     var result = data.data;
                     var text = "";
                     if (result.output && typeof result.output === "object") {
@@ -1106,6 +1330,7 @@
                 }
 
                 case "error":
+                    setChatProcessing(false);
                     addMessage("system", data.content || "未知错误", "error");
                     break;
 
@@ -1123,14 +1348,16 @@
         }, RECONNECT_DELAY);
     }
 
-    // ---- Send message ----------------------------------------------------
+    // ---- 发送消息 ---------------------------------------------------------
 
     function sendMessage(text) {
         if (!text.trim()) return;
+        if (chatProcessing) return;
 
         addMessage("user", text);
+        setChatProcessing(true);
 
-        var selectedWorkspace = chatWsSelect.value || null;
+        var selectedWorkspace = selectedChatWorkspace();
         var payload = { message: text };
         if (selectedWorkspace) {
             payload.workspace_id = selectedWorkspace;
@@ -1146,18 +1373,20 @@
             })
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
+                    setChatProcessing(false);
                     var out = data.output
                         ? (typeof data.output === "object" ? (data.output.message || JSON.stringify(data.output, null, 2)) : String(data.output))
                         : JSON.stringify(data, null, 2);
                     addMessage("assistant", out);
                 })
                 .catch(function (err) {
+                    setChatProcessing(false);
                     addMessage("system", "请求失败: " + err.message, "error");
                 });
         }
     }
 
-    // ---- Event listeners -------------------------------------------------
+    // ---- 事件监听 ---------------------------------------------------------
 
     chatForm.addEventListener("submit", function (e) {
         e.preventDefault();
@@ -1173,7 +1402,13 @@
         }
     });
 
-    // ---- Smooth scrolling for anchor links --------------------------------
+    if (chatWsSelect) {
+        chatWsSelect.addEventListener("change", function () {
+            handleWorkspaceSelection(this.value);
+        });
+    }
+
+    // ---- 锚点平滑滚动 -----------------------------------------------------
 
     document.querySelectorAll('a[href^="#"]').forEach(function (anchor) {
         anchor.addEventListener("click", function (e) {
@@ -1188,7 +1423,7 @@
         });
     });
 
-    // ---- Toast dismiss on click ------------------------------------------
+    // ---- 点击关闭提示 -----------------------------------------------------
 
     document.addEventListener("click", function (e) {
         if (e.target.classList.contains("toast")) {
@@ -1199,10 +1434,10 @@
         }
     });
 
-    // ---- Keyboard shortcuts ----------------------------------------------
+    // ---- 键盘快捷键 -------------------------------------------------------
 
     document.addEventListener("keydown", function (e) {
-        // Ctrl/Cmd + K to focus search (if exists)
+        // Ctrl/Cmd + K 聚焦搜索框（如果存在）
         if ((e.ctrlKey || e.metaKey) && e.key === "k") {
             e.preventDefault();
             var searchInput = document.querySelector('input[type="search"]');
@@ -1211,15 +1446,16 @@
             }
         }
 
-        // Escape to close modals
+        // Escape 关闭弹窗和抽屉
         if (e.key === "Escape") {
             var modals = document.querySelectorAll(".modal.active");
             modals.forEach(function (modal) {
                 modal.classList.remove("active");
             });
+            closeDrawer();
         }
 
-        // Ctrl+Q to quit (sends close request to backend)
+        // Ctrl+Q 退出（向后端发送关闭请求）
         if (e.ctrlKey && e.key === "q") {
             e.preventDefault();
             if (confirm("确定要退出 SuperMedicine 吗？")) {
@@ -1232,7 +1468,7 @@
             }
         }
 
-        // F11 for fullscreen toggle
+        // F11 切换全屏
         if (e.key === "F11") {
             e.preventDefault();
             if (document.fullscreenElement) {
@@ -1242,7 +1478,7 @@
             }
         }
 
-        // Ctrl+1-9 for tab switching
+        // Ctrl+1-9 切换页面
         if (e.ctrlKey && e.key >= "1" && e.key <= "9") {
             e.preventDefault();
             var tabIndex = parseInt(e.key, 10) - 1;
@@ -1253,7 +1489,7 @@
         }
     });
 
-    // ---- Init ------------------------------------------------------------
+    // ---- 初始化 -----------------------------------------------------------
 
     initTabs();
     setupWorkspaceForm();
@@ -1261,11 +1497,13 @@
     setupExperienceForm();
     setupToolForm();
     setupExperimentForm();
+    setupDialogHistoryForm();
+    setupLLMForm();
     setupPermissionForm();
     setupLogForm();
     setupSelfEvolutionForm();
     setupDiagnoseForm();
-    loadChatWorkspaceSelector();
+    loadWorkspaceSelectors();
     fetchStatus();
     connect();
 })();

@@ -330,44 +330,25 @@ class TestDeltaAgent:
         assert "target_agent" in result
         assert "context" in result
 
-    def test_auto_route_analyze_to_alpha(self):
+    @pytest.mark.parametrize(
+        ("task", "target_agent"),
+        [
+            ("Analyze the requirements", "alpha"),
+            ("Plan the implementation", "alpha"),
+            ("Review the code changes", "beta"),
+            ("Verify the output", "beta"),
+            ("Write the documentation", "gamma"),
+            ("Draft a summary report", "gamma"),
+            ("Generate content for the page", "gamma"),
+        ],
+    )
+    def test_auto_routes_by_task_keyword(self, task, target_agent):
         agent = DeltaAgent()
-        result = agent.execute({"task": "Analyze the requirements"})
-        assert result["target_agent"] == "alpha"
-
-    def test_auto_route_plan_to_alpha(self):
-        agent = DeltaAgent()
-        result = agent.execute({"task": "Plan the implementation"})
-        assert result["target_agent"] == "alpha"
-
-    def test_auto_route_review_to_beta(self):
-        agent = DeltaAgent()
-        result = agent.execute({"task": "Review the code changes"})
-        assert result["target_agent"] == "beta"
-
-    def test_auto_route_verify_to_beta(self):
-        agent = DeltaAgent()
-        result = agent.execute({"task": "Verify the output"})
-        assert result["target_agent"] == "beta"
-
-    def test_auto_route_write_to_gamma(self):
-        agent = DeltaAgent()
-        result = agent.execute({"task": "Write the documentation"})
-        assert result["target_agent"] == "gamma"
-
-    def test_auto_route_draft_to_gamma(self):
-        agent = DeltaAgent()
-        result = agent.execute({"task": "Draft a summary report"})
-        assert result["target_agent"] == "gamma"
-
-    def test_auto_route_generate_to_gamma(self):
-        agent = DeltaAgent()
-        result = agent.execute({"task": "Generate content for the page"})
-        assert result["target_agent"] == "gamma"
+        result = agent.execute({"task": task})
+        assert result["target_agent"] == target_agent
 
     def test_auto_route_default_to_alpha(self):
-        agent = DeltaAgent()
-        result = agent.execute({"task": "Do something random"})
+        result = DeltaAgent().execute({"task": "Do something random"})
         assert result["target_agent"] == "alpha"
         assert "default" in result["route"].lower()
 
@@ -387,23 +368,15 @@ class TestDeltaAgent:
         # "omega" is not a valid target, so auto-route should kick in
         assert result["target_agent"] == "gamma"  # "write" keyword
 
-    def test_phase_based_routing_analysis(self):
+    @pytest.mark.parametrize(
+        ("phase", "target_agent"),
+        [("analysis", "alpha"), ("review", "beta"), ("writing", "gamma")],
+    )
+    def test_phase_based_routing(self, phase, target_agent):
         agent = DeltaAgent()
-        result = agent.execute({"task": "Do stuff", "phase": "analysis"})
-        assert result["target_agent"] == "alpha"
-        assert "analysis" in result["route"].lower()
-
-    def test_phase_based_routing_review(self):
-        agent = DeltaAgent()
-        result = agent.execute({"task": "Do stuff", "phase": "review"})
-        assert result["target_agent"] == "beta"
-        assert "review" in result["route"].lower()
-
-    def test_phase_based_routing_writing(self):
-        agent = DeltaAgent()
-        result = agent.execute({"task": "Do stuff", "phase": "writing"})
-        assert result["target_agent"] == "gamma"
-        assert "writing" in result["route"].lower()
+        result = agent.execute({"task": "Do stuff", "phase": phase})
+        assert result["target_agent"] == target_agent
+        assert phase in result["route"].lower()
 
     def test_routing_history_is_tracked(self):
         agent = DeltaAgent()
@@ -499,39 +472,40 @@ class TestStateMachine:
         sm = StateMachine(task_id="t")
         assert sm.state == TaskState.PLANNING
 
-    def test_transition_planning_to_dispatch(self):
+    @pytest.mark.parametrize(
+        ("transitions", "expected_state"),
+        [
+            ([TaskState.DISPATCH], TaskState.DISPATCH),
+            ([TaskState.DISPATCH, TaskState.RUNNING], TaskState.RUNNING),
+            (
+                [TaskState.DISPATCH, TaskState.RUNNING, TaskState.VERIFYING],
+                TaskState.VERIFYING,
+            ),
+            (
+                [
+                    TaskState.DISPATCH,
+                    TaskState.RUNNING,
+                    TaskState.VERIFYING,
+                    TaskState.COMPLETED,
+                ],
+                TaskState.COMPLETED,
+            ),
+            (
+                [
+                    TaskState.DISPATCH,
+                    TaskState.RUNNING,
+                    TaskState.VERIFYING,
+                    TaskState.RETRY,
+                ],
+                TaskState.RETRY,
+            ),
+        ],
+    )
+    def test_valid_transitions(self, transitions, expected_state):
         sm = StateMachine(task_id="t")
-        sm.transition(TaskState.DISPATCH)
-        assert sm.state == TaskState.DISPATCH
-
-    def test_transition_dispatch_to_running(self):
-        sm = StateMachine(task_id="t")
-        sm.transition(TaskState.DISPATCH)
-        sm.transition(TaskState.RUNNING)
-        assert sm.state == TaskState.RUNNING
-
-    def test_transition_running_to_verifying(self):
-        sm = StateMachine(task_id="t")
-        sm.transition(TaskState.DISPATCH)
-        sm.transition(TaskState.RUNNING)
-        sm.transition(TaskState.VERIFYING)
-        assert sm.state == TaskState.VERIFYING
-
-    def test_transition_verifying_to_completed(self):
-        sm = StateMachine(task_id="t")
-        sm.transition(TaskState.DISPATCH)
-        sm.transition(TaskState.RUNNING)
-        sm.transition(TaskState.VERIFYING)
-        sm.transition(TaskState.COMPLETED)
-        assert sm.state == TaskState.COMPLETED
-
-    def test_transition_verifying_to_retry(self):
-        sm = StateMachine(task_id="t")
-        sm.transition(TaskState.DISPATCH)
-        sm.transition(TaskState.RUNNING)
-        sm.transition(TaskState.VERIFYING)
-        sm.transition(TaskState.RETRY)
-        assert sm.state == TaskState.RETRY
+        for state in transitions:
+            sm.transition(state)
+        assert sm.state == expected_state
 
     def test_invalid_transition_raises(self):
         with pytest.raises(ValueError):

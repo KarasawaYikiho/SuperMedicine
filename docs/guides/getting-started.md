@@ -193,7 +193,7 @@ supermedicine llm add deepseek \
 |---------|-------------|
 | `status` | Show project status |
 | `diagnose` | Run secret-safe diagnostics |
-| `tui` | Launch the Chinese Textual TUI |
+| `tui` | Launch the Chinese OpenTUI TUI |
 | `web` | Start the web interface |
 
 ### Workspace
@@ -260,11 +260,13 @@ supermedicine llm add deepseek \
 
 ## TUI Usage
 
-Launch the Chinese Textual terminal interface:
+Launch the Chinese OpenTUI terminal interface. Install the pinned JS dependency
+with `npm ci` first, and keep Bun available on `PATH` for the interactive runtime:
 
 ```bash
 supermedicine tui
 supermedicine tui --dry-run  # Check readiness without starting
+npm run opentui:smoke        # Check Bun/@opentui runtime prerequisites
 ```
 
 ### Global Shortcuts
@@ -274,9 +276,13 @@ supermedicine tui --dry-run  # Check readiness without starting
 | `Tab` | Move focus forward |
 | `Shift+Tab` | Move focus backward |
 | `Enter` | Submit/confirm |
-| `M` | Open main menu |
-| `P` | Open permission view |
-| `Esc` | Exit maximized mode |
+| `M` | Toggle the route/menu shell |
+| `P` / `Ctrl+P` | Open permission view |
+| `Esc` / `B` | Return/back |
+| `↑↓` / `j k` | Move selection where available |
+| `/` | Focus page filtering where available |
+| `[` / `]` | Scroll page content where available |
+| `Ctrl+1` ... `Ctrl+0` | Jump to primary routes |
 | `Q` | Quit TUI |
 
 ### Screens
@@ -302,6 +308,6 @@ Access at `http://127.0.0.1:8000`. See [API Reference](../api/README.md) for end
 | `No module named 'yaml'` | `pip install -e .` or `pip install pyyaml` |
 | `supermedicine` command not found | Add Python Scripts to PATH or use `python Cli.py` |
 | Missing LLM fields | Provide provider, base_url, model, and API key source |
-| TUI launch issue | Run `supermedicine tui --dry-run` first |
+| TUI launch issue | Run `supermedicine tui --dry-run`, `npm ci`, and `npm run opentui:smoke`; confirm Bun is installed/on `PATH` |
 
 See [README.md](../../README.md) for more troubleshooting details.

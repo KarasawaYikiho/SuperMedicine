@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Protocol
 from uuid import uuid4
@@ -21,10 +20,7 @@ from core.experiment_protocols import (
     list_protocols,
 )
 from core.redaction import redact_sensitive
-
-
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+from core.time_utils import utc_now
 
 
 class ExperimentStatus(str, Enum):
@@ -261,8 +257,8 @@ class ExperimentSession:
     status: ExperimentStatus = ExperimentStatus.IN_PROGRESS
     records: dict[str, StepRecord] = field(default_factory=dict)
     error: str | None = None
-    created_at: str = field(default_factory=_utc_now)
-    updated_at: str = field(default_factory=_utc_now)
+    created_at: str = field(default_factory=utc_now)
+    updated_at: str = field(default_factory=utc_now)
     metadata: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -345,14 +341,14 @@ class ExperimentSession:
             outputs=dict(outputs or {}),
             calculation_results=normalized_results,
             completed=True,
-            submitted_at=_utc_now(),
+            submitted_at=utc_now(),
         )
         self.records[step_id] = record
         self.error = None
         if advance:
             self.advance()
         else:
-            self.updated_at = _utc_now()
+            self.updated_at = utc_now()
         return record
 
     def build_plugin_requests(
@@ -463,7 +459,7 @@ class ExperimentSession:
             self.status = ExperimentStatus.COMPLETED
         else:
             self.current_step_index += 1
-        self.updated_at = _utc_now()
+        self.updated_at = utc_now()
 
     def recover(self) -> None:
         """Leave error state and resume from the current step."""
@@ -471,7 +467,7 @@ class ExperimentSession:
         if self.status == ExperimentStatus.ERROR:
             self.status = ExperimentStatus.IN_PROGRESS
             self.error = None
-            self.updated_at = _utc_now()
+            self.updated_at = utc_now()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -502,8 +498,8 @@ class ExperimentSession:
                 for key, value in data.get("records", {}).items()
             },
             error=data.get("error"),
-            created_at=str(data.get("created_at", _utc_now())),
-            updated_at=str(data.get("updated_at", _utc_now())),
+            created_at=str(data.get("created_at", utc_now())),
+            updated_at=str(data.get("updated_at", utc_now())),
             metadata=dict(data.get("metadata", {})),
         )
         if not 0 <= session.current_step_index < len(session.protocol.steps):
@@ -515,7 +511,7 @@ class ExperimentSession:
     def _fail(self, message: str) -> None:
         self.status = ExperimentStatus.ERROR
         self.error = message
-        self.updated_at = _utc_now()
+        self.updated_at = utc_now()
         raise ExperimentGuideError(message)
 
 

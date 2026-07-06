@@ -24,14 +24,14 @@ logger = logging.getLogger(__name__)
 
 
 def _ensure_fastapi() -> None:
-    """Raise a clear error when fastapi/uvicorn are not installed."""
+    """fastapi/uvicorn 未安装时抛出清晰错误。"""
     try:
         import fastapi  # noqa: F401
         import uvicorn  # noqa: F401
     except ImportError as exc:
         raise ImportError(
-            "Web interface requires 'fastapi' and 'uvicorn'. "
-            "Install them with:  pip install supermedicine[web]"
+            "网页 GUI 需要 'fastapi' 和 'uvicorn'。"
+            "请使用以下命令安装：pip install supermedicine[web]"
         ) from exc
 
 
@@ -46,7 +46,7 @@ def create_app() -> Any:
     app = FastAPI(
         title="SuperMedicine Web API",
         version="0.4.2",
-        description="Browser-based interface for SuperMedicine medical research agent",
+        description="SuperMedicine 医学研究智能体的浏览器/桌面 GUI 接口",
     )
 
     # ---- state -----------------------------------------------------------
@@ -70,6 +70,49 @@ def create_app() -> Any:
                 policies_dir=policies_dir,
             )
         return _kernel_holder["kernel"]
+
+    def _workspace_context(workspace_id: str | None) -> dict[str, Any] | None:
+        """Validate a selected workspace and build the shared execution context."""
+        if not workspace_id:
+            return None
+        from core.workspace import WorkspaceManager
+
+        workspace_info = WorkspaceManager(Path.cwd()).get_workspace(workspace_id)
+        return {
+            "id": workspace_info.id,
+            "path": str(workspace_info.path),
+            "metadata": workspace_info.metadata.to_dict(),
+        }
+
+    def _execute_chat_message(
+        message: str,
+        *,
+        workspace_id: str | None = None,
+        progress_callback: Any = None,
+    ) -> dict[str, Any]:
+        """Execute chat with the selected workspace synchronized into runtime state."""
+        kernel = _get_kernel()
+        workspace_context = _workspace_context(workspace_id)
+        params: dict[str, Any] | None = None
+        if workspace_context is not None:
+            workspace_id = str(workspace_context["id"])
+            params = {"_workspace": workspace_context}
+            kernel._config.set_runtime_state_value(
+                "last_workspace_id", workspace_id, save=True
+            )
+        else:
+            kernel._config.set_runtime_state_value("last_workspace_id", "", save=True)
+        result = kernel.execute_task(
+            message,
+            params=params,
+            progress_callback=progress_callback,
+        )
+        if workspace_context is not None:
+            metadata = result.setdefault("metadata", {})
+            if isinstance(metadata, dict):
+                metadata.setdefault("workspace", workspace_context)
+                metadata.setdefault("workspace_id", workspace_id)
+        return result
 
     # ---- REST endpoints --------------------------------------------------
 
@@ -102,9 +145,9 @@ def create_app() -> Any:
                 config = ConfigCenter(config_dir / "config.yaml")
                 manager = LLMConfigManager(config, restore_on_startup=False)
                 provider = manager.get_current_provider(redacted=True)
-                status["llm_provider"] = provider.get("provider", "unknown") if provider else "not configured"
+                status["llm_provider"] = provider.get("provider", "未知") if provider else "未配置"
             except Exception:
-                status["llm_provider"] = "error reading config"
+                status["llm_provider"] = "读取配置失败"
 
         return status
 
@@ -112,12 +155,12 @@ def create_app() -> Any:
     async def chat(request: dict[str, Any]) -> dict[str, Any]:
         """Send a message to the Kernel and return the response."""
         message = request.get("message", "")
+        workspace_id = request.get("workspace_id") or None
         if not message:
             return {"error": "No message provided", "status": "error"}
 
         try:
-            kernel = _get_kernel()
-            result = kernel.execute_task(message)
+            result = _execute_chat_message(message, workspace_id=workspace_id)
             return result
         except Exception as exc:
             logger.exception("Chat error")
@@ -226,7 +269,7 @@ def create_app() -> Any:
         """Enrich a paper with LLM-extracted metadata."""
         try:
             return _get_cli().paper_enrich(
-                workspace_id, paper_id, confirm_enrich=request.get("confirm_enrich", True)
+                workspace_id, paper_id, confirm_enrich=request.get("confirm_enrich", False)
             )
         except Exception as exc:
             logger.exception("paper_enrich error")
@@ -332,6 +375,28 @@ def create_app() -> Any:
             logger.exception("llm_providers error")
             return {"error": str(exc), "status": "error"}
 
+    @app.post("/api/v1/llm/providers")
+    async def llm_provider_create(request: dict[str, Any]) -> dict[str, Any]:
+        """Add or update one LLM provider."""
+        provider = request.get("provider") or request.get("name") or ""
+        if not provider:
+            return {"error": "No provider specified", "status": "error"}
+        try:
+            return _get_cli().llm_add(
+                provider,
+                api_format=request.get("api_format"),
+                base_url=request.get("base_url"),
+                api_key=request.get("api_key"),
+                api_key_env=request.get("api_key_env"),
+                model=request.get("model"),
+                timeout=request.get("timeout"),
+                headers=request.get("headers"),
+                set_current=request.get("set_current", False),
+            )
+        except Exception as exc:
+            logger.exception("llm_provider_create error")
+            return {"error": str(exc), "status": "error"}
+
     @app.get("/api/v1/llm/providers/{name}")
     async def llm_provider_get(name: str) -> dict[str, Any]:
         """Show one LLM provider."""
@@ -390,6 +455,18 @@ def create_app() -> Any:
             return _get_cli().permission_authorize(path)
         except Exception as exc:
             logger.exception("permission_authorize error")
+            return {"error": str(exc), "status": "error"}
+
+    @app.post("/api/v1/permissions/revoke")
+    async def permission_revoke(request: dict[str, Any]) -> dict[str, Any]:
+        """Revoke an authorized external path."""
+        path = request.get("path", "")
+        if not path:
+            return {"error": "No path specified", "status": "error"}
+        try:
+            return _get_cli().permission_revoke(path)
+        except Exception as exc:
+            logger.exception("permission_revoke error")
             return {"error": str(exc), "status": "error"}
 
     # ---- Log endpoints ----------------------------------------------------
@@ -460,6 +537,20 @@ def create_app() -> Any:
             )
         except Exception as exc:
             logger.exception("experiment_submit error")
+            return {"error": str(exc), "status": "error"}
+
+    # ---- Dialog history endpoints ----------------------------------------
+
+    @app.get("/api/v1/workspaces/{workspace_id}/dialog-history")
+    async def dialog_history_list(workspace_id: str) -> Any:
+        """List redacted dialog history summary events for a workspace."""
+        try:
+            from core.tui.dialog_history import DialogHistoryStore
+
+            events = DialogHistoryStore(project_root=Path.cwd()).load_events(workspace_id)
+            return [event.to_dict() for event in events]
+        except Exception as exc:
+            logger.exception("dialog_history_list error")
             return {"error": str(exc), "status": "error"}
 
     # ---- Self Evolution endpoints ----------------------------------------
@@ -552,6 +643,11 @@ def create_app() -> Any:
             logger.exception("diagnose_all error")
             return {"error": str(exc), "status": "error"}
 
+    @app.get("/api/v1/diagnose/all")
+    async def diagnose_all_compat() -> dict[str, Any]:
+        """Compatibility alias for full diagnostics."""
+        return await diagnose_all()
+
     @app.get("/api/v1/diagnose/config")
     async def diagnose_config() -> dict[str, Any]:
         """Get config diagnostics."""
@@ -585,6 +681,11 @@ def create_app() -> Any:
             logger.exception("diagnose_install error")
             return {"error": str(exc), "status": "error"}
 
+    @app.post("/api/v1/shutdown")
+    async def shutdown() -> dict[str, Any]:
+        """Acknowledge GUI close requests without forcing server termination."""
+        return {"status": "closing", "message": "GUI close requested"}
+
     # ---- WebSocket chat --------------------------------------------------
 
     @app.websocket("/ws/chat")
@@ -602,6 +703,7 @@ def create_app() -> Any:
                     data = {"message": raw}
 
                 message = data.get("message", "")
+                workspace_id = data.get("workspace_id") or None
                 if not message:
                     await websocket.send_json(
                         {"type": "error", "content": "No message provided"}
@@ -623,11 +725,12 @@ def create_app() -> Any:
                         )
 
                     try:
-                        kernel = _get_kernel()
                         result = await asyncio.get_event_loop().run_in_executor(
                             None,
-                            lambda: kernel.execute_task(
-                                message, progress_callback=progress_callback
+                            lambda: _execute_chat_message(
+                                message,
+                                workspace_id=workspace_id,
+                                progress_callback=progress_callback,
                             ),
                         )
                         await websocket.send_json(

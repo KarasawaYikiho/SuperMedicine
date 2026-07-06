@@ -325,10 +325,34 @@ def test_self_evolve_sandbox_rejects_out_of_scope_path(monkeypatch, tmp_path, ca
     assert not outside.exists()
 
 
-def test_self_evolve_full_access_notice_is_visible_and_requires_confirmation_flags(
-    monkeypatch, tmp_path, capsys
+@pytest.mark.parametrize(
+    ("output_path", "extra_flags", "expected_confirmed", "expected_failure"),
+    [
+        (
+            "generated/full.md",
+            [],
+            False,
+            None,
+        ),
+        (
+            "generated/full-no-risk.md",
+            ["--confirm-full-access"],
+            True,
+            "risk notice",
+        ),
+    ],
+)
+def test_self_evolve_full_access_failures_report_notice_and_do_not_write(
+    monkeypatch,
+    tmp_path,
+    capsys,
+    output_path,
+    extra_flags,
+    expected_confirmed,
+    expected_failure,
 ):
     monkeypatch.chdir(tmp_path)
+    target = tmp_path / output_path
 
     main(
         [
@@ -338,24 +362,32 @@ def test_self_evolve_full_access_notice_is_visible_and_requires_confirmation_fla
             "--target-type",
             "markdown",
             "--output",
-            "generated/full.md",
+            output_path,
             "--access-mode",
             "full",
             "--no-preview",
             "--confirm-write",
+            *extra_flags,
         ]
     )
 
     result = _cli_json(capsys)
     assert result["status"] == "failed"
     assert result["full_access_notice"]["full_access_requested"] is True
-    assert result["full_access_notice"]["explicit_full_access_confirmed"] is False
+    assert (
+        result["full_access_notice"]["explicit_full_access_confirmed"]
+        is expected_confirmed
+    )
     assert result["full_access_notice"]["risk_notice_acknowledged"] is False
     assert (
         "current user/process permissions" in result["full_access_notice"]["semantics"]
     )
     assert "[REDACTED]" not in json.dumps(result["full_access_notice"])
-    assert any("--confirm-full-access" in step for step in result["next_steps"])
+    if expected_failure is None:
+        assert any("--confirm-full-access" in step for step in result["next_steps"])
+    else:
+        assert expected_failure in result["failure_reason"].lower()
+        assert not target.exists()
 
 
 def test_self_evolve_full_access_confirmation_flags_are_reported(
@@ -386,37 +418,6 @@ def test_self_evolve_full_access_confirmation_flags_are_reported(
     assert result["full_access_notice"]["explicit_full_access_confirmed"] is True
     assert result["full_access_notice"]["risk_notice_acknowledged"] is True
     assert Path(result["audit_log"]["path"]).name == "audit.jsonl"
-
-
-def test_self_evolve_full_access_requires_risk_acknowledgement(
-    monkeypatch, tmp_path, capsys
-):
-    monkeypatch.chdir(tmp_path)
-    target = tmp_path / "generated" / "full-no-risk.md"
-
-    main(
-        [
-            "self-evolve",
-            "--instruction",
-            "Create full access output without risk acknowledgement",
-            "--target-type",
-            "markdown",
-            "--output",
-            "generated/full-no-risk.md",
-            "--access-mode",
-            "full",
-            "--no-preview",
-            "--confirm-write",
-            "--confirm-full-access",
-        ]
-    )
-
-    result = _cli_json(capsys)
-    assert result["status"] == "failed"
-    assert result["full_access_notice"]["explicit_full_access_confirmed"] is True
-    assert result["full_access_notice"]["risk_notice_acknowledged"] is False
-    assert "risk notice" in result["failure_reason"].lower()
-    assert not target.exists()
 
 
 def test_self_evolve_help_does_not_regress_existing_commands(capsys):

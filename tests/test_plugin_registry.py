@@ -11,19 +11,25 @@ class TestAdapterDiscoveryRegistry:
     ):
         import sys
 
-        sys.modules.pop("adapters", None)
-        sys.modules.pop("adapters.standalone", None)
-        sys.modules.pop("adapters.standalone.adapter", None)
-        sys.modules.pop("adapters.opencode", None)
-        sys.modules.pop("adapters.opencode.adapter", None)
-        sys.modules.pop("adapters.claude_code", None)
-        sys.modules.pop("adapters.claude_code.adapter", None)
+        for module_name in (
+            "adapters",
+            "adapters.standalone",
+            "adapters.standalone.adapter",
+            "adapters.opencode",
+            "adapters.opencode.adapter",
+            "adapters.claude_code",
+            "adapters.claude_code.adapter",
+        ):
+            sys.modules.pop(module_name, None)
 
         import adapters
 
-        assert "adapters.standalone.adapter" not in sys.modules
-        assert "adapters.opencode.adapter" not in sys.modules
-        assert "adapters.claude_code.adapter" not in sys.modules
+        for module_name in (
+            "adapters.standalone.adapter",
+            "adapters.opencode.adapter",
+            "adapters.claude_code.adapter",
+        ):
+            assert module_name not in sys.modules
 
         registrations = adapters.list_adapter_registrations()
         assert {item["platform"] for item in registrations} == {
@@ -37,9 +43,12 @@ class TestAdapterDiscoveryRegistry:
             assert registration["module"].startswith("adapters.")
             assert "adapter_class" in registration
 
-        assert "adapters.standalone" not in sys.modules
-        assert "adapters.opencode" not in sys.modules
-        assert "adapters.claude_code" not in sys.modules
+        for module_name in (
+            "adapters.standalone",
+            "adapters.opencode",
+            "adapters.claude_code",
+        ):
+            assert module_name not in sys.modules
 
     def test_adapter_registry_distinguishes_core_and_optional_boundaries(self):
         import adapters

@@ -66,67 +66,50 @@ def _write_policy(project_dir: Path) -> None:
     )
 
 
-def _opencode_adapter_with_policy(
+def _adapter_with_policy(
+    adapter_type: type[OpenCodeAdapter] | type[StandaloneAdapter],
     tmp_path: Path,
     *,
+    role: str,
     allowed: list[dict[str, str]],
     denied: list[dict[str, str]] | None = None,
     agent_id: str = "alpha",
-) -> OpenCodeAdapter:
+) -> OpenCodeAdapter | StandaloneAdapter:
     policy_dir = tmp_path / ".supermedicine" / "policies"
     policy_dir.mkdir(parents=True)
     (policy_dir / PermissionEngine.DEFAULT_POLICY_FILENAME).write_text(
         yaml.dump(
             {
                 "agent_id": agent_id,
-                "role": "adapter-test",
+                "role": role,
                 "permissions": {"allowed": allowed, "denied": denied or []},
             }
         ),
         encoding="utf-8",
     )
     engine = PermissionEngine(policy_dir, policy_dir / "audit.jsonl")
-    return OpenCodeAdapter(
-        permission_engine=engine, project_dir=tmp_path, default_agent_id=agent_id
-    )
-
-
-def _standalone_adapter_with_policy(
-    tmp_path: Path,
-    *,
-    allowed: list[dict[str, str]],
-    denied: list[dict[str, str]] | None = None,
-    agent_id: str = "alpha",
-) -> StandaloneAdapter:
-    policy_dir = tmp_path / ".supermedicine" / "policies"
-    policy_dir.mkdir(parents=True)
-    (policy_dir / PermissionEngine.DEFAULT_POLICY_FILENAME).write_text(
-        yaml.dump(
-            {
-                "agent_id": agent_id,
-                "role": "standalone-test",
-                "permissions": {"allowed": allowed, "denied": denied or []},
-            }
-        ),
-        encoding="utf-8",
-    )
-    engine = PermissionEngine(policy_dir, policy_dir / "audit.jsonl")
-    return StandaloneAdapter(
+    return adapter_type(
         permission_engine=engine, project_dir=tmp_path, default_agent_id=agent_id
     )
 
 
 @pytest.fixture
 def permissive_opencode_adapter(tmp_path: Path) -> OpenCodeAdapter:
-    return _opencode_adapter_with_policy(
-        tmp_path, allowed=[{"action": "tool_call", "scope": "*"}]
+    return _adapter_with_policy(
+        OpenCodeAdapter,
+        tmp_path,
+        role="adapter-test",
+        allowed=[{"action": "tool_call", "scope": "*"}],
     )
 
 
 @pytest.fixture
 def permissive_standalone_adapter(tmp_path: Path) -> StandaloneAdapter:
-    return _standalone_adapter_with_policy(
-        tmp_path, allowed=[{"action": "tool_call", "scope": "*"}]
+    return _adapter_with_policy(
+        StandaloneAdapter,
+        tmp_path,
+        role="standalone-test",
+        allowed=[{"action": "tool_call", "scope": "*"}],
     )
 
 
@@ -574,8 +557,11 @@ class TestToolCall:
         with tempfile.TemporaryDirectory() as tmpdir:
             project_dir = Path(tmpdir)
             file_path = Path(tmpdir) / "test.txt"
-            adapter = _opencode_adapter_with_policy(
-                project_dir, allowed=[{"action": "tool_call", "scope": str(file_path)}]
+            adapter = _adapter_with_policy(
+                OpenCodeAdapter,
+                project_dir,
+                role="adapter-test",
+                allowed=[{"action": "tool_call", "scope": str(file_path)}],
             )
             # Write
             write_result = adapter.tool_call(
@@ -615,8 +601,12 @@ class TestToolCall:
         assert result["context"]["native_dispatch_executed"] is False
 
     def test_high_risk_tool_denied_before_write_mutation(self, tmp_path):
-        adapter = _opencode_adapter_with_policy(
-            tmp_path, allowed=[], denied=[{"action": "tool_call", "scope": "*"}]
+        adapter = _adapter_with_policy(
+            OpenCodeAdapter,
+            tmp_path,
+            role="adapter-test",
+            allowed=[],
+            denied=[{"action": "tool_call", "scope": "*"}],
         )
         file_path = tmp_path / "blocked.txt"
 
@@ -630,8 +620,11 @@ class TestToolCall:
 
     def test_high_risk_tool_allowed_with_explicit_policy(self, tmp_path):
         target = tmp_path / "allowed.txt"
-        adapter = _opencode_adapter_with_policy(
-            tmp_path, allowed=[{"action": "tool_call", "scope": str(target)}]
+        adapter = _adapter_with_policy(
+            OpenCodeAdapter,
+            tmp_path,
+            role="adapter-test",
+            allowed=[{"action": "tool_call", "scope": str(target)}],
         )
 
         result = adapter.tool_call(
@@ -656,8 +649,10 @@ class TestToolCall:
         project_dir = tmp_path / "project"
         project_dir.mkdir()
         policy_scope = project_dir / "nested" / ".." / "nested" / "same-file.txt"
-        adapter = _opencode_adapter_with_policy(
+        adapter = _adapter_with_policy(
+            OpenCodeAdapter,
             project_dir,
+            role="adapter-test",
             allowed=[{"action": "tool_call", "scope": str(policy_scope)}],
         )
 
@@ -683,8 +678,10 @@ class TestToolCall:
             project_dir / "nested" / ".." / "nested" / "same-file-reversed.txt"
         )
         resolved_policy_scope = raw_file_path.resolve(strict=False)
-        adapter = _opencode_adapter_with_policy(
+        adapter = _adapter_with_policy(
+            OpenCodeAdapter,
             project_dir,
+            role="adapter-test",
             allowed=[{"action": "tool_call", "scope": str(resolved_policy_scope)}],
         )
 
@@ -708,8 +705,10 @@ class TestToolCall:
         project_dir.mkdir()
         allowed_file = project_dir / "nested" / "allowed.txt"
         different_file = project_dir / "nested" / "allowed.txt.bak"
-        adapter = _opencode_adapter_with_policy(
+        adapter = _adapter_with_policy(
+            OpenCodeAdapter,
             project_dir,
+            role="adapter-test",
             allowed=[
                 {
                     "action": "tool_call",
@@ -804,8 +803,12 @@ class TestToolCall:
 
     def test_bash_permission_denied_before_execution(self, tmp_path):
         marker = tmp_path / "should_not_exist.txt"
-        adapter = _opencode_adapter_with_policy(
-            tmp_path, allowed=[], denied=[{"action": "tool_call", "scope": "bash"}]
+        adapter = _adapter_with_policy(
+            OpenCodeAdapter,
+            tmp_path,
+            role="adapter-test",
+            allowed=[],
+            denied=[{"action": "tool_call", "scope": "bash"}],
         )
 
         result = adapter.tool_call(
@@ -823,8 +826,11 @@ class TestToolCall:
         self, tmp_path
     ):
         marker = tmp_path / "shell-injection-marker"
-        adapter = _opencode_adapter_with_policy(
-            tmp_path, allowed=[{"action": "tool_call", "scope": "bash"}]
+        adapter = _adapter_with_policy(
+            OpenCodeAdapter,
+            tmp_path,
+            role="adapter-test",
+            allowed=[{"action": "tool_call", "scope": "bash"}],
         )
 
         result = adapter.tool_call(
@@ -1166,8 +1172,11 @@ class TestStandaloneAdapter:
 
     def test_tool_call_read_write(self):
         with tempfile.TemporaryDirectory() as td:
-            adapter = _standalone_adapter_with_policy(
-                Path(td), allowed=[{"action": "tool_call", "scope": "*"}]
+            adapter = _adapter_with_policy(
+                StandaloneAdapter,
+                Path(td),
+                role="standalone-test",
+                allowed=[{"action": "tool_call", "scope": "*"}],
             )
             fp = Path(td) / "test.txt"
             w = adapter.tool_call(
@@ -1215,8 +1224,12 @@ class TestStandaloneAdapter:
     def test_denied_edit_returns_before_file_mutation(self, tmp_path):
         target = tmp_path / "blocked.txt"
         target.write_text("old", encoding="utf-8")
-        adapter = _standalone_adapter_with_policy(
-            tmp_path, allowed=[], denied=[{"action": "tool_call", "scope": "*"}]
+        adapter = _adapter_with_policy(
+            StandaloneAdapter,
+            tmp_path,
+            role="standalone-test",
+            allowed=[],
+            denied=[{"action": "tool_call", "scope": "*"}],
         )
 
         result = adapter.tool_call(
@@ -1229,8 +1242,11 @@ class TestStandaloneAdapter:
     def test_allowed_read_with_explicit_policy(self, tmp_path):
         target = tmp_path / "allowed.txt"
         target.write_text("readable", encoding="utf-8")
-        adapter = _standalone_adapter_with_policy(
-            tmp_path, allowed=[{"action": "tool_call", "scope": str(target)}]
+        adapter = _adapter_with_policy(
+            StandaloneAdapter,
+            tmp_path,
+            role="standalone-test",
+            allowed=[{"action": "tool_call", "scope": str(target)}],
         )
 
         result = adapter.tool_call("read", {"filePath": str(target)})
@@ -1284,8 +1300,12 @@ class TestStandaloneAdapter:
 
     def test_bash_permission_denied_before_execution(self, tmp_path):
         marker = tmp_path / "should_not_exist.txt"
-        adapter = _standalone_adapter_with_policy(
-            tmp_path, allowed=[], denied=[{"action": "tool_call", "scope": "bash"}]
+        adapter = _adapter_with_policy(
+            StandaloneAdapter,
+            tmp_path,
+            role="standalone-test",
+            allowed=[],
+            denied=[{"action": "tool_call", "scope": "bash"}],
         )
 
         result = adapter.tool_call(
@@ -1301,8 +1321,11 @@ class TestStandaloneAdapter:
 
     def test_bash_accepts_argv_without_shell_expansion(self, tmp_path):
         marker = tmp_path / "should_not_exist.txt"
-        adapter = _standalone_adapter_with_policy(
-            tmp_path, allowed=[{"action": "tool_call", "scope": "bash"}]
+        adapter = _adapter_with_policy(
+            StandaloneAdapter,
+            tmp_path,
+            role="standalone-test",
+            allowed=[{"action": "tool_call", "scope": "bash"}],
         )
 
         result = adapter.tool_call(

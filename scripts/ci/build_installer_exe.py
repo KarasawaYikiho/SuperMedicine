@@ -48,6 +48,7 @@ _DATA_ITEMS: list[str] = [
     "agents",
     "plugins",
     "adapters",
+    "assets",
 ]
 
 # PyInstaller hidden imports that may not be auto-detected.
@@ -123,6 +124,7 @@ def main() -> None:
         f"--distpath={dist}",
         f"--workpath={build_dir}",
         f"--specpath={root}",
+        f"--icon={root / 'assets' / 'logo.ico'}",
         *_build_add_data_args(root),
         *_build_hidden_import_args(),
         str(entry),

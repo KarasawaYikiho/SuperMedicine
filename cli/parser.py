@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from cli.helpers import (
     PERMISSION_RISK_NOTICE,
@@ -18,8 +17,16 @@ from cli.logging_setup import (
     _configure_stdio_errors,
 )
 
-if TYPE_CHECKING:
-    pass
+
+def _dispatch_subcommand(command, handlers, parser, error_types=(ValueError,)):
+    handler = handlers.get(command)
+    if handler is None:
+        parser.print_help()
+        return
+    try:
+        handler()
+    except error_types as exc:
+        parser.error(str(exc))
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -767,25 +774,22 @@ def main(argv: list[str] | None = None) -> None:
     elif args.command == "diagnose":
         cli.diagnose()
     elif args.command == "permission":
-        try:
-            if args.permission_command == "status":
-                cli.permission_status()
-            elif args.permission_command == "mode":
-                cli.permission_set_mode(
+        _dispatch_subcommand(
+            args.permission_command,
+            {
+                "status": cli.permission_status,
+                "roots": cli.permission_status,
+                "mode": lambda: cli.permission_set_mode(
                     args.mode,
                     confirm_full=args.confirm_full,
                     interactive=not args.no_interactive,
-                )
-            elif args.permission_command == "authorize":
-                cli.permission_authorize(args.path)
-            elif args.permission_command == "revoke":
-                cli.permission_revoke(args.path)
-            elif args.permission_command == "roots":
-                cli.permission_status()
-            else:
-                permission_parser.print_help()
-        except (ValueError, PermissionError) as exc:
-            permission_parser.error(str(exc))
+                ),
+                "authorize": lambda: cli.permission_authorize(args.path),
+                "revoke": lambda: cli.permission_revoke(args.path),
+            },
+            permission_parser,
+            (ValueError, PermissionError),
+        )
     elif args.command == "sandbox":
         sandbox_parser.print_help()
     elif args.command == "test":
@@ -826,45 +830,44 @@ def main(argv: list[str] | None = None) -> None:
             acknowledge_risk=args.acknowledge_risk,
         )
     elif args.command == "experiment":
-        try:
-            if args.experiment_command == "start":
-                cli.experiment_start(args.protocol, session_id=args.session_id)
-            elif args.experiment_command == "list":
-                cli.experiment_list()
-            elif args.experiment_command == "context":
-                cli.experiment_context(args.protocol)
-            elif args.experiment_command == "add-config":
-                cli.experiment_add_config(
+        _dispatch_subcommand(
+            args.experiment_command,
+            {
+                "start": lambda: cli.experiment_start(
+                    args.protocol, session_id=args.session_id
+                ),
+                "list": cli.experiment_list,
+                "context": lambda: cli.experiment_context(args.protocol),
+                "add-config": lambda: cli.experiment_add_config(
                     instruction=args.instruction,
                     config_json=args.config_json,
                     filename=args.filename,
                     overwrite=args.overwrite,
-                )
-            elif args.experiment_command == "show":
-                cli.experiment_show(args.session_file)
-            elif args.experiment_command == "submit":
-                cli.experiment_submit(
+                ),
+                "show": lambda: cli.experiment_show(args.session_file),
+                "submit": lambda: cli.experiment_submit(
                     args.session_file,
                     args.step,
                     args.input_json,
                     calculate=args.calculate,
-                )
-            else:
-                experiment_parser.print_help()
-        except (KeyError, ValueError) as exc:
-            experiment_parser.error(str(exc))
+                ),
+            },
+            experiment_parser,
+            (KeyError, ValueError),
+        )
     elif args.command == "log":
-        try:
-            if args.log_command == "write":
-                cli.log_write(args.message, session_id=args.session_id)
-            elif args.log_command == "list":
-                cli.log_list()
-            elif args.log_command == "show":
-                cli.log_show(args.file)
-            elif args.log_command == "location":
-                cli.log_location(file_name=args.file, session_id=args.session_id)
-            elif args.log_command == "follow":
-                cli.log_follow(
+        _dispatch_subcommand(
+            args.log_command,
+            {
+                "write": lambda: cli.log_write(
+                    args.message, session_id=args.session_id
+                ),
+                "list": cli.log_list,
+                "show": lambda: cli.log_show(args.file),
+                "location": lambda: cli.log_location(
+                    file_name=args.file, session_id=args.session_id
+                ),
+                "follow": lambda: cli.log_follow(
                     file_name=args.file,
                     session_id=args.session_id,
                     interval=args.interval,
@@ -873,60 +876,53 @@ def main(argv: list[str] | None = None) -> None:
                     iterations=args.iterations,
                     once=args.once,
                     no_clear=args.no_clear,
-                )
-            else:
-                log_parser.print_help()
-        except ValueError as exc:
-            log_parser.error(str(exc))
+                ),
+            },
+            log_parser,
+        )
     elif args.command == "workspace":
-        if args.workspace_command == "init":
-            cli.workspace_init(args.workspace, name=args.name)
-        elif args.workspace_command == "list":
-            cli.workspace_list()
-        elif args.workspace_command == "show":
-            cli.workspace_show(args.workspace)
-        elif args.workspace_command == "delete":
-            try:
-                cli.workspace_delete(args.workspace, args.confirm)
-            except ValueError as exc:
-                workspace_delete_parser.error(str(exc))
-        else:
-            workspace_parser.print_help()
+        _dispatch_subcommand(
+            args.workspace_command,
+            {
+                "init": lambda: cli.workspace_init(args.workspace, name=args.name),
+                "list": cli.workspace_list,
+                "show": lambda: cli.workspace_show(args.workspace),
+                "delete": lambda: cli.workspace_delete(args.workspace, args.confirm),
+            },
+            workspace_delete_parser
+            if args.workspace_command == "delete"
+            else workspace_parser,
+        )
     elif args.command == "tool":
-        if args.tool_command == "init":
-            cli.tool_init(args.workspace)
-        elif args.tool_command == "list":
-            cli.tool_list(args.workspace, language=args.language)
-        elif args.tool_command == "scan":
-            cli.tool_scan(language=args.language)
-        elif args.tool_command == "add":
-            try:
-                cli.tool_add(
+        _dispatch_subcommand(
+            args.tool_command,
+            {
+                "init": lambda: cli.tool_init(args.workspace),
+                "list": lambda: cli.tool_list(args.workspace, language=args.language),
+                "scan": lambda: cli.tool_scan(language=args.language),
+                "add": lambda: cli.tool_add(
                     args.workspace,
                     selections=args.select,
                     language=args.language,
                     overwrite=args.overwrite,
-                )
-            except ValueError as exc:
-                tool_add_parser.error(str(exc))
-        elif args.tool_command == "show":
-            cli.tool_show(args.workspace, args.language, args.tool)
-        elif args.tool_command == "run":
-            cli.tool_run(
-                args.workspace,
-                args.language,
-                args.tool,
-                dry_run=args.dry_run,
-                input_path=args.input,
-                output_path=args.output,
-            )
-        else:
-            tool_parser.print_help()
+                ),
+                "show": lambda: cli.tool_show(args.workspace, args.language, args.tool),
+                "run": lambda: cli.tool_run(
+                    args.workspace,
+                    args.language,
+                    args.tool,
+                    dry_run=args.dry_run,
+                    input_path=args.input,
+                    output_path=args.output,
+                ),
+            },
+            tool_add_parser if args.tool_command == "add" else tool_parser,
+        )
     elif args.command == "llm":
-        try:
-            if args.llm_command == "add":
-                headers = _parse_llm_headers(args.header, args.headers_json)
-                cli.llm_add(
+        _dispatch_subcommand(
+            args.llm_command,
+            {
+                "add": lambda: cli.llm_add(
                     args.provider,
                     api_format=args.api_format,
                     base_url=args.base_url,
@@ -934,82 +930,77 @@ def main(argv: list[str] | None = None) -> None:
                     api_key_env=args.api_key_env,
                     model=args.model,
                     timeout=args.timeout,
-                    headers=headers,
+                    headers=_parse_llm_headers(args.header, args.headers_json),
                     set_current=args.set_current,
-                )
-            elif args.llm_command == "list":
-                cli.llm_list()
-            elif args.llm_command == "show":
-                cli.llm_show(args.provider)
-            elif args.llm_command == "switch":
-                cli.llm_switch(args.provider)
-            else:
-                llm_parser.print_help()
-        except ValueError as exc:
-            llm_parser.error(str(exc))
+                ),
+                "list": cli.llm_list,
+                "show": lambda: cli.llm_show(args.provider),
+                "switch": lambda: cli.llm_switch(args.provider),
+            },
+            llm_parser,
+        )
     elif args.command == "paper":
-        if args.paper_command == "import":
-            cli.paper_import(
-                args.workspace,
-                args.path,
-                metadata=_paper_metadata_options(args),
-                enrich=args.enrich,
-                confirm_enrich=args.confirm_enrich,
-            )
-        elif args.paper_command == "list":
-            cli.paper_list(args.workspace)
-        elif args.paper_command == "show":
-            cli.paper_show(args.workspace, args.paper_id)
-        elif args.paper_command == "edit":
-            cli.paper_edit(args.workspace, args.paper_id, _paper_metadata_options(args))
-        elif args.paper_command == "enrich":
-            cli.paper_enrich(args.workspace, args.paper_id, args.confirm_enrich)
-        else:
-            paper_parser.print_help()
+        _dispatch_subcommand(
+            args.paper_command,
+            {
+                "import": lambda: cli.paper_import(
+                    args.workspace,
+                    args.path,
+                    metadata=_paper_metadata_options(args),
+                    enrich=args.enrich,
+                    confirm_enrich=args.confirm_enrich,
+                ),
+                "list": lambda: cli.paper_list(args.workspace),
+                "show": lambda: cli.paper_show(args.workspace, args.paper_id),
+                "edit": lambda: cli.paper_edit(
+                    args.workspace, args.paper_id, _paper_metadata_options(args)
+                ),
+                "enrich": lambda: cli.paper_enrich(
+                    args.workspace, args.paper_id, args.confirm_enrich
+                ),
+            },
+            paper_parser,
+        )
     elif args.command == "experience":
-        try:
-            if args.experience_command == "suggest":
-                cli.experience_suggest(
+        _dispatch_subcommand(
+            args.experience_command,
+            {
+                "suggest": lambda: cli.experience_suggest(
                     args.workspace, args.summary, title=args.title, tags=args.tag
-                )
-            elif args.experience_command == "add":
-                cli.experience_add(
+                ),
+                "add": lambda: cli.experience_add(
                     args.workspace,
                     args.scope,
                     args.title,
                     args.summary,
                     tags=args.tag,
                     confirm=args.confirm,
-                )
-            elif args.experience_command == "list":
-                cli.experience_list(
+                ),
+                "list": lambda: cli.experience_list(
                     args.workspace, include_general=args.include_general
-                )
-            elif args.experience_command == "view":
-                cli.experience_view(args.record_id, args.workspace, scope=args.scope)
-            elif args.experience_command == "edit":
-                cli.experience_edit(
+                ),
+                "view": lambda: cli.experience_view(
+                    args.record_id, args.workspace, scope=args.scope
+                ),
+                "edit": lambda: cli.experience_edit(
                     args.record_id,
                     args.workspace,
                     args.scope,
                     title=args.title,
                     summary=args.summary,
                     tags=args.tag,
-                )
-            elif args.experience_command == "delete":
-                cli.experience_delete(
+                ),
+                "delete": lambda: cli.experience_delete(
                     args.record_id, args.workspace, args.scope, args.confirm
-                )
-            elif args.experience_command == "export":
-                cli.experience_export(
+                ),
+                "export": lambda: cli.experience_export(
                     args.workspace,
                     args.format,
                     include_general=args.include_general,
                     output=args.output,
-                )
-            else:
-                experience_parser.print_help()
-        except ValueError as exc:
-            experience_parser.error(str(exc))
+                ),
+            },
+            experience_parser,
+        )
     else:
         parser.print_help()

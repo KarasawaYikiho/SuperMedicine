@@ -14,7 +14,9 @@ from tests.conftest import _cp1252_stdio_env
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RELEASE_DIR_NAME = "SuperMedicine Beta0.4.2"
 CRITICAL_RELEASE_PATHS = (
+    "install.py",
     "install_entry.py",
+    "assets/logo.ico",
     "core",
     "core/__init__.py",
     "dist/SuperMedicine.exe",
@@ -86,12 +88,15 @@ RELEASE_LABEL = "Beta0.4.2"
 PACKAGE_VERSION = "0.4.2b0"
 CRITICAL_RELEASE_FILES = {
     "cli_entry.py",
-    "install_entry.py",
+    "install.py",
     "install_entry.py",
     "uninstall_entry.py",
     "pyproject.toml",
+    "package.json",
+    "package-lock.json",
     "requirements.txt",
     "install.json",
+    "THIRD_PARTY_NOTICES.md",
     "README.md",
     "CHANGELOG.md",
     "docs/guides/INSTALL.md",
@@ -137,6 +142,11 @@ def _extract_bash_pyinstaller_command(workflow: str, exe_name: str) -> list[str]
 
 
 def _token_value(tokens: list[str], option: str) -> str | None:
+    option_equals = f"{option}="
+    for token in tokens:
+        if token.startswith(option_equals):
+            return token.removeprefix(option_equals)
+
     try:
         option_index = tokens.index(option)
     except ValueError:
@@ -149,30 +159,17 @@ def _token_value(tokens: list[str], option: str) -> str | None:
         ) from exc
 
 
-def _looks_absolute_or_resolved_for_ci_shell(source: str) -> bool:
-    return (
-        source.startswith(("/", "$", "${"))
-        or re.match(r"^[A-Za-z]:[\\/]", source) is not None
-        or "resolve" in source.lower()
-        or "realpath" in source.lower()
-        or "pwd" in source.lower()
-    )
-
-
-def _relative_source_is_staged_under_specpath(source: str, specpath: str) -> bool:
-    normalized_source = source.replace("\\", "/").lstrip("./")
-    normalized_specpath = specpath.replace("\\", "/").lstrip("./")
-    return normalized_source == normalized_specpath or normalized_source.startswith(
-        f"{normalized_specpath}/"
-    )
-
-
 def _copy_release_tree(tmp_path: Path) -> Path:
     """Build a representative extracted release directory in a temp workspace."""
 
     release_dir = tmp_path / RELEASE_DIR_NAME
     release_dir.mkdir()
+    shutil.copy2(REPO_ROOT / "install.py", release_dir / "install.py")
     shutil.copy2(REPO_ROOT / "install_entry.py", release_dir / "install_entry.py")
+
+    logo_target = release_dir / "assets" / "logo.ico"
+    logo_target.parent.mkdir()
+    shutil.copy2(REPO_ROOT / "assets" / "logo.ico", logo_target)
 
     for package_name in ("core", "permission", "installer"):
         shutil.copytree(
@@ -186,19 +183,6 @@ def _copy_release_tree(tmp_path: Path) -> Path:
     release_dist_exe.write_bytes(b"fake dist exe bytes for payload smoke dry-run")
 
     return release_dir
-
-
-def _read_git_index_file(path: str) -> str | None:
-    result = subprocess.run(
-        ["git", "show", f":{path}"],
-        cwd=REPO_ROOT,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        return None
-    return result.stdout
 
 
 def _run_release_python(
@@ -253,6 +237,19 @@ def test_extracted_release_directory_installer_entrypoint_smoke(tmp_path):
     assert "--release-exe" in help_output
     assert "UnicodeEncodeError" not in help_output
 
+    lowercase_help_result = _run_release_python(
+        release_dir,
+        "install.py",
+        "--help",
+        env=_cp1252_stdio_env(),
+        encoding="cp1252",
+    )
+    lowercase_help_output = lowercase_help_result.stdout + lowercase_help_result.stderr
+    assert lowercase_help_result.returncode == 0, lowercase_help_output
+    assert "usage:" in lowercase_help_output.lower()
+    assert "--release-exe" in lowercase_help_output
+    assert "UnicodeEncodeError" not in lowercase_help_output
+
     fake_exe = release_dir / "SuperMedicine.exe"
     fake_exe.write_bytes(b"fake exe bytes for release smoke dry-run")
     dry_run_result = _run_release_python(
@@ -286,35 +283,8 @@ def test_extracted_release_directory_installer_entrypoint_smoke(tmp_path):
     assert not (tmp_path / "Installed").exists()
 
 
-def test_ci_release_artifacts_include_installer_usable_exe_or_dist_path():
-    """Regression baseline: published CI artifacts must contain an Exe path Install.py can release."""
-
-    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
-        encoding="utf-8"
-    )
-
-    # Step-2 CI investigation note:
-    # These workflow assertions map the release-smoke failures to the concrete
-    # CI artifact contract: ``.github/workflows/ci.yml`` must publish an app Exe
-    # path usable by ``Install.py --release-exe`` and must stage the standalone
-    # installer payload with both case-only wrappers.  If these fail, inspect the
-    # workflow packaging scripts together with ``installer/exe_release.py``'s
-    # payload requirements and the wrapper preservation logic in ``setup.py`` /
-    # package metadata in ``pyproject.toml`` before changing production code.
-
-    assert any(path in workflow for path in INSTALLER_EXE_RELEASE_PATHS), (
-        "CI/release workflow must publish either dist/SuperMedicine.exe or "
-        "SuperMedicine.exe so Install.py --release-exe has a documented, packaged source path."
-    )
-    assert "actions/upload-artifact" in workflow
-    assert any(
-        f"--release-exe {path}" in workflow or f"--release-exe {path!r}" in workflow
-        for path in INSTALLER_EXE_RELEASE_PATHS
-    )
-
-
 def test_ci_release_artifacts_include_standalone_installer_exe_and_shared_payload():
-    """Published CI artifacts must include the installer Exe next to the app Exe."""
+    """Published CI artifacts must include usable app, installer, and payload paths."""
 
     workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
         encoding="utf-8"
@@ -325,8 +295,20 @@ def test_ci_release_artifacts_include_standalone_installer_exe_and_shared_payloa
     build_release_zip = (REPO_ROOT / "scripts" / "ci" / "build_release_zip.py").read_text(
         encoding="utf-8"
     )
+    packaging_common = (REPO_ROOT / "scripts" / "ci" / "_packaging_common.py").read_text(
+        encoding="utf-8"
+    )
 
-    # CI must invoke both build scripts
+    # CI artifact contract: app Exe, installer Exe, shared payload, and upload.
+    assert any(path in workflow for path in INSTALLER_EXE_RELEASE_PATHS), (
+        "CI/release workflow must publish either dist/SuperMedicine.exe or "
+        "SuperMedicine.exe so Install.py --release-exe has a documented, packaged source path."
+    )
+    assert "actions/upload-artifact" in workflow
+    assert any(
+        f"--release-exe {path}" in workflow or f"--release-exe {path!r}" in workflow
+        for path in INSTALLER_EXE_RELEASE_PATHS
+    )
     assert "build_installer_payload.py" in workflow
     assert "build_release_zip.py" in workflow
 
@@ -341,6 +323,16 @@ def test_ci_release_artifacts_include_standalone_installer_exe_and_shared_payloa
 
     # CI workflow must reference the app exe
     assert "dist/SuperMedicine.exe" in workflow
+    assert "npm ci" in workflow
+    assert "oven-sh/setup-bun" in workflow
+    assert "core/tui/opentui_runtime.mjs;core/tui" in workflow
+    assert "./dist/SuperMedicine.exe tui --dry-run" in workflow
+
+    # CUR-DBG-010: release payload/zip must carry the logo resource used for
+    # externally visible Windows Exe icons, not only the in-app GUI icon.
+    assert '"assets/logo.ico"' in packaging_common
+    assert "copy_include_files(root, payload)" in build_installer_payload
+    assert "copy_include_files(root, stage)" in build_release_zip
 
     # Packaging must install runtime deps
     assert PACKAGING_TOOLING_WITH_RUNTIME_INSTALL_RE.search(workflow), (
@@ -348,12 +340,49 @@ def test_ci_release_artifacts_include_standalone_installer_exe_and_shared_payloa
         "runtime/project dependencies before installer entrypoint smoke commands."
     )
 
-    # Release zip must handle install_entry.py correctly
-    assert '["git", "show", ":install_entry.py"]' in build_release_zip
+    # Release zip must expose the documented lowercase installer alias.
+    assert '["git", "show", ":install.py"]' in build_release_zip
+    assert f"SuperMedicine {{release_label}}/{CANONICAL_LOWERCASE_INSTALL}" in build_release_zip
     assert "archive.writestr(lowercase_entry" in build_release_zip
 
     # No git archive HEAD
     assert "git archive HEAD" not in workflow
+
+
+def test_cur_dbg_010_release_icon_contract_is_packaged_and_documented():
+    """Released Exes and desktop helpers must share the logo/icon contract."""
+
+    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
+        encoding="utf-8"
+    )
+    build_gui_exe = (REPO_ROOT / "scripts" / "ci" / "build_gui_exe.py").read_text(
+        encoding="utf-8"
+    )
+    build_installer_exe = (REPO_ROOT / "scripts" / "ci" / "build_installer_exe.py").read_text(
+        encoding="utf-8"
+    )
+    packaging_common = (REPO_ROOT / "scripts" / "ci" / "_packaging_common.py").read_text(
+        encoding="utf-8"
+    )
+    exe_release = (REPO_ROOT / "installer" / "exe_release.py").read_text(
+        encoding="utf-8"
+    )
+    exe_names = ("SuperMedicine", "SuperMedicineGUI", "SuperMedicineInstaller")
+
+    assert (REPO_ROOT / "assets" / "logo.ico").is_file()
+    for exe_name in exe_names:
+        command_tokens = _extract_bash_pyinstaller_command(workflow, exe_name)
+        icon = _token_value(command_tokens, "--icon")
+        assert icon is not None, f"{exe_name} PyInstaller command must set --icon"
+        assert icon.replace("\\", "/").endswith("assets/logo.ico")
+
+    assert "root / 'assets' / 'logo.ico'" in build_gui_exe
+    assert "root / 'assets' / 'logo.ico'" in build_installer_exe
+    assert '"assets/logo.ico"' in packaging_common
+    assert "WINDOWS_ICON_CACHE_NOTE" in exe_release
+    assert "assets/logo.ico" in exe_release
+    assert "versioned" in exe_release
+    assert "target_filename" in exe_release
 
 
 def test_ci_standalone_installer_pyinstaller_payload_path_matches_specpath_contract():
@@ -451,6 +480,10 @@ def test_release_docs_describe_ci_artifact_layout_and_install_py_roles():
     assert "with no flags" in combined
     assert "Advanced automation / CI" in combined
     assert "staged release payload" in combined
+    assert "@opentui/core@0.4.1" in combined
+    assert "npm ci" in combined
+    assert "npm run opentui:smoke" in combined
+    assert "Bun" in combined
     assert "--release-payload-root . " not in combined
     assert "--release-payload-root .\\" not in combined
     assert "What the interactive questions mean" in install
@@ -493,6 +526,49 @@ def test_beta042_version_contract_is_single_source_consistent_across_release_sur
     assert 'archive_name = f"SuperMedicine {release_label}.zip"' in build_release_zip
 
 
+def test_opentui_release_runtime_dependency_and_notice_are_packaged():
+    """Release packaging must carry OpenTUI manifests, bridge, and MIT notices."""
+
+    package_json = json.loads((REPO_ROOT / "package.json").read_text(encoding="utf-8"))
+    package_lock = json.loads((REPO_ROOT / "package-lock.json").read_text(encoding="utf-8"))
+    pyproject = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    manifest = (REPO_ROOT / "MANIFEST.in").read_text(encoding="utf-8")
+    packaging_common = (REPO_ROOT / "scripts" / "ci" / "_packaging_common.py").read_text(
+        encoding="utf-8"
+    )
+    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
+        encoding="utf-8"
+    )
+    notice = (REPO_ROOT / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    install = (REPO_ROOT / "docs" / "guides" / "INSTALL.md").read_text(encoding="utf-8")
+
+    assert package_json["dependencies"]["@opentui/core"] == "0.4.1"
+    assert package_lock["packages"]["node_modules/@opentui/core"]["version"] == "0.4.1"
+    assert (REPO_ROOT / "core" / "tui" / "opentui_runtime.mjs").is_file()
+    assert (REPO_ROOT / "core" / "tui" / "opentui_runtime.py").is_file()
+    assert 'core = ["tui/app.tcss", "tui/*.mjs", "web/frontend/*"]' in pyproject
+    assert "include THIRD_PARTY_NOTICES.md" in manifest
+    for relative_path in (
+        "package.json",
+        "package-lock.json",
+        "THIRD_PARTY_NOTICES.md",
+    ):
+        assert f'"{relative_path}"' in packaging_common
+    assert "npm ci" in workflow
+    assert "bun --version" in workflow
+    assert "npm run opentui:smoke" in workflow
+    assert "@opentui/core" in notice
+    assert "MIT License" in notice
+    assert "diff" in notice
+    assert "BSD-3-Clause" in notice
+    assert "typescript" in notice
+    assert "Apache-2.0" in notice
+    assert "Permission is hereby granted" in notice
+    assert "npm ci" in readme + install
+    assert "SUPERMEDICINE_OPENTUI_JS_RUNTIME" in readme
+
+
 def test_release_packaging_contract_includes_critical_modules_and_high_risk_surfaces(tracked_files):
     """Step 2/3 high-risk modules must be either packaged or intentionally tracked."""
 
@@ -516,6 +592,17 @@ def test_release_packaging_contract_includes_critical_modules_and_high_risk_surf
         assert relative_path in tracked, relative_path
         if relative_path.endswith(".py"):
             assert (REPO_ROOT / relative_path).read_text(encoding="utf-8").strip()
+
+    assert "core/tui/opentui_runtime.py" in tracked
+
+
+def test_dev_extra_runs_web_api_tests_in_release_gate(read_pyproject):
+    """The CI dev install must include Web extras so API tests do not skip."""
+
+    dev_dependencies = read_pyproject["project"]["optional-dependencies"]["dev"]
+
+    assert any(dep.startswith("fastapi") for dep in dev_dependencies)
+    assert any(dep.startswith("uvicorn") for dep in dev_dependencies)
 
 
 def test_release_verification_scripts_use_runner_temp_for_pytest_temp_exhaustion_risk():

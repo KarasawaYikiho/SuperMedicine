@@ -20,6 +20,12 @@ logger = logging.getLogger(__name__)
 DEFAULT_TARGET_FILENAME = "SuperMedicine.exe"
 DEFAULT_INSTALLER_FILENAME = "SuperMedicineInstaller.exe"
 DEFAULT_RELEASE_PAYLOAD_DIRNAME = "release_payload"
+WINDOWS_ICON_CACHE_NOTE = (
+    "Windows may keep showing a cached desktop icon for an overwritten Exe with "
+    "the same filename. The packaged executable resource icon is set at build "
+    "time from assets/logo.ico; if Explorer still shows the old logo, release "
+    "with --exe-overwrite plus a refreshed or versioned --exe-target-name."
+)
 DEFAULT_EXE_SEARCH_RELATIVE_PATHS = (
     Path("dist") / DEFAULT_TARGET_FILENAME,
     Path("Dist") / DEFAULT_TARGET_FILENAME,
@@ -350,6 +356,12 @@ def release_exe_to_desktop(
     Existing targets are skipped by default.  Set ``overwrite=True`` to replace
     an existing target.  ``dry_run=True`` reports the intended operation without
     creating directories or copying bytes.
+
+    The visible Windows desktop/file icon comes from the source executable's
+    PyInstaller resource icon.  When callers overwrite an existing desktop Exe,
+    Explorer may temporarily display the old cached icon for the same filename;
+    use a versioned ``target_filename`` or refresh Explorer's icon cache if the
+    copied Exe resource has changed but the shell display has not caught up.
     """
 
     desktop = resolve_desktop_dir(desktop_dir)
@@ -361,6 +373,7 @@ def release_exe_to_desktop(
         "desktop_dir": desktop,
         "target_path": target,
         "target_filename": filename,
+        "icon_cache_note": WINDOWS_ICON_CACHE_NOTE,
         "overwrite": overwrite,
         "dry_run": dry_run,
     }
@@ -379,10 +392,11 @@ def release_exe_to_desktop(
             }
         )
         logger.info(
-            "Exe release dry-run: source=%s target=%s overwrite=%s",
+            "Exe release dry-run: source=%s target=%s overwrite=%s icon_note=%s",
             source,
             target,
             overwrite,
+            WINDOWS_ICON_CACHE_NOTE,
         )
         return result
 
@@ -400,5 +414,9 @@ def release_exe_to_desktop(
     result.update(
         {"status": "copied", "reason": "overwritten" if target_exists else "created"}
     )
-    logger.info("Exe release completed: target=%s", target)
+    logger.info(
+        "Exe release completed: target=%s icon_note=%s",
+        target,
+        WINDOWS_ICON_CACHE_NOTE,
+    )
     return result

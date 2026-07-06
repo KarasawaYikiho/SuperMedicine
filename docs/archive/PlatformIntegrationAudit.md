@@ -166,7 +166,7 @@ Current documentation status after Step 6:
 - Modification targets:
   - `pyproject.toml` — consider pytest markers such as `core`, `adapter`, `opencode`, `claude_code`.
   - `tests/test_opencode_adapter.py`, `tests/test_claude_code_adapter.py`, `tests/test_standalone_adapter.py` — mark optional adapter tests if markers are introduced.
-  - `tests/test_backward_compatibility.py`, `tests/test_integration.py`, `tests/test_kernel.py`, `tests/test_plugin_registry.py`, `tests/test_permission_engine.py` — identify as core verification set.
+  - `tests/test_backward_compatibility.py`, `tests/test_integration.py`, `tests/test_kernel_full.py`, `tests/test_plugin_registry.py`, `tests/test_permission_engine.py` — identify as core verification set.
   - `README.md` — document core verification versus optional adapter verification commands.
 
 ### Risk H — Architecture Wording can Imply Kernel Depends on Adapters
@@ -176,7 +176,7 @@ Current documentation status after Step 6:
 - Modification targets:
   - `ARCHITECTURE.md` — state that `Kernel` initializes core subsystems and plugins; adapters are external entrypoints into the kernel, not kernel dependencies.
   - `core/kernel.py` — no runtime behavior change appears necessary; keep it adapter-free.
-  - `tests/test_kernel.py` and `tests/test_backward_compatibility.py` — protect no adapter import/requirement in kernel execution if a regression test is added later.
+  - `tests/test_kernel_full.py` and `tests/test_backward_compatibility.py` — protect no adapter import/requirement in kernel execution if a regression test is added later.
 
 ## 6. Verification Checklist for Later Steps
 

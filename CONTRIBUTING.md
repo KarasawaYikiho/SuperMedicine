@@ -71,7 +71,7 @@ paths take priority over naming style.
 Examples:
 
 - Keep Python package and test paths import-safe, such as `supermedicine/` and
-  `tests/test_kernel.py`.
+  `tests/test_kernel_full.py`.
 - Keep pytest-compatible names such as `test_*.py`.
 - Do not rename public plugin manifests or import paths only to satisfy a style
   preference.

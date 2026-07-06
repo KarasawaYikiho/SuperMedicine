@@ -104,7 +104,7 @@ Existing TUI test boundary:
   restore.
 - `tests/test_tui_state.py` covers workspace/session-only recent TUI selection
   and separation from CLI workspace defaults and LLM startup restore.
-- `tests/test_tui_workspace_screens.py` covers workspace controller create,
+- `tests/test_tui.py` covers workspace controller create,
   select, recent state, exact delete confirmation, policy use, hard delete, and
   audit-log creation.
 - `tests/test_tui_paper_screens.py` covers copy-only paper import, metadata list
@@ -113,7 +113,7 @@ Existing TUI test boundary:
   confirmation requirement, list/edit/export, and exact delete confirmation.
 - `tests/test_tui_dialog_history.py` covers summary-event dialog history storage
   and rejection of raw conversation fields.
-- `tests/test_tui_permissions.py` covers permission/confirmation preparation for
+- `tests/test_tui.py` covers permission/confirmation preparation for
   high-risk TUI tool actions.
 - `tests/test_tui_llm_screen.py` covers redacted provider add/switch/list,
   startup restore of the last provider, and secret-safe controller errors.

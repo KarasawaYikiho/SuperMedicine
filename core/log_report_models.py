@@ -3,12 +3,23 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
+import os
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from core.redaction import redact_path_for_display
 
-TUI_LOG_SESSION_ID = "tui-application"
+
+def new_application_log_session_id(prefix: str = "application") -> str:
+    """Return a process/opening scoped safe session id for one log container."""
+
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    return f"{prefix}-{timestamp}-{os.getpid()}-{uuid4().hex[:8]}"
+
+
+TUI_LOG_SESSION_ID = new_application_log_session_id("tui-application")
 
 
 @dataclass(frozen=True)

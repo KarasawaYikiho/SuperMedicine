@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""SuperMedicine Standalone GUI Application.
+"""SuperMedicine 独立 GUI 应用。
 
-Launches a native Chromium-based window with embedded web server.
-Double-click to run - no browser or terminal needed.
+启动带内嵌 Web 服务的原生 Chromium 窗口。
+可双击运行，无需浏览器或终端。
 """
 
 from __future__ import annotations
@@ -20,39 +20,30 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 # Setup logging for GUI mode (no console)
 def setup_gui_logging():
-    """Configure logging for GUI application."""
-    log_dir = Path.home() / ".supermedicine" / "logs"
-    log_dir.mkdir(parents=True, exist_ok=True)
-    log_file = log_dir / "gui_standalone.log"
+    """配置 GUI 应用日志。"""
+    from core.log_report_handler import (
+        configure_application_log_storage,
+        install_log_report_streams,
+    )
 
-    # Redirect stdout/stderr if None (no console)
-    if sys.stdout is None:
-        sys.stdout = open(log_file, "a", encoding="utf-8")
-    if sys.stderr is None:
-        sys.stderr = open(log_file, "a", encoding="utf-8")
+    project_dir = Path(__file__).parent
+    session_id = configure_application_log_storage(project_dir)
+    install_log_report_streams(project_dir, session_id=session_id)
     if sys.stdin is None:
         sys.stdin = open(os.devnull, "r")
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[
-            logging.FileHandler(log_file, encoding="utf-8"),
-            logging.StreamHandler(sys.stdout)
-        ]
-    )
     return logging.getLogger(__name__)
 
 
 def find_available_port(host: str = "127.0.0.1") -> int:
-    """Find an available port for the web server."""
+    """查找 Web 服务可用端口。"""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind((host, 0))
         return s.getsockname()[1]
 
 
 def start_web_server(host: str, port: int, ready_event: threading.Event):
-    """Start the FastAPI web server in a thread."""
+    """在线程中启动 FastAPI Web 服务。"""
     try:
         from core.web.server import create_app
         import uvicorn
@@ -70,14 +61,14 @@ def start_web_server(host: str, port: int, ready_event: threading.Event):
         server = uvicorn.Server(config)
         server.run()
     except Exception as e:
-        logging.error(f"Server error: {e}")
+        logging.error(f"Web 服务错误: {e}")
         ready_event.set()
 
 
 def main():
-    """Launch the SuperMedicine GUI application."""
+    """启动 SuperMedicine GUI 应用。"""
     logger = setup_gui_logging()
-    logger.info("Starting SuperMedicine GUI...")
+    logger.info("正在启动 SuperMedicine GUI...")
 
     import webview  # type: ignore[import-not-found]
 
@@ -85,7 +76,7 @@ def main():
     port = find_available_port(host)
     url = f"http://{host}:{port}"
 
-    logger.info(f"Server will start on {url}")
+    logger.info(f"Web 服务将在 {url} 启动")
 
     # Start web server in background thread
     ready_event = threading.Event()
@@ -100,7 +91,7 @@ def main():
     ready_event.wait(timeout=10)
     time.sleep(1)  # Give server a moment to fully start
 
-    logger.info(f"Opening GUI window at {url}")
+    logger.info(f"正在打开 GUI 窗口：{url}")
 
     # Resolve icon path
     # In a frozen PyInstaller executable, bundled data is extracted to sys._MEIPASS.
@@ -113,7 +104,7 @@ def main():
 
     # Create and start the GUI window
     webview.create_window(
-        title="SuperMedicine",
+        title="SuperMedicine 桌面版",
         url=url,
         width=1200,
         height=800,
@@ -126,7 +117,7 @@ def main():
     # Start the GUI (this blocks until window is closed)
     webview.start(debug=False)
 
-    logger.info("GUI window closed, shutting down...")
+    logger.info("GUI 窗口已关闭，正在退出...")
 
 
 if __name__ == "__main__":
