@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import TypeVar
 
 import pytest
 import yaml
@@ -25,6 +26,7 @@ from permission.engine import PermissionEngine
 # ═══ Shared Constants and Helpers ═══
 
 FORBIDDEN_PLATFORM_AGENT_NAMES = {"Brain", "Planner", "Coder", "Tester"}
+AdapterWithPolicy = TypeVar("AdapterWithPolicy", OpenCodeAdapter, StandaloneAdapter)
 
 
 def _write_policy(project_dir: Path) -> None:
@@ -67,14 +69,14 @@ def _write_policy(project_dir: Path) -> None:
 
 
 def _adapter_with_policy(
-    adapter_type: type[OpenCodeAdapter] | type[StandaloneAdapter],
+    adapter_type: type[AdapterWithPolicy],
     tmp_path: Path,
     *,
     role: str,
     allowed: list[dict[str, str]],
     denied: list[dict[str, str]] | None = None,
     agent_id: str = "alpha",
-) -> OpenCodeAdapter | StandaloneAdapter:
+) -> AdapterWithPolicy:
     policy_dir = tmp_path / ".supermedicine" / "policies"
     policy_dir.mkdir(parents=True)
     (policy_dir / PermissionEngine.DEFAULT_POLICY_FILENAME).write_text(
