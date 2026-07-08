@@ -1,29 +1,48 @@
-# RAG Provider 实现规范
+# RAG Provider Interface
 
-本文档是 RAG Provider 的最小接口参考。更完整的插件行为、错误结构、权限边界和
-密钥处理以 `plugins/rag/interface.py`、`plugins/rag/local_provider.py`、
-`plugins/rag/pubmed_provider.py` 以及项目架构/安全文档为准。
+This page describes the minimum RAG provider contract used by SuperMedicine.
+Source files remain authoritative:
 
-RAG 输出仅供医学科研辅助和检索上下文整理使用，不构成临床、监管或证据质量结论。
-外部 Provider 必须通过环境变量或私有配置引用密钥，不能把 API key、私有端点或原始
-请求日志写入 Markdown、清单或可提交配置。
+- `plugins/rag/interface.py`
+- `plugins/rag/local_provider.py`
+- `plugins/rag/pubmed_provider.py`
 
-## 接口要求
+RAG output is research-support context. It is not clinical advice, regulatory
+evidence, or a conclusion about evidence quality.
 
-实现 `RAGProvider` 抽象基类的三个方法：
+## Methods
 
-### query(query: str, scope: str) -> dict
-- query: 用户查询文本
-- scope: 检索范围 (literature | knowledge_base | project_context)
+Implement the `RAGProvider` interface:
 
-### store_context(key: str, value: Any) -> None
-- 存储项目上下文信息
+```python
+query(query: str, scope: str) -> dict
+store_context(key: str, value: Any) -> None
+retrieve_context(key: str) -> Any | None
+```
 
-### retrieve_context(key: str) -> Any | None
-- 检索之前存储的项目上下文
+Scopes should be explicit, for example:
 
-## 安全要求
+- `literature`
+- `knowledge_base`
+- `project_context`
 
-- 本地 Provider 应明确标记本地资源来源；外部 Provider 应明确标记外部资源来源。
-- 网络/API 访问必须由调用路径进行权限检查、超时控制和错误脱敏。
-- 返回结构应保留 `status`、`provider`、`items`、`errors` 等稳定字段，便于上层在不暴露敏感信息的情况下诊断。
+## Result Shape
+
+Providers should return stable structured fields:
+
+- `status`
+- `provider`
+- `items`
+- `errors`
+- metadata needed for diagnosis
+
+Do not include API keys, private endpoints, raw request payloads, or unredacted
+logs.
+
+## Safety
+
+- Local providers should label local resources.
+- External providers should label external resources.
+- Network/API access should use timeouts, redaction, and permission-aware call
+  paths.
+- Missing configuration and external failures should return structured errors.

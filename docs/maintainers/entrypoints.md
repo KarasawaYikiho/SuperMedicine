@@ -1,56 +1,45 @@
 # Entrypoints
 
-This page names the current entrypoints and compatibility surfaces. Prefer the
-canonical commands in new documentation and tests.
+Prefer the canonical commands below in new documentation and tests.
 
-## Canonical User Commands
+## User Commands
 
-| Task | Preferred command |
+| Task | Command |
 | --- | --- |
-| Show CLI help | `supermedicine --help` |
-| Project status | `supermedicine status` |
+| Help | `supermedicine --help` |
+| Status | `supermedicine status` |
 | Diagnostics | `supermedicine diagnose` |
 | TUI dry run | `supermedicine tui --dry-run` |
 | TUI launch | `supermedicine tui` |
 | Web launch | `supermedicine web` |
-| Run tests through Python | `python -m pytest tests/ -v` |
+| Tests | `python -m pytest tests/ -v` |
 
-The package console script is declared in `pyproject.toml`:
+Console script:
 
 ```text
 supermedicine = "cli_entry:main"
 ```
 
-## Python Files
+## Python Entrypoint Files
 
-| File | Role | Notes |
-| --- | --- | --- |
-| `cli_entry.py` | CLI facade and console-script target | Imports `cli.parser.main` at the bottom. |
-| `cli/parser.py` | Argument parser and command dispatch | Owns subcommand registration. |
-| `install_entry.py` | Installer executable/source entry | Current root installer file. |
-| `uninstall_entry.py` | Uninstall entry | Current root uninstall file. |
-| `gui_entry.py` | GUI launcher | Thin launcher surface. |
-| `gui_standalone.py` | Standalone GUI executable source | Used by PyInstaller workflow. |
-
-Older docs may mention `Cli.py`, `Install.py`, `install.py`, or `Uninstall.py`.
-Before preserving those names, verify whether they are generated release shims,
-legacy compatibility names, or stale documentation.
+| File | Role |
+| --- | --- |
+| `cli_entry.py` | Console-script target and CLI facade. |
+| `cli/parser.py` | Argument parser and dispatch. |
+| `install.py` | Compatibility installer entry. |
+| `install_entry.py` | Installer implementation entry. |
+| `uninstall_entry.py` | Uninstaller entry. |
+| `gui_entry.py` | GUI launcher. |
+| `gui_standalone.py` | Standalone GUI executable source. |
 
 ## Runtime Surfaces
 
-| Surface | Primary files | Boundary |
-| --- | --- | --- |
-| CLI | `cli/parser.py`, `cli_entry.py`, `cli/commands/` | User commands and orchestration facade. |
-| Kernel | `core/kernel.py` | Runtime wiring, plugin execution, permission integration. |
-| TUI | `core/tui/app.py`, `core/tui/opentui_runtime.mjs` | Python launches the TUI; OpenTUI JS owns the terminal runtime. |
-| Web | `core/web/server.py`, `core/web/frontend/` | FastAPI app and browser UI. |
-| Installer/release | `install_entry.py`, `installer/`, `setup.py`, `scripts/ci/` | Release packaging, installer payloads, executable smoke checks. |
+| Surface | Primary files |
+| --- | --- |
+| CLI | `cli/parser.py`, `cli_entry.py`, `cli/commands/` |
+| Kernel | `core/kernel.py` |
+| TUI | `core/tui/app.py`, `core/tui/opentui_runtime.mjs` |
+| Web | `core/web/server.py`, `core/web/frontend/` |
+| Installer | `install_entry.py`, `installer/`, `setup.py`, `scripts/ci/` |
 
-## Maintenance Rule
-
-Do not add a new entrypoint name unless it has all three:
-
-1. A documented reason to exist.
-2. A packaging or compatibility test.
-3. A clear owner file where maintainers update it.
-
+New entrypoint names need a reason, packaging coverage, and an owner file.

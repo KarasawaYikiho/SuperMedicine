@@ -1,185 +1,104 @@
 # Security Policy
 
-This policy summarizes SuperMedicine security, privacy, and medical-use
-boundaries for **Beta0.4.2**. Operational setup is in [INSTALL.md](docs/guides/INSTALL.md),
-and architecture boundaries are in [ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md).
+SuperMedicine is local-first research-support software. It is not a clinical
+decision system, a regulated medical device, or a replacement for qualified human
+review.
 
-## Security Model
+This policy applies to **Beta0.4.2**.
 
-SuperMedicine uses a runtime permission engine plus advisory prompt-context
-guidance:
+## Supported Boundary
 
-1. **Code Layer** — `PermissionEngine.check()` performs runtime allow/deny
-   decisions with deny-overrides-allow rules, hard-limit checks where supplied,
-   and JSONL audit logging.
-2. **Prompt Context Layer** — prompt helpers generate safety text and rejection
-   templates for agent context. They are advisory and are not a Kernel runtime
-   veto path.
+The supported default path is the standalone Python runtime: CLI, Kernel,
+permission engine, plugins, workspaces, installer, and TUI launcher. OpenCode and
+Claude Code files under `adapters/` are optional integration surfaces and must
+not be treated as proof of native platform runtime support unless code and tests
+show that support.
 
-Runtime permission checks are the enforcement boundary.
+## Permission Model
 
-## Permission Configuration
+Runtime enforcement lives in `permission/` and uses `PermissionEngine.check()`.
+Prompt text can explain policy, but prompt text is not the enforcement boundary.
 
-Policies are YAML files under `.supermedicine/policies/`. Each policy can define
-agent id, role, security level, allowed actions, denied actions, and hard limits:
+Permission decisions can be audited to:
 
-```yaml
-- agent_id: "alpha"
-  role: "analyst"
-  security_level: "standard"
-  permissions:
-    allowed:
-      - action: "read"
-        scope: "*"
-    denied:
-      - action: "publish"
-        scope: "*"
-    hard_limits:
-      max_files_per_session: 100
-      max_tool_calls_per_minute: 30
+```text
+.supermedicine/policies/audit.jsonl
 ```
 
-Configure agents with least privilege. Denied rules take precedence over allowed
-rules.
+The tracked default policy is:
 
-## Audit Logging and Redaction
+```text
+.supermedicine/policies/default.yaml
+```
 
-Permission decisions are logged to `.supermedicine/policies/audit.jsonl` with UTC
-timestamps. Diagnostics and log/report surfaces redact known secret carriers such
-as API keys, authorization headers, bearer tokens, key-like URL query values, and
-secret-looking fields.
+Denied rules take precedence over allowed rules. Full access only relaxes
+SuperMedicine's own checks after explicit confirmation; it does not elevate OS
+privileges, bypass UAC, bypass ACLs, or grant administrator rights.
 
-Shareable outputs may still include agent ids, actions, resource paths, provider
-names, model names, BaseURLs, missing-field names, timestamps, and structured
-error categories needed for repair.
+## Secrets
 
-Redaction is a safety layer, not permission to share raw logs. Before copying any
-diagnostic output into an issue, README, changelog, function map, prompt, or
-external ticket, remove private paths, project-specific patient/research data,
-authorization values, API keys, tokens, session identifiers, and private gateway
-URLs. Prefer summarized error categories over full traces.
+Use environment variables, private local config, secret managers, or CI secrets
+for real credentials.
 
-On Windows, POSIX file mode bits are not treated as proof of owner-only ACL
-protection. Windows permission checks are platform-capability-aware.
+Preferred key sources:
 
-## LLM Secret Handling
+- `OPENAI_API_KEY`
+- `ANTHROPIC_API_KEY`
+- `OPENROUTER_API_KEY`
+- custom variables referenced through `api_key_env`
 
-- Use environment variables, private local config, secret managers, or CI secrets
-  for real API keys.
-- Prefer `api_key_env` in `.supermedicine/config.yaml` over plaintext `api_key`.
-- Documentation, tests, manifests, and examples must use placeholders such as
-  `<OPENAI_API_KEY>`, `<ANTHROPIC_API_KEY>`, `<OPENROUTER_API_KEY>`, or
-  `<redacted>`.
-- `Install.py --api-key`, `SM_LLM_API_KEY`, and `supermedicine llm add --api-key`
-  can persist plaintext keys locally or expose them in shell history. Prefer
-  provider-specific environment variables and `--api-key-env`.
-- Do not paste unredacted local YAML, terminal history, screenshots, audit logs,
-  tracebacks, or private endpoints into public issues.
-- Optional OpenCode and Claude Code adapter files contain metadata only and must
-  not contain plaintext credentials.
+Do not put real keys in:
 
-Relevant environment variables:
+- Markdown files
+- tests
+- manifests
+- screenshots
+- issue comments
+- command history examples
+- `.supermedicine/config.yaml` snippets shared publicly
+- audit logs or raw diagnostic output
 
-| Variable | Purpose |
-|----------|---------|
-| `SM_CONFIG` | Override config file path |
-| `SM_<KEY>` | Override config keys using uppercase and `_` for `-` |
-| `SM_LLM_PROVIDER` | Installer-time provider override |
-| `SM_LLM_BASE_URL` | Installer-time custom BaseURL |
-| `SM_LLM_API_KEY` | Installer-time generic key injection; may be written to local config |
-| `SM_LLM_MODEL` | Installer-time model override |
-| `OPENAI_API_KEY` | OpenAI-compatible provider key |
-| `ANTHROPIC_API_KEY` | Anthropic-compatible provider key |
-| `OPENROUTER_API_KEY` | OpenRouter provider key |
+Shared examples must use placeholders such as `<OPENAI_API_KEY>` or
+`<redacted>`.
 
-## Workspace, Paper, Experience, Experiment, and Log Boundaries
+## Data and Workspace Boundaries
 
-- Workspace ids are slug-only identifiers that resolve to project-local
-  `workspaces/<id>` paths.
-- Workspace-scoped CLI commands require explicit `--workspace`; they do not reuse
-  TUI recent workspace state.
-- Workspace deletion requires exact confirmation, path validation,
-  PermissionEngine approval, and audit logging.
-- Paper import is copy-only and workspace-local. Source files are not moved or
-  uploaded by default.
-- Paper enrichment requires explicit confirmation, permission approval,
-  network/external API hard-limit checks, and audit logging before provider
-  access.
-- Experience learning stores only user-confirmed summaries and records, never raw
+- Workspace ids resolve to project-local `workspaces/<id>` paths.
+- Workspace commands require explicit `--workspace`.
+- Paper import is copy-only and does not upload source files by default.
+- Paper enrichment and external metadata lookups require explicit confirmation
+  where implemented.
+- Experience learning stores confirmed summaries and structured records, not raw
   conversations.
-- Experiment guide and Log report surfaces write local JSON records under
-  `.supermedicine/logs/` by default and use redaction for sensitive fields.
-- `supermedicine log location` and `supermedicine diagnose` display redacted log
-  storage locations. `supermedicine log follow` and the TUI Log page show redacted
-  realtime/refresh views; these are convenience views, not approval to publish raw
-  logs.
-- The built-in `experiment-wb` actions perform deterministic arithmetic and input
-  validation only. They do not perform network requests, call external APIs, or
-  validate laboratory SOPs.
-
-## Self-Evolution Safety Boundary
-
-The self-evolution feature generates previews and, only after explicit
-confirmation, writes limited Markdown/Python/R artifacts. It is intended for local
-research-workflow scaffolding, not autonomous repository maintenance.
-
-- Preview mode is the default and does not write files.
-- Confirmed writes require the CLI confirmation flags or the TUI confirmation text.
-- Sandbox writes are restricted to project-local generated roots such as
-  `self_evolution/`, `generated/`, and `tools/generated/`.
-- Conservative mode still follows the configured project/external-root permission
-  model.
-- Full access mode requires explicit risk acknowledgement and uses only the current
-  OS user/process permissions; it does not silently elevate privileges, bypass UAC,
-  or bypass operating-system ACLs.
-- Self-evolution output is blocked from engineering-only documentation paths such
-  as `Docs/`, `docs/`, and `REQUIREMENTS_TRACEABILITY.md`.
-- Generated content and logs are redacted on display where supported, but users
-  must not paste real API keys, tokens, patient identifiers, private datasets, or
-  unredacted local paths into instructions, ordinary chat fields, examples, or
-  public issues.
+- Logs and reports are local runtime artifacts and should be redacted before
+  sharing.
+- Self-evolution is preview-first and writes files only after explicit
+  confirmation and path/permission checks.
 
 ## Medical-Use Boundary
 
-SuperMedicine is a research-assistance framework, not a clinical decision system.
-Plugin outputs, RAG results, paper metadata, writing checklists, citation
-formatting, and prototype statistics outputs require qualified expert review. Do
-not use generated outputs as diagnosis, treatment, regulatory, or clinical
+Outputs from RAG, LLM calls, citation helpers, medical writing checklists,
+statistics prototypes, experiment helpers, and figure tools require qualified
+human review. Do not use them as diagnosis, treatment, regulatory, or clinical
 decision-support advice.
 
-## Optional Platform Adapter Boundary
+## Documentation Safety
 
-The standalone Python core is the default supported path. OpenCode and Claude
-Code add-ons are optional. Missing platform runtimes should degrade to explicit
-unavailable/degraded states rather than bypassing the core permission model.
+Before publishing docs, check that they:
 
-External project references must stay source-clean and license-aware. Do not copy
-third-party code, prompts, screenshots, logs, or configuration into this repository
-unless the license and disclosure boundary have been reviewed. Optional adapter
-documentation must not claim native OpenCode or Claude Code capabilities that are
-not implemented and tested.
+- use placeholders rather than real credentials;
+- avoid private absolute paths;
+- describe full-access mode as current-user permission only;
+- describe self-evolution as preview-first and confirmation-gated;
+- do not claim clinical validation;
+- do not claim native OpenCode or Claude Code runtime features unless tested;
+- do not link to ignored local archives as release evidence.
 
-## Release Documentation Safety Checklist
+## Reporting
 
-Before publishing Markdown, verify that it:
+Open a GitHub issue for security concerns and label it `security`. Include a
+minimal reproduction and affected version. Do not include real secrets, patient
+data, private endpoints, or unredacted logs.
 
-- uses placeholders such as `<OPENAI_API_KEY>` rather than real credentials;
-- avoids user-specific absolute paths except generic examples such as
-  `C:\Users\<you>\...`;
-- describes full-access mode as using only current OS/user privileges and never
-  as silent privilege escalation;
-- describes self-evolution as preview-first and confirmation/permission-gated,
-  without claiming autonomous safe code changes or clinical validation;
-- mentions log storage/follow features only with redaction and local-storage
-  boundaries;
-- preserves medical-use limits and human-review requirements;
-- links to visible/trackable release documents or clearly labels ignored local
-  docs as non-release references;
-- keeps function maps and audit inventories free of raw logs, private endpoints,
-  and environment values.
-
-## Reporting a Vulnerability
-
-Open a GitHub Issue with the label `security`. Do not disclose vulnerabilities
-publicly until they have been addressed. Maintainers aim to respond within 72
-hours and to fix critical issues within 7 days.
+Maintainers aim to acknowledge reports within 72 hours and prioritize critical
+fixes within 7 days.

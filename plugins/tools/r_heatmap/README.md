@@ -1,16 +1,14 @@
-# R Heatmap
+# R Heatmap Tool
 
-Workspace-local R heatmap visualization tool using pheatmap.
+Workspace-local heatmap visualization helper using R packages such as `readr`,
+`ggplot2`, and `pheatmap`.
 
-## Dependencies
-
-- ggplot2
-- readr
-- pheatmap
-
-## Usage
+## Commands
 
 ```bash
-Rscript runner.R --input data.csv --output heatmap.png
 Rscript runner.R --check-deps
+Rscript runner.R --input data.csv --output heatmap.png
 ```
+
+Inputs and outputs should stay inside the workspace. Review generated figures
+before using them in reports or publications.

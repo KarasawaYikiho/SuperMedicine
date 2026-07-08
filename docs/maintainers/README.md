@@ -1,46 +1,36 @@
 # Maintainer Guide
 
-This directory is the human-maintainer starting point for SuperMedicine. It
-summarizes the current repository shape, names the authoritative entrypoints,
-and separates stable project facts from archive notes and planned work.
+This directory is the starting point for repository maintenance.
 
-## Start Here
+## Read Order
 
-1. Read [repository-map.md](repository-map.md) for the current module and
-   ownership map.
-2. Read [entrypoints.md](entrypoints.md) before changing command, installer,
-   TUI, Web, or release behavior.
-3. Read [quality-gates.md](quality-gates.md) before changing CI, packaging, or
-   tests.
-4. Read [maintenance-backlog.md](maintenance-backlog.md) for the current
-   low-risk cleanup order.
+1. [repository-map.md](repository-map.md)
+2. [entrypoints.md](entrypoints.md)
+3. [quality-gates.md](quality-gates.md)
+4. [maintenance-backlog.md](maintenance-backlog.md)
 
-## Current Sources Of Truth
+## Sources of Truth
 
 | Topic | Source |
 | --- | --- |
-| Package metadata and console script | `pyproject.toml` |
-| CLI parser and dispatch | `cli/parser.py` |
-| CLI facade methods | `cli_entry.py` |
-| Kernel architecture | `core/kernel.py` |
-| Permission runtime | `permission/` |
-| Plugin contract | `plugins/base_plugin.py` and plugin manifests |
-| TUI launcher | `core/tui/app.py` |
-| OpenTUI runtime | `core/tui/opentui_runtime.mjs` |
+| Package metadata | `pyproject.toml` |
+| CLI parser | `cli/parser.py` |
+| CLI facade | `cli_entry.py` |
+| Kernel | `core/kernel.py` |
+| Permissions | `permission/` |
+| Plugin contract | `plugins/base_plugin.py` and manifests |
+| TUI launcher/runtime | `core/tui/` |
 | Web server | `core/web/server.py` |
-| Release workflow | `.github/workflows/ci.yml`, `setup.py`, `scripts/ci/` |
-| User install guide | `docs/guides/INSTALL.md` |
+| Installer/release | `installer/`, `setup.py`, `.github/workflows/ci.yml`, `scripts/ci/` |
+| User install docs | `docs/guides/INSTALL.md` |
 
-## Archive Rules
+## Archive Rule
 
-Historical or generated notes belong under local-only `Temp/docs/archive/`, not
-the Git-tracked `docs/` tree. Do not treat archive PASS claims, roadmaps, or
-inventories as current behavior without checking code and tests.
+Historical or generated notes belong under local-only `Temp/`, not in tracked
+`docs/archive/`. Do not use archive PASS claims as current release evidence
+without rerunning tests.
 
-## Working Tree Caution
-
-Large changes are often developed in this repository at once. Before editing,
-run:
+## Before Editing
 
 ```powershell
 git status --short --branch
@@ -48,5 +38,5 @@ git diff --name-status
 git diff --name-status --cached
 ```
 
-If a file has both staged and unstaged changes, avoid editing it until its owner
-has resolved the split index state.
+Do not overwrite unrelated user changes. If a file has both staged and unstaged
+changes, inspect it before editing.

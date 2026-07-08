@@ -1,14 +1,29 @@
-# R Data Analysis Workspace Tool
+# R Data Analysis Tool
 
-Workspace tool using base/recommended R functionality for common analysis
-linear/logistic regression, PCA, KMeans, hierarchical clustering, time-series
-basics, Welch t-test, chi-square test, and one-way ANOVA.
+Workspace-local R helper for common research-prototype analyses using base or
+recommended R functionality where possible.
 
-Optional heavy actions for random forest and gradient boosting report whether common packages (`randomForest`, `xgboost`, `lightgbm`) are installed, without requiring them for scanner discovery or baseline execution.
+## Baseline Actions
 
-## Safety Boundary
+- descriptive statistics
+- missing-value summary
+- linear regression
+- logistic regression
+- PCA
+- KMeans
+- hierarchical clustering summary
+- time-series basics
+- Welch t-test
+- chi-square test
+- one-way ANOVA
 
-This tool is for research-support prototyping only. It is not production-grade,
+Optional random-forest and gradient-boosting actions report whether packages such
+as `randomForest`, `xgboost`, and `lightgbm` are installed. They are not required
+for scanner discovery or baseline execution.
+
+## Boundary
+
+This is research-support prototype tooling. It is not production-grade,
 clinical-grade, or regulatory-grade statistical software. Keep inputs and outputs
-inside the selected workspace, do not embed credentials, and review all results
-with qualified statistical and domain expertise.
+inside the selected workspace and review results with qualified domain and
+statistical expertise.

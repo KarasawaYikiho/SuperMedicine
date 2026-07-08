@@ -1,103 +1,98 @@
-# Contributing to SuperMedicine
+# Contributing
 
-Thank you for contributing to SuperMedicine. This guide summarizes the local
-development workflow for the **Beta0.4.2** codebase. User installation details
-are in [INSTALL.md](docs/guides/INSTALL.md), and the local quality gate is in
-[README.md](README.md#local-quality-gate).
+This repository is a Python medical-research assistant with optional adapter and
+OpenTUI surfaces. Keep changes small, testable, and honest about what is actually
+implemented.
 
-## Development Environment
+## Setup
 
 ```bash
 git clone https://github.com/KarasawaYikiho/SuperMedicine.git
 cd SuperMedicine
 python -m venv .venv
-# Windows:
 .venv\Scripts\activate
-# Linux/macOS:
-source .venv/bin/activate
-pip install -e ".[dev]"
+python -m pip install -e ".[dev]"
+npm ci
 ```
 
-Requirements: Python >= 3.10 and Git.
-
-## Code Style
-
-- Follow existing module patterns and public interfaces.
-- Use type annotations for new Python code.
-- Prefer `logging.getLogger(__name__)` over `print()` in application code.
-- Use Ruff for linting and formatting; E501 line length is ignored by the local
-  lint command documented in the README.
-- Do not commit real API keys, private endpoints, audit logs with sensitive
-  paths, or local `.supermedicine/` secrets.
-
-Optional cleanup command:
+On Linux or macOS, activate the environment with:
 
 ```bash
-ruff check --fix .
+source .venv/bin/activate
 ```
 
-## Testing Expectations
+## Development Rules
 
-All functional changes should include appropriate tests and pass the existing
-suite before a pull request is submitted. Use the local quality gate documented
-in [README.md](README.md#local-quality-gate) for the maintained test command;
-targeted test or coverage variants may also be useful while developing.
+- Follow the existing package boundaries: CLI behavior in `cli/`, runtime
+  services in `core/`, permissions in `permission/`, plugins in `plugins/`,
+  installer behavior in `installer/`, and optional platform surfaces in
+  `adapters/`.
+- Do not claim a capability in docs until code and tests support it.
+- Do not store secrets in docs, tests, manifests, logs, screenshots, or examples.
+- Keep workspace-scoped behavior explicit; commands that operate on workspaces
+  should require `--workspace`.
+- Keep generated files, caches, release output, local archives, and runtime state
+  out of Git.
+- Treat files under `adapters/**/agents/*.md`, `adapters/**/skills/*.md`, and
+  `adapters/claude_code/SKILL.md` as runtime inputs, not ordinary prose.
 
-Use `tmp_path` for temporary filesystem tests, keep tests deterministic, and avoid
-live external provider calls unless a test is explicitly designed and gated for
-that purpose.
+## Quality Gate
 
-## Documentation and Upload Scope
+Run targeted checks while developing, then run the relevant gate before commit:
 
-- Root Markdown files are the user-facing documentation intended for release
-  upload.
-- Do not add final-upload dependencies on excluded engineering folders such as
-  `Docs/`, `docs/`, or `Architecture/`.
-- If a Markdown file in an ignored directory must be published, either force-track
-  it intentionally with review or provide a visible root-level alternative.
-- Keep documented versions aligned: public/release label `Beta0.4.2`, Python
-  package fallback version `0.4.2b0`.
-- Use placeholders such as `<OPENAI_API_KEY>` in examples; never use real secrets.
-- Keep external project references as design analysis unless code has been
-  license-reviewed, implemented, and tested in this repository.
+```bash
+python -m pytest tests/test_repo_hygiene.py tests/test_release.py tests/test_maintainer_markdown_links.py
+ruff check --select=E,F,W --ignore=E501 .
+```
 
-## File Naming
+For release or broad changes:
 
-For future non-Python files and directories, prefer independent-word initial
-capitalization when it does not affect tooling. Python import compatibility,
-pytest discovery, plugin manifests, entry-point targets, and documented public
-paths take priority over naming style.
+```bash
+python -m pytest tests/ -v
+```
 
-Examples:
+The repository supports Python 3.10 through 3.13. CI installs the `dev` extra and
+expects `pytest`, `ruff`, and `mypy` paths to remain usable.
 
-- Keep Python package and test paths import-safe, such as `supermedicine/` and
-  `tests/test_kernel_full.py`.
-- Keep pytest-compatible names such as `test_*.py`.
-- Do not rename public plugin manifests or import paths only to satisfy a style
-  preference.
+## Documentation
 
-## Pull Request Process
+- Keep root docs concise and current.
+- Keep `README.md` and `README.zh-CN.md` aligned on release label
+  `Beta0.4.2` and package fallback version `0.4.2b0`.
+- Keep release-package references to `SuperMedicineInstaller.exe`,
+  `dist/SuperMedicine.exe`, `@opentui/core@0.4.1`, and
+  `npm run opentui:smoke` when those contracts still apply.
+- Do not add new tracked archive notes under `docs/archive/`; use ignored
+  `Temp/` for local archive material.
+- Run the markdown link checker after doc changes:
 
-1. Fork the repository.
-2. Create a feature branch.
-3. Make clear, focused commits.
-4. Run the local quality gate from [README.md](README.md#local-quality-gate).
-5. Review repository hygiene before staging files.
-6. Open a pull request against `master` with a summary of what changed and why.
+```bash
+python scripts/maintainers/check_markdown_links.py docs
+```
 
-## Commit Convention
+## Pull Requests
 
-Use conventional commit prefixes where practical:
+1. Start from a clean `master`.
+2. Create a focused branch.
+3. Make the smallest change that handles the requirement.
+4. Add or update tests when behavior changes.
+5. Run the relevant quality gate.
+6. Summarize what changed, why it changed, and what was verified.
+
+## Commit Style
+
+Use clear imperative messages. Conventional prefixes are welcome when useful:
 
 ```text
-feat: add new feature
-fix: fix a bug
-refactor: code restructuring
-style: formatting and linting
-chore: maintenance tasks
-ci: CI/CD changes
+feat: add workspace import flow
+fix: reject unsafe paper paths
+docs: rewrite installation guide
+test: cover permission mode switching
+chore: clean ignored artifacts
 ```
 
-## Questions
+## Security
 
-Open a GitHub issue for questions, bugs, or proposed changes.
+Report security-sensitive issues through GitHub with enough detail to reproduce
+the problem, but do not include real credentials, patient data, private endpoints,
+or unredacted logs. See [SECURITY.md](SECURITY.md).

@@ -1,263 +1,77 @@
-# SuperMedicine Architecture Guide
+# Architecture Guide
 
-This guide explains SuperMedicine's architectural design. For the full technical
-reference, see [ARCHITECTURE.md](../architecture/ARCHITECTURE.md).
+SuperMedicine is organized around a small Python core and optional surfaces
+around it. The default supported path is the standalone CLI/Kernel runtime.
 
-## Microkernel Design
-
-SuperMedicine uses a **microkernel architecture** where the core provides minimal
-essential services, and all domain logic is added through plugins and components.
+## Runtime Shape
 
 ```text
-CLI / TUI / Web / Optional Adapters
-              |
-              v
-           Kernel
-             |
-             +-- ConfigCenter      (YAML config + env overrides)
-             +-- EventBus          (pub/sub messaging)
-             +-- PluginRegistry    (manifest discovery)
-             +-- SessionManager    (UUID session state)
-             +-- PermissionEngine  (runtime enforcement)
-             +-- LLMConfigManager  (provider management)
-             +-- CheckpointManager (agent checkpoint persistence)
+CLI / TUI / Web / optional adapters
+        |
+        v
+      Kernel
+        |
+        +-- configuration
+        +-- event bus
+        +-- plugin registry
+        +-- permission engine
+        +-- sessions and checkpoints
+        +-- LLM provider manager
 ```
 
-The Kernel (`core/kernel.py`) wires these components together. It does not
-contain domain logic itself — that lives in plugins, agents, and workspace modules.
+The Kernel coordinates shared services. Domain behavior should live in
+workspaces, plugins, permission modules, installer modules, or UI-specific
+surfaces rather than being embedded in the CLI facade.
 
-## Layer Structure
+## Main Directories
 
-### Layer 1: Core (`core/`)
+| Path | Responsibility |
+| --- | --- |
+| `cli/` | Parser and command modules. |
+| `core/` | Shared runtime services, Kernel, workspace, TUI, Web, LLM, logging. |
+| `permission/` | Runtime permission policy, engine, and audit logging. |
+| `plugins/` | Plugin manifests and research tools. |
+| `agents/` | Internal orchestration roles and state machine. |
+| `adapters/` | Optional OpenCode/Claude Code metadata and adapter surfaces. |
+| `installer/` | Installer and release extraction logic. |
+| `tests/` | Regression and repository hygiene checks. |
 
-Foundation services that everything else depends on:
+## Permission Boundary
 
-| Component | Purpose |
-|-----------|---------|
-| `ConfigCenter` | Reads YAML config, supports `SM_*` env overrides, redacts secrets |
-| `EventBus` | Topic-based publish/subscribe for decoupled communication |
-| `PluginRegistry` | Discovers `plugin.yaml` manifests, records capabilities |
-| `SessionManager` | Creates UUID sessions, stores session-scoped state |
-| `WorkspaceManager` | Anchors workspaces under `workspaces/<id>`, rejects path traversal |
-| `LLMConfigManager` | Provider-neutral LLM routing (OpenAI, Anthropic, OpenRouter, custom) |
-| `Effect[T, E]` | Monadic error handling container |
+Runtime access control belongs in `permission/` and `PermissionEngine.check()`.
+Prompt text and adapter metadata may explain policy, but they are not the
+enforcement boundary.
 
-### Layer 2: Permission System (`permission/`)
+Modes:
 
-Two-layer permission architecture:
+- `conservative`: default, project-local first, external operations restricted.
+- `full`: explicit acknowledgement, current OS user permissions only.
 
-```text
-Action request
-    |
-    +--> Runtime layer: PermissionEngine -> PermissionPolicy -> AuditLogger
-    |    (Deny-Overrides-Allow, hard limits, enforced decisions)
-    |
-    +--> Prompt layer: safety text and rejection templates
-         (Advisory only, not a runtime veto)
-```
+## Plugin Boundary
 
-**Modes:**
+Plugins are discovered from manifests and called through the runtime. A plugin
+should return structured success/error data and should not bypass permission
+checks for file, process, or network-sensitive work.
 
-| Mode | Behavior |
-|------|----------|
-| `conservative` | Default. Project-local allowed; external writes/execution denied unless authorized |
-| `full` | Relaxes SuperMedicine's restrictions after explicit confirmation |
+## Workspace Boundary
 
-Policies are defined in YAML with fnmatch patterns:
+Workspace ids resolve to `workspaces/<id>`. CLI commands that operate on
+workspace data require explicit `--workspace`.
 
-```yaml
-rules:
-  - pattern: "workspaces/*"
-    actions: ["read", "write"]
-    effect: allow
-  - pattern: "*.exe"
-    actions: ["execute"]
-    effect: deny
-```
+## Adapter Boundary
 
-### Layer 3: Agent Orchestration (`agents/`)
+OpenCode and Claude Code support is optional. Adapter files must not claim native
+platform runtime behavior unless that behavior is implemented and tested.
 
-Multi-role agent system with state machine and checkpoints.
+## Release Boundary
 
-**State machine lifecycle:**
+Packaging and installer behavior is product behavior. Changes to `setup.py`,
+`.github/workflows/ci.yml`, `scripts/ci/`, or `installer/` should be tested with
+release-focused tests.
 
-```text
-IDLE -> PLANNING -> DISPATCH -> RUNNING -> VERIFYING
-  ^                                           |
-  +--------------- RETRY (max 3) ------------+
-                       |
-                 COMPLETED / FAILED
-```
+## References
 
-**Agent roles:**
-
-| Agent | Role | Stage |
-|-------|------|-------|
-| Alpha | Analyst | Planning and requirements analysis |
-| Beta | Reviewer | Independent verification |
-| Gamma | Writer | Drafting and execution |
-| Delta | Orchestrator | Routing and coordination |
-
-The `Orchestrator` coordinates agents through tasks, with `CheckpointManager`
-persisting state for crash recovery.
-
-### Layer 4: Plugin Ecosystem (`plugins/`)
-
-Plugins are discovered from `plugin.yaml` manifests and execute through the
-Kernel's permission model.
-
-```text
-plugins/
-  base_plugin.py       Base class and execution contract
-  rag/                 RAG Provider Interface (local TF-IDF, mock external)
-  harness/             Audit monitoring and quality assessment
-  tools/               Python statistics and R survival interfaces
-  standards/           Medical writing checklists and citation formatting
-  experiments/         Config-driven experiment protocols
-```
-
-**Plugin execution contract:**
-- Input: `action: str`, `params: dict`, optional read-only `context: dict`
-- Permission: plugins are not permission entry points; Kernel/PermissionEngine gates execution
-- Output: unified shape `{status, plugin, action, output, error, metadata}`
-- Errors: structured `plugin_error` for load failures, unknown actions, runtime exceptions
-
-### Layer 5: Database Layer (`core/database/`)
-
-SQLite-based persistence with repository pattern:
-
-```python
-# Database: thread-safe wrapper
-with Database(Path("data.db")) as db:
-    db.execute("...")
-
-# Repository: abstract CRUD interface
-class SessionRepository(Repository[Session]):
-    def create(self, entity): ...
-    def get(self, id): ...
-    def update(self, entity): ...
-    def delete(self, id): ...
-    def list_all(self): ...
-```
-
-Built-in tables: `sessions`, `agents`, `plugins`, `migrations`
-
-### Layer 6: Web API (`core/web/`)
-
-FastAPI-based REST and WebSocket interface:
-
-```text
-Browser <-> FastAPI <-> Kernel
-              |
-              +-- REST endpoints (/api/v1/*)
-              +-- WebSocket chat (/ws/chat)
-              +-- Static frontend
-```
-
-### Layer 7: Workspace Layer
-
-Domain modules for research workflows:
-
-| Module | Purpose |
-|--------|---------|
-| `workspace.py` | Workspace lifecycle and path safety |
-| `paper_import/` | Copy-only paper import with SHA-256 dedup |
-| `experience.py` | User-confirmed experience summaries |
-| `experiment_guide.py` | Config-driven experiment protocols |
-| `workspace_tools.py` | Tool scanning, import, and execution |
-
-## Plugin System
-
-### Creating a Plugin
-
-1. Create a directory under `plugins/`
-2. Add a `plugin.yaml` manifest:
-
-```yaml
-name: my-plugin
-version: "1.0"
-description: "My custom plugin"
-actions:
-  - name: analyze
-    description: "Analyze data"
-```
-
-3. Implement the plugin class:
-
-```python
-from plugins.base_plugin import BasePlugin, plugin_result
-
-class MyPlugin(BasePlugin):
-    def execute(self, action: str, params: dict, context: dict = None) -> dict:
-        if action == "analyze":
-            # Implementation
-            return plugin_result(
-                status="success",
-                plugin="my-plugin",
-                action=action,
-                output={"result": "..."},
-            )
-        return plugin_result(
-            status="error",
-            plugin="my-plugin",
-            action=action,
-            error=f"Unknown action: {action}",
-        )
-```
-
-### Plugin Discovery
-
-Plugins are auto-discovered from `plugin.yaml` manifests:
-
-```bash
-# List discovered plugins
-supermedicine plugin list
-```
-
-## Permission System
-
-### How It Works
-
-1. An action request arrives (file write, tool execution, etc.)
-2. `PermissionEngine.check()` evaluates against loaded policies
-3. Policies use Deny-Overrides-Allow semantics
-4. All decisions are logged to `audit.jsonl`
-5. Advisory prompts provide additional safety context
-
-### Policy Configuration
-
-```yaml
-# .supermedicine/policies/default.yaml
-rules:
-  - pattern: "workspaces/*/papers/*"
-    actions: ["read"]
-    effect: allow
-  - pattern: "../*"
-    actions: ["read", "write", "delete"]
-    effect: deny
-    reason: "Path traversal not allowed"
-```
-
-### CLI Management
-
-```bash
-supermedicine permission status
-supermedicine permission mode conservative
-supermedicine permission authorize /path/to/allowed-dir
-supermedicine permission revoke /path/to/allowed-dir
-```
-
-## Design Principles
-
-1. **Preserve behavior** — changes require explicit approval
-2. **Runtime enforcement** — permissions are checked in code, not prompts
-3. **Core independence** — platform adapters are optional add-ons
-4. **Plugin extensibility** — capabilities added through manifests and interfaces
-5. **Research boundaries** — outputs require qualified human review
-
-## Further Reading
-
-- [ARCHITECTURE.md](../architecture/ARCHITECTURE.md) — full technical reference
-- [SECURITY.md](../../SECURITY.md) — security model and boundaries
-- [FUNCTION_MAP.md](../architecture/FUNCTION_MAP.md) — callable inventory
-- [API Reference](../api/README.md) — module and endpoint details
+- [Full architecture reference](../architecture/ARCHITECTURE.md)
+- [Function map](../architecture/FUNCTION_MAP.md)
+- [Repository map](../maintainers/repository-map.md)
+- [Quality gates](../maintainers/quality-gates.md)

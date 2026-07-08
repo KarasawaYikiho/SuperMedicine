@@ -1,226 +1,120 @@
-# SuperMedicine Architecture
+# Architecture
 
-This root architecture reference describes the public **Beta0.4.2** design. The
-Python package fallback version is **0.4.2b0**. Engineering notes in excluded
-folders are intentionally not referenced here.
+SuperMedicine is a local-first Python framework for medical research assistance.
+The default supported product is the standalone Python runtime: CLI, Kernel,
+permission engine, plugins, workspace state, installer, and TUI launcher.
 
-## Overview
+Current release label: **Beta0.4.2**. Python package fallback version:
+**0.4.2b0**.
 
-SuperMedicine uses a microkernel plus multi-role orchestration architecture for
-an independent Python medical research assistant framework. The Kernel wires
-configuration, events, plugin discovery, sessions, workspace state, LLM provider
-management, and runtime permission enforcement. Optional OpenCode and Claude Code
-adapters wrap the core; they are not initialization requirements and must not be
-described as native platform runtimes unless that functionality exists.
+## System Shape
 
 ```text
-CLI / TUI / Optional Adapters
+CLI / TUI / Web / optional adapters
         |
         v
-Kernel
-  - ConfigCenter
-  - EventBus
-  - PluginRegistry
-  - SessionManager
-  - PermissionEngine
+      Kernel
         |
-        +--> Agent orchestration and checkpoint state
-        +--> Plugins: RAG, harness, tools, standards
-        +--> Workspace layer: papers, experience, tool assets
-        +--> LLM provider clients and token tracking
+        +-- config
+        +-- event bus
+        +-- plugin registry
+        +-- permission engine
+        +-- sessions and checkpoints
+        +-- LLM provider routing
 ```
 
-## Layer 1: Microkernel (`core/`)
+The Kernel is a wiring point. Domain behavior belongs in focused modules:
+workspaces, paper import, experience records, plugins, permissions, installer
+logic, or UI-specific controllers.
 
-- **ConfigCenter** reads YAML configuration, supports `SM_*` environment
-  overrides, and exposes redacted LLM provider snapshots.
-- **EventBus** provides topic-based publish/subscribe messaging.
-- **PluginRegistry** discovers `plugin.yaml` manifests and records plugin
-  capabilities.
-- **SessionManager** creates UUID sessions and stores session-scoped state.
-- **WorkspaceManager** anchors workspaces under `workspaces/<id>`, rejects path
-  traversal and non-slug ids, and supports workspace-local papers, notes,
-  outputs, checkpoints, sessions, and RAG assets.
-- **TUI Backend Controllers** share the same core paths as the CLI. TUI recent
-  selection is not an implicit CLI default.
+## Core Boundaries
 
-## Layer 2: Permission System (`permission/`)
+| Area | Owner | Rule |
+| --- | --- | --- |
+| CLI | `cli/`, `cli_entry.py` | Parser and facade should delegate feature logic. |
+| Runtime | `core/` | Shared services used by CLI, TUI, Web, and tests. |
+| Permissions | `permission/` | Runtime enforcement happens here, not in prompt text. |
+| Plugins | `plugins/` | Capabilities are manifest-discovered and action-based. |
+| Workspaces | `core/workspace*.py`, `core/paper_import/`, `core/experience.py` | Workspace ids are explicit and project-local. |
+| TUI | `core/tui/` | Python launcher plus OpenTUI JavaScript runtime. |
+| Web | `core/web/` | Optional FastAPI/browser surface. |
+| Installer | `installer/`, `install*.py`, `uninstall*.py` | Release-critical behavior. |
+| Adapters | `adapters/` | Optional platform metadata and bridge code. |
 
-The permission system has a runtime enforcement path and an advisory prompt path:
+## Permission Model
 
-```text
-Action request
-    |
-    +--> Runtime code layer: PermissionEngine -> PermissionPolicy -> AuditLogger
-    |      Deny-Overrides-Allow, hard limits, enforced decision
-    |
-    +--> Prompt context layer: safety text and rejection templates
-           Advisory only, not a Kernel runtime veto
-```
+`PermissionEngine.check()` is the enforcement boundary. Prompt generators and
+adapter instructions may describe policy, but they do not replace runtime
+checks.
 
-Key files:
+Modes:
 
-| File | Role |
-|------|------|
-| `policy.py` | Permission policy data and fnmatch rule matching |
-| `engine.py` | Policy loading and `check()` evaluation |
-| `audit.py` | JSONL audit logging with UTC timestamps |
-| `prompt_generator.py` | Advisory prompt safety text |
+- `conservative`: default. Project-local first, external write/delete/execute
+  restricted.
+- `full`: explicit acknowledgement. Uses only current OS user/process
+  permissions; it does not bypass UAC, ACLs, or administrator requirements.
 
-## Layer 3: Agent Orchestration (`agents/`)
+Audit records are local runtime data under `.supermedicine/policies/audit.jsonl`.
 
-Agent workflows use a state machine with checkpoint persistence:
+## Plugin Model
 
-```text
-IDLE -> PLANNING -> DISPATCH -> RUNNING -> VERIFYING
-  ^                                           |
-  +--------------- RETRY (max 3) ------------+
-                       |
-                 COMPLETED / FAILED
-```
+Plugins live under `plugins/`, declare manifests, and expose action-oriented
+execution. A plugin should return structured success or error payloads and should
+not bypass permission checks for sensitive operations.
 
-Agent roles:
+Current plugin groups include RAG, harness checks, medical writing standards,
+medical citation formatting, experiment helpers, Python/R tools, and figure
+utilities.
 
-| Agent | Role | Workflow stage |
-|-------|------|----------------|
-| alpha | Analyst | Planning and requirements analysis |
-| beta | Reviewer | Independent verification and review |
-| gamma | Writer | Drafting and content execution |
-| delta | Orchestrator | Routing and coordination |
+## Workspace Model
 
-## Layer 4: Plugin Ecosystem (`plugins/`)
+Workspace-scoped commands require explicit `--workspace`. Workspace ids resolve
+under `workspaces/<id>`. Paper import is copy-only. Experience records store
+confirmed summaries rather than raw conversations.
 
-Plugins are discovered from manifests and execute through the Kernel and
-permission model where applicable.
+## LLM Provider Model
 
-```text
-plugins/
-  base_plugin.py
-  rag/                 RAG Provider Interface, local TF-IDF, mock external semantics
-  harness/             audit monitoring and quality assessment
-  tools/               prototype Python statistics and R survival interfaces
-  standards/           medical writing checklists and citation formatting
-```
+Provider configuration is local and provider-neutral. Records include provider
+name, API format, Base URL, model, and key source. Built-in API formats are
+`openai`, `anthropic`, and `openrouter`; compatible custom endpoints can be
+configured with explicit Base URLs.
 
-### RAG Contract
+## TUI Model
 
-RAG providers return stable structured fields such as `status`, `provider`,
-`items`, `errors`, and backward-compatible aliases. Errors distinguish missing
-configuration, connection failure, query timeout, and unavailable resources.
-Secrets are referenced by environment variable name rather than stored in code or
-repository configuration.
+The TUI has two surfaces:
 
-### Medical Statistics Boundary
+- Python support code in `core/tui/`
+- Bun/OpenTUI runtime bridge in `core/tui/opentui_runtime.mjs`
 
-Python statistics and R survival paths are prototype research-support interfaces.
-They are not production-grade, clinical-grade, regulatory-grade, or medical
-decision-support statistics.
+The JS runtime depends on `@opentui/core@0.4.1`. Route metadata and shortcut
+contracts are tested because they are user-facing behavior.
 
-### Medical Writing and Citation Boundary
+## Adapter Model
 
-CONSORT, STROBE, PRISMA, and STARD helpers identify checklist gaps. AMA and
-Vancouver helpers format citation strings. They do not validate clinical
-correctness, evidence quality, or regulatory compliance.
+OpenCode and Claude Code adapters are optional. They must return explicit
+degraded/unavailable states when platform runtime features are missing. Adapter
+docs and manifests must not contain credentials or claim unimplemented native
+runtime behavior.
 
-## Layer 5: LLM Provider System
+## Release Model
 
-LLM routing is provider-neutral. The configured `api_format` chooses the wire
-protocol:
-
-- `openai` -> OpenAI-compatible chat completions.
-- `anthropic` -> Anthropic-compatible messages.
-- `openrouter` -> OpenRouter gateway using OpenAI-compatible format defaults.
-
-Provider names are flexible. Built-in defaults exist for OpenAI, Anthropic, and
-OpenRouter, while custom BaseURLs support compatible gateways such as DeepSeek,
-智谱 GLM, Ollama-style local endpoints, and private services.
-
-Missing required fields produce structured validation errors, and HTTP/request
-errors are sanitized before display or logging. Runtime provider selection is
-explicit and persisted through `llm.provider` and `llm.last_provider`.
-
-## Layer 6: Workspace, Paper, Experience, TUI, Experiment, and Log Paths
-
-- Workspace ids are lowercase slugs and map to project-local paths.
-- Paper import is copy-only and deduplicates by SHA-256 plus normalized DOI/PMID
-  metadata when available.
-- Paper enrichment requires explicit confirmation, PermissionEngine approval, and
-  network/external API hard-limit checks.
-- Experience learning stores user-confirmed summaries and records, not raw
-  conversations.
-- The Chinese TUI exposes chat, dashboard, workspace, paper, experience, tool,
-  dialog history, LLM, experiment guide, and log report screens.
-- Experiment Guide and Log Report paths store local JSON records and use redacted
-  event/log output.
-
-## Layer 7: Optional Platform Adapters (`adapters/`)
-
-Adapters bridge SuperMedicine to assistant platforms while preserving standalone
-core independence.
-
-| Capability | Standalone Core | OpenCode Add-on | Claude Code Add-on |
-|------------|----------------|-----------------|-------------------|
-| CLI `init`/`status`/`run` | Supported | Can wrap/adapt metadata | Minimal adapter path |
-| PermissionEngine | Supported | Used for adapter operations | Used before tool execution |
-| Plugin discovery/execution | Supported | Metadata integration | Not native |
-| RAG/harness/medical standards | Supported | Skill docs available | Conceptual metadata |
-| Native platform tool calls | Not required | Declared mappings | `claude.invoke` only |
-| Native subagent runtime | Not applicable | Not launched by adapter alone | Not implemented |
-
-## Safety and Resource Metadata
-
-- High-risk execution, mutation, deletion, network, and external API paths are
-  permission-gated.
-- Adapter failures return structured unavailable/error states rather than hiding
-  missing runtimes.
-- RAG providers label local versus external resources and redact common secret
-  payloads.
-- Workspace deletion is exact-confirmation guarded and auditable.
-- Paper enrichment is explicit, permission-checked external-resource behavior.
-
-## Function Relationship Inventory
-
-The visible callable inventory is [FUNCTION_MAP.md](FUNCTION_MAP.md). It is kept
-alongside this document in `docs/architecture/`. The map is generated
-from Python AST static analysis and is useful for navigation, review, and impact
-assessment, but it is not a complete runtime trace. Dynamic CLI dispatch, Textual
-callbacks, decorators, plugin registries, tests, and reflection can add runtime
-relationships that are not statically visible. The inventory must remain
-secret-free and should not be edited to include environment values, API keys,
-private endpoints, raw tracebacks, or audit-log payloads.
-
-## External Reference Integration Boundary
-
-External projects may inform UI, workflow, or adapter design only after their
-license, implementation status, and security boundary are reviewed. For the
-current codebase, OpenCode-style interaction ideas are documented as optional
-experience references, not copied source and not core dependencies. Any future
-native platform bridge must be implemented, tested, and permission-gated before
-documentation claims native support.
+Release archives keep installer entrypoints, `installer/`, runtime packages,
+OpenTUI npm manifests, documentation, and executables together. Release package
+tests protect `SuperMedicineInstaller.exe`, `dist/SuperMedicine.exe`, and the
+OpenTUI smoke path.
 
 ## Repository Hygiene
 
-Git uploads should contain only necessary project files. `Docs/`,
-`docs/archive/`, and `Temp/` are local-only by default. Archived planning
-documents may be kept under `Temp/docs/archive/` for local reference, but they
-must not be uploaded as repository content. Do not upload generated build
-artifacts, caches, runtime checkpoint directories, raw logs, or local
-configuration containing secrets/private endpoints.
+Tracked content should be source, tests, CI, package metadata, docs, policies,
+and small assets. Generated output, local logs, runtime state, caches, secrets,
+desktop executables, and archive notes belong outside Git.
 
-Before release, exclude generated `build/`, `dist/`, `*.egg-info`, `__pycache__`,
-`.pytest_cache`, `.pytest-tmp`, runtime data, and private configuration files.
+`docs/archive/` is intentionally ignored. Local historical material may live in
+ignored `Temp/`.
 
-## Quality Gate
+## Related Docs
 
-The root Quality Gate reference is [README.md](README.md#local-quality-gate).
-Static type checking is not a required gate unless the project intentionally adds
-a dedicated mypy or pyright configuration.
-
-## Design Principles
-
-1. Preserve existing functional behavior unless a change is explicitly approved.
-2. Enforce permissions in the runtime code layer.
-3. Keep platform adapters optional and core logic platform-agnostic.
-4. Add capabilities through plugin manifests and well-defined interfaces.
-5. Treat medical, statistical, citation, and RAG outputs as research support that
-   requires qualified human review.
+- [Function map](FUNCTION_MAP.md)
+- [Maintainer guide](../maintainers/README.md)
+- [Installation guide](../guides/INSTALL.md)
+- [Security policy](../../SECURITY.md)

@@ -1,313 +1,112 @@
-# Getting Started with SuperMedicine
+# Getting Started
 
-This guide walks you through installing, configuring, and using SuperMedicine.
-For detailed installation options, see [INSTALL.md](INSTALL.md).
+This guide is the short path from a clean checkout to a usable local
+SuperMedicine workspace. For installer details, see [INSTALL.md](INSTALL.md).
 
-## Installation
-
-### Prerequisites
-
-| Requirement | Version | Notes |
-|-------------|---------|-------|
-| Python | >= 3.10 | Required |
-| Git | Any | Required for cloning |
-| pip | >= 21.0 | Required for installation |
-| R | >= 4.3 | Optional, for R survival backend |
-
-### Quick Install
+## 1. Install
 
 ```bash
-# Clone the repository
 git clone https://github.com/KarasawaYikiho/SuperMedicine.git
 cd SuperMedicine
+python -m pip install -e .
+npm ci
+python install.py
+```
 
-# Install in development mode
-pip install -e .
+Check the install:
 
-# Run the interactive installer
-python Install.py
-
-# Verify installation
+```bash
 supermedicine status
-```
-
-The installer wizard will guide you through:
-1. Setting the project path
-2. Initializing `.supermedicine/` configuration
-3. Configuring your LLM provider (API format, base URL, model, key)
-4. Optional shortcuts and PATH setup
-
-### Virtual Environment (Recommended)
-
-```bash
-python -m venv .venv
-# Windows:
-.venv\Scripts\activate
-# Linux/macOS:
-source .venv/bin/activate
-
-pip install -e .
-python Install.py
-```
-
-### Web Interface Dependencies
-
-```bash
-pip install supermedicine[web]
-```
-
-## Basic Usage
-
-### CLI Commands
-
-All commands work as `supermedicine <command>` after installation, or `python Cli.py <command>` from the repo root.
-
-```bash
-# Check project status
-supermedicine status
-
-# Run diagnostics
 supermedicine diagnose
+```
 
-# List LLM providers
+## 2. Configure an LLM Provider
+
+Prefer environment variables for keys:
+
+```bash
+set OPENAI_API_KEY=<OPENAI_API_KEY>
+```
+
+Add or switch providers with the CLI:
+
+```bash
+supermedicine llm add openai \
+  --api-format openai \
+  --base-url https://api.openai.com/v1 \
+  --api-key-env OPENAI_API_KEY \
+  --model gpt-4o-mini \
+  --set-current
+
 supermedicine llm list
 ```
 
-### Working with Workspaces
+## 3. Create a Workspace
 
 ```bash
-# Initialize a workspace
-supermedicine workspace init --workspace my-research --name "My Research"
-
-# List workspaces
+supermedicine workspace init --workspace demo --name "Demo Workspace"
 supermedicine workspace list
-
-# Show workspace details
-supermedicine workspace show --workspace my-research
+supermedicine workspace show --workspace demo
 ```
 
-### Managing Papers
+Workspace commands use explicit ids. SuperMedicine does not silently reuse a
+recent TUI workspace for CLI operations.
+
+## 4. Import a Paper
 
 ```bash
-# Import a paper
-supermedicine paper import ./paper.pdf --workspace my-research --title "Paper Title"
-
-# List papers in a workspace
-supermedicine paper list --workspace my-research
-
-# Enrich paper metadata with LLM
-supermedicine paper enrich --workspace my-research --paper-id <id> --confirm-enrich
+supermedicine paper import ./paper.pdf --workspace demo --title "Paper Title"
+supermedicine paper list --workspace demo
 ```
 
-### Experience Learning
+Paper import is copy-only. External enrichment requires explicit confirmation
+where implemented.
+
+## 5. Record Experience
 
 ```bash
-# Add an experience record
-supermedicine experience suggest --workspace my-research --summary "Keep prompts short"
-
-# List experiences
-supermedicine experience list --workspace my-research
+supermedicine experience suggest --workspace demo --summary "Keep prompts short"
+supermedicine experience add \
+  --workspace demo \
+  --scope workspace \
+  --title "Prompt note" \
+  --summary "Keep prompts short" \
+  --confirm
 ```
 
-### Research Tools
+Experience records store confirmed summaries, not raw conversations.
+
+## 6. Use Tools
 
 ```bash
-# Scan for available tools
 supermedicine tool scan --language python
-
-# Add a tool to workspace
-supermedicine tool add --workspace my-research --select 1
-
-# List workspace tools
-supermedicine tool list --workspace my-research
+supermedicine tool add --workspace demo --select 1
+supermedicine tool list --workspace demo
 ```
 
-### Experiments
+Tools are imported into the workspace before use.
+
+## 7. Run the TUI
 
 ```bash
-# List available experiment protocols
-supermedicine experiment list
-
-# Start an experiment
-supermedicine experiment start --protocol western_blot_basic --session-id wb-demo
-
-# Follow experiment logs
-supermedicine log follow --session-id wb-demo --interval 1 --max-entries 20
-```
-
-## Configuration
-
-### Project Structure
-
-```
-.supermedicine/
-  config.yaml          # Main configuration
-  policies/
-    default.yaml       # Default permission policy
-    audit.jsonl        # Permission audit log
-  checkpoints/         # Agent checkpoints
-  logs/                # Session logs
-```
-
-### Configuration File
-
-The main config is at `.supermedicine/config.yaml`:
-
-```yaml
-llm:
-  provider: openai
-  base_url: https://api.openai.com/v1
-  model: gpt-4o-mini
-  api_key_env: OPENAI_API_KEY
-
-permissions:
-  mode: conservative  # or "full"
-```
-
-### Environment Variables
-
-| Variable | Purpose |
-|----------|---------|
-| `SM_CONFIG` | Override config file path |
-| `SM_<KEY>` | Override any config key |
-| `OPENAI_API_KEY` | OpenAI API key |
-| `ANTHROPIC_API_KEY` | Anthropic API key |
-| `OPENROUTER_API_KEY` | OpenRouter API key |
-
-### Adding a Custom LLM Provider
-
-```bash
-supermedicine llm add deepseek \
-  --api-format openai \
-  --base-url https://api.deepseek.com/v1 \
-  --api-key-env DEEPSEEK_API_KEY \
-  --model deepseek-chat \
-  --set-current
-```
-
-## CLI Commands Reference
-
-### Core
-
-| Command | Description |
-|---------|-------------|
-| `status` | Show project status |
-| `diagnose` | Run secret-safe diagnostics |
-| `tui` | Launch the Chinese OpenTUI TUI |
-| `web` | Start the web interface |
-
-### Workspace
-
-| Command | Description |
-|---------|-------------|
-| `workspace init` | Create a new workspace |
-| `workspace list` | List all workspaces |
-| `workspace show` | Show workspace details |
-| `workspace delete` | Delete a workspace |
-
-### Papers
-
-| Command | Description |
-|---------|-------------|
-| `paper import` | Import a paper |
-| `paper list` | List papers |
-| `paper show` | Show paper details |
-| `paper edit` | Edit paper metadata |
-| `paper enrich` | Enrich with LLM |
-
-### Experience
-
-| Command | Description |
-|---------|-------------|
-| `experience suggest` | Add experience record |
-| `experience list` | List experiences |
-| `experience view` | View experience details |
-| `experience delete` | Delete an experience |
-
-### Tools
-
-| Command | Description |
-|---------|-------------|
-| `tool scan` | Scan for available tools |
-| `tool add` | Add tool to workspace |
-| `tool list` | List workspace tools |
-
-### LLM
-
-| Command | Description |
-|---------|-------------|
-| `llm list` | List configured providers |
-| `llm show` | Show provider details |
-| `llm add` | Add a new provider |
-| `llm switch` | Switch active provider |
-
-### Permissions
-
-| Command | Description |
-|---------|-------------|
-| `permission status` | Show permission status |
-| `permission mode` | Set permission mode |
-| `permission roots` | List authorized roots |
-| `permission authorize` | Authorize an external path |
-| `permission revoke` | Revoke an authorized path |
-
-### Logs
-
-| Command | Description |
-|---------|-------------|
-| `log location` | Show log storage path |
-| `log follow` | Follow log output |
-
-## TUI Usage
-
-Launch the Chinese OpenTUI terminal interface. Install the pinned JS dependency
-with `npm ci` first, and keep Bun available on `PATH` for the interactive runtime:
-
-```bash
+supermedicine tui --dry-run
 supermedicine tui
-supermedicine tui --dry-run  # Check readiness without starting
-npm run opentui:smoke        # Check Bun/@opentui runtime prerequisites
 ```
 
-### Global Shortcuts
+The interactive TUI requires Bun and the locked npm dependency installed by
+`npm ci`.
 
-| Key | Action |
-|-----|--------|
-| `Tab` | Move focus forward |
-| `Shift+Tab` | Move focus backward |
-| `Enter` | Submit/confirm |
-| `M` | Toggle the route/menu shell |
-| `P` / `Ctrl+P` | Open permission view |
-| `Esc` / `B` | Return/back |
-| `↑↓` / `j k` | Move selection where available |
-| `/` | Focus page filtering where available |
-| `[` / `]` | Scroll page content where available |
-| `Ctrl+1` ... `Ctrl+0` | Jump to primary routes |
-| `Q` | Quit TUI |
-
-### Screens
-
-The TUI provides screens for: chat, dashboard, workspace management, paper management, experience learning, tool management, dialog history, LLM management, experiment guide, permission mode, and log reports.
-
-## Web Interface
-
-Start the web server:
+## Common Checks
 
 ```bash
-supermedicine web
-# Or directly:
-python -c "from core.web.server import start_server; start_server()"
+supermedicine permission status
+supermedicine log location
+supermedicine experiment list
 ```
 
-Access at `http://127.0.0.1:8000`. See [API Reference](../api/README.md) for endpoint details.
+## Next Reading
 
-## Troubleshooting
-
-| Issue | Fix |
-|-------|-----|
-| `No module named 'yaml'` | `pip install -e .` or `pip install pyyaml` |
-| `supermedicine` command not found | Add Python Scripts to PATH or use `python Cli.py` |
-| Missing LLM fields | Provide provider, base_url, model, and API key source |
-| TUI launch issue | Run `supermedicine tui --dry-run`, `npm ci`, and `npm run opentui:smoke`; confirm Bun is installed/on `PATH` |
-
-See [README.md](../../README.md) for more troubleshooting details.
+- [Installation guide](INSTALL.md)
+- [Architecture guide](architecture.md)
+- [API reference](../api/README.md)
+- [Examples](../examples/README.md)

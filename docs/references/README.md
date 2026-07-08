@@ -1,9 +1,14 @@
-# Plugin References
+# References
 
-This directory contains reference documentation for SuperMedicine plugins.
+This directory contains stable reference material for plugins and research
+helpers.
 
-## Structure
+## Sections
 
-- [figure/](figure/) - Figure generation references
-- [rag/](rag/) - RAG plugin references
-- [standards/](standards/) - Medical writing standards
+- [figure](figure/chart_selection.md): figure selection, profiling, layout, and
+  publication checks.
+- [rag](rag/provider-interface.md): RAG provider interface notes.
+- [standards](standards/consort-checklist.md): medical writing checklist
+  references.
+
+Reference files are guidance, not clinical or regulatory advice.
