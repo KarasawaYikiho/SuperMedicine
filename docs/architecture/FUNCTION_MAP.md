@@ -26,12 +26,12 @@
 
 ## Maintainer Curated Function Map
 
-This section is the maintainer-facing project map. It integrates the current
-`Architecture/MaintainerRepositoryReading.md` reading pass and keeps the older
-AST callable inventory below as a static appendix rather than a raw execution
-log. It intentionally omits local runtime state, private scratch notes, raw logs,
-environment values, tokens, API keys, generated build outputs, and ignored
-runtime directories.
+This section is the maintainer-facing project map. It keeps the current
+repository structure, ownership boundaries, and callable inventory in the
+tracked documentation set while historical reading passes remain local-only
+archive material. It intentionally omits local runtime state, private scratch
+notes, raw logs, environment values, tokens, API keys, generated build outputs,
+and ignored runtime directories.
 
 ### Repository scope and release hygiene
 
@@ -277,4 +277,4 @@ Call/data flow: user intent -> optional confirmed experience lookup -> normalize
 - Python source files analyzed: 179
 - Callable units inventoried: 2082
 - Parse errors: 0
-
+

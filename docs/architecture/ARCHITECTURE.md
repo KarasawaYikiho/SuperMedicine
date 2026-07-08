@@ -200,11 +200,12 @@ documentation claims native support.
 
 ## Repository Hygiene
 
-Git uploads should contain only necessary project files. `Docs/` is ignored by
-default. Archived planning documents live in `docs/archive/` and are tracked for
-historical reference but must be reviewed before release. Do not
-upload generated build artifacts, caches, runtime checkpoint directories, raw
-logs, or local configuration containing secrets/private endpoints.
+Git uploads should contain only necessary project files. `Docs/`,
+`docs/archive/`, and `Temp/` are local-only by default. Archived planning
+documents may be kept under `Temp/docs/archive/` for local reference, but they
+must not be uploaded as repository content. Do not upload generated build
+artifacts, caches, runtime checkpoint directories, raw logs, or local
+configuration containing secrets/private endpoints.
 
 Before release, exclude generated `build/`, `dist/`, `*.egg-info`, `__pycache__`,
 `.pytest_cache`, `.pytest-tmp`, runtime data, and private configuration files.

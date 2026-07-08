@@ -1,8 +1,9 @@
-# Python bytecode/cache artifacts
+# Python caches and packaging output
 __pycache__/
 *.py[cod]
-
-# Packaging/build artifacts
+*.egg
+*.egg-info/
+.eggs/
 dist/
 build/
 .pyinstaller-build/
@@ -11,13 +12,12 @@ build-pyinstaller/
 .installer-payload-stage/
 .release-zip-stage/
 release-artifacts/
-*.egg-info/
-.eggs/
-*.egg
 *.exe
+*.zip
 !tests/fixtures/**/*.exe
+!tests/fixtures/**/*.zip
 
-# Test/lint/type-check/coverage artifacts
+# Test, lint, type-check, and coverage output
 .pytest_cache/
 .pytest-tmp/
 .pytest_tmp/
@@ -27,9 +27,16 @@ GITSuperMedicine.pytest_tmp/
 .coverage
 coverage.xml
 htmlcov/
+tests/**/__pycache__/
+tests/**/*.py[cod]
+tests/**/test_tmp_*.py
+tests/**/test_temp_*.py
+tests/**/test_scratch_*.py
+tests/**/test_debug_*.py
+installer/**/__pycache__/
+installer/**/*.py[cod]
 
-# SuperMedicine runtime artifacts
-# Keep the canonical policy file trackable while excluding local-only state.
+# Local runtime state
 .supermedicine/*
 !.supermedicine/policies/
 .supermedicine/policies/*
@@ -45,8 +52,9 @@ htmlcov/
 .supermedicine/tokens.jsonl
 .supermedicine/cache/
 .supermedicine/tmp/
+workspaces/
 
-# External assistant platform local config/artifacts
+# Local assistant/editor state
 .claude/
 .agents/
 .opencode/
@@ -57,6 +65,8 @@ htmlcov/
 .windsurf/
 .roo/
 .cline/
+.vscode/
+.idea/
 CodexTem/
 codex-tem/
 codex_tmp/
@@ -69,19 +79,8 @@ docs/Superpower/
 docs/Superpowers/
 docs/superpower/
 
-# Repository documentation boundary:
-# - Maintainer-facing repository docs are commit/upload eligible when curated to
-#   explain project structure, execution roadmaps, function maps, or maintenance
-#   decisions (for example: Architecture/ExecutionRoadmap.md,
-#   Architecture/ExecutionRoadMap.md, FUNCTION_MAP.md). The authoritative
-#   FunctionMap location is the root uppercase `FUNCTION_MAP.md`; avoid
-#   case-conflicting or duplicate FunctionMap files.
-# - `REQUIREMENTS_TRACEABILITY.md` is local-only and forbidden from upload.
-# - Local-only temporary engineering/audit artifacts stay excluded until they are
-#   intentionally converted into maintainer-facing documentation.
-# - Do not ignore a broad Docs/ directory: Windows case-insensitive matching can
-#   also hide curated lowercase docs/. Use the specific scratch/private patterns
-#   below for local-only notes instead.
+# Local-only notes and scratch documents
+# Maintainer-facing repository docs are commit/upload eligible when curated.
 EXTERNAL_PROJECT_ANALYSIS.md
 failure_inventory.md
 *_plan_draft*.md
@@ -101,7 +100,6 @@ failure_inventory.md
 *_transient_checklist*.md
 *_uncurated_engineering*.md
 *_validation_notes*.md
-# Local-only planning notes
 /Planning/
 /Planning/NextSteps.md
 /planning/
@@ -111,11 +109,16 @@ failure_inventory.md
 /SUPERPOWER*.md
 /Superpower*.md
 /superpower*.md
+/docs/**/*gap-analysis*.md
+/docs/**/*gap_analysis*.md
+/docs/**/*validation_notes*.md
+/docs/archive/
+/docs/archive/REQUIREMENTS_TRACEABILITY.md
 /docs/archive/DebugReviewManualValidation.md
 /docs/archive/PushCleanupClassification.md
 /docs/archive/TestMergeInventory.md
 
-# Environment secrets
+# Secrets and local environments
 .env
 .env.*
 .envrc
@@ -125,38 +128,41 @@ failure_inventory.md
 !*.env.example
 !*.env.sample
 !*.env.template
-
-# Python virtual environments
 .venv/
 venv/
 env/
 .tox/
 .nox/
 
-# Runtime workspace data (not committed)
-workspaces/
-
-# Node dependency install trees
+# Dependency installs and tool caches
 node_modules/
+.npm/
+.pnpm-store/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
+.yarn/install-state.gz
+.cache/
+.parcel-cache/
+.turbo/
+.next/
+.nuxt/
+.vite/
 
-# Log files
+# Logs, temporary files, and OS metadata
 *.log
-*.zip
-!tests/fixtures/**/*.zip
-
-# Temporary directories/files
 tmp/
+Temp/
 temp/
 *.tmp
-
-# macOS metadata
+*.temp
 .DS_Store
-
-# Windows metadata
 Thumbs.db
+Desktop.ini
+*.swp
+*.swo
 
-# Protected curated repository inputs that must remain trackable for CI,
-# installer/source review, maintainer documentation, and policy governance.
+# Trackable repository inputs
 !.github/
 !.github/workflows/
 !.github/workflows/**
@@ -164,39 +170,28 @@ Thumbs.db
 !tests/**
 !installer/
 !installer/**
-
-# Re-ignore generated/cache artifacts re-exposed by protected tree negations.
-tests/**/__pycache__/
-tests/**/*.py[cod]
-tests/**/test_tmp_*.py
-tests/**/test_temp_*.py
-tests/**/test_scratch_*.py
-tests/**/test_debug_*.py
-installer/**/__pycache__/
-installer/**/*.py[cod]
-
 !install.py
 !Install.py
 !Uninstall.py
 !install.json
-!docs/architecture/FUNCTION_MAP.md
-# !Architecture/  # moved to docs/archive/
-# !Architecture/**  # moved to docs/archive/
+!README.md
+!CHANGELOG.md
+!CONTRIBUTING.md
+!SECURITY.md
 !docs/
 !docs/**
-!docs/archive/
-!docs/archive/**
-/docs/archive/REQUIREMENTS_TRACEABILITY.md
-/docs/archive/DebugReviewManualValidation.md
-/docs/archive/PushCleanupClassification.md
-/docs/archive/TestMergeInventory.md
 !docs/architecture/
 !docs/architecture/**
+!docs/architecture/ARCHITECTURE.md
+!docs/architecture/FUNCTION_MAP.md
 !docs/guides/
 !docs/guides/**
+!docs/guides/INSTALL.md
 !docs/references/
 !docs/references/**
-# Re-ignore superpowers engineering files (local-only, must come after !docs/** negation)
+!.supermedicine/policies/default.yaml
+
+# Re-apply doc exclusions after broad docs unignore.
 docs/superpowers/
 docs/superpowers/**
 docs/Superpower/
@@ -208,11 +203,18 @@ docs/superpower/**
 /docs/**/*gap-analysis*.md
 /docs/**/*gap_analysis*.md
 /docs/**/*validation_notes*.md
-!README.md
-!docs/architecture/ARCHITECTURE.md
-!CHANGELOG.md
-!CONTRIBUTING.md
-!docs/guides/INSTALL.md
-!SECURITY.md
-!docs/archive/SECURITY_HARDENING_CHECKLIST.md
-!.supermedicine/policies/default.yaml
+/docs/archive/
+/docs/archive/REQUIREMENTS_TRACEABILITY.md
+/docs/archive/DebugReviewManualValidation.md
+/docs/archive/PushCleanupClassification.md
+/docs/archive/TestMergeInventory.md
+
+# Re-apply generated-file exclusions after broad test/installer unignore.
+tests/**/__pycache__/
+tests/**/*.py[cod]
+tests/**/test_tmp_*.py
+tests/**/test_temp_*.py
+tests/**/test_scratch_*.py
+tests/**/test_debug_*.py
+installer/**/__pycache__/
+installer/**/*.py[cod]

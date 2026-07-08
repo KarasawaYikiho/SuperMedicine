@@ -33,9 +33,9 @@ and separates stable project facts from archive notes and planned work.
 
 ## Archive Rules
 
-Files under `docs/archive/` are historical or generated notes unless a current
-document links to them as authoritative. Do not treat archive PASS claims,
-roadmaps, or inventories as current behavior without checking code and tests.
+Historical or generated notes belong under local-only `Temp/docs/archive/`, not
+the Git-tracked `docs/` tree. Do not treat archive PASS claims, roadmaps, or
+inventories as current behavior without checking code and tests.
 
 ## Working Tree Caution
 
@@ -50,4 +50,3 @@ git diff --name-status --cached
 
 If a file has both staged and unstaged changes, avoid editing it until its owner
 has resolved the split index state.
-

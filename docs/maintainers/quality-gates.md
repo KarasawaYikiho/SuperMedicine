@@ -43,7 +43,8 @@ python scripts\maintainers\check_markdown_links.py docs
 ```
 
 Do not wire the whole-tree command into CI until existing broken links in
-`docs/guides/` and `docs/archive/` are fixed or intentionally allowlisted.
+`docs/guides/` are fixed or intentionally allowlisted. Local-only archives under
+`Temp/docs/archive/` are outside the tracked documentation gate.
 
 ## Optional Web Gate
 

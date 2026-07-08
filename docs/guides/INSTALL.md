@@ -6,9 +6,7 @@ SuperMedicine **Beta0.4.2**. The Python package fallback version is **0.4.2b0**.
 
 For a shorter overview, start with [README.md](README.md). For design and
 security boundaries, see [ARCHITECTURE.md](ARCHITECTURE.md) and
-[SECURITY.md](SECURITY.md). For release documentation hardening and maintainer
-reading boundaries, see [SECURITY_HARDENING_CHECKLIST.md](SECURITY_HARDENING_CHECKLIST.md)
-and [Architecture/MaintainerRepositoryReading.md](Architecture/MaintainerRepositoryReading.md).
+[SECURITY.md](SECURITY.md).
 
 ## Prerequisites
 

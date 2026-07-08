@@ -77,6 +77,7 @@ LOCAL_ONLY_DOCUMENT_PATTERNS = (
     "superpower*.md",
 )
 LOCAL_ONLY_ARCHIVE_DOCUMENTS = {
+    "docs/archive/",
     "docs/archive/DebugReviewManualValidation.md",
     "docs/archive/PushCleanupClassification.md",
     "docs/archive/TestMergeInventory.md",
@@ -298,6 +299,8 @@ def test_tracked_files_do_not_include_forbidden_or_generated_artifacts():
 
         if parts and parts[0] == "Docs":
             forbidden_matches.append(tracked_path)
+        if tracked_path == "docs/archive" or tracked_path.startswith("docs/archive/"):
+            forbidden_matches.append(tracked_path)
         if any(part in LOCAL_ONLY_MARKERS for part in lower_parts):
             forbidden_matches.append(tracked_path)
         if "node_modules" in lower_parts or ".cache" in lower_parts:
@@ -492,10 +495,12 @@ def test_gitignore_excludes_runtime_and_external_platform_config_artifacts():
         "*_uncurated_engineering*.md",
         "*_validation_notes*.md",
         "/Planning/",
+        "Temp/",
         "node_modules/",
         "/docs/**/*gap-analysis*.md",
         "/docs/**/*gap_analysis*.md",
         "/docs/**/*validation_notes*.md",
+        "/docs/archive/",
         "/docs/archive/DebugReviewManualValidation.md",
         "/docs/archive/PushCleanupClassification.md",
         "/docs/archive/REQUIREMENTS_TRACEABILITY.md",
@@ -524,10 +529,12 @@ def test_gitignore_excludes_runtime_and_external_platform_config_artifacts():
         "Superpowers/local.md",
         "docs/Superpowers/local.md",
         "docs/tui-opentui-gap-analysis.md",
+        "docs/archive/README.md",
         "docs/archive/release_validation_notes.md",
         "docs/archive/DebugReviewManualValidation.md",
         "docs/archive/PushCleanupClassification.md",
         "docs/archive/TestMergeInventory.md",
+        "Temp/docs/archive/README.md",
         "local_plan_next.md",
         "analysis_codex_notes.md",
     ]:
@@ -548,6 +555,8 @@ def test_gitignore_allows_curated_maintainer_repository_docs():
     active_patterns = _active_gitignore_patterns()
 
     assert "Maintainer-facing repository docs are commit/upload eligible" in gitignore
+    assert "/docs/archive/" in active_patterns
+    assert "Temp/" in active_patterns
     for pattern in {
         "Architecture/ExecutionRoadmap.md",
         "Architecture/ExecutionRoadMap.md",
