@@ -35,7 +35,12 @@ class RuntimePaths:
         is_frozen = bool(getattr(sys, "frozen", False)) if frozen is None else frozen
         source = _absolute(source_root or Path(__file__).parents[1])
         executable_path = _absolute(executable or sys.executable)
-        executable_root = executable_path.parent if is_frozen else source
+        if executable is None and not is_frozen:
+            executable_root = source
+        else:
+            executable_root = (
+                executable_path if executable_path.is_dir() else executable_path.parent
+            )
         resource_root = (
             _absolute(bundle_root or getattr(sys, "_MEIPASS", source))
             if is_frozen
@@ -64,13 +69,18 @@ def _absolute(path: str | Path) -> Path:
     return Path(path).expanduser().resolve()
 
 
-def _project_from_record(record_path: Path) -> str | None:
+def _project_from_record(record_path: Path) -> Path | None:
     try:
         record = json.loads(record_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
     install_dir = record.get("install_dir") if isinstance(record, dict) else None
-    return install_dir if isinstance(install_dir, str) and install_dir.strip() else None
+    if not isinstance(install_dir, str) or not install_dir.strip():
+        return None
+    candidate = Path(install_dir).expanduser()
+    if not candidate.is_absolute() or not candidate.is_dir():
+        return None
+    return candidate.resolve()
 
 
 def _project_from_config(config_path: Path) -> Path | None:
@@ -88,8 +98,16 @@ def _default_project_root(
 ) -> Path:
     if not frozen:
         return source_root
-    if platform == "win32" and environ.get("LOCALAPPDATA"):
-        return Path(environ["LOCALAPPDATA"]) / "SuperMedicine"
+    if platform == "win32":
+        local_app_data = environ.get("LOCALAPPDATA")
+        if not local_app_data:
+            profile = (
+                Path(environ["USERPROFILE"])
+                if environ.get("USERPROFILE")
+                else Path.home()
+            )
+            local_app_data = str(profile / "AppData" / "Local")
+        return Path(local_app_data) / "SuperMedicine"
     return Path.home() / ".local" / "share" / "SuperMedicine"
 
 
