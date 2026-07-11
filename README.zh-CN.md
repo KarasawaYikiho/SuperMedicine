@@ -45,7 +45,7 @@ SuperMedicine 不是临床决策系统。所有生成内容都只应作为科研
 | 工作区 | 工作区、论文、工具、经验命令都使用显式 `--workspace`。 |
 | LLM Provider | 支持 OpenAI、Anthropic、OpenRouter 和 OpenAI-compatible 自定义端点。 |
 | 插件 | RAG、harness、医学写作、引用格式、实验辅助、Python/R 工具模板和图表工具。 |
-| TUI | 基于 Bun 和 `@opentui/core@0.4.1` 的中文 OpenTUI 终端界面。 |
+| TUI | 基于 Bun 和 `@opentui/core@0.4.3` 的中文 OpenTUI 终端界面。 |
 | 可选适配器 | `adapters/` 下包含 OpenCode 和 Claude Code 的元数据/适配器文件；独立 Python 运行时不依赖它们。 |
 
 ## 从源码安装
@@ -157,7 +157,7 @@ npm run opentui:smoke
 ```
 
 非 dry-run 路径通过 Bun 启动 `core/tui/opentui_runtime.mjs`，并使用固定依赖
-`@opentui/core@0.4.1`。
+`@opentui/core@0.4.3`。
 
 常用快捷键：
 

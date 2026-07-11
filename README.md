@@ -51,7 +51,7 @@ audit, and result envelope as single mode.
 | Workspaces | Explicit `--workspace` ids for workspace, paper, tool, and experience commands. |
 | LLM providers | OpenAI, Anthropic, OpenRouter, and OpenAI-compatible custom endpoints through local config or environment variables. |
 | Plugins | RAG, harness checks, medical writing, citation formatting, experiment helpers, Python/R tool templates, and figure utilities. |
-| TUI | Chinese OpenTUI terminal interface backed by Bun and `@opentui/core@0.4.1`. |
+| TUI | Chinese OpenTUI terminal interface backed by Bun and `@opentui/core@0.4.3`. |
 | Optional adapters | OpenCode and Claude Code metadata/adapter files under `adapters/`; they are not required for the standalone Python runtime. |
 
 ## Install From Source
@@ -176,7 +176,7 @@ npm run opentui:smoke
 ```
 
 The non-dry-run path uses Bun to start `core/tui/opentui_runtime.mjs` and the
-pinned `@opentui/core@0.4.1` dependency.
+pinned `@opentui/core@0.4.3` dependency.
 If Bun is not on `PATH`, set `SUPERMEDICINE_OPENTUI_JS_RUNTIME` to a
 Bun-compatible executable.
 

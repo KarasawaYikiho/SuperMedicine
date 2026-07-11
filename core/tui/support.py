@@ -25,7 +25,7 @@ class TUIStatus:
     status_right: str = ""
     focus_target: str = "prompt-input"
     runtime_name: str = "@opentui/core"
-    runtime_version: str = "0.4.1"
+    runtime_version: str = "0.4.3"
 
 
 @dataclass(frozen=True, slots=True)

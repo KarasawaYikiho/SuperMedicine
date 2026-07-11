@@ -3,9 +3,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "opentui:smoke": "bun core/tui/opentui_runtime.mjs --smoke"
+    "opentui:smoke": "bun core/tui/opentui_runtime.mjs --smoke",
+    "opentui:test": "bun test core/tui/opentui/__tests__",
+    "opentui:test:all": "bun run opentui:test && bun core/tui/opentui_runtime.mjs --automated-nav && bun core/tui/opentui_runtime.mjs --full-page-interactions"
   },
   "dependencies": {
-    "@opentui/core": "0.4.1"
+    "@opentui/core": "0.4.3"
   }
 }

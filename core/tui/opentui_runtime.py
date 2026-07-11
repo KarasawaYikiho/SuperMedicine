@@ -17,7 +17,7 @@ class OpenTUIRuntimeInfo:
     """Runtime metadata exposed to smoke checks and dry-run callers."""
 
     package: str = "@opentui/core"
-    version: str = "0.4.1"
+    version: str = "0.4.3"
     bridge: str = "core/tui/opentui_runtime.mjs"
 
 
@@ -58,7 +58,7 @@ def _bridge_path(project_root: Path | None = None) -> Path:
 def _preferred_js_runtime() -> str:
     """Return the JS runtime used for OpenTUI.
 
-    OpenTUI 0.4.1's native FFI is not available under Node on Windows.  Require
+    OpenTUI 0.4.3's native FFI is not available under Node on Windows.  Require
     Bun (or an explicitly configured Bun-compatible executable) so smoke checks
     exercise the real runtime instead of falling through to an unsupported host.
     """
