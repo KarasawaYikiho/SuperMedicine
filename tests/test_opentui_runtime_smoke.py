@@ -33,14 +33,19 @@ def test_tui_dry_run_and_manifests_report_approved_opentui_runtime(
     lock = json.loads(root.joinpath("package-lock.json").read_text(encoding="utf-8"))
 
     assert status.runtime_name == "@opentui/core"
-    assert status.runtime_version == "0.4.1"
-    assert package["dependencies"]["@opentui/core"] == "0.4.1"
+    assert status.runtime_version == "0.4.3"
+    assert package["dependencies"]["@opentui/core"] == "0.4.3"
     locked = lock["packages"]["node_modules/@opentui/core"]
-    assert locked["version"] == "0.4.1"
+    assert locked["version"] == "0.4.3"
     assert locked["license"] == "MIT"
 
     assert package["scripts"]["opentui:smoke"].startswith("bun ")
     assert not package["scripts"]["opentui:smoke"].startswith("node ")
+    assert package["scripts"]["opentui:test"] == "bun test core/tui/opentui/__tests__"
+    assert package["scripts"]["opentui:test:all"] == (
+        "bun run opentui:test && bun core/tui/opentui_runtime.mjs --automated-nav "
+        "&& bun core/tui/opentui_runtime.mjs --full-page-interactions"
+    )
 
 
 @pytest.mark.parametrize(

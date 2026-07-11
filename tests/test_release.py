@@ -485,7 +485,7 @@ def test_release_docs_describe_ci_artifact_layout_and_install_py_roles():
     assert "with no flags" in combined
     assert "Advanced automation / CI" in combined
     assert "staged release payload" in combined
-    assert "@opentui/core@0.4.1" in combined
+    assert "@opentui/core@0.4.3" in combined
     assert "npm ci" in combined
     assert "npm run opentui:smoke" in combined
     assert "Bun" in combined
@@ -543,8 +543,8 @@ def test_opentui_release_runtime_dependency_and_notice_are_packaged():
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     install = (REPO_ROOT / "docs" / "guides" / "INSTALL.md").read_text(encoding="utf-8")
 
-    assert package_json["dependencies"]["@opentui/core"] == "0.4.1"
-    assert package_lock["packages"]["node_modules/@opentui/core"]["version"] == "0.4.1"
+    assert package_json["dependencies"]["@opentui/core"] == "0.4.3"
+    assert package_lock["packages"]["node_modules/@opentui/core"]["version"] == "0.4.3"
     assert (REPO_ROOT / "core" / "tui" / "opentui_runtime.mjs").is_file()
     assert (REPO_ROOT / "core" / "tui" / "opentui_runtime.py").is_file()
     assert 'core = ["tui/app.tcss", "tui/*.mjs", "web/frontend/*"]' in pyproject
