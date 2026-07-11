@@ -94,11 +94,15 @@ def create_app(
     *,
     auth_token: str | None = None,
     shutdown_callback: Any = None,
+    paths: Any = None,
+    application: Any = None,
 ) -> Any:
     """Create the FastAPI application and register domain route adapters."""
     _ensure_fastapi()
     from fastapi import FastAPI
 
+    from core.application import ApplicationFacade
+    from core.runtime_paths import RuntimePaths
     from core.web.routes import (
         register_agent_evolution_routes,
         register_diagnostic_routes,
@@ -113,11 +117,15 @@ def create_app(
     )
     from core.web.runtime import WebRuntime
 
+    resolved_paths = paths or RuntimePaths.resolve(project_root=Path.cwd())
+    resolved_application = application or ApplicationFacade(resolved_paths)
     app = FastAPI(
         title="SuperMedicine Web API",
         version="0.4.2",
         description="SuperMedicine browser and desktop GUI API",
     )
+    app.state.paths = resolved_paths
+    app.state.application = resolved_application
     _install_web_security(app, auth_token)
 
     runtime = WebRuntime(
@@ -157,35 +165,18 @@ def start_server(
     reload: bool = False,
     auth_token_file: str | Path | None = None,
 ) -> None:
-    """Start the SuperMedicine web server.
-
-    Parameters
-    ----------
-    host:
-        Bind address.  Defaults to ``127.0.0.1`` (localhost only).
-    port:
-        Port number.  Defaults to ``8000``.
-    reload:
-        Enable auto-reload for development.
-    """
+    """Start the SuperMedicine web server."""
     _ensure_fastapi()
-
     import uvicorn
-
     from core.web.security import load_remote_auth_token
 
     auth_token = load_remote_auth_token(host, auth_token_file)
     if auth_token is not None and reload:
         raise ValueError("--reload cannot be combined with authenticated Web startup")
-
     logger.info("Starting SuperMedicine Web server on %s:%s", host, port)
     if reload:
         uvicorn.run(
-            "core.web.server:create_app",
-            host=host,
-            port=port,
-            reload=True,
-            factory=True,
+            "core.web.server:create_app", host=host, port=port, reload=True, factory=True
         )
         return
 
@@ -194,10 +185,7 @@ def start_server(
     def request_shutdown() -> None:
         server_holder["server"].should_exit = True
 
-    app = create_app(
-        auth_token=auth_token,
-        shutdown_callback=request_shutdown,
-    )
+    app = create_app(auth_token=auth_token, shutdown_callback=request_shutdown)
     server = uvicorn.Server(uvicorn.Config(app, host=host, port=port))
     server_holder["server"] = server
     server.run()
@@ -212,6 +200,6 @@ def find_available_port(host: str = "127.0.0.1") -> int:
     """Find an available port for the web server."""
     import socket
 
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind((host, 0))
-        return s.getsockname()[1]
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
+        server_socket.bind((host, 0))
+        return server_socket.getsockname()[1]

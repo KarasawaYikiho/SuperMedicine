@@ -124,6 +124,13 @@ _FORWARDED_COMMANDS = {
 class CLI:
     """SuperMedicine CLI"""
 
+    def __init__(self, *, paths=None, application=None) -> None:
+        from core.application import ApplicationFacade
+        from core.runtime_paths import RuntimePaths
+
+        self.paths = paths or RuntimePaths.resolve(project_root=Path.cwd())
+        self.application = application or ApplicationFacade(self.paths)
+
     def __getattr__(self, name: str):
         try:
             module_name, function_name = _FORWARDED_COMMANDS[name]
