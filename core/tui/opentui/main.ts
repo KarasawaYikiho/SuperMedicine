@@ -146,7 +146,16 @@ export function mountShell(renderer, options = {}) {
   }
 
   function focusFirstPageControl() {
-    pageControls()[0]?.focus()
+    focusPageControl(pageControls()[0])
+  }
+
+  function focusPageControl(control) {
+    if (!control) return
+    control.focus()
+    let ancestor = control
+    while (ancestor && ancestor !== currentPage) ancestor = ancestor.parent
+    if (ancestor === currentPage) currentPage.scrollChildIntoView(control.id)
+    renderer.requestRender()
   }
 
   function applyLayout(width = renderer.terminalWidth, height = renderer.terminalHeight) {
@@ -207,7 +216,7 @@ export function mountShell(renderer, options = {}) {
     const targetIndex = currentIndex < 0
       ? (event.shift ? controls.length - 1 : 0)
       : (currentIndex + step + controls.length) % controls.length
-    controls[targetIndex].focus()
+    focusPageControl(controls[targetIndex])
   }
 
   for (const route of ROUTES) {
@@ -249,6 +258,7 @@ export async function runAutomatedMode(mode, options = {}) {
       pageFixtures: {
         ...options.pageFixtures,
         paper: Array.from({ length: 40 }, (_, index) => `交互验证记录 ${index + 1}`),
+        workspace: Array.from({ length: 40 }, (_, index) => `焦点验证记录 ${index + 1}`),
       },
     } : options)
     await renderOnce()
@@ -292,12 +302,20 @@ export async function runAutomatedMode(mode, options = {}) {
       shell.activateRoute("paper")
       await renderOnce()
       const paperPage = renderer.root.findDescendantById("page-paper")
+      const paperSidebar = renderer.root.findDescendantById("sidebar")
+      const paperNav = renderer.root.findDescendantById("nav-paper")
+      const sidebarSnapshot = { y: paperSidebar.y, navY: paperNav.y }
       const routeBeforeScroll = shell.state.currentRoute
       await mockMouse.scroll(paperPage.x + 3, paperPage.y + 3, "down")
       await renderOnce()
       assertAutomation(paperPage.scrollTop > 0, "mouse wheel did not scroll the pointed page")
       assertAutomation(shell.state.currentRoute === routeBeforeScroll, "mouse wheel changed route")
+      assertAutomation(paperSidebar.y === sidebarSnapshot.y && paperNav.y === sidebarSnapshot.navY, "main wheel moved the sidebar")
       const wheelTop = paperPage.scrollTop
+      await mockMouse.scroll(paperSidebar.x + 3, paperSidebar.y + 4, "down")
+      await renderOnce()
+      assertAutomation(paperPage.scrollTop === wheelTop, "sidebar wheel changed the main page scroll")
+      assertAutomation(paperSidebar.y === sidebarSnapshot.y && paperNav.y === sidebarSnapshot.navY && shell.state.currentRoute === routeBeforeScroll, "sidebar wheel changed shell state")
       mockInput.pressKey("\x1b[6~")
       await renderOnce()
       assertAutomation(paperPage.scrollTop > wheelTop, "PageDown did not scroll the current page")
@@ -312,14 +330,44 @@ export async function runAutomatedMode(mode, options = {}) {
       assertAutomation(field.value.includes("中文123粘贴456"), "editor lost typed or pasted text")
       assertAutomation(shell.state.currentRoute === "workspace", "editor input triggered a route")
 
+      const workspacePage = renderer.root.findDescendantById("page-workspace")
+      for (let index = 0; index < 28; index += 1) {
+        mockInput.pressTab()
+        await renderOnce()
+        const focused = renderer.currentFocusedRenderable
+        assertAutomation(focused.y >= workspacePage.viewport.y && focused.y + focused.height <= workspacePage.viewport.y + workspacePage.viewport.height, `Tab focus ${focused.id} left the viewport`)
+      }
+      const forwardScrollTop = workspacePage.scrollTop
+      assertAutomation(forwardScrollTop > 0, "long Tab traversal did not scroll")
+      for (let index = 0; index < 20; index += 1) {
+        mockInput.pressTab({ shift: true })
+        await renderOnce()
+        const focused = renderer.currentFocusedRenderable
+        assertAutomation(focused.y >= workspacePage.viewport.y && focused.y + focused.height <= workspacePage.viewport.y + workspacePage.viewport.height, `ShiftTab focus ${focused.id} left the viewport`)
+      }
+      assertAutomation(workspacePage.scrollTop < forwardScrollTop, "long ShiftTab traversal did not reverse scroll")
+
       for (const [width, height, expectedSidebar] of [[60, 20, 0], [80, 24, 20], [120, 30, 26], [160, 45, 26]]) {
         resize(width, height)
+        shell.activateRoute("dashboard")
         await renderOnce()
         const sidebar = renderer.root.findDescendantById("sidebar")
         const main = renderer.root.findDescendantById("main-area")
+        const header = renderer.root.findDescendantById("top-bar")
+        const footer = renderer.root.findDescendantById("status-bar")
+        const frame = captureCharFrame()
+        const rows = frame.split("\n").slice(0, height)
+        const focused = renderer.currentFocusedRenderable
         assertAutomation((sidebar.visible ? sidebar.width : 0) === expectedSidebar, `${width}x${height} sidebar breakpoint failed`)
-        assertAutomation(main.x + main.width <= width && main.y + main.height <= height, `${width}x${height} layout overflowed`)
-        assertAutomation(captureCharFrame().split("\n").slice(0, height).every((row) => [...row].length <= width), `${width}x${height} frame clipped`)
+        assertAutomation(header.y === 0 && main.y === header.height && main.y + main.height === footer.y && footer.y + footer.height === height, `${width}x${height} chrome overlapped`)
+        assertAutomation(main.x + main.width <= width && main.y + main.height <= height && focused.y >= main.y && focused.y + focused.height <= footer.y, `${width}x${height} layout or focus overflowed`)
+        assertAutomation(rows.every((row) => [...row].length <= width) && frame.includes("SuperMedicine") && frame.includes("状态看板") && frame.includes("刷新状态"), `${width}x${height} frame clipped key content`)
+        if (height >= 24) {
+          assertAutomation(/^┌─+┐$/.test(rows[0]) && /^└─+┘$/.test(rows[header.height - 1]) && /^┌─+┐$/.test(rows[footer.y]) && /^└─+┘$/.test(rows[height - 1]), `${width}x${height} chrome border incomplete`)
+          assertAutomation(/^┌─.*┐/.test(rows[main.y]) && /^└─+┘/.test(rows[footer.y - 1]), `${width}x${height} sidebar border incomplete`)
+        } else {
+          assertAutomation(!/[┌┐└┘]/.test(rows[0]) && !/[┌┐└┘]/.test(rows[height - 1]), `${width}x${height} compact chrome left half borders`)
+        }
         checkedLayouts += 1
       }
 

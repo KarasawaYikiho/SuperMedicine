@@ -213,6 +213,28 @@ test("responsive breakpoints resize the native shell without clipped chrome", as
       const rows = captureCharFrame().split("\n").slice(0, height)
       expect(rows.length).toBe(height)
       expect(rows.every((row) => [...row].length <= width)).toBe(true)
+      expect(header.y).toBe(0)
+      expect(main.y).toBe(header.y + header.height)
+      expect(main.y + main.height).toBe(footer.y)
+      expect(footer.y + footer.height).toBe(height)
+      expect(captureCharFrame()).toContain("SuperMedicine")
+      expect(captureCharFrame()).toContain("对话")
+      expect(captureCharFrame()).toContain("输入科研问题")
+      expect(renderer.currentFocusedRenderable?.id).toBe("prompt-input")
+      const focused = renderer.currentFocusedRenderable
+      expect(focused.y).toBeGreaterThanOrEqual(main.y)
+      expect(focused.y + focused.height).toBeLessThanOrEqual(footer.y)
+      if (height >= 24) {
+        expect(rows[0]).toMatch(/^┌─+┐$/)
+        expect(rows[header.height - 1]).toMatch(/^└─+┘$/)
+        expect(rows[footer.y]).toMatch(/^┌─+┐$/)
+        expect(rows[height - 1]).toMatch(/^└─+┘$/)
+        expect(rows[main.y]).toMatch(/^┌─.*┐/)
+        expect(rows[footer.y - 1]).toMatch(/^└─+┘/)
+      } else {
+        expect(rows[0]).not.toMatch(/[┌┐└┘]/)
+        expect(rows[height - 1]).not.toMatch(/[┌┐└┘]/)
+      }
     } finally {
       renderer.destroy()
     }
@@ -250,20 +272,72 @@ test("real wheel and PageDown scroll only the active long page without routing",
     await renderOnce()
     const page = renderer.root.findDescendantById("page-paper")
     const sidebar = renderer.root.findDescendantById("sidebar")
+    const sidebarBefore = { y: sidebar.y, navY: renderer.root.findDescendantById("nav-paper").y }
     const before = captureCharFrame()
     await mockMouse.scroll(page.x + 4, page.y + 4, "down")
     await renderOnce()
     expect(page.scrollTop).toBeGreaterThan(0)
     expect(shell.state.currentRoute).toBe("paper")
-    expect(sidebar.y).toBe(3)
+    expect({ y: sidebar.y, navY: renderer.root.findDescendantById("nav-paper").y }).toEqual(sidebarBefore)
     expect(captureCharFrame()).not.toBe(before)
     const wheelTop = page.scrollTop
+    const sidebarTop = sidebar.y
+    await mockMouse.scroll(sidebar.x + 3, sidebar.y + 5, "down")
+    await renderOnce()
+    expect(page.scrollTop).toBe(wheelTop)
+    expect(sidebar.y).toBe(sidebarTop)
+    expect(shell.state.currentRoute).toBe("paper")
     mockInput.pressKey("\x1b[6~")
     await renderOnce()
     expect(page.scrollTop).toBeGreaterThan(wheelTop)
     mockInput.pressKey("\x1b[5~")
     await renderOnce()
     expect(page.scrollTop).toBeLessThan(wheelTop + page.viewport.height)
+  } finally {
+    renderer.destroy()
+  }
+})
+
+test("long current-page Tab and ShiftTab keep every focused child inside its ScrollBox viewport", async () => {
+  const records = Array.from({ length: 40 }, (_, index) => `真实焦点记录 ${String(index + 1).padStart(2, "0")}`)
+  const { renderer, mockInput, renderOnce, captureCharFrame } = await createTestRenderer({ width: 80, height: 24 })
+  try {
+    const shell = mountShell(renderer, { pageFixtures: { workspace: records } })
+    shell.activateRoute("workspace")
+    await renderOnce()
+    const page = renderer.root.findDescendantById("page-workspace")
+    const viewport = page.viewport
+    expect(page.scrollTop).toBe(0)
+    for (let index = 0; index < 28; index += 1) {
+      mockInput.pressTab()
+      await renderOnce()
+      const focused = renderer.currentFocusedRenderable
+      expect(focused.id).toBe(index === 0 ? "page-record-workspace-0" : `page-record-workspace-${index}`)
+      expect(focused.y).toBeGreaterThanOrEqual(viewport.y)
+      expect(focused.y + focused.height).toBeLessThanOrEqual(viewport.y + viewport.height)
+      const label = focused.getChildren()[0].chunks.map((chunk) => chunk.text).join("")
+      expect(captureCharFrame()).toContain(label)
+    }
+    expect(page.scrollTop).toBeGreaterThan(0)
+    const scrolledTop = page.scrollTop
+    for (let index = 0; index < 20; index += 1) {
+      mockInput.pressTab({ shift: true })
+      await renderOnce()
+      const focused = renderer.currentFocusedRenderable
+      expect(focused.y).toBeGreaterThanOrEqual(viewport.y)
+      expect(focused.y + focused.height).toBeLessThanOrEqual(viewport.y + viewport.height)
+      const label = focused.getChildren()[0].chunks.map((chunk) => chunk.text).join("")
+      expect(captureCharFrame()).toContain(label)
+    }
+    expect(page.scrollTop).toBeLessThan(scrolledTop)
+    shell.activateRoute("llm")
+    await renderOnce()
+    const llmPage = renderer.root.findDescendantById("page-llm")
+    const routeFocused = renderer.currentFocusedRenderable
+    expect(routeFocused.id).toBe("page-field-llm")
+    expect(routeFocused.y).toBeGreaterThanOrEqual(llmPage.viewport.y)
+    expect(routeFocused.y + routeFocused.height).toBeLessThanOrEqual(llmPage.viewport.y + llmPage.viewport.height)
+    expect(captureCharFrame()).toContain("模型提供方")
   } finally {
     renderer.destroy()
   }
