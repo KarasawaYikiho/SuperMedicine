@@ -18,8 +18,9 @@ export function createShellState() {
   return {
     currentRoute: "chat",
     hoveredRoute: null,
-    workspaceName: "未选择工作区",
-    connectionStatus: "本地界面",
+    workspaceName: "未选择",
+    llmStatus: "未连接",
+    connectionStatus: "未连接",
   }
 }
 

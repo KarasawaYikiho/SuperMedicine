@@ -72,3 +72,44 @@ export function createPanel(renderer, options = {}) {
     ...options,
   })
 }
+
+export function createActionButton(renderer, { id, label, onActivate }) {
+  let hovered = false
+  const button = createPanel(renderer, {
+    id,
+    width: "100%",
+    height: 3,
+    focusable: true,
+    paddingX: 1,
+    focusedBorderColor: THEME.accent,
+    onMouseOver() {
+      hovered = true
+      button.backgroundColor = THEME.hover
+      renderer.setMousePointer("pointer")
+      renderer.requestRender()
+    },
+    onMouseOut() {
+      hovered = false
+      button.backgroundColor = THEME.surface
+      renderer.setMousePointer("default")
+      renderer.requestRender()
+    },
+    onMouseUp(event) {
+      if (event.button !== MouseButton.LEFT) return
+      event.stopPropagation()
+      button.focus()
+      onActivate()
+    },
+    onKeyDown(event) {
+      if (event.name !== "enter" && event.name !== "return") return
+      event.preventDefault()
+      onActivate()
+    },
+  })
+  const text = createText(renderer, { content: label, fg: THEME.accent })
+  button.add(text)
+  button.on("blurred", () => {
+    if (!hovered && !button.isDestroyed) button.backgroundColor = THEME.surface
+  })
+  return button
+}

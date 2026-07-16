@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test"
-import { InputRenderable, ScrollBoxRenderable, TextRenderable } from "@opentui/core"
+import { BoxRenderable, InputRenderable, MarkdownRenderable, ScrollBoxRenderable, SelectRenderable, TextRenderable } from "@opentui/core"
 import { createTestRenderer, MouseButtons } from "@opentui/core/testing"
 import { ROUTES } from "../state.ts"
-import { mountShell } from "../main.ts"
+import { mountShell, runAutomatedMode } from "../main.ts"
 
 test("OpenTUI 0.4.3 test renderer renders and is destroyed", async () => {
   const { renderer, renderOnce, captureCharFrame } = await createTestRenderer({
@@ -64,16 +64,66 @@ test("shell uses real page scroll boxes and chat-only input", async () => {
   }
 })
 
+test("page shells use honest native list, form, and action controls", async () => {
+  const { renderer, renderOnce, captureCharFrame } = await createTestRenderer({ width: 100, height: 30 })
+  try {
+    const shell = mountShell(renderer)
+    expect(renderer.root.findDescendantById("page-markdown-chat")).toBeInstanceOf(MarkdownRenderable)
+    shell.activateRoute("workspace")
+    await renderOnce()
+    expect(renderer.root.findDescendantById("page-field-workspace")).toBeInstanceOf(InputRenderable)
+    expect(renderer.root.findDescendantById("page-action-workspace")).toBeInstanceOf(BoxRenderable)
+
+    shell.activateRoute("paper")
+    await renderOnce()
+    expect(renderer.root.findDescendantById("page-list-paper")).toBeInstanceOf(SelectRenderable)
+    expect(renderer.root.findDescendantById("page-action-paper")?.focusable).toBe(true)
+    expect(captureCharFrame()).toContain("暂无论文")
+    expect(captureCharFrame()).not.toMatch(/study-a|heatmap\.py|openai\s+ready|step 1/)
+  } finally {
+    renderer.destroy()
+  }
+})
+
+test("header shows only a safe workspace label and explicit service states", async () => {
+  const { renderer, renderOnce, captureCharFrame } = await createTestRenderer({ width: 100, height: 30 })
+  try {
+    mountShell(renderer, { projectRoot: "C:\\Users\\secret\\Research Alpha" })
+    await renderOnce()
+    const frame = captureCharFrame()
+    expect(frame).toContain("工作区: Research Alpha")
+    expect(frame).toContain("LLM: 未连接")
+    expect(frame).toContain("服务: 未连接")
+    expect(frame).not.toContain("C:\\Users\\secret")
+  } finally {
+    renderer.destroy()
+  }
+})
+
 test("left mouse activates a focusable navigation item", async () => {
   const { renderer, mockMouse, renderOnce, captureCharFrame } = await createTestRenderer({ width: 100, height: 30 })
   try {
     const shell = mountShell(renderer)
     await renderOnce()
     const nav = renderer.root.findDescendantById("nav-workspace")
+    const initialColor = nav.backgroundColor.toString()
+    const pointers = []
+    const setMousePointer = renderer.setMousePointer.bind(renderer)
+    renderer.setMousePointer = (value) => {
+      pointers.push(value)
+      setMousePointer(value)
+    }
 
     expect(nav?.focusable).toBe(true)
     await mockMouse.moveTo(nav.x + 2, nav.y)
     expect(shell.state.hoveredRoute).toBe("workspace")
+    expect(nav.backgroundColor.toString()).not.toBe(initialColor)
+    expect(pointers).toContain("pointer")
+    await mockMouse.moveTo(50, 20)
+    expect(shell.state.hoveredRoute).toBeNull()
+    expect(nav.backgroundColor.toString()).toBe(initialColor)
+    expect(pointers).toContain("default")
+    await mockMouse.moveTo(nav.x + 2, nav.y)
     await mockMouse.click(nav.x + 2, nav.y, MouseButtons.RIGHT)
     expect(shell.state.currentRoute).toBe("chat")
     await mockMouse.click(nav.x + 2, nav.y)
@@ -85,4 +135,28 @@ test("left mouse activates a focusable navigation item", async () => {
   } finally {
     renderer.destroy()
   }
+})
+
+test("Enter provides the same navigation activation as the left mouse button", async () => {
+  const { renderer, mockInput, renderOnce } = await createTestRenderer({ width: 100, height: 30 })
+  try {
+    const shell = mountShell(renderer)
+    await renderOnce()
+    renderer.root.findDescendantById("nav-workspace").focus()
+    mockInput.pressEnter()
+    await renderOnce()
+    expect(shell.state.currentRoute).toBe("workspace")
+  } finally {
+    renderer.destroy()
+  }
+})
+
+test("automated modes validate real renderer input paths", async () => {
+  const navResult = await runAutomatedMode("automated-nav", { projectRoot: "C:\\safe\\Lab" })
+  expect(navResult.route).toBe("dashboard")
+  expect(navResult.frame).toContain("状态看板")
+
+  const fullResult = await runAutomatedMode("full-page-interactions", { projectRoot: "C:\\safe\\Lab" })
+  expect(fullResult.checkedRoutes).toBe(ROUTES.length)
+  expect(fullResult.checkedActions).toBeGreaterThan(0)
 })
