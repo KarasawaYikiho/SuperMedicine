@@ -100,7 +100,10 @@ export function mountShell(renderer, options = {}) {
       composer.destroyRecursively()
       composer = null
     }
-    currentPage = createPage(renderer, route, { markdownSyntaxStyle })
+    currentPage = createPage(renderer, route, {
+      markdownSyntaxStyle,
+      pageFixtures: options.pageFixtures,
+    })
     pageColumn.add(currentPage)
     if (route.id === "chat") {
       composer = createPanel(renderer, {
@@ -127,6 +130,84 @@ export function mountShell(renderer, options = {}) {
     renderPage(route)
     for (const nav of navigation) nav.update()
     renderer.requestRender()
+    focusFirstPageControl()
+    if (state.menuOpen) closeMenu()
+  }
+
+  function pageControls() {
+    const controls = []
+    const visit = (node) => {
+      if (node.focusable && node.visible) controls.push(node)
+      for (const child of node.getChildren()) visit(child)
+    }
+    if (currentPage) visit(currentPage)
+    if (composer) visit(composer)
+    return controls
+  }
+
+  function focusFirstPageControl() {
+    pageControls()[0]?.focus()
+  }
+
+  function applyLayout(width = renderer.terminalWidth, height = renderer.terminalHeight) {
+    const narrow = width < 80
+    const compressed = height < 24
+    header.border = !compressed
+    footer.border = !compressed
+    header.height = compressed ? 1 : 3
+    footer.height = compressed ? 1 : 3
+    sidebar.width = width >= 120 ? 26 : 20
+    sidebar.position = narrow ? "absolute" : "relative"
+    sidebar.left = 0
+    sidebar.top = 0
+    sidebar.zIndex = narrow ? 10 : 0
+    sidebar.visible = narrow ? state.menuOpen : true
+    pageColumn.width = narrow ? "100%" : "auto"
+    pageColumn.flexGrow = 1
+    renderer.requestRender()
+  }
+
+  function openMenu() {
+    if (renderer.terminalWidth >= 80) return
+    state.menuOpen = true
+    applyLayout()
+    navigation[0]?.item.focus()
+  }
+
+  function closeMenu() {
+    if (!state.menuOpen) return
+    state.menuOpen = false
+    applyLayout()
+    focusFirstPageControl()
+  }
+
+  function handleShellKey(event) {
+    const name = String(event.name || "").toLowerCase()
+    if (name === "escape" && state.menuOpen) {
+      event.preventDefault()
+      closeMenu()
+      return
+    }
+    if (name === "m" && !renderer.currentFocusedEditor && renderer.terminalWidth < 80) {
+      event.preventDefault()
+      state.menuOpen ? closeMenu() : openMenu()
+      return
+    }
+    if ((name === "pageup" || name === "pagedown") && !renderer.currentFocusedEditor) {
+      event.preventDefault()
+      currentPage?.scrollBy(name === "pageup" ? -0.5 : 0.5, "viewport")
+      return
+    }
+    if (name !== "tab") return
+    const controls = state.menuOpen ? navigation.map((nav) => nav.item) : pageControls()
+    if (controls.length === 0) return
+    event.preventDefault()
+    const currentIndex = controls.indexOf(renderer.currentFocusedRenderable)
+    const step = event.shift ? -1 : 1
+    const targetIndex = currentIndex < 0
+      ? (event.shift ? controls.length - 1 : 0)
+      : (currentIndex + step + controls.length) % controls.length
+    controls[targetIndex].focus()
   }
 
   for (const route of ROUTES) {
@@ -136,9 +217,15 @@ export function mountShell(renderer, options = {}) {
   }
 
   renderer.root.add(root)
+  renderer.on("resize", applyLayout)
+  renderer.keyInput.on("keypress", handleShellKey)
+  renderer.once("destroy", () => {
+    renderer.off("resize", applyLayout)
+    renderer.keyInput.off("keypress", handleShellKey)
+  })
+  applyLayout()
   activateRoute("chat")
-  renderer.root.findDescendantById("prompt-input")?.focus()
-  return { root, state, activateRoute }
+  return { root, state, activateRoute, openMenu, closeMenu }
 }
 
 function assertAutomation(condition, message) {
@@ -147,7 +234,7 @@ function assertAutomation(condition, message) {
 
 export async function runAutomatedMode(mode, options = {}) {
   const { createTestRenderer, MouseButtons } = await import("@opentui/core/testing")
-  const { renderer, mockInput, mockMouse, renderOnce, captureCharFrame } = await createTestRenderer({
+  const { renderer, mockInput, mockMouse, renderOnce, captureCharFrame, resize } = await createTestRenderer({
     width: 100,
     height: 30,
     useMouse: true,
@@ -155,8 +242,15 @@ export async function runAutomatedMode(mode, options = {}) {
   })
   let checkedRoutes = 0
   let checkedActions = 0
+  let checkedLayouts = 0
   try {
-    const shell = mountShell(renderer, options)
+    const shell = mountShell(renderer, mode === "full-page-interactions" ? {
+      ...options,
+      pageFixtures: {
+        ...options.pageFixtures,
+        paper: Array.from({ length: 40 }, (_, index) => `交互验证记录 ${index + 1}`),
+      },
+    } : options)
     await renderOnce()
 
     const workspaceNav = renderer.root.findDescendantById("nav-workspace")
@@ -166,7 +260,7 @@ export async function runAutomatedMode(mode, options = {}) {
     assertAutomation(shell.state.currentRoute === "chat", "right click activated navigation")
     await mockMouse.click(workspaceNav.x + 2, workspaceNav.y)
     await renderOnce()
-    assertAutomation(shell.state.currentRoute === "workspace" && workspaceNav.focused, "left click did not focus and activate")
+    assertAutomation(shell.state.currentRoute === "workspace" && renderer.currentFocusedRenderable?.id === "page-field-workspace", "left click did not activate and focus the page")
 
     const dashboardNav = renderer.root.findDescendantById("nav-dashboard")
     dashboardNav.focus()
@@ -194,8 +288,52 @@ export async function runAutomatedMode(mode, options = {}) {
           checkedActions += 1
         }
       }
+
+      shell.activateRoute("paper")
+      await renderOnce()
+      const paperPage = renderer.root.findDescendantById("page-paper")
+      const routeBeforeScroll = shell.state.currentRoute
+      await mockMouse.scroll(paperPage.x + 3, paperPage.y + 3, "down")
+      await renderOnce()
+      assertAutomation(paperPage.scrollTop > 0, "mouse wheel did not scroll the pointed page")
+      assertAutomation(shell.state.currentRoute === routeBeforeScroll, "mouse wheel changed route")
+      const wheelTop = paperPage.scrollTop
+      mockInput.pressKey("\x1b[6~")
+      await renderOnce()
+      assertAutomation(paperPage.scrollTop > wheelTop, "PageDown did not scroll the current page")
+
+      shell.activateRoute("workspace")
+      await renderOnce()
+      const field = renderer.root.findDescendantById("page-field-workspace")
+      await mockMouse.click(field.x + 2, field.y)
+      await mockInput.typeText("中文123")
+      await mockInput.pasteBracketedText("粘贴456")
+      await renderOnce()
+      assertAutomation(field.value.includes("中文123粘贴456"), "editor lost typed or pasted text")
+      assertAutomation(shell.state.currentRoute === "workspace", "editor input triggered a route")
+
+      for (const [width, height, expectedSidebar] of [[60, 20, 0], [80, 24, 20], [120, 30, 26], [160, 45, 26]]) {
+        resize(width, height)
+        await renderOnce()
+        const sidebar = renderer.root.findDescendantById("sidebar")
+        const main = renderer.root.findDescendantById("main-area")
+        assertAutomation((sidebar.visible ? sidebar.width : 0) === expectedSidebar, `${width}x${height} sidebar breakpoint failed`)
+        assertAutomation(main.x + main.width <= width && main.y + main.height <= height, `${width}x${height} layout overflowed`)
+        assertAutomation(captureCharFrame().split("\n").slice(0, height).every((row) => [...row].length <= width), `${width}x${height} frame clipped`)
+        checkedLayouts += 1
+      }
+
+      resize(60, 20)
+      await renderOnce()
+      shell.activateRoute("dashboard")
+      mockInput.pressKey("m")
+      await renderOnce()
+      assertAutomation(shell.state.menuOpen, "M did not open the narrow overlay menu")
+      await mockInput.pressKeys(["ESCAPE"], 75)
+      await renderOnce()
+      assertAutomation(!shell.state.menuOpen && shell.state.currentRoute === "dashboard", "Esc did not only close the top menu")
     }
-    return { route: shell.state.currentRoute, frame: captureCharFrame(), checkedRoutes, checkedActions }
+    return { route: shell.state.currentRoute, frame: captureCharFrame(), checkedRoutes, checkedActions, checkedLayouts }
   } finally {
     renderer.destroy()
   }

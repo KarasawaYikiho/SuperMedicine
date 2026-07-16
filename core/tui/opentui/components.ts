@@ -113,3 +113,49 @@ export function createActionButton(renderer, { id, label, onActivate }) {
   })
   return button
 }
+
+export function createListItem(renderer, { id, label, onActivate = () => {} }) {
+  const item = new BoxRenderable(renderer, {
+    id,
+    width: "100%",
+    height: 1,
+    focusable: true,
+    backgroundColor: THEME.surface,
+    onMouseOver() {
+      item.backgroundColor = THEME.hover
+      renderer.setMousePointer("pointer")
+      renderer.requestRender()
+    },
+    onMouseOut() {
+      if (!item.focused) item.backgroundColor = THEME.surface
+      renderer.setMousePointer("default")
+      renderer.requestRender()
+    },
+    onMouseUp(event) {
+      if (event.button !== MouseButton.LEFT) return
+      event.stopPropagation()
+      item.focus()
+      onActivate()
+    },
+    onKeyDown(event) {
+      if (event.name !== "enter" && event.name !== "return") return
+      event.preventDefault()
+      onActivate()
+    },
+  })
+  const text = createText(renderer, { content: `› ${label}` })
+  item.add(text)
+  item.on("focused", () => {
+    if (item.isDestroyed || text.isDestroyed) return
+    text.fg = THEME.accent
+    item.backgroundColor = THEME.surfaceRaised
+    renderer.requestRender()
+  })
+  item.on("blurred", () => {
+    if (item.isDestroyed || text.isDestroyed) return
+    text.fg = THEME.text
+    item.backgroundColor = THEME.surface
+    renderer.requestRender()
+  })
+  return item
+}

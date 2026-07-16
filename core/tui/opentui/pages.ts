@@ -1,5 +1,5 @@
 import { InputRenderable, MarkdownRenderable, ScrollBoxRenderable } from "@opentui/core"
-import { createActionButton, createPanel, createText } from "./components.ts"
+import { createActionButton, createListItem, createPanel, createText } from "./components.ts"
 import { THEME } from "./theme.ts"
 
 const PAGE_CONTENT = Object.freeze({
@@ -100,7 +100,15 @@ export function createPage(renderer, route, resources) {
     }))
   }
 
-  if (route.id !== "chat") addEmptyState(renderer, page, route)
+  const records = resources.pageFixtures?.[route.id] || []
+  for (const [index, record] of records.entries()) {
+    page.add(createListItem(renderer, {
+      id: `page-record-${route.id}-${index}`,
+      label: String(record),
+    }))
+  }
+
+  if (route.id !== "chat" && records.length === 0) addEmptyState(renderer, page, route)
   if (route.id !== "chat") {
     const feedback = createText(renderer, {
       id: `page-feedback-${route.id}`,
