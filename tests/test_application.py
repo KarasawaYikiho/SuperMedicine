@@ -145,16 +145,30 @@ def test_web_workspace_delete_requires_caller_confirmation(tmp_path) -> None:
     client = TestClient(create_app(paths=paths, application=app))
     assert app.create_workspace("keep-me").ok is True
 
+    missing_body = client.delete("/api/v1/workspaces/keep-me")
     missing = client.request("DELETE", "/api/v1/workspaces/keep-me", json={})
     wrong = client.request(
         "DELETE", "/api/v1/workspaces/keep-me", json={"confirm": "wrong"}
     )
 
+    assert missing_body.status_code == 422
     assert missing.status_code == 422
     assert wrong.status_code == 422
+    assert missing_body.json()["error"]["code"] == "validation_error"
     assert missing.json()["error"]["code"] == "validation_error"
     assert wrong.json()["error"]["code"] == "validation_error"
     assert app.get_workspace("keep-me").ok is True
+
+
+def test_web_workspace_delete_caller_sends_exact_confirmation() -> None:
+    source = (
+        Path(__file__).parent.parent / "core" / "web" / "frontend" / "app.js"
+    ).read_text(encoding="utf-8")
+
+    assert (
+        'apiCall("DELETE", "/api/v1/workspaces/" + encodeURIComponent(id), '
+        "{ confirm: id })"
+    ) in source
 
 
 def test_web_workspace_delete_accepts_exact_caller_confirmation(tmp_path) -> None:

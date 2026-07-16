@@ -13,21 +13,16 @@ logger = logging.getLogger(__name__)
 
 
 def _ensure_fastapi() -> None:
-    """Ensure the optional FastAPI and Uvicorn dependencies are installed."""
     try:
         import fastapi  # noqa: F401
         import uvicorn  # noqa: F401
     except ImportError as exc:
-        raise ImportError(
-            "Web GUI requires 'fastapi' and 'uvicorn'. Install them with: pip install supermedicine[web]"
-        ) from exc
+        raise ImportError("Web GUI requires 'fastapi' and 'uvicorn'. Install them with: pip install supermedicine[web]") from exc
 
 
 def _install_web_security(app: Any, auth_token: str | None) -> None:
-    """Install shared errors, request IDs, path validation, and remote auth."""
     from urllib.parse import unquote
     from core.web.errors import APIError, api_error_response, install_api_error_handlers
-
     install_api_error_handlers(app)
 
     @app.middleware("http")
@@ -39,9 +34,8 @@ def _install_web_security(app: Any, auth_token: str | None) -> None:
         artifact_prefix = "/api/v1/self-evolution/"
         if encoded_path.startswith(artifact_prefix):
             from core.web.security import validate_artifact_id
-            artifact_id = unquote(encoded_path[len(artifact_prefix) :])
             try:
-                validate_artifact_id(artifact_id)
+                validate_artifact_id(unquote(encoded_path[len(artifact_prefix) :]))
             except APIError as exc:
                 return api_error_response(exc, request_id=request_id)
         api_path = request.url.path == "/api/v1" or request.url.path.startswith("/api/v1/")
@@ -85,7 +79,6 @@ def create_app(*, auth_token: str | None = None, shutdown_callback: Any = None, 
 
 
 def start_server(host: str = "127.0.0.1", port: int = 8000, *, reload: bool = False, auth_token_file: str | Path | None = None) -> None:
-    """Start the SuperMedicine web server."""
     _ensure_fastapi()
     import uvicorn
     from core.web.security import load_remote_auth_token
@@ -106,12 +99,10 @@ def start_server(host: str = "127.0.0.1", port: int = 8000, *, reload: bool = Fa
 
 
 def create_server_app():
-    """Create and return the FastAPI application for embedded use."""
     return create_app()
 
 
 def find_available_port(host: str = "127.0.0.1") -> int:
-    """Find an available port for the web server."""
     import socket
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         server_socket.bind((host, 0))

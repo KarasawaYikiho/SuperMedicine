@@ -362,7 +362,7 @@
     window.deleteWorkspace = async function (id) {
         if (!confirm("确定要删除工作区 '" + id + "' 吗？")) return;
         try {
-            await apiCall("DELETE", "/api/v1/workspaces/" + encodeURIComponent(id));
+            await apiCall("DELETE", "/api/v1/workspaces/" + encodeURIComponent(id), { confirm: id });
             showToast("工作区已删除", "success");
             loadWorkspaces();
             if (currentWorkspaceId === id || selectedChatWorkspace() === id) {
