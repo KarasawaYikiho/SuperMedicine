@@ -6,6 +6,7 @@ import socket
 import subprocess
 import threading
 import shutil
+import time
 from pathlib import Path
 
 import pytest
@@ -48,6 +49,15 @@ class BridgePeer:
     def close(self) -> None:
         self.reader.close()
         self.socket.close()
+
+
+def _wait_until(predicate, timeout: float = 2.0) -> bool:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if predicate():
+            return True
+        time.sleep(0.01)
+    return bool(predicate())
 
 
 @pytest.fixture
@@ -102,6 +112,24 @@ def test_invalid_json_and_wrong_token_are_rejected(bridge, payload, code) -> Non
     assert response["type"] == "error"
     assert response["error"]["code"] == code
     assert bridge.token not in json.dumps(response)
+    assert peer.reader.readline() == ""
+    peer.close()
+
+
+@pytest.mark.parametrize("constant", ["NaN", "Infinity", "-Infinity"])
+def test_nonstandard_json_constants_are_rejected(bridge, constant) -> None:
+    peer = BridgePeer(bridge)
+    peer.socket.sendall(
+        (
+            '{"version":1,"id":"bad-number","type":"request",'
+            '"method":"status","params":{"value":'
+            + constant
+            + '},"token":"'
+            + bridge.token
+            + '"}\n'
+        ).encode()
+    )
+    assert peer.receive()["error"]["code"] == "invalid_json"
     peer.close()
 
 
@@ -217,6 +245,188 @@ def test_stream_completes_with_correlated_events_and_result(tmp_path) -> None:
         server.close()
 
 
+@pytest.mark.parametrize("terminal", ["timeout", "cancelled"])
+def test_noncooperative_handler_retires_without_blocking_close(
+    tmp_path, terminal
+) -> None:
+    release = threading.Event()
+
+    def blocks_forever(_context: BridgeContext, _params: dict) -> None:
+        release.wait()
+
+    server = TUIBridgeServer(
+        _application(tmp_path),
+        handlers={"test.never": blocks_forever},
+        concurrency_limit=1,
+        handler_capacity=2,
+        request_timeout=0.08,
+        close_timeout=0.2,
+    ).start()
+    peer = BridgePeer(server)
+    try:
+        peer.send(_request("never", "test.never", token=server.token))
+        if terminal == "cancelled":
+            peer.send(
+                {
+                    **_request("never", "test.never", token=server.token),
+                    "type": "cancel",
+                }
+            )
+        response = peer.receive()
+        assert response["error"]["code"] == terminal
+        assert _wait_until(lambda: server.active_request_count == 0)
+
+        peer.send(_request("after", "status", token=server.token))
+        assert peer.receive()["type"] == "result"
+        started = time.monotonic()
+        server.close()
+        assert time.monotonic() - started < 0.5
+        assert not [
+            thread
+            for thread in threading.enumerate()
+            if thread.name.startswith("tui-bridge-")
+        ]
+        assert server.detached_handler_count == 1
+    finally:
+        release.set()
+        peer.close()
+        server.close()
+        assert _wait_until(lambda: server.detached_handler_count == 0)
+
+
+def test_detached_handler_capacity_is_bounded(tmp_path) -> None:
+    release = threading.Event()
+
+    def blocks(_context: BridgeContext, _params: dict) -> None:
+        release.wait()
+
+    server = TUIBridgeServer(
+        _application(tmp_path),
+        handlers={"test.never": blocks},
+        concurrency_limit=1,
+        handler_capacity=2,
+        request_timeout=0.05,
+    ).start()
+    peer = BridgePeer(server)
+    try:
+        for request_id in ("one", "two"):
+            peer.send(_request(request_id, "test.never", token=server.token))
+            assert peer.receive()["error"]["code"] == "timeout"
+        peer.send(_request("three", "test.never", token=server.token))
+        assert peer.receive()["error"]["code"] == "worker_capacity"
+        assert server.detached_handler_count == 2
+    finally:
+        release.set()
+        peer.close()
+        server.close()
+        assert _wait_until(lambda: server.detached_handler_count == 0)
+
+
+def test_connection_limit_and_authentication_deadline_bound_idle_clients(
+    tmp_path,
+) -> None:
+    server = TUIBridgeServer(
+        _application(tmp_path),
+        concurrency_limit=1,
+        connection_limit=1,
+        authentication_timeout=0.12,
+    ).start()
+    clients = []
+    try:
+        for _ in range(40):
+            try:
+                clients.append(socket.create_connection(server.address, timeout=0.1))
+            except OSError:
+                pass
+        max_connections = 0
+        max_readers = 0
+        deadline = time.monotonic() + 0.4
+        while time.monotonic() < deadline:
+            max_connections = max(max_connections, server.connection_count)
+            max_readers = max(
+                max_readers,
+                len(
+                    [
+                        thread
+                        for thread in threading.enumerate()
+                        if thread.name.startswith("tui-bridge-client-")
+                    ]
+                ),
+            )
+            time.sleep(0.005)
+        assert max_connections <= 1
+        assert max_readers <= 1
+        assert _wait_until(lambda: server.connection_count == 0, timeout=1)
+    finally:
+        for client in clients:
+            client.close()
+        server.close()
+
+
+def test_authenticated_idle_connection_has_read_deadline(tmp_path) -> None:
+    server = TUIBridgeServer(_application(tmp_path), idle_timeout=0.1).start()
+    peer = BridgePeer(server)
+    try:
+        peer.send(_request("status", "status", token=server.token))
+        assert peer.receive()["type"] == "result"
+        assert _wait_until(lambda: server.connection_count == 0, timeout=1)
+        assert peer.reader.readline() == ""
+    finally:
+        peer.close()
+        server.close()
+
+
+@pytest.mark.parametrize("source", ["result", "event"])
+def test_unserializable_handler_output_gets_one_terminal_internal_error(
+    tmp_path, source
+) -> None:
+    def handler(context: BridgeContext, _params: dict):
+        if source == "event":
+            context.emit("chunk", {"bad": object()})
+            return {"ignored": True}
+        return {"bad": object()}
+
+    server = TUIBridgeServer(
+        _application(tmp_path), handlers={"test.bad": handler}
+    ).start()
+    peer = BridgePeer(server)
+    try:
+        peer.send(_request("bad", "test.bad", token=server.token))
+        response = peer.receive()
+        assert response["type"] == "error"
+        assert response["error"]["code"] == "internal_error"
+        peer.socket.settimeout(0.1)
+        with pytest.raises(socket.timeout):
+            peer.socket.recv(1)
+    finally:
+        peer.close()
+        server.close()
+
+
+@pytest.mark.parametrize("source", ["result", "event"])
+def test_outbound_frame_limit_returns_bounded_error(tmp_path, source) -> None:
+    def large(context: BridgeContext, _params: dict):
+        if source == "event":
+            context.emit("chunk", "x" * 1000)
+            return "ignored"
+        return "x" * 1000
+
+    server = TUIBridgeServer(
+        _application(tmp_path),
+        handlers={"test.large": large},
+        max_frame_bytes=256,
+    ).start()
+    peer = BridgePeer(server)
+    try:
+        peer.send(_request("large", "test.large", token=server.token))
+        raw = peer.reader.readline().encode()
+        assert len(raw) <= 256
+        assert json.loads(raw)["error"]["code"] == "response_too_large"
+    finally:
+        peer.close()
+        server.close()
+
+
 def test_shutdown_closes_clients_and_leaves_no_bridge_threads(bridge) -> None:
     peer = BridgePeer(bridge)
     bridge.close()
@@ -285,7 +495,7 @@ def test_python_launcher_exception_still_closes_bridge(tmp_path, monkeypatch) ->
 
 
 @pytest.mark.skipif(not os.environ.get("PATH"), reason="runtime lookup unavailable")
-def test_bun_client_creates_workspace_in_python_temporary_root(tmp_path) -> None:
+def test_real_bun_client_python_bridge_lifecycle_integration(tmp_path) -> None:
     bun = (
         [shutil.which("bun")]
         if shutil.which("bun")
@@ -293,17 +503,67 @@ def test_bun_client_creates_workspace_in_python_temporary_root(tmp_path) -> None
     )
     if not bun[0]:
         pytest.skip("Bun is not installed")
-    server = TUIBridgeServer(_application(tmp_path))
-    server.start()
+    release = threading.Event()
+
+    def complete(context: BridgeContext, _params: dict) -> dict:
+        context.emit("progress", {"value": 0.5})
+        context.emit("chunk", {"text": "half"})
+        context.emit("completed", {"done": True})
+        return {"text": "done"}
+
+    def fail(_context: BridgeContext, _params: dict) -> None:
+        raise RuntimeError("secret exception detail")
+
+    def slow(context: BridgeContext, _params: dict) -> None:
+        while not release.wait(0.01):
+            context.raise_if_cancelled()
+
+    def never(_context: BridgeContext, _params: dict) -> None:
+        release.wait()
+
+    server = TUIBridgeServer(
+        _application(tmp_path),
+        handlers={
+            "test.complete": complete,
+            "test.fail": fail,
+            "test.slow": slow,
+            "test.never": never,
+        },
+        request_timeout=0.12,
+        concurrency_limit=2,
+        handler_capacity=4,
+    ).start()
     script = tmp_path / "bridge-client.mjs"
     bridge_module = Path(__file__).parents[1] / "core" / "tui" / "opentui" / "bridge.ts"
     script.write_text(
         "import { BridgeClient } from " + json.dumps(bridge_module.as_uri()) + ";\n"
+        "const env = process.env;\n"
+        "const bad = new BridgeClient(env.SUPERMEDICINE_TUI_BRIDGE_HOST, Number(env.SUPERMEDICINE_TUI_BRIDGE_PORT), 'wrong', 1048576, 1000);\n"
+        "await bad.connect();\n"
+        "const auth = await bad.request('status').catch(error => error.code);\n"
+        "if (auth !== 'authentication_failed') throw new Error('auth path failed');\n"
+        "bad.close();\n"
         "const client = BridgeClient.fromEnvironment();\n"
         "await client.connect();\n"
-        "const result = await client.request('workspace.create', {workspace_id:'from-bun'});\n"
-        "if (result.id !== 'from-bun') throw new Error('unexpected bridge result');\n"
-        "client.close();\n",
+        "const workspace = await client.request('workspace.create', {workspace_id:'from-bun'});\n"
+        "if (workspace.id !== 'from-bun') throw new Error('workspace path failed');\n"
+        "const events = [];\n"
+        "const streamed = await client.request('test.complete', {}, (event) => events.push(event));\n"
+        "if (streamed.text !== 'done' || events.join(',') !== 'progress,chunk,completed') throw new Error('stream path failed');\n"
+        "const failed = await client.request('test.fail').catch(error => error.code);\n"
+        "if (failed !== 'internal_error') throw new Error('error path failed');\n"
+        "const cancelled = client.startRequest('test.slow');\n"
+        "setTimeout(cancelled.cancel, 20);\n"
+        "if (await cancelled.promise.catch(error => error.code) !== 'cancelled') throw new Error('cancel path failed');\n"
+        "if (await client.request('test.never').catch(error => error.code) !== 'timeout') throw new Error('timeout path failed');\n"
+        "const interrupted = client.startRequest('test.slow');\n"
+        "setTimeout(() => client.disconnect(), 20);\n"
+        "const disconnected = await interrupted.promise.catch(error => error);\n"
+        "if (!disconnected.recoverable || disconnected.code !== 'disconnected') throw new Error('disconnect path failed');\n"
+        "await client.connect();\n"
+        "if (!(await client.request('status')).ok) throw new Error('reconnect path failed');\n"
+        "client.close();\n"
+        "process.stdout.write('REAL_BRIDGE_OK\\n');\n",
         encoding="utf-8",
     )
     try:
@@ -316,7 +576,17 @@ def test_bun_client_creates_workspace_in_python_temporary_root(tmp_path) -> None
             env=environment,
         )
         assert completed.returncode == 0, completed.stderr
+        assert completed.stdout == "REAL_BRIDGE_OK\n"
         assert _application(tmp_path).get_workspace("from-bun").ok is True
         assert server.token not in completed.stdout + completed.stderr
     finally:
+        release.set()
         server.close()
+    assert server.active_request_count == 0
+    assert server.connection_count == 0
+    assert _wait_until(lambda: server.detached_handler_count == 0)
+    assert not [
+        thread
+        for thread in threading.enumerate()
+        if thread.name.startswith("tui-bridge-")
+    ]
