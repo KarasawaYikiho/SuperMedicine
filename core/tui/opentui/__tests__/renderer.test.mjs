@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { BoxRenderable, InputRenderable, MarkdownRenderable, ScrollBoxRenderable, SelectRenderable, TextRenderable } from "@opentui/core"
+import { BoxRenderable, InputRenderable, MarkdownRenderable, ScrollBoxRenderable, TextRenderable } from "@opentui/core"
 import { createTestRenderer, MouseButtons } from "@opentui/core/testing"
 import { ROUTES } from "../state.ts"
 import { mountShell, runAutomatedMode } from "../main.ts"
@@ -64,7 +64,7 @@ test("shell uses real page scroll boxes and chat-only input", async () => {
   }
 })
 
-test("page shells use honest native list, form, and action controls", async () => {
+test("page shells use honest native markdown, form, empty state, and action controls", async () => {
   const { renderer, renderOnce, captureCharFrame } = await createTestRenderer({ width: 100, height: 30 })
   try {
     const shell = mountShell(renderer)
@@ -76,11 +76,41 @@ test("page shells use honest native list, form, and action controls", async () =
 
     shell.activateRoute("paper")
     await renderOnce()
-    expect(renderer.root.findDescendantById("page-list-paper")).toBeInstanceOf(SelectRenderable)
+    expect(renderer.root.findDescendantById("page-list-paper")).toBeUndefined()
     expect(renderer.root.findDescendantById("page-action-paper")?.focusable).toBe(true)
+    const page = renderer.root.findDescendantById("page-paper")
+    const focusableIds = []
+    const visit = (node) => {
+      if (node.focusable) focusableIds.push(node.id)
+      for (const child of node.getChildren()) visit(child)
+    }
+    visit(page)
+    expect(focusableIds).toEqual(["page-action-paper"])
     expect(captureCharFrame()).toContain("暂无论文")
     expect(captureCharFrame()).not.toMatch(/study-a|heatmap\.py|openai\s+ready|step 1/)
   } finally {
+    renderer.destroy()
+  }
+})
+
+test("chat page reuses one markdown style lifecycle across repeated route changes", async () => {
+  const { renderer, renderOnce } = await createTestRenderer({ width: 100, height: 30 })
+  const warnings = []
+  const onWarning = (warning) => warnings.push(warning)
+  process.on("warning", onWarning)
+  try {
+    const shell = mountShell(renderer)
+    await renderOnce()
+    const destroyListeners = renderer.listenerCount("destroy")
+    for (let index = 0; index < 30; index += 1) {
+      shell.activateRoute("workspace")
+      shell.activateRoute("chat")
+      await renderOnce()
+      expect(renderer.listenerCount("destroy")).toBe(destroyListeners)
+    }
+    expect(warnings.filter((warning) => warning.name === "MaxListenersExceededWarning")).toHaveLength(0)
+  } finally {
+    process.off("warning", onWarning)
     renderer.destroy()
   }
 })

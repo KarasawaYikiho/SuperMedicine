@@ -1,6 +1,7 @@
 import {
   BoxRenderable,
   InputRenderable,
+  SyntaxStyle,
   createCliRenderer,
 } from "@opentui/core"
 import { createNavigationItem, createPanel, createText } from "./components.ts"
@@ -17,6 +18,11 @@ function safeWorkspaceLabel(projectRoot) {
 export function mountShell(renderer, options = {}) {
   const state = createShellState()
   state.workspaceName = options.workspaceName || safeWorkspaceLabel(options.projectRoot)
+  const markdownSyntaxStyle = SyntaxStyle.fromStyles({
+    default: { fg: THEME.text },
+    "markup.heading": { fg: THEME.accent, bold: true },
+  })
+  renderer.once("destroy", () => markdownSyntaxStyle.destroy())
   const root = new BoxRenderable(renderer, {
     id: "supermedicine-root",
     width: "100%",
@@ -94,7 +100,7 @@ export function mountShell(renderer, options = {}) {
       composer.destroyRecursively()
       composer = null
     }
-    currentPage = createPage(renderer, route)
+    currentPage = createPage(renderer, route, { markdownSyntaxStyle })
     pageColumn.add(currentPage)
     if (route.id === "chat") {
       composer = createPanel(renderer, {

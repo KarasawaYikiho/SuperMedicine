@@ -1,4 +1,4 @@
-import { InputRenderable, MarkdownRenderable, ScrollBoxRenderable, SelectRenderable, SyntaxStyle } from "@opentui/core"
+import { InputRenderable, MarkdownRenderable, ScrollBoxRenderable } from "@opentui/core"
 import { createActionButton, createPanel, createText } from "./components.ts"
 import { THEME } from "./theme.ts"
 
@@ -18,7 +18,6 @@ const PAGE_CONTENT = Object.freeze({
   diagnose: ["尚未开始诊断", "连接业务服务后可检查运行环境与配置。"],
 })
 
-const LIST_ROUTES = new Set(["dashboard", "paper", "experience", "tool", "dialog"])
 const FORM_ROUTES = Object.freeze({
   workspace: ["工作区名称", "输入工作区名称"],
   llm: ["模型提供方", "输入提供方名称"],
@@ -54,7 +53,7 @@ function addEmptyState(renderer, page, route) {
   page.add(empty)
 }
 
-export function createPage(renderer, route) {
+export function createPage(renderer, route, resources) {
   const page = new ScrollBoxRenderable(renderer, {
     id: `page-${route.id}`,
     width: "100%",
@@ -62,25 +61,22 @@ export function createPage(renderer, route) {
     flexGrow: 1,
     scrollY: true,
     scrollX: false,
-    focusable: true,
+    focusable: false,
     border: false,
     backgroundColor: THEME.background,
     contentOptions: { flexDirection: "column", gap: 1, padding: 1 },
     verticalScrollbarOptions: { trackOptions: { backgroundColor: THEME.surfaceRaised } },
   })
+  page.focusable = false
   page.add(createText(renderer, { content: route.label, fg: THEME.accent }))
 
   if (route.id === "chat") {
-    const syntaxStyle = SyntaxStyle.fromStyles({
-      default: { fg: THEME.text },
-      "markup.heading": { fg: THEME.accent, bold: true },
-    })
     page.add(new MarkdownRenderable(renderer, {
       id: "page-markdown-chat",
       width: "100%",
       height: 5,
       content: "## 开始新的科研对话\n\n业务服务尚未连接。",
-      syntaxStyle,
+      syntaxStyle: resources.markdownSyntaxStyle,
       fg: THEME.text,
       renderNode(token) {
         if (token.type !== "heading" && token.type !== "paragraph") return undefined
@@ -89,20 +85,6 @@ export function createPage(renderer, route) {
           fg: token.type === "heading" ? THEME.accent : THEME.text,
         })
       },
-    }))
-    renderer.once("destroy", () => syntaxStyle.destroy())
-  }
-
-  if (LIST_ROUTES.has(route.id)) {
-    page.add(new SelectRenderable(renderer, {
-      id: `page-list-${route.id}`,
-      width: "100%",
-      height: 4,
-      options: [],
-      backgroundColor: THEME.surface,
-      focusedBackgroundColor: THEME.surfaceRaised,
-      textColor: THEME.text,
-      focusedTextColor: THEME.accent,
     }))
   }
 
