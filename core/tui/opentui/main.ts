@@ -8,6 +8,7 @@ import { createNavigationItem, createPanel, createText } from "./components.ts"
 import { createPage } from "./pages.ts"
 import { ROUTES, createShellState, findRoute } from "./state.ts"
 import { THEME } from "./theme.ts"
+import { BridgeClient } from "./bridge.ts"
 
 function safeWorkspaceLabel(projectRoot) {
   if (!projectRoot) return "未选择"
@@ -18,6 +19,7 @@ function safeWorkspaceLabel(projectRoot) {
 export function mountShell(renderer, options = {}) {
   const state = createShellState()
   state.workspaceName = options.workspaceName || safeWorkspaceLabel(options.projectRoot)
+  state.connectionStatus = options.connectionStatus || state.connectionStatus
   const markdownSyntaxStyle = SyntaxStyle.fromStyles({
     default: { fg: THEME.text },
     "markup.heading": { fg: THEME.accent, bold: true },
@@ -41,7 +43,8 @@ export function mountShell(renderer, options = {}) {
   header.add(createText(renderer, { content: "SuperMedicine", width: "25%", fg: THEME.accent }))
   header.add(createText(renderer, { content: `工作区: ${state.workspaceName}`, width: "30%", fg: THEME.muted }))
   header.add(createText(renderer, { content: `LLM: ${state.llmStatus}`, width: "20%", fg: THEME.muted }))
-  header.add(createText(renderer, { content: `服务: ${state.connectionStatus}`, width: "25%", fg: THEME.muted }))
+  const serviceStatus = createText(renderer, { content: `服务: ${state.connectionStatus}`, width: "25%", fg: THEME.muted })
+  header.add(serviceStatus)
   root.add(header)
 
   const body = new BoxRenderable(renderer, {
@@ -234,7 +237,12 @@ export function mountShell(renderer, options = {}) {
   })
   applyLayout()
   activateRoute("chat")
-  return { root, state, activateRoute, openMenu, closeMenu }
+  function setConnectionStatus(status) {
+    state.connectionStatus = status
+    serviceStatus.content = `服务: ${status}`
+    renderer.requestRender()
+  }
+  return { root, state, activateRoute, openMenu, closeMenu, setConnectionStatus }
 }
 
 function assertAutomation(condition, message) {
@@ -415,7 +423,18 @@ export async function runCli(argv = process.argv.slice(2)) {
   }
 
   let renderer
+  let bridge
   try {
+    let connectionStatus = "未连接"
+    if (BridgeClient.environmentConfigured()) {
+      bridge = BridgeClient.fromEnvironment()
+      try {
+        await bridge.connect()
+        connectionStatus = "已连接"
+      } catch {
+        connectionStatus = "桥断开，可重试"
+      }
+    }
     renderer = await createCliRenderer({
       exitOnCtrlC: true,
       clearOnShutdown: true,
@@ -425,7 +444,8 @@ export async function runCli(argv = process.argv.slice(2)) {
       consoleMode: "disabled",
       screenMode: "alternate-screen",
     })
-    const shell = mountShell(renderer, { projectRoot: args.projectRoot })
+    const shell = mountShell(renderer, { projectRoot: args.projectRoot, connectionStatus })
+    if (bridge) bridge.onDisconnect = () => shell.setConnectionStatus("桥断开，可重试")
     renderer.keyInput.on("keypress", (event) => {
       const name = String(event.name || "").toLowerCase()
       if (name === "q" && !renderer.currentFocusedEditor) {
@@ -440,12 +460,14 @@ export async function runCli(argv = process.argv.slice(2)) {
       }
     })
     renderer.once("destroy", () => {
+      bridge?.close()
       if (args.mode === "smoke") process.stdout.write("SUPERMEDICINE_OPENTUI_SMOKE_OK\n")
     })
     renderer.start()
     renderer.requestRender()
     if (args.mode === "smoke") setTimeout(() => renderer.destroy(), 175)
   } catch (error) {
+    bridge?.close()
     if (renderer && !renderer.isDestroyed) renderer.destroy()
     const message = error instanceof Error ? error.message : String(error)
     process.stderr.write(`SuperMedicine OpenTUI runtime failed: ${message}\n`)

@@ -9,6 +9,9 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from core.application import ApplicationFacade
+from core.runtime_paths import RuntimePaths
+from core.tui.bridge import TUIBridgeServer
 from core.tui.resources import resolve_resource
 
 
@@ -113,15 +116,65 @@ def opentui_command(
 def launch_opentui_runtime(*, project_root: Path | str | None = None) -> int:
     """Launch the interactive OpenTUI runtime and return its process code."""
 
-    command = opentui_command(project_root=project_root)
+    root = Path(project_root or Path.cwd()).resolve()
+    command = opentui_command(project_root=root)
+    bridge = _start_bridge(root)
     try:
-        completed = subprocess.run(command, cwd=Path(project_root or Path.cwd()))
+        process = subprocess.Popen(
+            command, cwd=root, env={**os.environ, **bridge.child_environment()}
+        )
+        try:
+            return int(process.wait() or 0)
+        except KeyboardInterrupt:
+            process.terminate()
+            try:
+                return int(process.wait(timeout=3) or 0)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                return int(process.wait() or 0)
     except FileNotFoundError as exc:
         raise OpenTUIRuntimeError(
             "OpenTUI runtime requires Bun to execute @opentui/core native FFI. "
             "Install Bun from https://bun.sh/ and rerun the TUI."
         ) from exc
-    return int(completed.returncode or 0)
+    finally:
+        bridge.close()
+
+
+def _start_bridge(project_root: Path) -> TUIBridgeServer:
+    paths = RuntimePaths.resolve(project_root=project_root, source_root=project_root)
+    return TUIBridgeServer(ApplicationFacade(paths)).start()
+
+
+def _run_checked_mode(
+    *,
+    project_root: Path | str | None,
+    smoke: bool = False,
+    automated_nav: bool = False,
+    full_page_interactions: bool = False,
+    timeout: float,
+) -> subprocess.CompletedProcess[str]:
+    root = Path(project_root or Path.cwd()).resolve()
+    bridge = _start_bridge(root)
+    try:
+        return subprocess.run(
+            opentui_command(
+                project_root=root,
+                smoke=smoke,
+                automated_nav=automated_nav,
+                full_page_interactions=full_page_interactions,
+            ),
+            cwd=root,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=timeout,
+            env={**os.environ, **bridge.child_environment()},
+        )
+    finally:
+        bridge.close()
 
 
 def smoke_opentui_runtime(
@@ -129,18 +182,8 @@ def smoke_opentui_runtime(
 ) -> subprocess.CompletedProcess[str]:
     """Start the OpenTUI bridge in smoke mode for external verification."""
 
-    command = opentui_command(project_root=project_root, smoke=True)
     try:
-        return subprocess.run(
-            command,
-            cwd=Path(project_root or Path.cwd()),
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=10,
-        )
+        return _run_checked_mode(project_root=project_root, smoke=True, timeout=10)
     except FileNotFoundError as exc:
         raise OpenTUIRuntimeError(
             "OpenTUI runtime requires Bun to execute @opentui/core native FFI. "
@@ -153,17 +196,9 @@ def automated_nav_opentui_runtime(
 ) -> subprocess.CompletedProcess[str]:
     """Start the OpenTUI bridge in scripted navigation mode for verification."""
 
-    command = opentui_command(project_root=project_root, automated_nav=True)
     try:
-        return subprocess.run(
-            command,
-            cwd=Path(project_root or Path.cwd()),
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=10,
+        return _run_checked_mode(
+            project_root=project_root, automated_nav=True, timeout=10
         )
     except FileNotFoundError as exc:
         raise OpenTUIRuntimeError(
@@ -177,17 +212,9 @@ def full_page_interactions_opentui_runtime(
 ) -> subprocess.CompletedProcess[str]:
     """Start the OpenTUI bridge in scripted all-page interaction mode."""
 
-    command = opentui_command(project_root=project_root, full_page_interactions=True)
     try:
-        return subprocess.run(
-            command,
-            cwd=Path(project_root or Path.cwd()),
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=15,
+        return _run_checked_mode(
+            project_root=project_root, full_page_interactions=True, timeout=15
         )
     except FileNotFoundError as exc:
         raise OpenTUIRuntimeError(
