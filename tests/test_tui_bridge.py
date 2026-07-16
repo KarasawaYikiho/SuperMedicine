@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import multiprocessing
 import os
 import socket
 import subprocess
@@ -15,6 +16,60 @@ from core.application import ApplicationFacade
 from core.runtime_paths import RuntimePaths
 from core.tui import opentui_runtime
 from core.tui.bridge import BridgeContext, TUIBridgeServer
+
+
+def _never_returns(_context: BridgeContext, _params: dict) -> None:
+    while True:
+        time.sleep(1)
+
+
+def _delayed_side_effect(_context: BridgeContext, params: dict) -> None:
+    time.sleep(float(params["delay"]))
+    Path(params["path"]).write_text("mutated", encoding="utf-8")
+
+
+def _stream_forever(context: BridgeContext, _params: dict) -> None:
+    context.emit("progress", {"value": 0.5})
+    context.emit("chunk", {"text": "half"})
+    while True:
+        time.sleep(0.01)
+        context.raise_if_cancelled()
+
+
+def _late_stream(context: BridgeContext, _params: dict) -> None:
+    time.sleep(0.08)
+    context.emit("progress", {"value": 0.5})
+    context.emit("chunk", {"text": "late"})
+    while True:
+        time.sleep(0.01)
+        context.raise_if_cancelled()
+
+
+def _complete_stream(context: BridgeContext, params: dict) -> dict:
+    context.emit("progress", {"value": 1})
+    context.emit("chunk", {"text": "done"})
+    context.emit("completed", {"done": True})
+    return {"echo": params["value"]} if "value" in params else {"text": "done"}
+
+
+def _fail_handler(_context: BridgeContext, _params: dict) -> None:
+    raise RuntimeError("secret exception detail")
+
+
+def _bad_result(_context: BridgeContext, _params: dict) -> dict:
+    return {"bad": object()}
+
+
+def _bad_event(context: BridgeContext, _params: dict) -> None:
+    context.emit("chunk", {"bad": object()})
+
+
+def _large_result(_context: BridgeContext, _params: dict) -> str:
+    return "x" * 1000
+
+
+def _large_event(context: BridgeContext, _params: dict) -> None:
+    context.emit("chunk", "x" * 1000)
 
 
 def _application(tmp_path: Path) -> ApplicationFacade:
@@ -158,19 +213,9 @@ def test_oversized_frame_and_unknown_method_are_rejected(tmp_path) -> None:
 
 
 def test_concurrency_limit_timeout_stream_events_and_cancel(tmp_path) -> None:
-    release = threading.Event()
-
-    def stream(context: BridgeContext, params: dict) -> dict:
-        context.emit("progress", {"value": 0.5})
-        context.emit("chunk", {"text": "half"})
-        while not release.wait(0.01):
-            context.raise_if_cancelled()
-        context.emit("completed", {"done": True})
-        return {"text": "done"}
-
     server = TUIBridgeServer(
         _application(tmp_path),
-        handlers={"test.stream": stream},
+        handlers={"test.stream": _stream_forever},
         concurrency_limit=1,
         request_timeout=0.12,
     )
@@ -192,14 +237,12 @@ def test_concurrency_limit_timeout_stream_events_and_cancel(tmp_path) -> None:
         assert cancelled["error"]["code"] == "cancelled"
 
     finally:
-        release.set()
         peer.close()
         server.close()
 
-    release.clear()
     server = TUIBridgeServer(
         _application(tmp_path),
-        handlers={"test.stream": stream},
+        handlers={"test.stream": _stream_forever},
         request_timeout=0.08,
     )
     server.start()
@@ -211,20 +254,13 @@ def test_concurrency_limit_timeout_stream_events_and_cancel(tmp_path) -> None:
         assert timed_out["id"] == "timeout"
         assert timed_out["error"]["code"] == "timeout"
     finally:
-        release.set()
         peer.close()
         server.close()
 
 
 def test_stream_completes_with_correlated_events_and_result(tmp_path) -> None:
-    def complete(context: BridgeContext, params: dict) -> dict:
-        context.emit("progress", {"value": 1})
-        context.emit("chunk", {"text": "done"})
-        context.emit("completed", {"done": True})
-        return {"echo": params["value"]}
-
     server = TUIBridgeServer(
-        _application(tmp_path), handlers={"test.complete": complete}
+        _application(tmp_path), handlers={"test.complete": _complete_stream}
     ).start()
     peer = BridgePeer(server)
     try:
@@ -246,19 +282,13 @@ def test_stream_completes_with_correlated_events_and_result(tmp_path) -> None:
 
 
 @pytest.mark.parametrize("terminal", ["timeout", "cancelled"])
-def test_noncooperative_handler_retires_without_blocking_close(
+def test_noncooperative_handler_is_terminated_before_terminal_and_close(
     tmp_path, terminal
 ) -> None:
-    release = threading.Event()
-
-    def blocks_forever(_context: BridgeContext, _params: dict) -> None:
-        release.wait()
-
     server = TUIBridgeServer(
         _application(tmp_path),
-        handlers={"test.never": blocks_forever},
+        handlers={"test.never": _never_returns},
         concurrency_limit=1,
-        handler_capacity=2,
         request_timeout=0.08,
         close_timeout=0.2,
     ).start()
@@ -277,7 +307,8 @@ def test_noncooperative_handler_retires_without_blocking_close(
         assert _wait_until(lambda: server.active_request_count == 0)
 
         peer.send(_request("after", "status", token=server.token))
-        assert peer.receive()["type"] == "result"
+        after = peer.receive()
+        assert after["type"] == "result", after
         started = time.monotonic()
         server.close()
         assert time.monotonic() - started < 0.5
@@ -286,40 +317,76 @@ def test_noncooperative_handler_retires_without_blocking_close(
             for thread in threading.enumerate()
             if thread.name.startswith("tui-bridge-")
         ]
-        assert server.detached_handler_count == 1
+        assert server.worker_count == 0
+        assert not [
+            process
+            for process in multiprocessing.active_children()
+            if process.name.startswith("tui-worker-")
+        ]
     finally:
-        release.set()
         peer.close()
         server.close()
-        assert _wait_until(lambda: server.detached_handler_count == 0)
 
 
-def test_detached_handler_capacity_is_bounded(tmp_path) -> None:
-    release = threading.Event()
-
-    def blocks(_context: BridgeContext, _params: dict) -> None:
-        release.wait()
-
+def test_close_terminates_an_active_noncooperative_worker(tmp_path) -> None:
     server = TUIBridgeServer(
         _application(tmp_path),
-        handlers={"test.never": blocks},
-        concurrency_limit=1,
-        handler_capacity=2,
-        request_timeout=0.05,
+        handlers={"test.never": _never_returns},
+        request_timeout=10,
+        close_timeout=0.5,
     ).start()
     peer = BridgePeer(server)
     try:
-        for request_id in ("one", "two"):
-            peer.send(_request(request_id, "test.never", token=server.token))
-            assert peer.receive()["error"]["code"] == "timeout"
-        peer.send(_request("three", "test.never", token=server.token))
-        assert peer.receive()["error"]["code"] == "worker_capacity"
-        assert server.detached_handler_count == 2
+        peer.send(_request("never", "test.never", token=server.token))
+        assert _wait_until(lambda: server.worker_count == 1)
+        started = time.monotonic()
+        server.close()
+        assert time.monotonic() - started < 1
+        assert server.worker_count == 0
+        assert server.active_request_count == 0
+        assert not [
+            process
+            for process in multiprocessing.active_children()
+            if process.name.startswith("tui-worker-")
+        ]
     finally:
-        release.set()
         peer.close()
         server.close()
-        assert _wait_until(lambda: server.detached_handler_count == 0)
+
+
+def test_cancelled_handler_cannot_apply_a_late_side_effect(tmp_path) -> None:
+    mutation = tmp_path / "late-mutation.txt"
+    server = TUIBridgeServer(
+        _application(tmp_path),
+        handlers={"test.side-effect": _delayed_side_effect},
+        request_timeout=1,
+    ).start()
+    peer = BridgePeer(server)
+    try:
+        peer.send(
+            _request(
+                "side-effect",
+                "test.side-effect",
+                {"path": str(mutation), "delay": 0.3},
+                token=server.token,
+            )
+        )
+        peer.send(
+            {
+                **_request(
+                    "side-effect", "test.side-effect", token=server.token
+                ),
+                "type": "cancel",
+            }
+        )
+        assert peer.receive()["error"]["code"] == "cancelled"
+        server.close()
+        time.sleep(0.4)
+        assert not mutation.exists()
+        assert server.worker_count == 0
+    finally:
+        peer.close()
+        server.close()
 
 
 def test_connection_limit_and_authentication_deadline_bound_idle_clients(
@@ -380,14 +447,11 @@ def test_authenticated_idle_connection_has_read_deadline(tmp_path) -> None:
 def test_unserializable_handler_output_gets_one_terminal_internal_error(
     tmp_path, source
 ) -> None:
-    def handler(context: BridgeContext, _params: dict):
-        if source == "event":
-            context.emit("chunk", {"bad": object()})
-            return {"ignored": True}
-        return {"bad": object()}
-
     server = TUIBridgeServer(
-        _application(tmp_path), handlers={"test.bad": handler}
+        _application(tmp_path),
+        handlers={
+            "test.bad": _bad_event if source == "event" else _bad_result
+        },
     ).start()
     peer = BridgePeer(server)
     try:
@@ -405,15 +469,11 @@ def test_unserializable_handler_output_gets_one_terminal_internal_error(
 
 @pytest.mark.parametrize("source", ["result", "event"])
 def test_outbound_frame_limit_returns_bounded_error(tmp_path, source) -> None:
-    def large(context: BridgeContext, _params: dict):
-        if source == "event":
-            context.emit("chunk", "x" * 1000)
-            return "ignored"
-        return "x" * 1000
-
     server = TUIBridgeServer(
         _application(tmp_path),
-        handlers={"test.large": large},
+        handlers={
+            "test.large": _large_event if source == "event" else _large_result
+        },
         max_frame_bytes=256,
     ).start()
     peer = BridgePeer(server)
@@ -503,35 +563,16 @@ def test_real_bun_client_python_bridge_lifecycle_integration(tmp_path) -> None:
     )
     if not bun[0]:
         pytest.skip("Bun is not installed")
-    release = threading.Event()
-
-    def complete(context: BridgeContext, _params: dict) -> dict:
-        context.emit("progress", {"value": 0.5})
-        context.emit("chunk", {"text": "half"})
-        context.emit("completed", {"done": True})
-        return {"text": "done"}
-
-    def fail(_context: BridgeContext, _params: dict) -> None:
-        raise RuntimeError("secret exception detail")
-
-    def slow(context: BridgeContext, _params: dict) -> None:
-        while not release.wait(0.01):
-            context.raise_if_cancelled()
-
-    def never(_context: BridgeContext, _params: dict) -> None:
-        release.wait()
-
     server = TUIBridgeServer(
         _application(tmp_path),
         handlers={
-            "test.complete": complete,
-            "test.fail": fail,
-            "test.slow": slow,
-            "test.never": never,
+            "test.complete": _complete_stream,
+            "test.fail": _fail_handler,
+            "test.slow": _stream_forever,
+            "test.never": _never_returns,
         },
         request_timeout=0.12,
         concurrency_limit=2,
-        handler_capacity=4,
     ).start()
     script = tmp_path / "bridge-client.mjs"
     bridge_module = Path(__file__).parents[1] / "core" / "tui" / "opentui" / "bridge.ts"
@@ -572,7 +613,7 @@ def test_real_bun_client_python_bridge_lifecycle_integration(tmp_path) -> None:
             [*bun, str(script)],
             capture_output=True,
             text=True,
-            timeout=10,
+            timeout=30,
             env=environment,
         )
         assert completed.returncode == 0, completed.stderr
@@ -580,13 +621,74 @@ def test_real_bun_client_python_bridge_lifecycle_integration(tmp_path) -> None:
         assert _application(tmp_path).get_workspace("from-bun").ok is True
         assert server.token not in completed.stdout + completed.stderr
     finally:
-        release.set()
         server.close()
     assert server.active_request_count == 0
     assert server.connection_count == 0
-    assert _wait_until(lambda: server.detached_handler_count == 0)
+    assert server.worker_count == 0
     assert not [
         thread
         for thread in threading.enumerate()
         if thread.name.startswith("tui-bridge-")
     ]
+
+
+@pytest.mark.skipif(not os.environ.get("PATH"), reason="runtime lookup unavailable")
+def test_real_bun_client_keeps_socket_after_late_abandoned_stream(
+    tmp_path,
+) -> None:
+    bun = (
+        [shutil.which("bun")]
+        if shutil.which("bun")
+        else [shutil.which("npx"), "--yes", "bun"]
+    )
+    if not bun[0]:
+        pytest.skip("Bun is not installed")
+    server = TUIBridgeServer(
+        _application(tmp_path),
+        handlers={"test.late": _late_stream},
+        request_timeout=4,
+    ).start()
+    original_cancel = server._cancel
+
+    def delayed_cancel(connection, request_id) -> None:
+        time.sleep(1.5)
+        original_cancel(connection, request_id)
+
+    server._cancel = delayed_cancel
+    emitted: list[str] = []
+    original_send_event = server._send_event_bytes
+
+    def record_event(active, payload) -> None:
+        emitted.append(json.loads(payload)["event"])
+        original_send_event(active, payload)
+
+    server._send_event_bytes = record_event
+    script = tmp_path / "late-bridge-client.mjs"
+    bridge_module = Path(__file__).parents[1] / "core" / "tui" / "opentui" / "bridge.ts"
+    script.write_text(
+        "import { BridgeClient } from " + json.dumps(bridge_module.as_uri()) + ";\n"
+        "const env = process.env;\n"
+        "const client = new BridgeClient(env.SUPERMEDICINE_TUI_BRIDGE_HOST, Number(env.SUPERMEDICINE_TUI_BRIDGE_PORT), env.SUPERMEDICINE_TUI_BRIDGE_TOKEN, 1048576, 10000);\n"
+        "await client.connect();\n"
+        "if (await client.request('test.late', {}, undefined, 25).catch(error => error.code) !== 'client_timeout') throw new Error('client timeout missing');\n"
+        "await Bun.sleep(1800);\n"
+        "if (!(await client.request('status')).ok) throw new Error('socket was not reusable');\n"
+        "client.close();\n"
+        "process.stdout.write('LATE_STREAM_OK\\n');\n",
+        encoding="utf-8",
+    )
+    try:
+        completed = subprocess.run(
+            [*bun, str(script)],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env={**os.environ, **server.child_environment()},
+        )
+        assert completed.returncode == 0, completed.stderr
+        assert completed.stdout == "LATE_STREAM_OK\n"
+        assert emitted == ["progress", "chunk"]
+    finally:
+        server.close()
+    assert server.worker_count == 0
+    assert server.active_request_count == 0

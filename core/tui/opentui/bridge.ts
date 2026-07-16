@@ -33,7 +33,7 @@ export class BridgeClient {
   #connectPromise?: Promise<void>
   #buffer = Buffer.alloc(0)
   #pending = new Map<string, Pending>()
-  #abandoned = new Set<string>()
+  #abandoned = new Map<string, number>()
   #requestTimeoutMs: number
   onDisconnect?: (error: BridgeError) => void
 
@@ -44,7 +44,16 @@ export class BridgeClient {
     maxFrameBytes = DEFAULT_MAX_FRAME_BYTES,
     requestTimeoutMs = 30_000,
   ) {
-    if (host !== "127.0.0.1" || !Number.isInteger(port) || port < 1 || !token || requestTimeoutMs < 1) {
+    if (
+      host !== "127.0.0.1" ||
+      !Number.isInteger(port) ||
+      port < 1 ||
+      !token ||
+      !Number.isInteger(maxFrameBytes) ||
+      maxFrameBytes < 256 ||
+      !Number.isFinite(requestTimeoutMs) ||
+      requestTimeoutMs < 1
+    ) {
       throw new BridgeError("invalid_configuration", "Invalid local bridge configuration")
     }
     this.host = host
@@ -96,17 +105,31 @@ export class BridgeClient {
     }
   }
 
-  request(method: string, params: Record<string, unknown> = {}, onEvent?: Pending["onEvent"]): Promise<any> {
-    return this.startRequest(method, params, onEvent).promise
+  request(
+    method: string,
+    params: Record<string, unknown> = {},
+    onEvent?: Pending["onEvent"],
+    timeoutMs = this.#requestTimeoutMs,
+  ): Promise<any> {
+    return this.startRequest(method, params, onEvent, timeoutMs).promise
   }
 
-  startRequest(method: string, params: Record<string, unknown> = {}, onEvent?: Pending["onEvent"]): {
+  startRequest(
+    method: string,
+    params: Record<string, unknown> = {},
+    onEvent?: Pending["onEvent"],
+    timeoutMs = this.#requestTimeoutMs,
+  ): {
     id: string
     promise: Promise<any>
     cancel: () => void
   } {
     const id = randomUUID()
     const promise = new Promise((resolve, reject) => {
+      if (!Number.isFinite(timeoutMs) || timeoutMs < 1) {
+        reject(new BridgeError("invalid_request", "Bridge request timeout is invalid"))
+        return
+      }
       if (!this.#socket || this.#socket.destroyed) {
         reject(new BridgeError("disconnected", "Python bridge is disconnected", true))
         return
@@ -115,16 +138,14 @@ export class BridgeClient {
         const pending = this.#pending.get(id)
         if (!pending) return
         this.#pending.delete(id)
-        this.#abandoned.add(id)
-        const oldest = this.#abandoned.values().next().value
-        if (this.#abandoned.size > 256 && oldest) this.#abandoned.delete(oldest)
+        this.#rememberAbandoned(id)
         try {
           this.cancel(id, method)
         } catch {
           // The timeout already rejects the request; disconnect cleanup owns the socket.
         }
         pending.reject(new BridgeError("client_timeout", "Bridge request timed out", true))
-      }, this.#requestTimeoutMs)
+      }, timeoutMs)
       this.#pending.set(id, { resolve, reject, onEvent, timer })
       try {
         this.#write({ version: VERSION, id, type: "request", method, params, token: this.#token })
@@ -142,9 +163,16 @@ export class BridgeClient {
   }
 
   disconnect(): void {
+    const socket = this.#socket
+    this.#socket = undefined
     this.#connectingSocket?.destroy()
     this.#connectingSocket = undefined
-    this.#socket?.destroy()
+    socket?.destroy()
+    this.#buffer = Buffer.alloc(0)
+    this.#abandoned.clear()
+    const error = new BridgeError("disconnected", "Python bridge disconnected", true)
+    this.#rejectAll(error)
+    this.onDisconnect?.(error)
   }
 
   close(): void {
@@ -206,7 +234,20 @@ export class BridgeClient {
     }
     const pending = this.#pending.get(frame.id)
     if (!pending) {
-      if (this.#abandoned.delete(frame.id)) return
+      const expiresAt = this.#abandoned.get(frame.id)
+      if (expiresAt && expiresAt > Date.now()) {
+        if (frame.type === "event" && ["progress", "chunk", "completed"].includes(frame.event)) return
+        if (frame.type === "result") {
+          this.#abandoned.delete(frame.id)
+          return
+        }
+        if (frame.type === "error" && typeof frame.error?.code === "string" && typeof frame.error?.message === "string") {
+          this.#abandoned.delete(frame.id)
+          return
+        }
+      } else if (expiresAt) {
+        this.#abandoned.delete(frame.id)
+      }
       this.#protocolFailure("Python bridge sent an unknown response")
       return
     }
@@ -236,6 +277,19 @@ export class BridgeClient {
   #protocolFailure(message: string): void {
     this.#socket?.destroy()
     this.#rejectAll(new BridgeError("protocol_error", message, true))
+  }
+
+  #rememberAbandoned(id: string): void {
+    const now = Date.now()
+    for (const [candidate, expiresAt] of this.#abandoned) {
+      if (expiresAt <= now) this.#abandoned.delete(candidate)
+    }
+    this.#abandoned.set(id, now + Math.max(30_000, this.#requestTimeoutMs * 4))
+    while (this.#abandoned.size > 256) {
+      const oldest = this.#abandoned.keys().next().value
+      if (typeof oldest !== "string") break
+      this.#abandoned.delete(oldest)
+    }
   }
 
   #disconnect(socket: Socket): void {

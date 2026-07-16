@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+import multiprocessing
 import os
 import sys
 from importlib import import_module
@@ -404,4 +405,5 @@ class CLI:
 from cli.parser import main  # noqa: E402
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     main()

@@ -56,6 +56,92 @@ describe("BridgeClient", () => {
     client.close()
   })
 
+  test("ignores late events through the abandoned terminal and keeps the socket healthy", async () => {
+    let request = 0
+    server = createServer((socket) => {
+      socket.on("data", (raw) => {
+        for (const line of raw.toString("utf8").trim().split("\n")) {
+          const frame = JSON.parse(line)
+          if (frame.type !== "request") continue
+          request += 1
+          if (request === 1) {
+            setTimeout(() => socket.write(`${JSON.stringify({ version: 1, id: frame.id, type: "event", event: "chunk", data: "late" })}\n`), 45)
+            setTimeout(() => socket.write(`${JSON.stringify({ version: 1, id: frame.id, type: "error", error: { code: "cancelled", message: "cancelled" } })}\n`), 55)
+          } else {
+            socket.write(`${JSON.stringify({ version: 1, id: frame.id, type: "result", result: { ok: true } })}\n`)
+          }
+        }
+      })
+    })
+    await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve))
+    const address = server.address()
+    if (!address || typeof address === "string") throw new Error("test server did not bind")
+    const client = new BridgeClient("127.0.0.1", address.port, "token", 1024, 25)
+    let disconnected = false
+    client.onDisconnect = () => { disconnected = true }
+    await client.connect()
+    expect((await client.request("slow").catch((error) => error)).code).toBe("client_timeout")
+    await Bun.sleep(80)
+    expect(await client.request("status")).toEqual({ ok: true })
+    expect(disconnected).toBe(false)
+    client.close()
+  })
+
+  test("ignores a lone late terminal response", async () => {
+    let request = 0
+    server = createServer((socket) => {
+      socket.on("data", (raw) => {
+        for (const line of raw.toString("utf8").trim().split("\n")) {
+          const frame = JSON.parse(line)
+          if (frame.type !== "request") continue
+          request += 1
+          if (request === 1) {
+            setTimeout(() => socket.write(`${JSON.stringify({ version: 1, id: frame.id, type: "result", result: "late" })}\n`), 45)
+          } else {
+            socket.write(`${JSON.stringify({ version: 1, id: frame.id, type: "result", result: { ok: true } })}\n`)
+          }
+        }
+      })
+    })
+    await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve))
+    const address = server.address()
+    if (!address || typeof address === "string") throw new Error("test server did not bind")
+    const client = new BridgeClient("127.0.0.1", address.port, "token", 1024, 25)
+    await client.connect()
+    expect((await client.request("slow").catch((error) => error)).code).toBe("client_timeout")
+    await Bun.sleep(60)
+    expect(await client.request("status")).toEqual({ ok: true })
+    client.disconnect()
+    client.close()
+  })
+
+  test("drops abandoned ids when a connection generation ends", async () => {
+    let connection = 0
+    let abandonedId = ""
+    server = createServer((socket) => {
+      connection += 1
+      socket.once("data", (raw) => {
+        const frame = JSON.parse(raw.toString("utf8").trim().split("\n")[0])
+        if (connection === 1) {
+          abandonedId = frame.id
+          return
+        }
+        socket.write(`${JSON.stringify({ version: 1, id: abandonedId, type: "result", result: "stale generation" })}\n`)
+      })
+    })
+    await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve))
+    const address = server.address()
+    if (!address || typeof address === "string") throw new Error("test server did not bind")
+    const client = new BridgeClient("127.0.0.1", address.port, "token", 1024, 25)
+    await client.connect()
+    expect((await client.request("slow").catch((error) => error)).code).toBe("client_timeout")
+    client.disconnect()
+    await Bun.sleep(5)
+    await client.connect()
+    expect((await client.request("status").catch((error) => error)).code).toBe("protocol_error")
+    client.close()
+  })
+
   test("rejects mismatched correlated responses and shares an in-flight connection", async () => {
     let connections = 0
     server = createServer((socket) => {

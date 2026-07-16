@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import hmac
 import json
+import multiprocessing
 import secrets
 import socket
 import threading
 import time
 from dataclasses import dataclass, field
+from multiprocessing.connection import Connection
 from typing import Any, Callable
 
 from core.application import AppResult, ApplicationFacade
@@ -26,6 +28,37 @@ class _OutboundTooLarge(ValueError):
     pass
 
 
+class _WorkerTerminal(RuntimeError):
+    pass
+
+
+def _encode_frame(frame: dict[str, Any], max_frame_bytes: int) -> bytes:
+    payload = (
+        json.dumps(
+            frame,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+        + "\n"
+    ).encode()
+    if len(payload) > max_frame_bytes:
+        raise _OutboundTooLarge
+    return payload
+
+
+def _fallback_frame(request_id: str, code: str, max_frame_bytes: int) -> bytes:
+    return _encode_frame(
+        {
+            "version": PROTOCOL_VERSION,
+            "id": request_id,
+            "type": "error",
+            "error": {"code": code, "message": "bridge response failed"},
+        },
+        max_frame_bytes,
+    )
+
+
 @dataclass(slots=True, eq=False)
 class _Connection:
     socket: socket.socket
@@ -40,38 +73,198 @@ class _Connection:
 class _ActiveRequest:
     request_id: str
     connection: _Connection
-    cancelled: threading.Event = field(default_factory=threading.Event)
+    cancelled: Any = field(default_factory=threading.Event)
+    process: multiprocessing.Process | None = None
+    pipe: Connection | None = None
     terminal: bool = False
     retired: bool = False
     timer: threading.Timer | None = None
     lock: threading.Lock = field(default_factory=threading.Lock)
     retire_lock: threading.Lock = field(default_factory=threading.Lock)
+    stop_lock: threading.Lock = field(default_factory=threading.Lock)
 
 
 class BridgeContext:
     """Request context used by long-running handlers for events and cancellation."""
 
-    def __init__(self, server: "TUIBridgeServer", active: _ActiveRequest) -> None:
-        self._server = server
-        self._active = active
+    def __init__(
+        self,
+        emit: Callable[[str, Any], None],
+        cancelled: Any,
+    ) -> None:
+        self._emit = emit
+        self._cancelled = cancelled
 
     def emit(self, event: str, data: Any = None) -> None:
         if event not in {"progress", "chunk", "completed"}:
             raise ValueError(f"unsupported bridge event: {event}")
         self.raise_if_cancelled()
-        self._server._send_event(self._active, event, data)
+        self._emit(event, data)
 
     def raise_if_cancelled(self) -> None:
-        if self._active.cancelled.is_set():
+        if self._cancelled.is_set():
             raise BridgeCancelled("request cancelled")
+
+
+_FACADE_METHODS = {
+    "status",
+    "workspace.list",
+    "workspace.get",
+    "workspace.create",
+    "workspace.delete",
+}
+
+
+def _call_facade(
+    application: ApplicationFacade, method: str, params: dict[str, Any]
+) -> Any:
+    if method == "status":
+        return {
+            "ok": True,
+            "workspace_count": len(application.list_workspaces().data or []),
+        }
+    operations = {
+        "workspace.list": application.list_workspaces,
+        "workspace.get": application.get_workspace,
+        "workspace.create": application.create_workspace,
+        "workspace.delete": application.delete_workspace,
+    }
+    return operations[method](**params)
+
+
+def _request_worker(
+    pipe: Connection,
+    cancelled: Any,
+    paths: Any,
+    method: str,
+    params: dict[str, Any],
+    handler: Handler | None,
+    request_id: str,
+    max_frame_bytes: int,
+) -> None:
+    """Run one request outside the bridge parent so it can be terminated safely."""
+
+    def emit(event: str, data: Any) -> None:
+        try:
+            payload = _encode_frame(
+                {
+                    "version": PROTOCOL_VERSION,
+                    "id": request_id,
+                    "type": "event",
+                    "event": event,
+                    "data": data,
+                },
+                max_frame_bytes,
+            )
+        except _OutboundTooLarge:
+            pipe.send(
+                (
+                    "terminal",
+                    _fallback_frame(
+                        request_id, "response_too_large", max_frame_bytes
+                    ),
+                )
+            )
+            raise _WorkerTerminal
+        except (TypeError, ValueError):
+            pipe.send(
+                (
+                    "terminal",
+                    _fallback_frame(request_id, "internal_error", max_frame_bytes),
+                )
+            )
+            raise _WorkerTerminal
+        pipe.send(("event", event, payload))
+
+    def terminal(frame: dict[str, Any]) -> None:
+        try:
+            payload = _encode_frame(frame, max_frame_bytes)
+        except _OutboundTooLarge:
+            payload = _fallback_frame(
+                request_id, "response_too_large", max_frame_bytes
+            )
+        except (TypeError, ValueError):
+            payload = _fallback_frame(request_id, "internal_error", max_frame_bytes)
+        pipe.send(("terminal", payload))
+
+    try:
+        context = BridgeContext(emit, cancelled)
+        pipe.send(("ready",))
+        result = (
+            handler(context, params)
+            if handler is not None
+            else _call_facade(ApplicationFacade(paths), method, params)
+        )
+        if isinstance(result, AppResult):
+            if result.ok:
+                terminal(
+                    {
+                        "version": PROTOCOL_VERSION,
+                        "id": request_id,
+                        "type": "result",
+                        "result": result.data,
+                    }
+                )
+            else:
+                error = result.error
+                terminal(
+                    {
+                        "version": PROTOCOL_VERSION,
+                        "id": request_id,
+                        "type": "error",
+                        "error": {
+                            "code": error.code if error else "internal_error",
+                            "message": error.message
+                            if error
+                            else "application operation failed",
+                            **({"details": error.details} if error and error.details is not None else {}),
+                        },
+                    }
+                )
+        else:
+            terminal(
+                {
+                    "version": PROTOCOL_VERSION,
+                    "id": request_id,
+                    "type": "result",
+                    "result": result,
+                }
+            )
+    except _WorkerTerminal:
+        pass
+    except BridgeCancelled:
+        terminal(
+            {
+                "version": PROTOCOL_VERSION,
+                "id": request_id,
+                "type": "error",
+                "error": {"code": "cancelled", "message": "request cancelled"},
+            }
+        )
+    except Exception:
+        try:
+            terminal(
+                {
+                    "version": PROTOCOL_VERSION,
+                    "id": request_id,
+                    "type": "error",
+                    "error": {
+                        "code": "internal_error",
+                        "message": "bridge handler failed",
+                    },
+                }
+            )
+        except Exception:
+            pass
+    finally:
+        pipe.close()
 
 
 class TUIBridgeServer:
     """Serve facade operations to authenticated loopback clients.
 
-    Python cannot terminate arbitrary threads safely. Timed-out non-cooperative
-    handlers are therefore detached daemon work with a separate hard capacity;
-    protocol slots and all socket service threads remain immediately reclaimable.
+    Each request runs in a spawn worker process. Cancellation, timeout, disconnect,
+    and close terminate and join that worker before exposing terminal state.
     """
 
     def __init__(
@@ -83,21 +276,17 @@ class TUIBridgeServer:
         request_timeout: float = 30.0,
         concurrency_limit: int = 8,
         connection_limit: int | None = None,
-        handler_capacity: int | None = None,
         authentication_timeout: float = 2.0,
         idle_timeout: float = 30.0,
         close_timeout: float = 2.0,
     ) -> None:
         if connection_limit is None:
             connection_limit = max(4, concurrency_limit * 2)
-        if handler_capacity is None:
-            handler_capacity = max(concurrency_limit + 1, concurrency_limit * 2)
         if (
             max_frame_bytes < 256
             or request_timeout <= 0
             or concurrency_limit < 1
             or connection_limit < 1
-            or handler_capacity < concurrency_limit
             or authentication_timeout <= 0
             or idle_timeout <= 0
             or close_timeout <= 0
@@ -109,7 +298,6 @@ class TUIBridgeServer:
         self.request_timeout = request_timeout
         self.concurrency_limit = concurrency_limit
         self.connection_limit = connection_limit
-        self.handler_capacity = handler_capacity
         self.authentication_timeout = authentication_timeout
         self.idle_timeout = idle_timeout
         self.close_timeout = close_timeout
@@ -117,14 +305,13 @@ class TUIBridgeServer:
         self._address: tuple[str, int] | None = None
         self._closing = threading.Event()
         self._service_threads: set[threading.Thread] = set()
-        self._handler_threads: set[threading.Thread] = set()
+        self._workers: set[multiprocessing.Process] = set()
         self._connections: set[_Connection] = set()
         self._active: dict[tuple[int, str], _ActiveRequest] = {}
         self._lock = threading.Lock()
         self._slots = threading.BoundedSemaphore(concurrency_limit)
-        self._handler_slots = threading.BoundedSemaphore(handler_capacity)
-        self._handlers = self._facade_handlers()
-        self._handlers.update(handlers or {})
+        self._handlers = dict(handlers or {})
+        self._mp = multiprocessing.get_context("spawn")
 
     @property
     def address(self) -> tuple[str, int]:
@@ -143,9 +330,9 @@ class TUIBridgeServer:
             return len(self._connections)
 
     @property
-    def detached_handler_count(self) -> int:
+    def worker_count(self) -> int:
         with self._lock:
-            return sum(thread.is_alive() for thread in self._handler_threads)
+            return sum(process.is_alive() for process in self._workers)
 
     def child_environment(self) -> dict[str, str]:
         host, port = self.address
@@ -180,8 +367,7 @@ class TUIBridgeServer:
             active = list(self._active.values())
             connections = list(self._connections)
         for request in active:
-            request.cancelled.set()
-            self._retire(request)
+            self._abort(request)
         for connection in connections:
             try:
                 connection.socket.shutdown(socket.SHUT_RDWR)
@@ -243,7 +429,14 @@ class TUIBridgeServer:
         try:
             while not self._closing.is_set():
                 if time.monotonic() >= deadline:
-                    break
+                    with self._lock:
+                        busy = any(
+                            connection_id == id(connection)
+                            for connection_id, _ in self._active
+                        )
+                    if not busy:
+                        break
+                    deadline = time.monotonic() + self.idle_timeout
                 try:
                     chunk = client.recv(65536)
                 except socket.timeout:
@@ -286,8 +479,7 @@ class TUIBridgeServer:
                     if connection_id == key
                 ]
             for request in requests:
-                request.cancelled.set()
-                self._retire(request)
+                self._abort(request)
             try:
                 client.close()
             except OSError:
@@ -345,74 +537,69 @@ class TUIBridgeServer:
         params: dict[str, Any],
     ) -> None:
         handler = self._handlers.get(method)
-        if handler is None:
+        if handler is None and method not in _FACADE_METHODS:
             self._error(connection, request_id, "unknown_method", "unknown method")
             return
         if not self._slots.acquire(blocking=False):
             self._error(connection, request_id, "concurrency_limit", "bridge is busy")
             return
-        if not self._handler_slots.acquire(blocking=False):
-            self._slots.release()
-            self._error(
-                connection, request_id, "worker_capacity", "bridge workers are busy"
-            )
-            return
         active = _ActiveRequest(request_id, connection)
         key = (id(connection), request_id)
         with self._lock:
             if key in self._active:
-                self._handler_slots.release()
                 self._slots.release()
                 self._error(
                     connection, request_id, "duplicate_id", "request id is active"
                 )
                 return
             self._active[key] = active
-        timer = threading.Timer(
-            self.request_timeout,
-            lambda: self._finish_error(
-                active, "timeout", "request timed out", cancel=True
+        parent_pipe, child_pipe = self._mp.Pipe(duplex=False)
+        cancelled = self._mp.Event()
+        process = self._mp.Process(
+            target=_request_worker,
+            args=(
+                child_pipe,
+                cancelled,
+                self.application.paths,
+                method,
+                params,
+                handler,
+                request_id,
+                self.max_frame_bytes,
             ),
+            name=f"tui-worker-{request_id[:12]}",
         )
-        timer.daemon = True
-        active.timer = timer
-        timer.start()
-
-        def run() -> None:
-            try:
-                result = handler(BridgeContext(self, active), params)
-                if isinstance(result, AppResult):
-                    if result.ok:
-                        self._finish(active, "result", result=result.data)
-                    else:
-                        error = result.error
-                        self._finish_error(
-                            active,
-                            error.code if error else "internal_error",
-                            error.message if error else "application operation failed",
-                            details=error.details if error else None,
-                        )
-                else:
-                    self._finish(active, "result", result=result)
-            except BridgeCancelled:
-                self._finish_error(active, "cancelled", "request cancelled")
-            except Exception:
-                self._finish_error(active, "internal_error", "bridge handler failed")
-            finally:
-                timer.cancel()
-                self._retire(active)
-                self._handler_slots.release()
-                with self._lock:
-                    self._handler_threads.discard(threading.current_thread())
-
-        thread = threading.Thread(
-            target=run,
-            name=f"tui-handler-{request_id[:12]}",
-            daemon=True,
-        )
+        active.process = process
+        active.pipe = parent_pipe
+        active.cancelled = cancelled
         with self._lock:
-            self._handler_threads.add(thread)
-        thread.start()
+            self._workers.add(process)
+        try:
+            with active.stop_lock:
+                if active.cancelled.is_set() or self._closing.is_set():
+                    started = False
+                else:
+                    process.start()
+                    started = True
+        except Exception:
+            child_pipe.close()
+            parent_pipe.close()
+            with self._lock:
+                self._workers.discard(process)
+            self._finish_error(active, "internal_error", "bridge worker failed")
+            return
+        if not started:
+            child_pipe.close()
+            parent_pipe.close()
+            with self._lock:
+                self._workers.discard(process)
+            self._abort(active)
+            return
+        child_pipe.close()
+        self._spawn_service(
+            lambda: self._monitor_worker(active),
+            f"tui-bridge-worker-{request_id[:12]}",
+        )
 
     def _cancel(self, connection: _Connection, request_id: str) -> None:
         with self._lock:
@@ -420,31 +607,116 @@ class TUIBridgeServer:
         if active is None:
             self._error(connection, request_id, "not_found", "request is not active")
             return
-        self._finish_error(active, "cancelled", "request cancelled", cancel=True)
+        self._terminate_error(active, "cancelled", "request cancelled")
 
-    def _encode(self, frame: dict[str, Any]) -> bytes:
-        payload = (
-            json.dumps(
-                frame,
-                ensure_ascii=False,
-                separators=(",", ":"),
-                allow_nan=False,
-            )
-            + "\n"
-        ).encode()
-        if len(payload) > self.max_frame_bytes:
-            raise _OutboundTooLarge
-        return payload
+    def _monitor_worker(self, active: _ActiveRequest) -> None:
+        pipe = active.pipe
+        process = active.process
+        if pipe is None or process is None:
+            return
+        try:
+            while True:
+                try:
+                    if pipe.poll(0.05):
+                        message = pipe.recv()
+                    elif process.is_alive():
+                        continue
+                    else:
+                        self._stop_worker(active)
+                        self._finish_error(
+                            active, "internal_error", "bridge worker failed"
+                        )
+                        return
+                except (EOFError, OSError):
+                    self._stop_worker(active)
+                    self._finish_error(active, "internal_error", "bridge worker failed")
+                    return
+                kind = message[0]
+                if kind == "ready":
+                    with active.lock:
+                        if active.terminal:
+                            return
+                    timer = threading.Timer(
+                        self.request_timeout,
+                        lambda: self._terminate_error(
+                            active, "timeout", "request timed out"
+                        ),
+                    )
+                    timer.daemon = True
+                    active.timer = timer
+                    timer.start()
+                    continue
+                if kind == "event":
+                    self._send_event_bytes(active, message[2])
+                    continue
+                self._stop_worker(active)
+                if kind == "terminal":
+                    self._finish_bytes(active, message[1])
+                else:
+                    self._finish_error(active, "internal_error", "bridge worker failed")
+                return
+        finally:
+            pipe.close()
 
-    def _fallback_error_bytes(self, request_id: str, code: str) -> bytes:
-        return self._encode(
+    def _stop_worker(self, active: _ActiveRequest, *, terminate: bool = False) -> None:
+        process = active.process
+        if process is None:
+            return
+        with active.stop_lock:
+            try:
+                if terminate and process.is_alive():
+                    process.terminate()
+                process.join(timeout=self.close_timeout)
+                if process.is_alive():
+                    process.kill()
+                    process.join(timeout=self.close_timeout)
+                if process.is_alive():
+                    raise RuntimeError("bridge worker did not terminate")
+            except (AssertionError, ValueError):
+                pass
+            finally:
+                if not process.is_alive():
+                    with self._lock:
+                        self._workers.discard(process)
+
+    def _abort(self, active: _ActiveRequest) -> None:
+        with active.lock:
+            if active.terminal:
+                return
+            active.terminal = True
+            active.cancelled.set()
+        self._stop_worker(active, terminate=True)
+        self._retire(active)
+
+    def _terminate_error(
+        self, active: _ActiveRequest, code: str, message: str
+    ) -> None:
+        with active.lock:
+            if active.terminal:
+                return
+            active.terminal = True
+            active.cancelled.set()
+        self._stop_worker(active, terminate=True)
+        encoded = self._prepare_terminal(
+            active,
             {
                 "version": PROTOCOL_VERSION,
-                "id": request_id,
+                "id": active.request_id,
                 "type": "error",
-                "error": {"code": code, "message": "bridge response failed"},
-            }
+                "error": {"code": code, "message": message},
+            },
         )
+        try:
+            active.connection.send_bytes(encoded)
+        except OSError:
+            pass
+        self._retire(active)
+
+    def _encode(self, frame: dict[str, Any]) -> bytes:
+        return _encode_frame(frame, self.max_frame_bytes)
+
+    def _fallback_error_bytes(self, request_id: str, code: str) -> bytes:
+        return _fallback_frame(request_id, code, self.max_frame_bytes)
 
     def _prepare_terminal(self, active: _ActiveRequest, frame: dict[str, Any]) -> bytes:
         try:
@@ -454,43 +726,28 @@ class TUIBridgeServer:
         except (TypeError, ValueError):
             return self._fallback_error_bytes(active.request_id, "internal_error")
 
-    def _send_event(self, active: _ActiveRequest, event: str, data: Any) -> None:
-        retire = False
+    def _send_event_bytes(self, active: _ActiveRequest, payload: bytes) -> None:
+        failed = False
         with active.lock:
             if active.terminal:
                 return
             try:
-                payload = self._encode(
-                    {
-                        "version": PROTOCOL_VERSION,
-                        "id": active.request_id,
-                        "type": "event",
-                        "event": event,
-                        "data": data,
-                    }
-                )
-            except _OutboundTooLarge:
-                payload = self._fallback_error_bytes(
-                    active.request_id, "response_too_large"
-                )
-                active.terminal = True
-                active.cancelled.set()
-                retire = True
-            except (TypeError, ValueError):
-                payload = self._fallback_error_bytes(
-                    active.request_id, "internal_error"
-                )
-                active.terminal = True
-                active.cancelled.set()
-                retire = True
+                active.connection.send_bytes(payload)
+            except OSError:
+                failed = True
+        if failed:
+            self._abort(active)
+
+    def _finish_bytes(self, active: _ActiveRequest, payload: bytes) -> None:
+        with active.lock:
+            if active.terminal:
+                return
+            active.terminal = True
             try:
                 active.connection.send_bytes(payload)
             except OSError:
-                active.terminal = True
                 active.cancelled.set()
-                retire = True
-        if retire:
-            self._retire(active)
+        self._retire(active)
 
     def _finish(self, active: _ActiveRequest, frame_type: str, **payload: Any) -> None:
         with active.lock:
@@ -519,10 +776,7 @@ class TUIBridgeServer:
         message: str,
         *,
         details: Any = None,
-        cancel: bool = False,
     ) -> None:
-        if cancel:
-            active.cancelled.set()
         error = {"code": code, "message": message}
         if details is not None:
             error["details"] = details
@@ -536,9 +790,9 @@ class TUIBridgeServer:
             timer = active.timer
         if timer is not None and timer is not threading.current_thread():
             timer.cancel()
+        self._slots.release()
         with self._lock:
             self._active.pop((id(active.connection), active.request_id), None)
-        self._slots.release()
 
     def _error(
         self, connection: _Connection, request_id: Any, code: str, message: str
@@ -560,19 +814,5 @@ class TUIBridgeServer:
             connection.send_bytes(payload)
         except (OSError, TypeError, ValueError, _OutboundTooLarge):
             pass
-
-    def _facade_handlers(self) -> dict[str, Handler]:
-        app = self.application
-        return {
-            "status": lambda _context, _params: {
-                "ok": True,
-                "workspace_count": len(app.list_workspaces().data or []),
-            },
-            "workspace.list": lambda _context, _params: app.list_workspaces(),
-            "workspace.get": lambda _context, params: app.get_workspace(**params),
-            "workspace.create": lambda _context, params: app.create_workspace(**params),
-            "workspace.delete": lambda _context, params: app.delete_workspace(**params),
-        }
-
 
 __all__ = ["BridgeCancelled", "BridgeContext", "TUIBridgeServer"]
