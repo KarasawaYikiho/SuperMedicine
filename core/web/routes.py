@@ -17,6 +17,23 @@ from core.web.runtime import (
     web_error,
 )
 
+
+def application_data(result: Any) -> Any:
+    """Map the application facade result without routing through the CLI."""
+    if result.ok:
+        return result.data
+    error = result.error
+    assert error is not None
+    return {
+        "status": "error",
+        "error": {
+            "code": error.code,
+            "message": error.message,
+            "details": error.details,
+            "retryable": error.retryable,
+        },
+    }
+
 logger = logging.getLogger(__name__)
 
 
@@ -61,30 +78,30 @@ def register_workspace_paper_routes(app: Any, runtime: WebRuntime) -> None:
     @app.get("/api/v1/workspaces")
     async def workspace_list() -> Any:
         """List all workspaces."""
-        return service_data(runtime.service("workspace").list())
+        return application_data(runtime.application.list_workspaces())
 
     @app.post("/api/v1/workspaces")
     async def workspace_create(request: dict[str, Any]) -> dict[str, Any]:
         """Initialize a new workspace."""
         workspace_id = request.get("id", "")
-        if not workspace_id:
-            return web_error("No workspace id provided", 400)
-        return service_data(
-            runtime.service("workspace").create(
-                workspace_id, name=request.get("name"), fail_if_exists=True
-            )
+        return application_data(
+            runtime.application.create_workspace(workspace_id, name=request.get("name"))
         )
 
     @app.get("/api/v1/workspaces/{workspace_id}")
     async def workspace_get(workspace_id: str) -> dict[str, Any]:
         """Show one workspace by id."""
-        return service_data(runtime.service("workspace").show(workspace_id))
+        return application_data(runtime.application.get_workspace(workspace_id))
 
     @app.delete("/api/v1/workspaces/{workspace_id}")
-    async def workspace_remove(workspace_id: str) -> dict[str, Any]:
+    async def workspace_remove(
+        workspace_id: str, request: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """Delete a workspace after confirmation."""
-        return service_data(
-            runtime.service("workspace").delete(workspace_id, confirm=workspace_id)
+        return application_data(
+            runtime.application.delete_workspace(
+                workspace_id, confirm=(request or {}).get("confirm")
+            )
         )
 
     # ---- Paper endpoints --------------------------------------------------
