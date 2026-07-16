@@ -1,0 +1,74 @@
+import { BoxRenderable, MouseButton, TextRenderable } from "@opentui/core"
+import { THEME } from "./theme.ts"
+
+export function createText(renderer, options) {
+  return new TextRenderable(renderer, {
+    fg: THEME.text,
+    height: 1,
+    width: "100%",
+    ...options,
+  })
+}
+
+export function createNavigationItem(renderer, route, state, activateRoute) {
+  const item = new BoxRenderable(renderer, {
+    id: `nav-${route.id}`,
+    width: "100%",
+    height: 1,
+    focusable: true,
+    backgroundColor: THEME.surface,
+    onMouseOver() {
+      state.hoveredRoute = route.id
+      item.backgroundColor = THEME.hover
+      renderer.setMousePointer("pointer")
+      renderer.requestRender()
+    },
+    onMouseOut() {
+      state.hoveredRoute = null
+      item.backgroundColor = state.currentRoute === route.id ? THEME.surfaceRaised : THEME.surface
+      renderer.setMousePointer("default")
+      renderer.requestRender()
+    },
+    onMouseUp(event) {
+      if (event.button !== MouseButton.LEFT) return
+      event.stopPropagation()
+      item.focus()
+      activateRoute(route.id)
+    },
+    onKeyDown(event) {
+      if (event.name !== "enter" && event.name !== "return") return
+      event.preventDefault()
+      activateRoute(route.id)
+    },
+  })
+  const label = createText(renderer, { id: `nav-label-${route.id}`, content: "" })
+  item.add(label)
+
+  const update = () => {
+    const active = state.currentRoute === route.id
+    label.content = `${active ? "●" : " "} ${route.symbol} ${route.label}`
+    label.fg = active ? THEME.accent : THEME.text
+    if (state.hoveredRoute !== route.id) {
+      item.backgroundColor = active ? THEME.surfaceRaised : THEME.surface
+    }
+  }
+  item.on("focused", () => {
+    if (label.isDestroyed) return
+    label.fg = THEME.accent
+    renderer.requestRender()
+  })
+  item.on("blurred", () => {
+    if (!label.isDestroyed) update()
+  })
+  update()
+  return { item, update }
+}
+
+export function createPanel(renderer, options = {}) {
+  return new BoxRenderable(renderer, {
+    border: true,
+    borderColor: THEME.border,
+    backgroundColor: THEME.surface,
+    ...options,
+  })
+}
