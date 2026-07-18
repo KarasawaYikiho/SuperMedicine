@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import re
 from pathlib import Path
 
 import yaml
@@ -76,12 +77,21 @@ def discover_tui_actions(root: Path) -> set[str]:
 
 def discover_config_environment_keys(root: Path) -> set[str]:
     keys: set[str] = set()
-    for source_path in sorted((root / "core").glob("**/*.py")):
+    source_paths = [
+        *sorted((root / "core").glob("**/*.py")),
+        *sorted((root / "cli").glob("**/*.py")),
+        root / "cli_entry.py",
+        root / "install_entry.py",
+        root / "gui_entry.py",
+    ]
+    for source_path in source_paths:
+        if not source_path.is_file():
+            continue
         tree = ast.parse(source_path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             value = _literal_text(node)
-            if value and value.startswith("SM_"):
-                keys.add(f"config_env:{value}")
+            if value:
+                keys.update(f"config_env:{match}" for match in re.findall(r"\bSM_[A-Z0-9_]+\b", value))
     return keys
 
 

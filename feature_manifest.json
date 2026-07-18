@@ -4,7 +4,7 @@
   "audit_reference": "49ac6f88264fe4e06090af39154f2a089a18d8ef",
   "baseline_relationship": "audit_reference_is_not_an_ancestor_of_implementation_baseline",
   "metrics": {
-    "feature_id_count": 141
+    "feature_id_count": 145
   },
   "features": [
     {
@@ -362,6 +362,34 @@
       "feature_id": "config_env:SM_CONFIG",
       "category": "config_env",
       "entrypoint": "config_env:SM_CONFIG",
+      "expected_result": "Preserves declared config env entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "config_env:SM_LLM_API_KEY",
+      "category": "config_env",
+      "entrypoint": "config_env:SM_LLM_API_KEY",
+      "expected_result": "Preserves declared config env entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "config_env:SM_LLM_BASE_URL",
+      "category": "config_env",
+      "entrypoint": "config_env:SM_LLM_BASE_URL",
+      "expected_result": "Preserves declared config env entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "config_env:SM_LLM_MODEL",
+      "category": "config_env",
+      "entrypoint": "config_env:SM_LLM_MODEL",
+      "expected_result": "Preserves declared config env entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "config_env:SM_LLM_PROVIDER",
+      "category": "config_env",
+      "entrypoint": "config_env:SM_LLM_PROVIDER",
       "expected_result": "Preserves declared config env entrypoint.",
       "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
     },
@@ -1010,3 +1038,4 @@
     }
   ]
 }
+

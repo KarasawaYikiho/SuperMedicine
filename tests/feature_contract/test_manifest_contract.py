@@ -49,6 +49,7 @@ def test_manifest_covers_tui_actions_and_configuration_keys(manifest: dict[str, 
     assert {
         "tui_action:show_help",
         "config_env:SM_CONFIG",
+        "config_env:SM_LLM_API_KEY",
     } <= entries
 
 
