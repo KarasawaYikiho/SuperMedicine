@@ -192,3 +192,28 @@ def test_paper_rag_service_enrichment_requires_confirmation(tmp_path):
     assert result.data["status"] == "skipped"
     assert result.data["applied_fields"] == []
     assert result.data["metadata"]["id"] == paper_id
+
+
+def test_experiment_tool_service_owns_tool_initialization_and_listing(tmp_path):
+    from core.services import ExperimentToolService
+
+    service = ExperimentToolService(tmp_path)
+    initialized = service.initialize_tools("trial-1", request_id="tool-init-1")
+    listed = service.list_tools("trial-1", request_id="tool-list-1")
+
+    assert initialized.ok is True
+    assert initialized.data["status"] == "initialized"
+    assert listed.data == {"python": [], "r": []}
+    assert listed.meta == {
+        "service": "experiment_tool",
+        "operation": "list_tools",
+    }
+
+
+def test_experiment_tool_service_invalid_language_has_stable_error(tmp_path):
+    from core.services import ExperimentToolService
+
+    result = ExperimentToolService(tmp_path).scan_tools("julia")
+
+    assert result.ok is False
+    assert result.error.code == "invalid_tool_language"

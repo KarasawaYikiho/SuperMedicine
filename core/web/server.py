@@ -15,7 +15,13 @@ import logging
 from pathlib import Path
 from typing import Any, Iterable
 
-from core.services import LLMService, PaperRAGService, ServiceResult, WorkspaceService
+from core.services import (
+    ExperimentToolService,
+    LLMService,
+    PaperRAGService,
+    ServiceResult,
+    WorkspaceService,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +89,11 @@ def create_app() -> Any:
             "paper_source_missing": 404,
             "paper_not_found": 404,
             "unsupported_paper_format": 422,
+            "invalid_tool_language": 422,
+            "invalid_tool_id": 422,
+            "invalid_tool_manifest": 422,
+            "invalid_tool_candidate": 422,
+            "tool_not_found": 404,
         }.get(code, 500)
         return _web_error(error.message if error else "Service failed", status_code)
 
@@ -403,34 +414,30 @@ def create_app() -> Any:
     @app.get("/api/v1/workspaces/{workspace_id}/tools")
     async def tool_list(workspace_id: str, language: str | None = None) -> Any:
         """List tools in a workspace."""
-        try:
-            return _get_cli().tool_list(workspace_id, language=language)
-        except Exception as exc:
-            logger.exception("tool_list error")
-            return _web_error(str(exc), 500)
+        return _service_data(
+            ExperimentToolService(Path.cwd()).list_tools(
+                workspace_id, language=language
+            )
+        )
 
     @app.post("/api/v1/workspaces/{workspace_id}/tools")
     async def tool_create(workspace_id: str, request: dict[str, Any]) -> dict[str, Any]:
         """Add tools to a workspace."""
-        try:
-            return _get_cli().tool_add(
+        return _service_data(
+            ExperimentToolService(Path.cwd()).import_tools(
                 workspace_id,
-                selections=request.get("selections"),
+                request.get("selections"),
                 language=request.get("language"),
                 overwrite=request.get("overwrite", False),
             )
-        except Exception as exc:
-            logger.exception("tool_create error")
-            return _web_error(str(exc), 500)
+        )
 
     @app.get("/api/v1/tools/scan")
     async def tool_scan(language: str | None = None) -> Any:
         """Scan for available tools."""
-        try:
-            return _get_cli().tool_scan(language=language)
-        except Exception as exc:
-            logger.exception("tool_scan error")
-            return _web_error(str(exc), 500)
+        return _service_data(
+            ExperimentToolService(Path.cwd()).scan_tools(language)
+        )
 
     # ---- LLM endpoints ---------------------------------------------------
 

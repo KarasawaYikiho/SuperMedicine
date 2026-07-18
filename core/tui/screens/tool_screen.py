@@ -10,6 +10,7 @@ from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Input, Select, Static
 
 from core.redaction import redact_sensitive
+from core.services import ExperimentToolService
 from core.tui.app import apply_status_style
 from core.tui.i18n import t
 
@@ -179,10 +180,9 @@ class ToolView(Vertical):
             )
             return
 
-        from core.workspace_tools import WorkspaceToolService
-
         try:
-            grouped = WorkspaceToolService(self._project_root).list_tools(workspace_id)
+            service = ExperimentToolService(self._project_root)
+            grouped = service.require_data(service.list_tools(workspace_id))
         except Exception as e:
             self._set_error(e)
             return
@@ -230,12 +230,9 @@ class ToolView(Vertical):
             if language_select.value != Select.BLANK
             else None
         )
-        from core.workspace_tools import WorkspaceToolService
-
         try:
-            grouped = WorkspaceToolService(self._project_root).scan_import_candidates(
-                language
-            )
+            service = ExperimentToolService(self._project_root)
+            grouped = service.require_data(service.scan_tools(language))
         except Exception as e:
             self._set_error(e)
             return
@@ -319,15 +316,17 @@ class ToolView(Vertical):
             self._confirm_self_evolution_write()
 
     def _init_tools(self) -> None:
-        workspace_path = self._get_workspace_path()
-        if not workspace_path:
+        workspace_id = self._get_selected_workspace()
+        if not workspace_id:
             self._set_status(t("paper_select_workspace"))
             return
 
-        tools_dir = workspace_path / "tools"
-        tools_dir.mkdir(parents=True, exist_ok=True)
-        (tools_dir / "python").mkdir(exist_ok=True)
-        (tools_dir / "r").mkdir(exist_ok=True)
+        try:
+            service = ExperimentToolService(self._project_root)
+            service.require_data(service.initialize_tools(workspace_id))
+        except Exception as e:
+            self._set_error(e)
+            return
         self._tool_run_empty_error_active = False
         self._tool_run_empty_error_workspace_id = None
         self._set_status(t("tool_initialized"))
@@ -356,11 +355,10 @@ class ToolView(Vertical):
             self._set_status(f"{t('error')}: 未选择候选工具。")
             return
         selection = str(table.get_row_at(table.cursor_row)[0])
-        from core.workspace_tools import WorkspaceToolService
-
         try:
-            result = WorkspaceToolService(self._project_root).import_scanned_tools(
-                workspace_id, [selection]
+            service = ExperimentToolService(self._project_root)
+            result = service.require_data(
+                service.import_tools(workspace_id, [selection])
             )
         except Exception as e:
             self._set_error(e)
@@ -368,32 +366,9 @@ class ToolView(Vertical):
         if result.get("errors"):
             self._set_status(f"{t('error')}: {result['errors'][0].get('error')}")
             return
-        if result.get("imported"):
-            self._sync_tool_import_state(
-                workspace_id,
-                list(result.get("imported") or []),
-            )
         self.app.notify(t("tool_added"))
         self._load_tools(refreshed=True)
         self._set_status(t("tool_added"))
-
-    def _sync_tool_import_state(
-        self, workspace_id: str, imported: list[dict[str, Any]]
-    ) -> None:
-        """Persist latest import so Kernel LLM tool context sees refreshed tools."""
-
-        try:
-            from core.config_center import ConfigCenter
-
-            config = ConfigCenter(self._project_root / ".supermedicine" / "config.yaml")
-            config.set_runtime_state_value("last_workspace_id", workspace_id)
-            config.record_tool_import_state(
-                workspace_id=workspace_id,
-                imported=imported,
-                save=True,
-            )
-        except Exception as exc:
-            self._set_status(f"工具导入状态同步失败：{redact_sensitive(str(exc))}")
 
     def _run_tool(self) -> None:
         table = self.query_one("#tool-table", DataTable)
@@ -417,18 +392,22 @@ class ToolView(Vertical):
         language = str(row_data[0])
         tool_id = str(row_data[1])
 
-        workspace_path = self._get_workspace_path()
-        if not workspace_path:
+        workspace_id = self._get_selected_workspace()
+        if not workspace_id:
             self._set_status(t("paper_select_workspace"))
             return
 
-        tool_dir = workspace_path / "tools" / language / tool_id
-        if not tool_dir.is_dir():
+        try:
+            service = ExperimentToolService(self._project_root)
+            tool = service.require_data(
+                service.show_tool(workspace_id, language, tool_id)
+            )
+        except Exception:
             self._set_status(f"{t('error')}: {t('tool_no_tools')}")
             return
 
         # Show tool path for user
-        self._set_status(f"{t('tool_run')}: {tool_dir}")
+        self._set_status(f"{t('tool_run')}: {tool['path']}")
 
     def _sync_self_evolution_permission_mode(
         self, *, show_status: bool = False
