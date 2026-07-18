@@ -40,7 +40,7 @@ def create_app() -> Any:
     _ensure_fastapi()
 
     from fastapi import FastAPI
-    from fastapi.responses import HTMLResponse
+    from fastapi.responses import HTMLResponse, JSONResponse
     from fastapi.staticfiles import StaticFiles
 
     app = FastAPI(
@@ -51,6 +51,13 @@ def create_app() -> Any:
 
     # ---- state -----------------------------------------------------------
     _kernel_holder: dict[str, Any] = {}
+
+    def _web_error(message: str, status_code: int) -> Any:
+        """Preserve the public error payload while using HTTP error semantics."""
+        return JSONResponse(
+            status_code=status_code,
+            content={"error": message, "status": "error"},
+        )
 
     def _get_kernel() -> Any:
         """Lazily initialise a Kernel instance (cached)."""
@@ -165,12 +172,9 @@ def create_app() -> Any:
         workspace_id = request.get("workspace_id") or None
         agent_mode = request.get("agent_mode") or None
         if not message:
-            return {"error": "No message provided", "status": "error"}
+            return _web_error("No message provided", 400)
         if agent_mode not in {None, "single", "multi"}:
-            return {
-                "error": "agent_mode must be 'single' or 'multi'",
-                "status": "error",
-            }
+            return _web_error("agent_mode must be 'single' or 'multi'", 400)
 
         try:
             result = _execute_chat_message(
@@ -179,7 +183,7 @@ def create_app() -> Any:
             return result
         except Exception as exc:
             logger.exception("Chat error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     # ---- CLI helper (lazy) ------------------------------------------------
 
@@ -199,19 +203,19 @@ def create_app() -> Any:
             return _get_cli().workspace_list()
         except Exception as exc:
             logger.exception("workspace_list error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     @app.post("/api/v1/workspaces")
     async def workspace_create(request: dict[str, Any]) -> dict[str, Any]:
         """Initialize a new workspace."""
         workspace_id = request.get("id", "")
         if not workspace_id:
-            return {"error": "No workspace id provided", "status": "error"}
+            return _web_error("No workspace id provided", 400)
         try:
             return _get_cli().workspace_init(workspace_id, name=request.get("name"))
         except Exception as exc:
             logger.exception("workspace_create error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     @app.get("/api/v1/workspaces/{workspace_id}")
     async def workspace_get(workspace_id: str) -> dict[str, Any]:
@@ -220,7 +224,7 @@ def create_app() -> Any:
             return _get_cli().workspace_show(workspace_id)
         except Exception as exc:
             logger.exception("workspace_get error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     @app.delete("/api/v1/workspaces/{workspace_id}")
     async def workspace_remove(workspace_id: str) -> dict[str, Any]:
@@ -229,7 +233,7 @@ def create_app() -> Any:
             return _get_cli().workspace_delete(workspace_id, confirm=workspace_id)
         except Exception as exc:
             logger.exception("workspace_remove error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     # ---- Paper endpoints --------------------------------------------------
 
@@ -240,14 +244,14 @@ def create_app() -> Any:
             return _get_cli().paper_list(workspace_id)
         except Exception as exc:
             logger.exception("paper_list error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     @app.post("/api/v1/workspaces/{workspace_id}/papers")
     async def paper_create(workspace_id: str, request: dict[str, Any]) -> dict[str, Any]:
         """Import a paper into a workspace."""
         source_path = request.get("source_path", "")
         if not source_path:
-            return {"error": "No source_path provided", "status": "error"}
+            return _web_error("No source_path provided", 400)
         try:
             return _get_cli().paper_import(
                 workspace_id,
@@ -258,7 +262,7 @@ def create_app() -> Any:
             )
         except Exception as exc:
             logger.exception("paper_create error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     @app.get("/api/v1/workspaces/{workspace_id}/papers/{paper_id}")
     async def paper_get(workspace_id: str, paper_id: str) -> dict[str, Any]:
@@ -267,7 +271,7 @@ def create_app() -> Any:
             return _get_cli().paper_show(workspace_id, paper_id)
         except Exception as exc:
             logger.exception("paper_get error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     @app.patch("/api/v1/workspaces/{workspace_id}/papers/{paper_id}")
     async def paper_update(workspace_id: str, paper_id: str, request: dict[str, Any]) -> dict[str, Any]:
@@ -277,7 +281,7 @@ def create_app() -> Any:
             return _get_cli().paper_edit(workspace_id, paper_id, metadata)
         except Exception as exc:
             logger.exception("paper_update error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     @app.post("/api/v1/workspaces/{workspace_id}/papers/{paper_id}/enrich")
     async def paper_enrich(workspace_id: str, paper_id: str, request: dict[str, Any]) -> dict[str, Any]:
@@ -288,7 +292,7 @@ def create_app() -> Any:
             )
         except Exception as exc:
             logger.exception("paper_enrich error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     # ---- Experience endpoints ---------------------------------------------
 
@@ -299,7 +303,7 @@ def create_app() -> Any:
             return _get_cli().experience_list(workspace_id)
         except Exception as exc:
             logger.exception("experience_list error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     @app.post("/api/v1/workspaces/{workspace_id}/experiences")
     async def experience_create(workspace_id: str, request: dict[str, Any]) -> dict[str, Any]:
@@ -308,7 +312,7 @@ def create_app() -> Any:
         title = request.get("title", "")
         summary = request.get("summary", "")
         if not all([scope, title, summary]):
-            return {"error": "scope, title, and summary are required", "status": "error"}
+            return _web_error("scope, title, and summary are required", 400)
         try:
             return _get_cli().experience_add(
                 workspace_id,
@@ -320,7 +324,7 @@ def create_app() -> Any:
             )
         except Exception as exc:
             logger.exception("experience_create error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     @app.get("/api/v1/workspaces/{workspace_id}/experiences/{experience_id}")
     async def experience_get(workspace_id: str, experience_id: str) -> dict[str, Any]:
@@ -329,21 +333,21 @@ def create_app() -> Any:
             return _get_cli().experience_view(experience_id, workspace_id)
         except Exception as exc:
             logger.exception("experience_get error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     @app.delete("/api/v1/workspaces/{workspace_id}/experiences/{experience_id}")
     async def experience_remove(workspace_id: str, experience_id: str, request: dict[str, Any]) -> dict[str, Any]:
         """Delete one experience after confirmation."""
         scope = request.get("scope", "")
         if not scope:
-            return {"error": "scope is required", "status": "error"}
+            return _web_error("scope is required", 400)
         try:
             return _get_cli().experience_delete(
                 experience_id, workspace_id, scope, confirm=experience_id
             )
         except Exception as exc:
             logger.exception("experience_remove error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     # ---- Tool endpoints ---------------------------------------------------
 
@@ -354,7 +358,7 @@ def create_app() -> Any:
             return _get_cli().tool_list(workspace_id, language=language)
         except Exception as exc:
             logger.exception("tool_list error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     @app.post("/api/v1/workspaces/{workspace_id}/tools")
     async def tool_create(workspace_id: str, request: dict[str, Any]) -> dict[str, Any]:
@@ -368,7 +372,7 @@ def create_app() -> Any:
             )
         except Exception as exc:
             logger.exception("tool_create error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     @app.get("/api/v1/tools/scan")
     async def tool_scan(language: str | None = None) -> Any:
@@ -377,7 +381,7 @@ def create_app() -> Any:
             return _get_cli().tool_scan(language=language)
         except Exception as exc:
             logger.exception("tool_scan error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     # ---- LLM endpoints ---------------------------------------------------
 
@@ -388,14 +392,14 @@ def create_app() -> Any:
             return _get_cli().llm_list()
         except Exception as exc:
             logger.exception("llm_providers error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     @app.post("/api/v1/llm/providers")
     async def llm_provider_create(request: dict[str, Any]) -> dict[str, Any]:
         """Add or update one LLM provider."""
         provider = request.get("provider") or request.get("name") or ""
         if not provider:
-            return {"error": "No provider specified", "status": "error"}
+            return _web_error("No provider specified", 400)
         try:
             return _get_cli().llm_add(
                 provider,
@@ -410,7 +414,7 @@ def create_app() -> Any:
             )
         except Exception as exc:
             logger.exception("llm_provider_create error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     @app.get("/api/v1/llm/providers/{name}")
     async def llm_provider_get(name: str) -> dict[str, Any]:
@@ -419,19 +423,19 @@ def create_app() -> Any:
             return _get_cli().llm_show(name)
         except Exception as exc:
             logger.exception("llm_provider_get error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     @app.post("/api/v1/llm/switch")
     async def llm_switch(request: dict[str, Any]) -> dict[str, Any]:
         """Switch the active LLM provider."""
         provider = request.get("provider", "")
         if not provider:
-            return {"error": "No provider specified", "status": "error"}
+            return _web_error("No provider specified", 400)
         try:
             return _get_cli().llm_switch(provider)
         except Exception as exc:
             logger.exception("llm_switch error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     # ---- Permission endpoints ---------------------------------------------
 
@@ -442,14 +446,14 @@ def create_app() -> Any:
             return _get_cli().permission_status()
         except Exception as exc:
             logger.exception("permission_status error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     @app.post("/api/v1/permissions/mode")
     async def permission_set_mode(request: dict[str, Any]) -> dict[str, Any]:
         """Set the permission mode."""
         mode = request.get("mode", "")
         if not mode:
-            return {"error": "No mode specified", "status": "error"}
+            return _web_error("No mode specified", 400)
         try:
             return _get_cli().permission_set_mode(
                 mode,
@@ -458,31 +462,31 @@ def create_app() -> Any:
             )
         except Exception as exc:
             logger.exception("permission_set_mode error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     @app.post("/api/v1/permissions/authorize")
     async def permission_authorize(request: dict[str, Any]) -> dict[str, Any]:
         """Authorize an external path."""
         path = request.get("path", "")
         if not path:
-            return {"error": "No path specified", "status": "error"}
+            return _web_error("No path specified", 400)
         try:
             return _get_cli().permission_authorize(path)
         except Exception as exc:
             logger.exception("permission_authorize error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     @app.post("/api/v1/permissions/revoke")
     async def permission_revoke(request: dict[str, Any]) -> dict[str, Any]:
         """Revoke an authorized external path."""
         path = request.get("path", "")
         if not path:
-            return {"error": "No path specified", "status": "error"}
+            return _web_error("No path specified", 400)
         try:
             return _get_cli().permission_revoke(path)
         except Exception as exc:
             logger.exception("permission_revoke error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     # ---- Log endpoints ----------------------------------------------------
 
@@ -493,7 +497,7 @@ def create_app() -> Any:
             return _get_cli().log_list()
         except Exception as exc:
             logger.exception("log_list error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     @app.get("/api/v1/logs/{name}")
     async def log_get(name: str) -> dict[str, Any]:
@@ -502,19 +506,19 @@ def create_app() -> Any:
             return _get_cli().log_show(name)
         except Exception as exc:
             logger.exception("log_get error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     @app.post("/api/v1/logs")
     async def log_create(request: dict[str, Any]) -> dict[str, Any]:
         """Write a log entry."""
         message = request.get("message", "")
         if not message:
-            return {"error": "No message provided", "status": "error"}
+            return _web_error("No message provided", 400)
         try:
             return _get_cli().log_write(message, session_id=request.get("session_id"))
         except Exception as exc:
             logger.exception("log_create error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     # ---- Experiment endpoints ---------------------------------------------
 
@@ -525,19 +529,19 @@ def create_app() -> Any:
             return _get_cli().experiment_list()
         except Exception as exc:
             logger.exception("experiment_list error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     @app.post("/api/v1/experiments")
     async def experiment_create(request: dict[str, Any]) -> dict[str, Any]:
         """Start a new experiment."""
         protocol = request.get("protocol", "")
         if not protocol:
-            return {"error": "No protocol specified", "status": "error"}
+            return _web_error("No protocol specified", 400)
         try:
             return _get_cli().experiment_start(protocol, session_id=request.get("session_id"))
         except Exception as exc:
             logger.exception("experiment_create error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     @app.post("/api/v1/experiments/{session_file}/submit")
     async def experiment_submit(session_file: str, request: dict[str, Any]) -> dict[str, Any]:
@@ -545,14 +549,14 @@ def create_app() -> Any:
         step_id = request.get("step_id", "")
         input_json = request.get("input_json", "")
         if not all([step_id, input_json]):
-            return {"error": "step_id and input_json are required", "status": "error"}
+            return _web_error("step_id and input_json are required", 400)
         try:
             return _get_cli().experiment_submit(
                 session_file, step_id, input_json, calculate=request.get("calculate", False)
             )
         except Exception as exc:
             logger.exception("experiment_submit error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     # ---- Dialog history endpoints ----------------------------------------
 
@@ -566,7 +570,7 @@ def create_app() -> Any:
             return [event.to_dict() for event in events]
         except Exception as exc:
             logger.exception("dialog_history_list error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     # ---- Self Evolution endpoints ----------------------------------------
 
@@ -596,7 +600,7 @@ def create_app() -> Any:
             return artifacts
         except Exception as exc:
             logger.exception("self_evolution_list error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     @app.post("/api/v1/self-evolution/generate")
     async def self_evolution_generate(request: dict[str, Any]) -> dict[str, Any]:
@@ -605,7 +609,7 @@ def create_app() -> Any:
         artifact_type = request.get("type", "code")
         output = request.get("output", "")
         if not all([instruction, output]):
-            return {"error": "instruction and output are required", "status": "error"}
+            return _web_error("instruction and output are required", 400)
         try:
             return _get_cli().self_evolve(
                 instruction=instruction,
@@ -615,7 +619,7 @@ def create_app() -> Any:
             )
         except Exception as exc:
             logger.exception("self_evolution_generate error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     @app.get("/api/v1/self-evolution/{artifact_id}")
     async def self_evolution_get(artifact_id: str) -> dict[str, Any]:
@@ -625,12 +629,12 @@ def create_app() -> Any:
             project_dir = _P.cwd()
             artifact_path = project_dir / "self_evolution" / f"{artifact_id}.json"
             if not artifact_path.exists():
-                return {"error": "Artifact not found", "status": "error"}
+                return _web_error("Artifact not found", 404)
             import json as _json
             return _json.loads(artifact_path.read_text(encoding="utf-8"))
         except Exception as exc:
             logger.exception("self_evolution_get error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     @app.delete("/api/v1/self-evolution/{artifact_id}")
     async def self_evolution_delete(artifact_id: str) -> dict[str, Any]:
@@ -640,12 +644,12 @@ def create_app() -> Any:
             project_dir = _P.cwd()
             artifact_path = project_dir / "self_evolution" / f"{artifact_id}.json"
             if not artifact_path.exists():
-                return {"error": "Artifact not found", "status": "error"}
+                return _web_error("Artifact not found", 404)
             artifact_path.unlink()
             return {"success": True, "message": f"Artifact {artifact_id} deleted"}
         except Exception as exc:
             logger.exception("self_evolution_delete error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     # ---- Diagnose endpoints ----------------------------------------------
 
@@ -656,7 +660,7 @@ def create_app() -> Any:
             return _get_cli().diagnose()
         except Exception as exc:
             logger.exception("diagnose_all error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     @app.get("/api/v1/diagnose/all")
     async def diagnose_all_compat() -> dict[str, Any]:
@@ -671,7 +675,7 @@ def create_app() -> Any:
             return result.get("config", {})
         except Exception as exc:
             logger.exception("diagnose_config error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     @app.get("/api/v1/diagnose/llm")
     async def diagnose_llm() -> dict[str, Any]:
@@ -681,7 +685,7 @@ def create_app() -> Any:
             return result.get("llm", {})
         except Exception as exc:
             logger.exception("diagnose_llm error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     @app.get("/api/v1/diagnose/install")
     async def diagnose_install() -> dict[str, Any]:
@@ -694,7 +698,7 @@ def create_app() -> Any:
             }
         except Exception as exc:
             logger.exception("diagnose_install error")
-            return {"error": str(exc), "status": "error"}
+            return _web_error(str(exc), 500)
 
     @app.post("/api/v1/shutdown")
     async def shutdown() -> dict[str, Any]:
