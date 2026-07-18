@@ -645,7 +645,8 @@
       "expected_result": "Provides checkpoint verification and monitoring actions.",
       "contract_test": "tests/feature_contract/test_runtime_contract.py::test_required_plugins_are_discovered",
       "required": true,
-      "default_enabled": true
+      "default_enabled": true,
+      "runtime_contract": "harness_checkpoint"
     },
     {
       "feature_id": "plugin:rag-interface",
@@ -654,7 +655,8 @@
       "expected_result": "Provides local and permission-governed retrieval actions.",
       "contract_test": "tests/feature_contract/test_runtime_contract.py::test_required_plugins_are_discovered",
       "required": true,
-      "default_enabled": true
+      "default_enabled": true,
+      "runtime_contract": "rag_local_query"
     },
     {
       "feature_id": "tui_action:command_palette",
@@ -1008,4 +1010,3 @@
     }
   ]
 }
-
