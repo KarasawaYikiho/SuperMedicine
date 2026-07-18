@@ -597,7 +597,8 @@ def test_dev_extra_runs_web_api_tests_in_release_gate(read_pyproject):
     dev_dependencies = read_pyproject["project"]["optional-dependencies"]["dev"]
 
     assert any(dep.startswith("fastapi") for dep in dev_dependencies)
-    assert any(dep.startswith("httpx2") for dep in dev_dependencies)
+    assert any(dep.startswith("httpx>=0.28.1,<1") for dep in dev_dependencies)
+    assert not any(dep.startswith("httpx2") for dep in dev_dependencies)
     assert any(dep.startswith("uvicorn") for dep in dev_dependencies)
 
 
