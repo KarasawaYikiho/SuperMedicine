@@ -41,6 +41,7 @@ class PaperImportResult:
 
     metadata: PaperMetadata
     source_path: Path | None = None
+    status: str = "imported"
     warnings: list[str] = field(default_factory=list)
     duplicate: bool = False
     duplicate_reason: str | None = None

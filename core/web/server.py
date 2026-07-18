@@ -88,6 +88,7 @@ def create_app() -> Any:
         message: str,
         *,
         workspace_id: str | None = None,
+        agent_mode: str | None = None,
         progress_callback: Any = None,
     ) -> dict[str, Any]:
         """Execute chat with the selected workspace synchronized into runtime state."""
@@ -106,6 +107,7 @@ def create_app() -> Any:
             message,
             params=params,
             progress_callback=progress_callback,
+            use_agent_chain=None if agent_mode is None else agent_mode == "multi",
         )
         if workspace_context is not None:
             metadata = result.setdefault("metadata", {})
@@ -134,7 +136,12 @@ def create_app() -> Any:
                 if plugins_dir.exists()
                 else 0
             ),
+            "required_runtime": _get_kernel().runtime_capabilities.to_dict(),
         }
+        runtime = status["required_runtime"]
+        status["ok"] = bool(runtime["harness"]["healthy"]) and bool(
+            runtime["rag"]["healthy"]
+        )
 
         # Include LLM provider info if config is available
         if config_dir.exists():
@@ -156,11 +163,19 @@ def create_app() -> Any:
         """Send a message to the Kernel and return the response."""
         message = request.get("message", "")
         workspace_id = request.get("workspace_id") or None
+        agent_mode = request.get("agent_mode") or None
         if not message:
             return {"error": "No message provided", "status": "error"}
+        if agent_mode not in {None, "single", "multi"}:
+            return {
+                "error": "agent_mode must be 'single' or 'multi'",
+                "status": "error",
+            }
 
         try:
-            result = _execute_chat_message(message, workspace_id=workspace_id)
+            result = _execute_chat_message(
+                message, workspace_id=workspace_id, agent_mode=agent_mode
+            )
             return result
         except Exception as exc:
             logger.exception("Chat error")

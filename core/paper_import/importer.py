@@ -19,6 +19,7 @@ from core.paper_import.models import (
     PaperMetadata,
 )
 from core.path_safety import _is_relative_to, validate_path_in_project_root
+from core.rag_service import RAGService
 from core.serialization import json_ready
 from core.time_utils import utc_now_datetime
 from core.workspace import WorkspaceInfo, WorkspaceManager
@@ -192,6 +193,38 @@ class PaperImporter:
             + "\n",
             encoding="utf-8",
         )
+        import_status = "imported"
+        import_warnings: list[str] = []
+        if extension in {".md", ".txt", ".pdf"}:
+            try:
+                page_texts = None
+                text = source_bytes.decode("utf-8") if extension != ".pdf" else ""
+                if extension == ".pdf":
+                    from pypdf import PdfReader
+
+                    reader = PdfReader(stored_path)
+                    page_texts = [
+                        (page_number, page.extract_text() or "")
+                        for page_number, page in enumerate(reader.pages, start=1)
+                    ]
+                    if not any(page_text.strip() for _, page_text in page_texts):
+                        import_status = "ocr_required"
+                        import_warnings.append(
+                            "ocr_required: PDF contains no extractable text"
+                        )
+                        page_texts = None
+                if import_status != "ocr_required":
+                    RAGService.index_workspace_document(
+                        workspace.path,
+                        text=text,
+                        document_id=paper_metadata.id or sha256,
+                        source_path=stored_path,
+                        title=paper_metadata.title,
+                        page_texts=page_texts,
+                    )
+            except Exception:
+                import_status = "imported_with_index_error"
+                import_warnings.append("rag_index_failed: retry paper indexing")
 
         log_record = {
             "event": "paper_imported",
@@ -201,6 +234,7 @@ class PaperImporter:
             "source_path": source,
             "stored_path": stored_path,
             "metadata_path": metadata_path,
+            "index_status": import_status,
         }
         with import_log_path.open("a", encoding="utf-8") as log_file:
             log_file.write(
@@ -208,7 +242,12 @@ class PaperImporter:
                 + "\n"
             )
 
-        return PaperImportResult(metadata=paper_metadata, source_path=source)
+        return PaperImportResult(
+            metadata=paper_metadata,
+            source_path=source,
+            status=import_status,
+            warnings=import_warnings,
+        )
 
     import_paper = import_file
 
@@ -261,6 +300,24 @@ class PaperImporter:
         metadata.updated_at = utc_now_datetime()
         self._write_metadata(path, metadata)
         return metadata
+
+    def delete_paper(self, workspace_id: str, paper_id: str) -> dict[str, Any]:
+        """Delete one imported paper and synchronously remove its RAG chunks."""
+        workspace = self.workspace_manager.get_workspace(workspace_id)
+        metadata_path = self._metadata_path_for_paper(workspace_id, paper_id)
+        if not metadata_path.is_file():
+            raise MissingPaperSourceError(f"Paper metadata not found: {paper_id}")
+        metadata = self._load_metadata(metadata_path)
+        removed_chunks = RAGService.remove_workspace_document(workspace.path, paper_id)
+        stored_path = metadata.stored_path
+        if stored_path is not None and stored_path.is_file():
+            stored_path.unlink()
+        metadata_path.unlink()
+        return {
+            "status": "deleted",
+            "paper_id": paper_id,
+            "rag_chunks_removed": removed_chunks,
+        }
 
     def _metadata_path_for_paper(self, workspace_id: str, paper_id: str) -> Path:
         workspace = self.workspace_manager.get_workspace(workspace_id)

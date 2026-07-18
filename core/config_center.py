@@ -52,6 +52,26 @@ DEFAULT_FILE_ACCESS_CONFIG: dict[str, Any] = {
 }
 
 
+DEFAULT_RAG_CONFIG: dict[str, Any] = {
+    "provider": "local",
+    "local_backend": "lexical",
+    "top_k": 6,
+    "min_score": 0.05,
+    "external_provider": "pubmed",
+    "external_fallback": "local_only",
+    "chunk_size": 1200,
+    "chunk_overlap": 150,
+    "max_context_chars": 12000,
+}
+
+
+DEFAULT_AGENTS_CONFIG: dict[str, Any] = {
+    "mode": "single",
+    "max_steps": 4,
+    "max_retries": 1,
+}
+
+
 DEFAULT_RUNTIME_STATE_CONFIG: dict[str, Any] = {
     "current_view": "chat",
     "selected_experiment_protocol": "",
@@ -225,6 +245,21 @@ class ConfigCenter:
         if not isinstance(llm_config, dict):
             return {}
         return llm_config
+
+    def get_rag_config(self) -> dict[str, Any]:
+        """Return mandatory local-first RAG settings without an enable switch."""
+        return self._merged_default_section("rag", DEFAULT_RAG_CONFIG)
+
+    def get_agents_config(self) -> dict[str, Any]:
+        """Return the optional agent executor settings; multi is opt-in."""
+        config = self._merged_default_section("agents", DEFAULT_AGENTS_CONFIG)
+        mode = str(config.get("mode", "single")).lower()
+        if mode not in {"single", "multi"}:
+            raise ValueError("agents.mode must be 'single' or 'multi'")
+        config["mode"] = mode
+        config["max_steps"] = max(1, int(config.get("max_steps", 4)))
+        config["max_retries"] = max(0, int(config.get("max_retries", 1)))
+        return config
 
     def get_experiment_guide_config(self) -> dict[str, Any]:
         """获取实验引导配置，缺失用户配置时返回安全默认值。"""

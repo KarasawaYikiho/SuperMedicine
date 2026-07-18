@@ -19,6 +19,8 @@ from core.workspace import WorkspaceNotFoundError
 from permission.audit import AuditLogger
 from permission.engine import PermissionEngine
 from permission.policy import ensure_default_policy
+from plugins.rag.local_provider import LocalRAGProvider
+from core.rag_service import RAGService
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -655,3 +657,114 @@ def test_import_propagates_missing_workspace_without_creating_workspace_or_parti
         PaperImporter(manager).import_paper("missing-workspace-study", source)
 
     assert not missing_workspace_path.exists()
+
+
+def test_markdown_import_is_added_to_the_workspace_local_rag_index(tmp_path):
+    manager = WorkspaceManager(tmp_path)
+    workspace = manager.initialize_workspace("rag-paper-study")
+    source = tmp_path / "evidence.md"
+    source.write_text("# Hypertension evidence\nLifestyle treatment is supported.", encoding="utf-8")
+
+    PaperImporter(manager).import_paper(workspace.id, source)
+
+    result = LocalRAGProvider(
+        workspace.path / ".supermedicine" / "rag" / "local"
+    ).query("hypertension")
+    assert result["items"][0]["source"] == "paper_import"
+
+
+def test_pdf_import_indexes_extractable_text_with_page_number(tmp_path):
+    from pypdf import PdfWriter
+    from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
+
+    manager = WorkspaceManager(tmp_path)
+    workspace = manager.initialize_workspace("pdf-rag-study")
+    source = tmp_path / "evidence.pdf"
+    writer = PdfWriter()
+    page = writer.add_blank_page(width=612, height=792)
+    font = DictionaryObject(
+        {
+            NameObject("/Type"): NameObject("/Font"),
+            NameObject("/Subtype"): NameObject("/Type1"),
+            NameObject("/BaseFont"): NameObject("/Helvetica"),
+        }
+    )
+    page[NameObject("/Resources")] = DictionaryObject(
+        {
+            NameObject("/Font"): DictionaryObject(
+                {NameObject("/F1"): writer._add_object(font)}
+            )
+        }
+    )
+    content = DecodedStreamObject()
+    content.set_data(
+        b"BT /F1 12 Tf 72 720 Td (Hypertension ACEI evidence from a PDF page) Tj ET"
+    )
+    page[NameObject("/Contents")] = writer._add_object(content)
+    with source.open("wb") as output:
+        writer.write(output)
+
+    result = PaperImporter(manager).import_paper(workspace.id, source)
+    items = LocalRAGProvider(
+        workspace.path / ".supermedicine" / "rag" / "local"
+    ).query("hypertension ACEI")["items"]
+
+    assert result.status == "imported"
+    assert items[0]["page"] == 1
+    assert items[0]["document_id"] == result.metadata.id
+
+
+def test_blank_pdf_import_reports_ocr_required_without_claiming_indexed(tmp_path):
+    from pypdf import PdfWriter
+
+    manager = WorkspaceManager(tmp_path)
+    workspace = manager.initialize_workspace("ocr-study")
+    source = tmp_path / "scan.pdf"
+    writer = PdfWriter()
+    writer.add_blank_page(width=300, height=300)
+    with source.open("wb") as output:
+        writer.write(output)
+
+    result = PaperImporter(manager).import_paper(workspace.id, source)
+
+    assert result.status == "ocr_required"
+    assert result.warnings == ["ocr_required: PDF contains no extractable text"]
+    index_file = workspace.path / ".supermedicine" / "rag" / "local" / "documents.json"
+    assert not index_file.exists()
+
+
+def test_paper_delete_removes_original_metadata_and_rag_chunks(tmp_path):
+    manager = WorkspaceManager(tmp_path)
+    workspace = manager.initialize_workspace("delete-rag-paper")
+    source = tmp_path / "evidence.md"
+    source.write_text("Unique thrombolysis evidence", encoding="utf-8")
+    importer = PaperImporter(manager)
+    imported = importer.import_paper(workspace.id, source)
+
+    deleted = importer.delete_paper(workspace.id, imported.metadata.id)
+
+    assert deleted["status"] == "deleted"
+    assert not imported.metadata.stored_path.exists()
+    assert LocalRAGProvider(
+        workspace.path / ".supermedicine" / "rag" / "local"
+    ).query("thrombolysis")["items"] == []
+
+
+def test_import_preserves_copied_paper_and_reports_retryable_index_failure(
+    tmp_path, monkeypatch
+):
+    manager = WorkspaceManager(tmp_path)
+    workspace = manager.initialize_workspace("rag-index-failure-study")
+    source = tmp_path / "evidence.md"
+    source.write_text("# Evidence\nImport must survive index failure.", encoding="utf-8")
+
+    def fail_index(*args, **kwargs):
+        raise OSError("index unavailable")
+
+    monkeypatch.setattr(RAGService, "index_workspace_document", fail_index)
+
+    result = PaperImporter(manager).import_paper(workspace.id, source)
+
+    assert result.status == "imported_with_index_error"
+    assert result.metadata.stored_path.is_file()
+    assert result.warnings == ["rag_index_failed: retry paper indexing"]

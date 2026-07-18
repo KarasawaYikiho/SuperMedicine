@@ -30,6 +30,13 @@ reading will not show.
 | `core/path_safety.py` | Path validation helpers. |
 | `core/log_report*.py` | Local log report storage and rendering. |
 | `core/operation_guard.py` | Guardrails for dangerous operations. |
+| `core/runtime_capabilities.py` | Required Harness/RAG manifest, entry, action, storage, and disable-policy validation. |
+| `core/runtime_pipeline.py` | UUID Harness runs, ordered checkpoints, performance recording, and unique finalization. |
+| `core/rag_service.py` | Task classification, local-first retrieval, PubMed degradation, source budgeting, and workspace paper indexing. |
+
+`core/kernel.py::Kernel.execute_task` is the sole formal execution envelope for
+single/multi-agent, plugin, and LLM paths. CLI, TUI, and Web read the same
+`RuntimeCapabilities` health snapshot.
 
 ## LLM and Paper Flow
 

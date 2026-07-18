@@ -1525,6 +1525,9 @@ def test_tui_theme_layout_and_status_text_are_testable_without_terminal(tmp_path
     assert "#sidebar" in Path(app.CSS_PATH).read_text(encoding="utf-8")
 
     idle_status = app.status_text("chat")
+    assert "Harness" in idle_status.center
+    assert "RAG" in idle_status.center
+    assert "Agents single" in idle_status.center
     assert idle_status.left.startswith("📁 0 工作区")
     assert "🔌 0 插件" in idle_status.center
     assert "LLM 未就绪" in idle_status.center

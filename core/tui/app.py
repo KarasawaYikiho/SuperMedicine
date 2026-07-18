@@ -406,7 +406,13 @@ class SuperMedicineTUI(App[Any]):
         )
         layout_state = self._layout_status_label()
         left = f"📁 {self._workspace_count()} {t('status_workspaces')}"
-        center = f"🔌 {self._plugin_count()} {t('status_plugins')}  |  {self._llm_status_label()}  |  {self._permission_status_label()}  |  {task_state}"
+        from cli_entry import required_runtime_snapshot
+
+        runtime = required_runtime_snapshot(self.project_root)
+        harness_label = "Harness ✓" if runtime["harness"]["healthy"] else "Harness ✗"
+        rag_label = "RAG ✓" if runtime["rag"]["healthy"] else "RAG ✗"
+        agents_label = f"Agents {runtime['agents']['mode']}"
+        center = f"🔌 {self._plugin_count()} {t('status_plugins')}  |  {harness_label}  |  {rag_label}  |  {agents_label}  |  {self._llm_status_label()}  |  {self._permission_status_label()}  |  {task_state}"
         right = f"{t('layout_current_view')}：{self.view_title_text(current_view)}  |  {t('layout_mode')}：{layout_state}  |  SuperMedicine {self._package_version()}"
         focus = f"{t('layout_focus')}：{t('status_focus_input')}"
         return ShellStatusText(

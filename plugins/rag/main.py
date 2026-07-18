@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from tempfile import gettempdir
 from typing import Any
 
 from plugins.base_plugin import plugin_result
@@ -41,24 +40,6 @@ ACTION_CONTRACTS: dict[str, dict[str, Any]] = {
         "output_fields": ["key", "data", "found"],
     },
 }
-
-DEFAULT_DOCUMENTS: list[dict[str, Any]] = [
-    {
-        "id": "rag-default-1",
-        "title": "Hypertension and diabetes risk",
-        "source": "rag-interface-default-local-index",
-        "text": "hypertension diabetes cardiovascular risk prevention",
-        "metadata": {"fixture": True, "topic": "cardiovascular"},
-    },
-    {
-        "id": "rag-default-2",
-        "title": "Oncology immunotherapy overview",
-        "source": "rag-interface-default-local-index",
-        "text": "oncology cancer immunotherapy checkpoint treatment",
-        "metadata": {"fixture": True, "topic": "oncology"},
-    },
-]
-
 
 def execute(
     action: str,
@@ -126,7 +107,7 @@ def _execute_query(
 
     if provider_name in {"local", "local-tfidf"}:
         local_provider = LocalRAGProvider(_storage_dir(params))
-        documents = params.get("documents", DEFAULT_DOCUMENTS)
+        documents = params.get("documents")
         _seed_local_documents(local_provider, documents)
         return local_provider.query(
             query, top_k=top_k, scope=str(params.get("scope", "literature"))
@@ -190,7 +171,7 @@ def _base_metadata(context: dict[str, Any]) -> dict[str, Any]:
 def _storage_dir(params: dict[str, Any]) -> Path:
     storage_dir = params.get("storage_dir")
     if storage_dir is None:
-        return Path(gettempdir()) / "supermedicine-rag-interface"
+        return Path(".supermedicine") / "rag" / "local"
     if not isinstance(storage_dir, (str, Path)):
         raise ValueError("storage_dir must be a path string")
     return Path(storage_dir)
@@ -235,7 +216,7 @@ def _provider_config(params: dict[str, Any]) -> RAGProviderConfig:
 
 
 def _records_from_params(params: dict[str, Any]) -> list[dict[str, Any]]:
-    records = params.get("records", params.get("documents", DEFAULT_DOCUMENTS))
+    records = params.get("records", params.get("documents", []))
     if not isinstance(records, list):
         raise ValueError("records must be a list")
     normalized: list[dict[str, Any]] = []

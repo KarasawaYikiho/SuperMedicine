@@ -154,6 +154,11 @@ class TestPluginRegistry:
         r.discover()
 
         denied = r.get("secured-plugin").execute("demo.action", {"ok": True})
+        monkeypatch.setenv("SUPERMEDICINE_ALLOW_PLUGIN_DIRECT_EXECUTION", "true")
+        env_denied = r.get("secured-plugin").execute("demo.action", {"ok": True})
+        param_denied = r.get("secured-plugin").execute(
+            "demo.action", {"ok": True}, {"allow_direct_execution": True}
+        )
         allowed = r.get("secured-plugin").execute(
             "demo.action",
             {"ok": True},
@@ -166,6 +171,8 @@ class TestPluginRegistry:
         )
 
         assert denied["status"] == "denied"
+        assert env_denied["status"] == "denied"
+        assert param_denied["status"] == "denied"
         assert allowed["status"] == "success"
 
     def test_python_entry_missing_execute_returns_plugin_error(self, tmp_path):
@@ -280,6 +287,7 @@ class TestPluginRegistry:
         assert meta is not None
         assert meta.name in [item.name for item in metas]
         assert {item["id"] for item in meta.provides} == {
+            "harness.runtime.health",
             "harness.integration.checkpoint",
             "harness.integration.checkpoint_all",
             "harness.monitor.permission_audit",

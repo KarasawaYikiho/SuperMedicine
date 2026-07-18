@@ -200,7 +200,7 @@ class TestIntegration:
 
         kernel = Kernel(
             config_path=config_path,
-            plugins_dir=tmp_path / "plugins",
+            plugins_dir="plugins",
             policies_dir=policies_dir,
         )
         context = kernel._llm_runtime_context()
@@ -345,6 +345,9 @@ class TestIntegration:
 
         assert result["ok"] is True
         assert result["stage"] == "diagnose"
+        assert result["required_runtime"]["harness"]["required"] is True
+        assert result["required_runtime"]["rag"]["disable_supported"] is False
+        assert result["required_runtime"]["agents"]["mode"] == "single"
         assert result["config"]["exists"] is True
         assert result["config"]["load_error"] == ""
         assert result["llm"]["ok"] is True
@@ -533,7 +536,7 @@ class TestIntegration:
         )
         kernel = Kernel(
             config_path=tmp_path / "config.yaml",
-            plugins_dir=tmp_path / "plugins",
+            plugins_dir="plugins",
             policies_dir=tmp_path / "policies",
         )
         assert kernel is not None
@@ -719,7 +722,7 @@ class TestIntegration:
 
         kernel = Kernel(
             config_path=config_path,
-            plugins_dir=tmp_path / "plugins",
+            plugins_dir="plugins",
             policies_dir=policies_dir,
         )
         context = kernel._llm_runtime_context()

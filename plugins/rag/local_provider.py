@@ -1,12 +1,15 @@
-"""RAG 本地实现 — 基于 TF-IDF 的检索和外部向量库契约后端。"""
+"""RAG 本地实现 — 基于 BM25 的检索和外部向量库契约后端。"""
 
 from __future__ import annotations
 
 import json
 import math
 import re
+from hashlib import sha256
 from collections import Counter
+from datetime import datetime, timezone
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from typing import Any
 
 from .interface import (
@@ -23,7 +26,7 @@ from .interface import (
 class LocalRAGProvider(RAGProvider):
     """基于本地文件的 RAG Provider"""
 
-    provider_name = "local-tfidf"
+    provider_name = "local-bm25"
     _SAFE_CONTEXT_KEY = re.compile(r"^[A-Za-z0-9_.-]+$")
 
     def __init__(self, storage_dir: Path):
@@ -41,19 +44,94 @@ class LocalRAGProvider(RAGProvider):
                 self._documents = json.load(f)
 
     def _save_index(self) -> None:
-        with open(self._index_file, "w", encoding="utf-8") as f:
-            json.dump(self._documents, f, ensure_ascii=False, indent=2)
+        with NamedTemporaryFile(
+            "w", encoding="utf-8", dir=self._storage_dir, delete=False
+        ) as temporary:
+            json.dump(self._documents, temporary, ensure_ascii=False, indent=2)
+            temporary.flush()
+            temporary_path = Path(temporary.name)
+        temporary_path.replace(self._index_file)
 
     def add_document(self, text: str, metadata: dict[str, Any] | None = None) -> None:
+        content_hash = sha256(text.encode("utf-8")).hexdigest()
+        if any(
+            document.get("content_hash") == content_hash
+            or (
+                "content_hash" not in document
+                and document.get("text") == text
+            )
+            for document in self._documents
+        ):
+            return
         """添加文档到索引"""
+        metadata = dict(metadata or {})
+        document_id = str(metadata.get("document_id") or metadata.get("id") or content_hash)
+        metadata.setdefault("document_id", document_id)
+        metadata.setdefault("chunk_id", f"{document_id}:0")
+        metadata.setdefault("source_type", "local")
+        metadata.setdefault("source_path", "")
+        metadata.setdefault("page", None)
+        metadata.setdefault("section", "")
+        metadata.setdefault("created_at", datetime.now(timezone.utc).isoformat())
         doc = {
             "id": len(self._documents),
             "text": text,
-            "metadata": metadata or {},
+            "metadata": metadata,
             "tokens": self._tokenize(text),
+            "content_hash": content_hash,
         }
         self._documents.append(doc)
         self._save_index()
+
+    def remove_document(self, document_id: str) -> int:
+        """Remove every chunk belonging to one logical document."""
+        before = len(self._documents)
+        self._documents = [
+            document
+            for document in self._documents
+            if str(document.get("metadata", {}).get("document_id")) != document_id
+        ]
+        removed = before - len(self._documents)
+        if removed:
+            self._save_index()
+        return removed
+
+    def replace_document(
+        self,
+        document_id: str,
+        chunks: list[tuple[str, dict[str, Any]]],
+    ) -> None:
+        """Atomically replace all indexed chunks for a logical document."""
+        original = list(self._documents)
+        self._documents = [
+            document
+            for document in self._documents
+            if str(document.get("metadata", {}).get("document_id")) != document_id
+        ]
+        try:
+            for text, metadata in chunks:
+                values = dict(metadata)
+                values["document_id"] = document_id
+                content_hash = sha256(text.encode("utf-8")).hexdigest()
+                values.setdefault("chunk_id", f"{document_id}:{len(self._documents)}")
+                values.setdefault("source_type", "local")
+                values.setdefault("source_path", "")
+                values.setdefault("page", None)
+                values.setdefault("section", "")
+                values.setdefault("created_at", datetime.now(timezone.utc).isoformat())
+                self._documents.append(
+                    {
+                        "id": len(self._documents),
+                        "text": text,
+                        "metadata": values,
+                        "tokens": self._tokenize(text),
+                        "content_hash": content_hash,
+                    }
+                )
+            self._save_index()
+        except Exception:
+            self._documents = original
+            raise
 
     def query(
         self, query: str, top_k: int = 5, scope: str = "literature"
@@ -73,16 +151,19 @@ class LocalRAGProvider(RAGProvider):
 
         query_tokens = self._tokenize(query)
 
-        # 计算 TF-IDF 相似度
+        # BM25 lexical ranking (dependency-free).
         scores = []
+        average_length = sum(len(doc["tokens"]) for doc in self._documents) / max(
+            len(self._documents), 1
+        )
         for doc in self._documents:
-            score = self._cosine_similarity(query_tokens, doc["tokens"])
+            score = self._bm25_score(query_tokens, doc["tokens"], average_length)
             scores.append((score, doc))
 
         # 按相似度排序
         scores.sort(key=lambda x: x[0], reverse=True)
 
-        top_results = scores[:top_k]
+        top_results = [item for item in scores if item[0] > 0][:top_k]
 
         items = []
         for score, doc in top_results:
@@ -96,6 +177,14 @@ class LocalRAGProvider(RAGProvider):
                     "source": metadata.get("source", "local"),
                     "score": round(score, 4),
                     "snippet": doc["text"],
+                    "document_id": str(metadata.get("document_id", "")),
+                    "chunk_id": str(metadata.get("chunk_id", "")),
+                    "content_hash": str(doc.get("content_hash", "")),
+                    "source_type": metadata.get("source_type", "local"),
+                    "source_path": metadata.get("source_path", ""),
+                    "page": metadata.get("page"),
+                    "section": metadata.get("section", ""),
+                    "created_at": metadata.get("created_at", ""),
                     "metadata": metadata,
                 }
             )
@@ -152,37 +241,42 @@ class LocalRAGProvider(RAGProvider):
         return context_file
 
     def _tokenize(self, text: str) -> list[str]:
-        """简单分词，支持中英文混合"""
+        """Tokenize Latin medical terms and CJK text without character-only noise."""
         tokens: list[str] = []
-        for word in text.lower().split():
-            has_cjk = any(ord(c) > 0x2E80 for c in word)
-            if has_cjk:
-                # 包含 CJK 字符，逐字拆分
-                for c in word:
-                    tokens.append(c)
+        for part in re.findall(r"[a-z0-9][a-z0-9._-]*|[\u3400-\u9fff]+", text.lower()):
+            if re.fullmatch(r"[\u3400-\u9fff]+", part):
+                tokens.extend(
+                    part[index : index + 2]
+                    for index in range(max(len(part) - 1, 1))
+                )
             else:
-                tokens.append(word)
+                tokens.append(part)
         return tokens
 
-    def _cosine_similarity(self, tokens1: list[str], tokens2: list[str]) -> float:
-        """计算余弦相似度"""
-        counter1 = Counter(tokens1)
-        counter2 = Counter(tokens2)
-
-        # 所有词
-        all_words = set(counter1.keys()) | set(counter2.keys())
-
-        # 计算点积
-        dot_product = sum(counter1.get(w, 0) * counter2.get(w, 0) for w in all_words)
-
-        # 计算范数
-        norm1 = math.sqrt(sum(v**2 for v in counter1.values()))
-        norm2 = math.sqrt(sum(v**2 for v in counter2.values()))
-
-        if norm1 == 0 or norm2 == 0:
-            return 0
-
-        return dot_product / (norm1 * norm2)
+    def _bm25_score(
+        self, query_tokens: list[str], document_tokens: list[str], average_length: float
+    ) -> float:
+        """Return a BM25 score using corpus document frequencies."""
+        if not query_tokens or not document_tokens:
+            return 0.0
+        frequencies = Counter(document_tokens)
+        total_documents = len(self._documents)
+        score = 0.0
+        k1 = 1.5
+        b = 0.75
+        for token in set(query_tokens):
+            document_frequency = sum(
+                token in document.get("tokens", []) for document in self._documents
+            )
+            inverse_frequency = math.log(
+                1 + (total_documents - document_frequency + 0.5) / (document_frequency + 0.5)
+            )
+            frequency = frequencies.get(token, 0)
+            denominator = frequency + k1 * (
+                1 - b + b * len(document_tokens) / max(average_length, 1.0)
+            )
+            score += inverse_frequency * (frequency * (k1 + 1)) / denominator
+        return score
 
 
 class MockExternalVectorStoreProvider(RAGProvider):

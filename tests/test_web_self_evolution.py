@@ -66,6 +66,16 @@ def test_diagnose_all(client):
     assert "config" in data or "error" in data
 
 
+def test_status_reports_shared_required_runtime_health(client):
+    response = client.get("/api/v1/status")
+
+    assert response.status_code == 200
+    runtime = response.json()["required_runtime"]
+    assert runtime["harness"]["required"] is True
+    assert runtime["rag"]["disable_supported"] is False
+    assert runtime["agents"]["multi_available"] is True
+
+
 def test_diagnose_config(client):
     """Test GET /api/v1/diagnose/config returns config diagnostics."""
     response = client.get("/api/v1/diagnose/config")

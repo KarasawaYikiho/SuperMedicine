@@ -164,6 +164,7 @@ def _paper_import_result_to_dict(
     import_result, warnings: list[str] | None = None
 ) -> dict:
     return {
+        "status": import_result.status,
         "metadata": _paper_metadata_to_dict(import_result.metadata),
         "source_path": str(import_result.source_path)
         if import_result.source_path

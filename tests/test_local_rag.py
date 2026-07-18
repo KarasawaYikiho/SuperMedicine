@@ -9,8 +9,11 @@ import pytest
 import yaml
 
 from permission.engine import PermissionEngine
+from core.config_center import ConfigCenter
+from core.rag_service import RAGService
 from plugins.rag.interface import RAGProviderConfig
 from plugins.rag.local_provider import LocalRAGProvider, MockExternalVectorStoreProvider
+from plugins.rag import main as rag_main
 from plugins.rag.pubmed_provider import PubmedRAGProvider
 
 
@@ -43,6 +46,16 @@ def _pubmed_engine_for(agent_id: str, allowed: bool) -> PermissionEngine:
 
 
 class TestLocalRAGProvider:
+    def test_query_without_explicit_documents_returns_an_empty_local_index(self, tmp_path):
+        result = rag_main.execute(
+            "rag.query",
+            {"query": "hypertension", "storage_dir": str(tmp_path / "rag")},
+            {"agent_id": "alpha", "permission_checked": True},
+        )
+
+        assert result["status"] == "success"
+        assert result["output"]["items"] == []
+
     def test_add_and_query(self, tmp_path):
         provider = LocalRAGProvider(tmp_path)
         provider.add_document("心血管疾病的危险因素包括高血压和糖尿病")
@@ -55,6 +68,69 @@ class TestLocalRAGProvider:
         assert result["items"][0]["id"] is not None
         assert "score" in result["items"][0]
         assert "snippet" in result["items"][0]
+
+    def test_readding_identical_document_does_not_grow_the_index(self, tmp_path):
+        provider = LocalRAGProvider(tmp_path)
+
+        provider.add_document("hypertension evidence", {"source": "fixture"})
+        provider.add_document("hypertension evidence", {"source": "fixture"})
+
+        assert len(json.loads((tmp_path / "documents.json").read_text("utf-8"))) == 1
+
+    def test_query_excludes_zero_score_documents(self, tmp_path):
+        provider = LocalRAGProvider(tmp_path)
+        provider.add_document("hypertension evidence")
+        provider.add_document("oncology immunotherapy")
+
+        result = provider.query("hypertension")
+
+        assert [item["snippet"] for item in result["items"]] == [
+            "hypertension evidence"
+        ]
+
+    def test_tokenizer_uses_cjk_bigrams_and_preserves_medical_abbreviations(self, tmp_path):
+        tokens = LocalRAGProvider(tmp_path)._tokenize("高血压与ACEI治疗 2024")
+
+        assert "高血" in tokens
+        assert "血压" in tokens
+        assert "acei" in tokens
+        assert "2024" in tokens
+
+    def test_index_records_and_results_preserve_traceable_source_fields(self, tmp_path):
+        provider = LocalRAGProvider(tmp_path)
+        provider.add_document(
+            "ACEI evidence for hypertension",
+            {
+                "document_id": "paper-1",
+                "chunk_id": "paper-1:7",
+                "source_type": "paper",
+                "source_path": "paper.pdf",
+                "page": 7,
+                "section": "Results",
+            },
+        )
+
+        item = provider.query("ACEI hypertension")["items"][0]
+
+        assert item["document_id"] == "paper-1"
+        assert item["chunk_id"] == "paper-1:7"
+        assert item["source_path"] == "paper.pdf"
+        assert item["page"] == 7
+        assert item["content_hash"]
+        assert item["created_at"]
+
+    def test_replace_and_remove_document_chunks_are_idempotent(self, tmp_path):
+        provider = LocalRAGProvider(tmp_path)
+        provider.add_document("old hypertension text", {"document_id": "paper-1"})
+        provider.replace_document(
+            "paper-1",
+            [("new oncology text", {"chunk_id": "paper-1:1"})],
+        )
+
+        assert provider.query("old hypertension")["items"] == []
+        assert provider.query("new oncology")["items"][0]["document_id"] == "paper-1"
+        assert provider.remove_document("paper-1") == 1
+        assert provider.remove_document("paper-1") == 0
 
     def test_empty_query(self, tmp_path):
         provider = LocalRAGProvider(tmp_path)
@@ -98,6 +174,52 @@ class TestLocalRAGProvider:
     def test_context_not_found(self, tmp_path):
         provider = LocalRAGProvider(tmp_path)
         assert provider.retrieve_context("nonexistent") is None
+
+
+def test_rag_service_truncates_sources_to_configured_context_budget(tmp_path):
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        "rag:\n  top_k: 5\n  min_score: 0\n  max_context_chars: 40\n",
+        encoding="utf-8",
+    )
+    provider = LocalRAGProvider(tmp_path / ".supermedicine" / "rag" / "local")
+    provider.add_document("hypertension " + "evidence " * 20)
+
+    context = RAGService(ConfigCenter(config_path), config_path).retrieve(
+        "hypertension evidence"
+    )
+
+    assert sum(len(item["snippet"]) for item in context.sources) <= 40
+
+
+def test_medical_writing_and_citation_are_classified_as_knowledge_generation():
+    assert RAGService.classify_task("CONSORT", "medical-writing", "standard.consort") == "knowledge_generation"
+    assert RAGService.classify_task("AMA", "medical-citation", "standard.citation.ama") == "knowledge_generation"
+
+
+def test_pubmed_denial_uses_local_results_as_degraded_without_http(tmp_path, monkeypatch):
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("rag:\n  provider: hybrid\n  min_score: 0\n", encoding="utf-8")
+    LocalRAGProvider(tmp_path / ".supermedicine" / "rag" / "local").add_document(
+        "local hypertension evidence", {"source": "local-paper"}
+    )
+    monkeypatch.setattr(
+        PubmedRAGProvider,
+        "_search",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("HTTP path must not run after permission denial")
+        ),
+    )
+
+    context = RAGService(
+        ConfigCenter(config_path),
+        config_path,
+        permission_engine=_pubmed_engine_for("alpha", False),
+    ).retrieve("hypertension")
+
+    assert context.status == "degraded"
+    assert context.sources[0]["source"] == "local-paper"
+    assert context.errors[0]["code"] == "permission_denied"
 
 
 class TestPubmedRAGProvider:

@@ -1,10 +1,14 @@
 name: "harness-core"
 version: "0.1.0"
 type: "harness"
+required: true
+disable_supported: false
 language: "python"
 entry: "main.py"
 description: "测试评估与 Agent 监控框架"
 provides:
+  - id: "harness.runtime.health"
+    description: "Report mandatory Harness runtime health"
   - id: "harness.integration.checkpoint"
     description: "验证检查点完整性"
   - id: "harness.integration.checkpoint_all"

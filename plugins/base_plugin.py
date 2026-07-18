@@ -54,6 +54,8 @@ class PluginMeta:
     entry: str = "main.py"
     permissions_required: list[str] = field(default_factory=list)
     provides: list[str] = field(default_factory=list)
+    required: bool = False
+    disable_supported: bool = True
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> PluginMeta:
@@ -65,6 +67,8 @@ class PluginMeta:
             entry=data.get("entry", "main.py"),
             permissions_required=data.get("permissions_required", []),
             provides=data.get("provides", []),
+            required=bool(data.get("required", False)),
+            disable_supported=bool(data.get("disable_supported", True)),
         )
 
 
@@ -80,6 +84,11 @@ class BasePlugin:
     @property
     def name(self) -> str:
         return self._meta.name
+
+    @property
+    def plugin_dir(self) -> Path:
+        """Filesystem location of the manifest, for runtime validation only."""
+        return self._plugin_dir
 
     def execute(
         self,
@@ -166,12 +175,6 @@ class BasePlugin:
             and security.get("permission_checked") is True
             and security.get("permission_entrypoint") == "kernel"
         ):
-            return None
-        if context.get("allow_direct_execution") is True:
-            return None
-        if os.environ.get(
-            "SUPERMEDICINE_ALLOW_PLUGIN_DIRECT_EXECUTION", ""
-        ).lower() in {"1", "true", "yes", "dev", "test"}:
             return None
         if os.environ.get("PYTEST_CURRENT_TEST"):
             return None

@@ -78,6 +78,7 @@ def llm_chat_messages(
     task: str,
     config: ConfigCenter,
     config_path,
+    rag_context: dict[str, Any] | None = None,
 ) -> list[dict[str, str]]:
     """Build the canonical LLM chat message list for standalone Kernel chat."""
     selected_protocol = config.get_selected_experiment_protocol()
@@ -105,7 +106,7 @@ def llm_chat_messages(
         ),
         "last_tool_import": last_tool_import,
     }
-    return [
+    messages = [
         {"role": "system", "content": SUPERMEDICINE_SYSTEM_PROMPT},
         {
             "role": "system",
@@ -124,8 +125,25 @@ def llm_chat_messages(
                 tool_authoring_context, ensure_ascii=False, sort_keys=True
             ),
         },
-        {"role": "user", "content": task},
     ]
+    evidence_context = rag_context or {
+        "enabled": True,
+        "status": "empty",
+        "sources": [],
+    }
+    messages.append(
+        {
+            "role": "system",
+            "content": (
+                "Retrieved evidence. Cite only these sources; do not invent sources. "
+                "When sources are empty, state that local evidence is unavailable and "
+                "do not make unsupported medical factual claims:\n"
+                + json.dumps(evidence_context, ensure_ascii=False, sort_keys=True)
+            ),
+        }
+    )
+    messages.append({"role": "user", "content": task})
+    return messages
 
 
 def execute_llm_chat(
@@ -138,6 +156,7 @@ def execute_llm_chat(
     config_path,
     checkpoint_task_fn: Callable[..., None],
     progress_callback: Callable[[dict[str, Any]], None] | None = None,
+    rag_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Execute an unmatched natural-language task through the configured LLM."""
 
@@ -184,7 +203,7 @@ def execute_llm_chat(
         return result
 
     try:
-        messages = llm_chat_messages(task, config, config_path)
+        messages = llm_chat_messages(task, config, config_path, rag_context)
         emit("status", "已发送请求，等待模型返回。")
         stream_method = getattr(client_or_error, "chat_stream", None)
         if callable(stream_method):
@@ -380,6 +399,7 @@ def execute_llm_chat(
         "metadata": {
             "medical_boundary": MEDICAL_BOUNDARY,
             "llm": llm_runtime_context(llm_manager, config),
+            "rag": (rag_context or {"enabled": True, "status": "empty"}),
         },
     }
     checkpoint_task_fn(

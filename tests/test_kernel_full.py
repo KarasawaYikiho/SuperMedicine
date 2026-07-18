@@ -1,17 +1,22 @@
 from __future__ import annotations
 
+import json
 import shutil
 from typing import Any
 from unittest.mock import patch
 
 import yaml
+import pytest
 
 from core.kernel import Kernel
+from core.runtime_capabilities import RuntimeInvariantError
 from core.kernel_constants import SUPERMEDICINE_SYSTEM_PROMPT
 from core.kernel_llm_chat import execute_llm_chat
 from core.llm_client import LLMClient
 from core.llm_manager import LLMConfigManager
+from plugins.rag.local_provider import LocalRAGProvider
 from permission.engine import PermissionEngine
+from permission.policy import PermissionResult
 from permission.prompt_generator import PromptGenerator
 
 
@@ -31,7 +36,7 @@ class TestKernel:
         )
         return Kernel(
             config_path=tmp_path / "config.yaml",
-            plugins_dir=tmp_path / "plugins",
+            plugins_dir="plugins",
             policies_dir=tmp_path / "policies",
         )
 
@@ -54,6 +59,276 @@ class TestKernel:
 
         assert isinstance(kernel.permission_engine, PermissionEngine)
         assert not isinstance(kernel.permission_engine, PromptGenerator)
+
+    def test_execute_task_always_returns_finalized_harness_metadata(
+        self, tmp_path, monkeypatch
+    ):
+        class Client(LLMClient):
+            def chat(self, messages, **kwargs):
+                return {"content": "ok"}
+
+            def complete(self, prompt, **kwargs):
+                return {"content": ""}
+
+        kernel = self._create_kernel(tmp_path)
+        monkeypatch.setattr(kernel.llm_manager, "create_client", lambda: Client())
+        monkeypatch.setattr(
+            kernel.llm_manager,
+            "get_current_provider",
+            lambda redacted=True: {"provider": "fake", "api_key": "<redacted>"},
+        )
+        monkeypatch.setattr(
+            kernel.llm_manager, "validate_provider", lambda name, config: None
+        )
+
+        result = kernel.execute_task("ordinary medical question")
+
+        assert result["metadata"]["harness"]["participated"] is True
+        assert result["metadata"]["harness"]["finalized"] is True
+        assert result["run_id"]
+        checkpoints = kernel.checkpoint_manager.base_dir / result["run_id"]
+        states = [
+            json.loads(path.read_text(encoding="utf-8"))["state"]
+            for path in checkpoints.glob("step-*/status.json")
+        ]
+        assert sum(state in {"completed", "failed"} for state in states) == 1
+
+    def test_execute_task_fails_closed_when_harness_cannot_begin(self, tmp_path, monkeypatch):
+        kernel = self._create_kernel(tmp_path)
+        monkeypatch.setattr(
+            kernel._harness_runtime,
+            "begin",
+            lambda **kwargs: (_ for _ in ()).throw(OSError("checkpoint unavailable")),
+        )
+
+        result = kernel.execute_task("ordinary medical question")
+
+        assert result["status"] == "harness_unavailable"
+        assert result["metadata"]["harness"]["participated"] is False
+
+    def test_execute_task_fails_closed_when_harness_cannot_finalize(
+        self, tmp_path, monkeypatch
+    ):
+        kernel = self._create_kernel(tmp_path)
+        monkeypatch.setattr(
+            kernel._harness_runtime,
+            "finalize",
+            lambda *args, **kwargs: (_ for _ in ()).throw(OSError("finalize unavailable")),
+        )
+
+        result = kernel.execute_task("ordinary medical question")
+
+        assert result["status"] == "harness_unavailable"
+        assert result["metadata"]["harness"]["finalized"] is False
+
+    def test_llm_chat_retrieves_local_rag_context_without_retrieval_keywords(
+        self, tmp_path, monkeypatch
+    ):
+        LocalRAGProvider(tmp_path / ".supermedicine" / "rag" / "local").add_document(
+            "Hypertension evidence supports lifestyle and pharmacologic treatment.",
+            {"source": "local-fixture", "title": "Evidence note"},
+        )
+        captured = {}
+
+        class Client(LLMClient):
+            def chat(self, messages, **kwargs):
+                captured["messages"] = messages
+                return {"content": "ok"}
+
+            def complete(self, prompt, **kwargs):
+                return {"content": ""}
+
+        kernel = self._create_kernel(tmp_path)
+        monkeypatch.setattr(kernel.llm_manager, "create_client", lambda: Client())
+        monkeypatch.setattr(
+            kernel.llm_manager,
+            "get_current_provider",
+            lambda redacted=True: {"provider": "fake", "api_key": "<redacted>"},
+        )
+        monkeypatch.setattr(
+            kernel.llm_manager, "validate_provider", lambda name, config: None
+        )
+
+        result = kernel.execute_task("What evidence supports hypertension care?")
+
+        assert result["metadata"]["rag"]["status"] == "used"
+        assert any(
+            "Hypertension evidence" in message["content"]
+            for message in captured["messages"]
+            if message["role"] == "system"
+        )
+
+    def test_llm_chat_uses_selected_workspace_rag_index(self, tmp_path, monkeypatch):
+        workspace = tmp_path / "workspaces" / "trial"
+        LocalRAGProvider(workspace / ".supermedicine" / "rag" / "local").add_document(
+            "Workspace-specific ACEI evidence.",
+            {"source": "workspace-paper"},
+        )
+        captured = {}
+
+        class Client(LLMClient):
+            def chat(self, messages, **kwargs):
+                captured["messages"] = messages
+                return {"content": "ok"}
+
+            def complete(self, prompt, **kwargs):
+                return {"content": ""}
+
+        kernel = self._create_kernel(tmp_path)
+        monkeypatch.setattr(kernel.llm_manager, "create_client", lambda: Client())
+        monkeypatch.setattr(
+            kernel.llm_manager,
+            "get_current_provider",
+            lambda redacted=True: {"provider": "fake", "api_key": "<redacted>"},
+        )
+        monkeypatch.setattr(kernel.llm_manager, "validate_provider", lambda *args: None)
+
+        result = kernel.execute_task(
+            "What is the ACEI evidence?",
+            params={"_workspace": {"id": "trial", "path": str(workspace)}},
+        )
+
+        assert result["metadata"]["rag"]["status"] == "used"
+        assert result["metadata"]["sources"][0]["source"] == "workspace-paper"
+
+    def test_deterministic_plugin_records_enumerated_rag_skip(self, tmp_path):
+        kernel = self._create_kernel(tmp_path)
+
+        result = kernel.execute_task(
+            "describe values",
+            plugin_name="python-stats",
+            action="python.stats.describe",
+            params={"values": [1, 2, 3]},
+        )
+
+        assert result["metadata"]["rag"] == {
+            "enabled": True,
+            "status": "skipped",
+            "skip_reason": "deterministic_plugin",
+        }
+        assert result["metadata"]["permission"]["checked"] is True
+
+    def test_llm_chat_fails_closed_when_local_rag_index_is_corrupt(
+        self, tmp_path, monkeypatch
+    ):
+        index_dir = tmp_path / ".supermedicine" / "rag" / "local"
+        index_dir.mkdir(parents=True)
+        (index_dir / "documents.json").write_text("{not json", encoding="utf-8")
+        with pytest.raises(RuntimeInvariantError) as captured:
+            self._create_kernel(tmp_path)
+
+        assert captured.value.code == "rag_index_corrupt"
+
+    def test_empty_rag_context_explicitly_forbids_invented_sources(
+        self, tmp_path, monkeypatch
+    ):
+        captured = {}
+
+        class Client(LLMClient):
+            def chat(self, messages, **kwargs):
+                captured["messages"] = messages
+                return {"content": "Local evidence is unavailable."}
+
+            def complete(self, prompt, **kwargs):
+                return {"content": ""}
+
+        kernel = self._create_kernel(tmp_path)
+        monkeypatch.setattr(kernel.llm_manager, "create_client", lambda: Client())
+        monkeypatch.setattr(
+            kernel.llm_manager,
+            "get_current_provider",
+            lambda redacted=True: {"provider": "fake", "api_key": "<redacted>"},
+        )
+        monkeypatch.setattr(kernel.llm_manager, "validate_provider", lambda *args: None)
+
+        result = kernel.execute_task("What evidence supports treatment?")
+
+        assert result["metadata"]["rag"]["status"] == "empty"
+        evidence_messages = [
+            item["content"]
+            for item in captured["messages"]
+            if item["role"] == "system" and "evidence" in item["content"].lower()
+        ]
+        assert any("do not invent" in message.lower() for message in evidence_messages)
+
+    def test_multi_agent_execution_uses_same_rag_and_harness_pipeline(self, tmp_path):
+        LocalRAGProvider(tmp_path / ".supermedicine" / "rag" / "local").add_document(
+            "Hypertension cohort evidence.",
+            {"source": "local-fixture", "title": "Cohort note"},
+        )
+        kernel = self._create_kernel(tmp_path)
+
+        result = kernel.execute_task(
+            "Summarize hypertension evidence", use_agent_chain=True
+        )
+
+        assert result["status"] == "success", result
+        assert result["metadata"]["rag"]["status"] == "used"
+        assert result["metadata"]["agent_mode"] == "multi"
+        assert result["metadata"]["harness"]["finalized"] is True
+        audit_entries = [
+            json.loads(line)
+            for line in (tmp_path / "policies" / "audit.jsonl")
+            .read_text(encoding="utf-8")
+            .splitlines()
+        ]
+        assert {
+            entry["agent_id"]
+            for entry in audit_entries
+            if entry["action"] == "plan"
+        } == {"delta", "alpha", "beta", "gamma"}
+
+    def test_agents_config_defaults_to_single_and_can_select_multi(self, tmp_path):
+        kernel = self._create_kernel(tmp_path)
+        kernel.config.set("agents", {"mode": "multi"})
+        kernel.config.save()
+
+        result = kernel.execute_task("Summarize hypertension evidence")
+
+        assert result["status"] == "success"
+        assert result["metadata"]["agent_mode"] == "multi"
+        assert result["metadata"]["harness"]["finalized"] is True
+
+    def test_explicit_single_override_wins_over_multi_config(self, tmp_path, monkeypatch):
+        kernel = self._create_kernel(tmp_path)
+        kernel.config.set("agents", {"mode": "multi"})
+        kernel.config.save()
+        monkeypatch.setattr(
+            kernel,
+            "_execute_agent_chain",
+            lambda *args, **kwargs: (_ for _ in ()).throw(
+                AssertionError("multi executor must not run")
+            ),
+        )
+
+        result = kernel.execute_task(
+            "deterministic task",
+            plugin_name="python-stats",
+            action="python.stats.describe",
+            params={"values": [1, 2, 3]},
+            use_agent_chain=False,
+        )
+
+        assert result["metadata"]["agent_mode"] == "single"
+
+    def test_multi_agent_permission_denial_is_structured_and_finalized(
+        self, tmp_path, monkeypatch
+    ):
+        kernel = self._create_kernel(tmp_path)
+        original_check = kernel.permission_engine.check
+
+        def deny_beta(agent_id, action, resource, context=None):
+            if agent_id == "beta" and action == "plan":
+                return PermissionResult.DENIED
+            return original_check(agent_id, action, resource, context)
+
+        monkeypatch.setattr(kernel.permission_engine, "check", deny_beta)
+
+        result = kernel.execute_task("Summarize evidence", use_agent_chain=True)
+
+        assert result["status"] == "denied"
+        assert result["metadata"]["harness"]["finalized"] is True
+        assert result["error"]["code"] == "agent_permission_denied"
 
     def test_llm_chat_provider_exception_returns_structured_error_and_checkpoint(
         self, tmp_path, monkeypatch
@@ -155,7 +430,8 @@ class TestKernel:
             "workspaces/<workspace-id>/tools/r/<tool-id>/"
             in captured["messages"][3]["content"]
         )
-        assert captured["messages"][4] == {"role": "user", "content": "你是谁？"}
+        assert "Retrieved evidence" in captured["messages"][4]["content"]
+        assert captured["messages"][-1] == {"role": "user", "content": "你是谁？"}
 
     def test_llm_chat_system_prompt_preserves_permission_generator_boundary(
         self, tmp_path
@@ -177,7 +453,8 @@ class TestKernel:
         assert messages[3]["role"] == "system"
         assert "Python/R workspace tool authoring rules" in messages[3]["content"]
         assert "scan_validate_import_flow" in messages[3]["content"]
-        assert messages[4] == {"role": "user", "content": "你的职责是什么？"}
+        assert "Retrieved evidence" in messages[4]["content"]
+        assert messages[-1] == {"role": "user", "content": "你的职责是什么？"}
 
     def test_llm_chat_context_injects_selected_experiment_permission_and_tools(
         self, tmp_path
@@ -216,7 +493,7 @@ class TestKernel:
         )
         kernel = Kernel(
             config_path=config_path,
-            plugins_dir=tmp_path / "plugins",
+            plugins_dir="plugins",
             policies_dir=tmp_path / "policies",
         )
 
@@ -233,7 +510,8 @@ class TestKernel:
         assert "trial-1" in runtime_context
         assert "python-stats" in runtime_context
         assert "python-stats" in tool_context
-        assert messages[4] == {"role": "user", "content": "根据当前配置说明下一步"}
+        assert "Retrieved evidence" in messages[4]["content"]
+        assert messages[-1] == {"role": "user", "content": "根据当前配置说明下一步"}
 
 
 class TestKernelProgressCallback:

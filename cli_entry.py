@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import sys
+from dataclasses import replace
 from importlib import import_module
 from pathlib import Path
 from typing import Any
@@ -69,6 +70,33 @@ _FORWARDED_COMMANDS = {
 }
 
 
+def required_runtime_snapshot(project_dir: Path) -> dict[str, Any]:
+    """Build the entry-point-neutral mandatory runtime health snapshot."""
+    from core.config_center import ConfigCenter
+    from core.plugin_registry import PluginRegistry
+    from core.runtime_capabilities import RuntimeInvariantError, validate_required_plugins
+
+    config_path = project_dir / ".supermedicine" / "config.yaml"
+    config = ConfigCenter(config_path)
+    registry = PluginRegistry(Path(__file__).resolve().parent / "plugins")
+    registry.discover()
+    try:
+        capabilities = validate_required_plugins(registry, config_path)
+    except RuntimeInvariantError as exc:
+        return {
+            "harness": {"required": True, "healthy": False, "disable_supported": False},
+            "rag": {"required": True, "healthy": False, "disable_supported": False, "index": ""},
+            "agents": {"mode": "single", "multi_available": True},
+            "diagnostics": [exc.to_dict()],
+        }
+    capabilities = replace(
+        capabilities,
+        agent_mode=config.get_agents_config()["mode"],
+        rag_index=str(project_dir / ".supermedicine" / "rag" / "local"),
+    )
+    return capabilities.to_dict()
+
+
 class CLI:
     """SuperMedicine CLI"""
 
@@ -129,6 +157,13 @@ class CLI:
         """显示项目状态"""
         logger.info("SuperMedicine Beta0.4.2")
         logger.info("=" * 40)
+        runtime = required_runtime_snapshot(Path.cwd())
+        logger.info(
+            "[RUNTIME] Harness %s | RAG %s | Agents %s",
+            "OK" if runtime["harness"]["healthy"] else "FAIL",
+            "OK" if runtime["rag"]["healthy"] else "FAIL",
+            runtime["agents"]["mode"],
+        )
 
         # 检查配置
         config_dir = Path.cwd() / ".supermedicine"
@@ -180,6 +215,7 @@ class CLI:
         action: str | None = None,
         params: dict | None = None,
         workspace: str | None = None,
+        agents: str | None = None,
     ) -> dict:
         """执行任务 — 真实执行用户任务与医疗插件"""
         from core.kernel import Kernel
@@ -230,9 +266,14 @@ class CLI:
             for p in plugins:
                 logger.info("     - %s (%s)", p.name, p.type)
 
-        result = kernel.execute_task(
-            task, plugin_name=plugin, action=action, params=execution_params
-        )
+        execute_kwargs: dict[str, Any] = {
+            "plugin_name": plugin,
+            "action": action,
+            "params": execution_params,
+        }
+        if agents is not None:
+            execute_kwargs["use_agent_chain"] = agents == "multi"
+        result = kernel.execute_task(task, **execute_kwargs)
         if verbose:
             logger.info(
                 "[STATE] agent=%s task=%s plugin=%s action=%s status=%s",
@@ -270,6 +311,7 @@ class CLI:
                 "writable_parent": audit_log.parent.exists(),
             },
             "log_storage": storage_locations.to_dict(),
+            "required_runtime": required_runtime_snapshot(project_dir),
             "commands": {
                 "init": "set provider API key env var first, then run: supermedicine init --provider <name> --base-url <url> --model <model>",
                 "llm_list": "supermedicine llm list",
@@ -278,7 +320,13 @@ class CLI:
                 "uninstall_dry_run": "python Uninstall.py --dry-run",
             },
         }
-        result["ok"] = bool(config_diag.get("exists")) and bool(llm_diag.get("ok"))
+        runtime = result["required_runtime"]
+        result["ok"] = (
+            bool(config_diag.get("exists"))
+            and bool(llm_diag.get("ok"))
+            and bool(runtime["harness"]["healthy"])
+            and bool(runtime["rag"]["healthy"])
+        )
         _log_json(result)
         return result
 

@@ -26,6 +26,8 @@ class PluginRegistry:
 
     def discover(self) -> list[PluginMeta]:
         found = []
+        self._metas = {}
+        self._plugins = {}
         self._diagnostics = []
         if not self._plugins_dir.exists():
             return []
@@ -39,6 +41,16 @@ class PluginRegistry:
             except Exception as exc:
                 self._diagnostics.append(
                     {"status": "skipped", "manifest": str(yml), "error": str(exc)}
+                )
+                continue
+            if meta.name in self._metas:
+                self._diagnostics.append(
+                    {
+                        "status": "failed",
+                        "code": "duplicate_plugin_name",
+                        "manifest": str(yml),
+                        "plugin": meta.name,
+                    }
                 )
                 continue
             self._metas[meta.name] = meta

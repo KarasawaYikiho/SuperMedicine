@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 from pathlib import Path
+import shutil
 import sys
 
 import pytest
@@ -69,6 +70,7 @@ def test_cli_help_preserves_legacy_commands_and_run_flags(capsys):
         "--params-json",
         "--params-file",
         "--workspace",
+        "--agents",
     ):
         assert flag in run_output
 
@@ -240,6 +242,7 @@ def test_plugin_manifest_names_and_action_ids_are_unchanged():
         },
         "medical-citation": {"standard.citation.vancouver", "standard.citation.ama"},
         "harness-core": {
+            "harness.runtime.health",
             "harness.integration.checkpoint",
             "harness.integration.checkpoint_all",
             "harness.monitor.permission_audit",
@@ -333,6 +336,8 @@ def test_kernel_execute_task_result_shape_and_permission_gate_are_stable(tmp_pat
         "    return {'status': 'success', 'output': {'echo': params}, 'metadata': {'custom': 'ok'}}\n",
         encoding="utf-8",
     )
+    for required_name in ("harness", "rag"):
+        shutil.copytree(Path("plugins") / required_name, plugins_dir / required_name)
     (tmp_path / "config.yaml").write_text("project: compat\n", encoding="utf-8")
     policies = _write_policy(
         tmp_path,

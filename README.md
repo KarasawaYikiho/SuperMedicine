@@ -19,6 +19,21 @@ research assistance that needs qualified human review.
 Current release label: **Beta0.4.2**. Python package fallback version:
 **0.4.2b0**.
 
+## Mandatory Harness and RAG Runtime
+
+Every formal CLI, TUI, Web, plugin, LLM, and optional multi-agent task enters the
+same Kernel pipeline. Harness and local-first RAG are required runtime
+capabilities and cannot be disabled by configuration, environment variables, or
+direct plugin parameters. Missing, damaged, or unwritable required components
+fail closed with structured errors.
+
+Knowledge-generation tasks retrieve evidence before generation. An empty index
+is reported as `rag.status=empty`; sources are never fabricated. Deterministic
+and control actions record an explicit `skipped` reason. PubMed remains
+permission-gated and degrades to local evidence when denied. Multi-agent mode
+defaults to `agents.mode: single` and uses the same Harness, RAG, permission,
+audit, and result envelope as single mode.
+
 ## Read First
 
 - [Installation guide](docs/guides/INSTALL.md)

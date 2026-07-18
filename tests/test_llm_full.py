@@ -829,7 +829,7 @@ def test_kernel_exposes_manager_and_restores_last_provider(tmp_path):
 
     kernel = Kernel(
         config_path=config_path,
-        plugins_dir=tmp_path / "plugins",
+        plugins_dir="plugins",
         policies_dir=policies_dir,
     )
 

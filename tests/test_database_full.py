@@ -435,7 +435,7 @@ def _make_kernel(tmp_path: Path) -> Kernel:
     )
     return Kernel(
         config_path=config_path,
-        plugins_dir=tmp_path / "plugins",
+        plugins_dir="plugins",
         policies_dir=tmp_path / "policies",
     )
 
@@ -633,7 +633,7 @@ class TestKernelFallbackWhenDbUnavailable:
         try:
             kernel = Kernel(
                 config_path=config_path,
-                plugins_dir=tmp_path / "plugins",
+                plugins_dir="plugins",
                 policies_dir=policies,
             )
 
@@ -710,7 +710,7 @@ class TestBackwardCompatibilityNoDb:
         try:
             kernel = Kernel(
                 config_path=config_path,
-                plugins_dir=tmp_path / "plugins",
+                plugins_dir="plugins",
                 policies_dir=policies,
             )
             assert kernel.database is None
@@ -743,7 +743,7 @@ class TestBackwardCompatibilityNoDb:
         try:
             kernel = Kernel(
                 config_path=config_path,
-                plugins_dir=tmp_path / "plugins",
+                plugins_dir="plugins",
                 policies_dir=policies,
             )
 

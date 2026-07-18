@@ -11,6 +11,31 @@ from permission.access_mode import AccessDecisionStatus, FullAccessConfirmationR
 
 
 class TestConfigCenter:
+    def test_rag_config_has_required_local_first_defaults(self, tmp_path):
+        config = ConfigCenter(tmp_path / "config.yaml")
+
+        rag = config.get_rag_config()
+
+        assert rag["provider"] == "local"
+        assert rag["top_k"] == 6
+        assert "enabled" not in rag
+
+    def test_agents_config_defaults_to_single_with_bounded_execution(self, tmp_path):
+        config = ConfigCenter(tmp_path / "config.yaml")
+
+        assert config.get_agents_config() == {
+            "mode": "single",
+            "max_steps": 4,
+            "max_retries": 1,
+        }
+
+    def test_agents_config_rejects_unknown_mode(self, tmp_path):
+        config = ConfigCenter(tmp_path / "config.yaml")
+        config.set("agents", {"mode": "swarm"})
+
+        with pytest.raises(ValueError, match="agents.mode"):
+            config.get_agents_config()
+
     """测试 ConfigCenter"""
 
     def test_get_set(self, tmp_path):

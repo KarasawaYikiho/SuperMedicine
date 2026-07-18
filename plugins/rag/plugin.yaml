@@ -1,6 +1,8 @@
 name: "rag-interface"
 version: "0.1.0"
 type: "rag"
+required: true
+disable_supported: false
 language: "python"
 entry: "main.py"
 description: "RAG 检索接口（支持本地确定性 Provider 与受权限约束的外部 Provider）"

@@ -73,6 +73,11 @@
   "dependencies": {"python": ">=3.10", "r": ">=4.3 (optional)"},
   "plugins": {
     "required": ["rag-interface", "harness-core", "medical-writing", "medical-citation"],
+    "required_runtime": {
+      "disable_supported": false,
+      "harness-core": {"actions": ["harness.runtime.health", "harness.integration.checkpoint", "harness.integration.checkpoint_all", "harness.monitor.permission_audit", "harness.monitor.denied_actions", "harness.monitor.anomaly", "harness.monitor.performance", "harness.monitor.failure_patterns"]},
+      "rag-interface": {"actions": ["rag.query", "rag.context.store", "rag.context.retrieve"]}
+    },
     "optional": ["tools-python-stats", "tools-r-survival"]
   },
   "components": {

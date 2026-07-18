@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from .base_agent import BaseAgent
 from .checkpoint import CheckpointManager
@@ -15,6 +15,7 @@ class Orchestrator:
         self,
         checkpoint_manager: CheckpointManager | None = None,
         checkpoint_dir: Path | None = None,
+        permission_check: Callable[[str, dict[str, Any]], bool] | None = None,
     ):
         self._agents: dict[str, BaseAgent] = {}
         self._checkpoint_manager = checkpoint_manager or CheckpointManager(
@@ -22,6 +23,7 @@ class Orchestrator:
         )
         self._task_steps: dict[str, int] = {}
         self._task_states: dict[str, StateMachine] = {}
+        self._permission_check = permission_check
 
     @property
     def checkpoint_manager(self) -> CheckpointManager:
@@ -84,8 +86,9 @@ class Orchestrator:
             or task.get("id")
             or f"task-{len(self._task_states) + 1}"
         )
-        machine = self._task_states.get(task_id) or StateMachine(task_id=task_id)
-        self._task_states[task_id] = machine
+        state_key = f"{task_id}:{agent_id}"
+        machine = self._task_states.get(state_key) or StateMachine(task_id=task_id)
+        self._task_states[state_key] = machine
         if machine.state == TaskState.PLANNING:
             machine.transition(
                 TaskState.DISPATCH,
@@ -117,6 +120,26 @@ class Orchestrator:
                 not_recoverable_reason="No registered agent can resume this dispatch.",
             )
             raise KeyError(f"Unknown agent: {agent_id}")
+        if self._permission_check is not None and not self._permission_check(
+            agent_id, task
+        ):
+            machine.transition(TaskState.RUNNING, status="permission_check")
+            machine.transition(
+                TaskState.FAILED,
+                status="permission_denied",
+                details={"agent_id": agent_id},
+            )
+            self._save_stage(
+                task_id=task_id,
+                agent_id=agent_id,
+                machine=machine,
+                state=TaskState.FAILED,
+                task=task,
+                error="Agent dispatch permission denied.",
+                recoverable=False,
+                not_recoverable_reason="Agent dispatch was denied by policy.",
+            )
+            raise PermissionError(f"Agent dispatch denied: {agent_id}")
         try:
             machine.transition(
                 TaskState.RUNNING,

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
+from uuid import uuid4
 from typing import Any, Callable, cast
 
 from agents.checkpoint import CheckpointManager
@@ -18,6 +20,14 @@ from core.database.repository import AgentRepository
 from core.event_bus import EventBus
 from core.llm_manager import LLMConfigManager
 from core.plugin_registry import PluginRegistry
+from core.runtime_capabilities import (
+    RuntimeCapabilities,
+    RuntimeInvariantError,
+    validate_required_plugins,
+)
+from core.runtime_pipeline import HarnessRuntime
+from core.rag_service import RAGService
+from plugins.harness.monitor import AgentPerformanceMonitor
 from core.session_manager import SessionManager
 from permission.engine import PermissionEngine
 from permission.policy import (
@@ -63,10 +73,21 @@ class Kernel:
         self._llm_manager = LLMConfigManager(self._config)
         self._event_bus = EventBus()
         self._plugin_registry = PluginRegistry(self._plugins_dir)
+        self._plugin_registry.discover()
+        self._runtime_capabilities = validate_required_plugins(
+            self._plugin_registry, self._config_path
+        )
         self._session_manager = SessionManager()
         self._checkpoint_manager = CheckpointManager(
             self._config_path.parent / "checkpoints"
         )
+        self._performance_monitor = AgentPerformanceMonitor(
+            self._config_path.parent / "performance.jsonl"
+        )
+        self._harness_runtime = HarnessRuntime(
+            self._checkpoint_manager, self._performance_monitor
+        )
+        self._refresh_runtime_capabilities()
 
         # Database initialization with graceful fallback
         self._database: Database | None = None
@@ -99,6 +120,11 @@ class Kernel:
             self._policies_dir,
             audit_log_path,
         )
+        self._rag_service = RAGService(
+            self._config,
+            self._config_path,
+            permission_engine=self._permission_engine,
+        )
 
     def _ensure_canonical_default_policy(self) -> None:
         """Create the canonical default policy for normal project policy dirs.
@@ -118,9 +144,41 @@ class Kernel:
         ):
             ensure_default_policy(policy_dir.parent.parent)
 
+    def _refresh_runtime_capabilities(self) -> None:
+        """Attach config-derived state to the validated shared health snapshot."""
+        agent_mode = self._config.get_agents_config()["mode"]
+        project_root = (
+            self._config_path.parent.parent
+            if self._config_path.parent.name == ".supermedicine"
+            else self._config_path.parent
+        )
+        rag_index = str(project_root / ".supermedicine" / "rag" / "local")
+        self._runtime_capabilities = replace(
+            self._runtime_capabilities,
+            agent_mode=agent_mode,
+            rag_index=rag_index,
+        )
+
     def _create_agent_orchestrator(self) -> Orchestrator:
         """Create and return an Orchestrator pre-loaded with alpha, beta, gamma, delta agents."""
-        orch = Orchestrator(checkpoint_manager=self._checkpoint_manager)
+        def permission_check(agent_id: str, task: dict[str, Any]) -> bool:
+            return (
+                self._permission_engine.check(
+                    agent_id,
+                    "plan",
+                    "agent.pipeline",
+                    context={
+                        "task": task.get("task"),
+                        "agent_mode": "multi",
+                    },
+                )
+                == PermissionResult.ALLOWED
+            )
+
+        orch = Orchestrator(
+            checkpoint_manager=self._checkpoint_manager,
+            permission_check=permission_check,
+        )
         orch.register_agent(AlphaAgent())
         orch.register_agent(BetaAgent())
         orch.register_agent(GammaAgent())
@@ -133,6 +191,7 @@ class Kernel:
         *,
         task_id: str,
         emit: Callable[..., None],
+        rag_context: Any = None,
         progress_callback: Callable[[dict[str, Any]], None] | None = None,
     ) -> dict[str, Any]:
         """Run the full alpha → beta → gamma pipeline coordinated by delta.
@@ -150,6 +209,10 @@ class Kernel:
         delta_result = orch.dispatch("delta", task_dict)
         target = delta_result.get("target_agent", "alpha")
         context = delta_result.get("context", {})
+        if not isinstance(context, dict):
+            context = {}
+        if rag_context is not None:
+            context = {**context, "rag": rag_context.as_prompt_payload()}
 
         # Step 2: Alpha analysis
         emit("status", "Alpha agent analysing task…")
@@ -224,6 +287,11 @@ class Kernel:
     @property
     def plugin_registry(self) -> PluginRegistry:
         return self._plugin_registry
+
+    @property
+    def runtime_capabilities(self) -> RuntimeCapabilities:
+        """Return the validated mandatory-runtime health snapshot."""
+        return self._runtime_capabilities
 
     @property
     def session_manager(self) -> SessionManager:
@@ -307,10 +375,11 @@ class Kernel:
         not_recoverable_reason: str | None = None,
     ) -> None:
         latest = self._checkpoint_manager.get_latest_step(task_id) or 0
+        checkpoint_state = "running" if state in {"completed", "failed"} else state
         self._checkpoint_manager.save(
             task_id=task_id,
             step=latest + 1,
-            state=state,
+            state=checkpoint_state,
             status=state,
             agent_id=agent_id,
             input_data={"task": task, "plugin": plugin, "action": action},
@@ -323,6 +392,7 @@ class Kernel:
             recoverable=recoverable,
             not_recoverable_reason=not_recoverable_reason,
             result=output if isinstance(output, dict) else {},
+            stage_history=[{"name": state}],
         )
 
     def execute_task(
@@ -333,7 +403,175 @@ class Kernel:
         params: dict[str, Any] | None = None,
         agent_id: str = "alpha",
         progress_callback: Callable[[dict[str, Any]], None] | None = None,
+        use_agent_chain: bool | None = None,
+    ) -> dict[str, Any]:
+        """Execute every task inside the mandatory Harness lifecycle."""
+        self._config.reload()
+        configured_mode = self._config.get_agents_config()["mode"]
+        resolved_agent_mode = (
+            configured_mode == "multi"
+            if use_agent_chain is None
+            else bool(use_agent_chain)
+        )
+        try:
+            run = self._harness_runtime.begin(
+                task=task,
+                entrypoint="kernel.execute_task",
+                agent_mode="multi" if resolved_agent_mode else "single",
+                agent_id=agent_id,
+            )
+        except Exception as exc:
+            return {
+                "status": "harness_unavailable",
+                "task": task,
+                "agent": agent_id,
+                "plugin": plugin_name,
+                "action": action,
+                "output": None,
+                "error": {"code": "harness_unavailable", "message": str(exc)},
+                "metadata": {
+                    "harness": {
+                        "enabled": True,
+                        "participated": False,
+                        "finalized": False,
+                    }
+                },
+            }
+        result: dict[str, Any]
+        try:
+            result = self._execute_task_uninstrumented(
+                task,
+                plugin_name=plugin_name,
+                action=action,
+                params=params,
+                agent_id=agent_id,
+                progress_callback=progress_callback,
+                use_agent_chain=resolved_agent_mode,
+                task_id=run.run_id,
+            )
+        except RuntimeInvariantError as exc:
+            result = {
+                "status": "runtime_invariant_error",
+                "task": task,
+                "agent": agent_id,
+                "plugin": plugin_name,
+                "action": action,
+                "output": None,
+                "error": exc.to_dict(),
+                "metadata": {},
+            }
+        except PermissionError as exc:
+            result = {
+                "status": "denied",
+                "task": task,
+                "agent": agent_id,
+                "plugin": plugin_name,
+                "action": action,
+                "output": None,
+                "error": {
+                    "code": "agent_permission_denied",
+                    "message": str(exc),
+                },
+                "metadata": {
+                    "permission": {"checked": True, "result": "denied"},
+                    "agent_mode": "multi" if resolved_agent_mode else "single",
+                },
+            }
+        except Exception as exc:
+            result = {
+                "status": "failed",
+                "task": task,
+                "agent": agent_id,
+                "plugin": plugin_name,
+                "action": action,
+                "output": None,
+                "error": {"code": "kernel_execution_error", "message": str(exc)},
+                "metadata": {},
+            }
+        finally:
+            final = None
+            finalize_error = None
+            try:
+                final = self._harness_runtime.finalize(
+                    run,
+                    status=str(result.get("status", "failed"))
+                    if "result" in locals()
+                    else "failed",
+                    output=result.get("output") if "result" in locals() else None,
+                    error=result.get("error") if "result" in locals() else None,
+                )
+            except Exception as exc:
+                finalize_error = exc
+        if finalize_error is not None:
+            return {
+                "status": "harness_unavailable",
+                "task": task,
+                "agent": agent_id,
+                "plugin": plugin_name,
+                "action": action,
+                "output": None,
+                "error": {
+                    "code": "harness_unavailable",
+                    "message": str(finalize_error),
+                },
+                "metadata": {
+                    "harness": {
+                        "enabled": True,
+                        "participated": True,
+                        "finalized": False,
+                    }
+                },
+            }
+        assert final is not None
+        metadata = result.setdefault("metadata", {})
+        if not isinstance(metadata, dict):
+            metadata = result["metadata"] = {}
+        metadata["harness"] = {
+            "enabled": True,
+            "participated": True,
+            "finalized": True,
+            "verification": final["verification"],
+        }
+        metadata.setdefault(
+            "agent_mode", "multi" if resolved_agent_mode else "single"
+        )
+        if "rag" not in metadata:
+            classification = self._rag_service.classify_task(
+                task, result.get("plugin"), result.get("action")
+            )
+            skip_reason = (
+                "control_task" if classification == "control" else "deterministic_plugin"
+            )
+            metadata["rag"] = {
+                "enabled": True,
+                "status": "skipped",
+                "skip_reason": skip_reason,
+            }
+        rag_metadata = metadata.get("rag")
+        if isinstance(rag_metadata, dict) and "sources" in rag_metadata:
+            metadata.setdefault("sources", rag_metadata["sources"])
+        metadata.setdefault("sources", [])
+        permission_metadata = metadata.get("permission")
+        if not isinstance(permission_metadata, dict):
+            metadata["permission"] = {
+                "checked": True,
+                "result": permission_metadata or "allowed",
+            }
+        else:
+            permission_metadata.setdefault("checked", True)
+        result["run_id"] = run.run_id
+        return result
+
+    def _execute_task_uninstrumented(
+        self,
+        task: str,
+        plugin_name: str | None = None,
+        action: str | None = None,
+        params: dict[str, Any] | None = None,
+        agent_id: str = "alpha",
+        progress_callback: Callable[[dict[str, Any]], None] | None = None,
         use_agent_chain: bool = False,
+        task_id: str | None = None,
     ) -> dict[str, Any]:
         """执行用户任务或医疗插件，返回结构化结果。
 
@@ -349,24 +587,39 @@ class Kernel:
         # (e.g. permission mode switch via PermissionScreenController).
         self._config.reload()
         self._plugin_registry.discover()
+        self._runtime_capabilities = validate_required_plugins(
+            self._plugin_registry, self._config_path
+        )
+        self._refresh_runtime_capabilities()
 
         def emit(kind: str, message: str = "", **payload: Any) -> None:
             if progress_callback is None:
                 return
             progress_callback({"kind": kind, "message": message, **payload})
 
-        task_id = (
-            f"kernel-{abs(hash((task, plugin_name, action, agent_id))) & 0xFFFFFFFF:x}"
-        )
+        task_id = task_id or str(uuid4())
+        workspace_path = None
+        workspace = (params or {}).get("_workspace")
+        if isinstance(workspace, dict) and workspace.get("path"):
+            workspace_path = Path(str(workspace["path"]))
 
         # --- optional multi-agent chain ---
         if use_agent_chain:
-            return self._execute_agent_chain(
+            rag_context = self._rag_service.retrieve(task, workspace_path)
+            result = self._execute_agent_chain(
                 task,
                 task_id=task_id,
                 emit=emit,
+                rag_context=rag_context,
                 progress_callback=progress_callback,
             )
+            metadata = result.setdefault("metadata", {})
+            metadata["rag"] = {
+                **rag_context.as_metadata(),
+                "sources": list(rag_context.sources),
+            }
+            metadata["agent_mode"] = "multi"
+            return result
 
         self._checkpoint_task(
             task_id=task_id,
@@ -389,8 +642,17 @@ class Kernel:
                 task_id=task_id,
                 agent_id=agent_id,
                 progress_callback=progress_callback,
+                workspace_path=workspace_path,
             )
         selected_plugin, selected_action = dispatch
+        plugin_rag_context = None
+        if (
+            self._rag_service.classify_task(task, selected_plugin, selected_action)
+            == "knowledge_generation"
+        ):
+            plugin_rag_context = self._rag_service.retrieve(task, workspace_path)
+            params = dict(params or {})
+            params["_rag_context"] = plugin_rag_context.as_prompt_payload()
 
         self._checkpoint_task(
             task_id=task_id,
@@ -433,10 +695,18 @@ class Kernel:
             )
 
         # --- execute plugin and shape result ---
-        return self._execute_plugin(
+        result = self._execute_plugin(
             plugin, selected_action, params, execution_context,
             task, agent_id, selected_plugin, task_id, emit,
         )
+        if plugin_rag_context is not None:
+            metadata = result.setdefault("metadata", {})
+            if isinstance(metadata, dict):
+                metadata["rag"] = {
+                    **plugin_rag_context.as_metadata(),
+                    "sources": list(plugin_rag_context.sources),
+                }
+        return result
 
     def _dispatch_plugin_task(
         self,
@@ -695,10 +965,12 @@ class Kernel:
         task_id: str,
         agent_id: str,
         progress_callback: Callable[[dict[str, Any]], None] | None = None,
+        workspace_path: Path | None = None,
     ) -> dict[str, Any]:
         """Execute an unmatched natural-language task through the configured LLM."""
         # Ensure config is fresh before building LLM messages with permission context.
         self._config.reload()
+        rag_context = self._rag_service.retrieve(task, workspace_path)
         return _execute_llm_chat_fn(
             task,
             task_id=task_id,
@@ -708,6 +980,10 @@ class Kernel:
             config_path=self._config_path,
             checkpoint_task_fn=self._checkpoint_task,
             progress_callback=progress_callback,
+            rag_context={
+                **rag_context.as_metadata(),
+                "sources": list(rag_context.sources),
+            },
         )
 
     def _llm_chat_messages(self, task: str) -> list[dict[str, str]]:

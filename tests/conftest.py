@@ -119,7 +119,7 @@ def kernel(tmp_path):
     )
     return Kernel(
         config_path=config_path,
-        plugins_dir=tmp_path / "plugins",
+        plugins_dir="plugins",
         policies_dir=tmp_path / "policies",
     )
 

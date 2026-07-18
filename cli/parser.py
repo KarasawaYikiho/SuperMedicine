@@ -192,6 +192,13 @@ def main(argv: list[str] | None = None) -> None:
         help="显式工作区 slug ID（workspaces/<id>；不会读取 TUI 最近状态）",
     )
 
+    run_parser.add_argument(
+        "--agents",
+        choices=("single", "multi"),
+        default=None,
+        help="Agent execution mode; defaults to agents.mode from config",
+    )
+
     self_evolve_parser = subparsers.add_parser(
         "self-evolve",
         aliases=["self-evolution"],
@@ -814,6 +821,7 @@ def main(argv: list[str] | None = None) -> None:
             action=args.action,
             params=params,
             workspace=args.workspace,
+            agents=args.agents,
         )
     elif args.command in {"self-evolve", "self-evolution"}:
         cli.self_evolve(

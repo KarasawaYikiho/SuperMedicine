@@ -8,6 +8,23 @@ Public release labels and Python package versions may differ when the public lab
 is not PEP 440-compatible. Current public/release label: **Beta0.4.2**. Current
 Python package fallback version: **0.4.2b0**.
 
+## [Unreleased]
+
+### Added
+
+- Added mandatory runtime capability validation, a UUID-based Harness lifecycle,
+  local-first RAG orchestration, workspace paper indexing, PDF page extraction,
+  and shared CLI/TUI/Web health reporting.
+
+### Changed
+
+- Harness and RAG are now fail-closed required capabilities. Knowledge tasks
+  inject traceable BM25 evidence into LLM and multi-agent contexts; empty sources
+  are explicit and deterministic/control tasks record enumerated skip reasons.
+- Multi-agent execution now defaults to single mode, supports explicit CLI/Web
+  selection, and remains inside the same permission, audit, RAG, and Harness
+  envelope.
+
 ## [Beta0.4.2] - 2026-06-07
 
 ### Added

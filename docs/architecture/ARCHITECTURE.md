@@ -27,6 +27,14 @@ The Kernel is a wiring point. Domain behavior belongs in focused modules:
 workspaces, paper import, experience records, plugins, permissions, installer
 logic, or UI-specific controllers.
 
+The mandatory execution order is runtime validation, Harness begin, task
+classification, local-first RAG where required, permission checks, single or
+multi-agent execution, and exactly one Harness finalize. `RuntimeCapabilities`
+is the shared health snapshot consumed by CLI, TUI, and Web. Harness/RAG
+manifests are declarations; `validate_required_plugins()` is the code-level
+fail-closed enforcement. Multi-agent mode defaults to single and cannot create a
+parallel top-level lifecycle.
+
 ## Core Boundaries
 
 | Area | Owner | Rule |

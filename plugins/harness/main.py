@@ -14,6 +14,10 @@ from plugins.tools._common import required_str
 PLUGIN_NAME = "harness-core"
 
 ACTION_CONTRACTS: dict[str, dict[str, Any]] = {
+    "harness.runtime.health": {
+        "required_params": {},
+        "output_fields": ["required", "healthy", "disable_supported", "participating"],
+    },
     "harness.integration.checkpoint": {
         "required_params": {"checkpoint_dir": "str", "task_id": "str"},
         "output_fields": [
@@ -69,7 +73,14 @@ def execute(
     metadata = _base_metadata(context)
 
     try:
-        if action == "harness.integration.checkpoint":
+        if action == "harness.runtime.health":
+            output = {
+                "required": True,
+                "healthy": True,
+                "disable_supported": False,
+                "participating": bool(context),
+            }
+        elif action == "harness.integration.checkpoint":
             output = _execute_checkpoint(params)
         elif action == "harness.integration.checkpoint_all":
             output = _execute_checkpoint_all(params)

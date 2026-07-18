@@ -17,6 +17,17 @@ SuperMedicine 不是临床决策系统。所有生成内容都只应作为科研
 
 当前发布标签：**Beta0.4.2**。Python 包 fallback 版本：**0.4.2b0**。
 
+## 强制 Harness 与 RAG 运行时
+
+所有正式 CLI、TUI、Web、插件、LLM 与可选多 Agent 任务都进入同一 Kernel
+管线。Harness 与 local-first RAG 是不可关闭的必需能力；配置、环境变量或插件
+参数都不能绕过。必需组件缺失、损坏或存储不可写时以结构化错误 fail closed。
+
+知识生成任务在生成前检索证据；空索引明确报告 `rag.status=empty`，不得伪造
+来源。确定性和控制动作记录枚举化 `skipped` 原因。PubMed 始终经过权限检查，
+被拒绝时降级使用本地证据。多 Agent 默认 `agents.mode: single`，启用后仍使用
+同一 Harness、RAG、权限、审计与结果封装。
+
 ## 先读这些
 
 - [安装指南](docs/guides/INSTALL.md)
