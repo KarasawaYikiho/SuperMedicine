@@ -22,6 +22,7 @@ pytest.importorskip("matplotlib")
 # Fix 1: check.py — DPI empty tuple
 # ---------------------------------------------------------------------------
 
+
 class TestCheckDpiTuple:
     """Verify _check_raster handles DPI as tuple correctly."""
 
@@ -44,14 +45,18 @@ class TestCheckDpiTuple:
         sys.modules["PIL"] = mock_pil
         sys.modules["PIL.Image"] = mock_image_mod
         try:
-            from plugins.figure.check import _check_raster
+            from plugins.figure.audit import _check_raster
+
             issues, info = _check_raster("fake.png", "png", 300, None)
         finally:
             sys.modules.pop("PIL", None)
             sys.modules.pop("PIL.Image", None)
 
-        severity_msgs = [(s, m) for s, m in issues if "empty tuple" in m.lower()
-                         or "cannot determine" in m.lower()]
+        severity_msgs = [
+            (s, m)
+            for s, m in issues
+            if "empty tuple" in m.lower() or "cannot determine" in m.lower()
+        ]
         assert len(severity_msgs) >= 1, f"Expected empty-tuple warning, got: {issues}"
         assert severity_msgs[0][0] == "WARN"
 
@@ -76,6 +81,7 @@ class TestCheckDpiTuple:
 # ---------------------------------------------------------------------------
 # Fix 2: export.py — formats parameter accepts string
 # ---------------------------------------------------------------------------
+
 
 class TestExportFormatsString:
     """Verify export_figure handles string formats parameter."""
@@ -127,6 +133,7 @@ class TestExportFormatsString:
 # Fix 3: qa.py — y-axis tick label overlap detection
 # ---------------------------------------------------------------------------
 
+
 class TestQaTickOverlap:
     """Verify _ticklabels_overlap uses correct coordinates per axis."""
 
@@ -145,39 +152,36 @@ class TestQaTickOverlap:
 
     def test_y_axis_detects_vertical_overlap(self):
         """Y-axis labels that overlap vertically should be detected."""
-        from plugins.figure.qa import _ticklabels_overlap
+        from plugins.figure.audit import _ticklabels_overlap
 
         renderer = MagicMock()
         # Two labels stacked vertically with overlap
-        label1 = self._make_label(0, 0, 50, 30)   # bottom label
-        label2 = self._make_label(0, 20, 50, 50)   # top label (overlaps by 10px)
+        label1 = self._make_label(0, 0, 50, 30)  # bottom label
+        label2 = self._make_label(0, 20, 50, 50)  # top label (overlaps by 10px)
 
-        result = _ticklabels_overlap([label1, label2], renderer,
-                                     axis="y", tol=1.0)
+        result = _ticklabels_overlap([label1, label2], renderer, axis="y", tol=1.0)
         assert result is True, "Y-axis vertical overlap should be detected"
 
     def test_y_axis_no_overlap_when_separated(self):
         """Y-axis labels with no vertical overlap should not trigger."""
-        from plugins.figure.qa import _ticklabels_overlap
+        from plugins.figure.audit import _ticklabels_overlap
 
         renderer = MagicMock()
         label1 = self._make_label(0, 0, 50, 20)
         label2 = self._make_label(0, 30, 50, 50)  # gap of 10px
 
-        result = _ticklabels_overlap([label1, label2], renderer,
-                                     axis="y", tol=1.0)
+        result = _ticklabels_overlap([label1, label2], renderer, axis="y", tol=1.0)
         assert result is False, "Separated y-axis labels should not overlap"
 
     def test_x_axis_detects_horizontal_overlap(self):
         """X-axis labels that overlap horizontally should be detected."""
-        from plugins.figure.qa import _ticklabels_overlap
+        from plugins.figure.audit import _ticklabels_overlap
 
         renderer = MagicMock()
         label1 = self._make_label(0, 0, 40, 20)
         label2 = self._make_label(30, 0, 70, 20)  # overlaps by 10px
 
-        result = _ticklabels_overlap([label1, label2], renderer,
-                                     axis="x", tol=1.0)
+        result = _ticklabels_overlap([label1, label2], renderer, axis="x", tol=1.0)
         assert result is True, "X-axis horizontal overlap should be detected"
 
 
@@ -185,19 +189,20 @@ class TestQaTickOverlap:
 # Fix 4: layout.py — _letter_sequence for n>702
 # ---------------------------------------------------------------------------
 
+
 class TestLetterSequence:
     """Verify _letter_sequence generates correct labels for large n."""
 
     def test_basic_sequence(self):
         """a, b, ..., z for first 26."""
-        from plugins.figure.layout import _letter_sequence
+        from plugins.figure.presentation import _letter_sequence
 
         result = _letter_sequence(26)
         assert result == list(string.ascii_lowercase)
 
     def test_two_letter_sequence(self):
         """aa, ab, ..., az for indices 26-51."""
-        from plugins.figure.layout import _letter_sequence
+        from plugins.figure.presentation import _letter_sequence
 
         result = _letter_sequence(52)
         assert result[26] == "aa"
@@ -206,14 +211,14 @@ class TestLetterSequence:
 
     def test_three_letter_boundary(self):
         """Index 702 should produce 'aaa' (3-letter label)."""
-        from plugins.figure.layout import _letter_sequence
+        from plugins.figure.presentation import _letter_sequence
 
         result = _letter_sequence(703)
         assert result[702] == "aaa", f"Expected 'aaa' at index 702, got '{result[702]}'"
 
     def test_large_n_does_not_crash(self):
         """Generating 1000 labels should not raise IndexError."""
-        from plugins.figure.layout import _letter_sequence
+        from plugins.figure.presentation import _letter_sequence
 
         result = _letter_sequence(1000)
         assert len(result) == 1000
@@ -226,7 +231,7 @@ class TestLetterSequence:
 
     def test_sequence_ordering(self):
         """Labels should be in lexicographic order within same length."""
-        from plugins.figure.layout import _letter_sequence
+        from plugins.figure.presentation import _letter_sequence
 
         result = _letter_sequence(703)
         # All single-letter labels
@@ -243,6 +248,7 @@ class TestLetterSequence:
 # Fix 5: runner.py — exception logging in panel labels
 # ---------------------------------------------------------------------------
 
+
 class TestRunnerExceptionLogging:
     """Verify runner.py logs panel label exceptions instead of swallowing."""
 
@@ -256,7 +262,10 @@ class TestRunnerExceptionLogging:
             mock_layout.add_panel_labels.side_effect = ValueError("test error")
             with patch("plugins.figure.runner.qa_mod") as mock_qa:
                 mock_qa.audit_layout.return_value = []
-                mock_qa.format_audit_report.return_value = {"verdict": "PASS", "issues": []}
+                mock_qa.format_audit_report.return_value = {
+                    "verdict": "PASS",
+                    "issues": [],
+                }
                 with patch("plugins.figure.runner.style_mod") as mock_style:
                     mock_style.setup_style.return_value = {}
                     result = execute_figure_workflow(

@@ -37,3 +37,39 @@ def test_harness_keeps_one_entrypoint_and_one_shared_monitor_module():
         encoding="utf-8"
     )
     assert "from agents.checkpoint import CheckpointRepository" in monitor_source
+
+
+def test_figure_keeps_all_entrypoints_in_six_maintainer_owned_modules():
+    paths = sorted((PROJECT_ROOT / "plugins" / "figure").glob("*.py"))
+    assert [path.name for path in paths] == [
+        "__init__.py",
+        "audit.py",
+        "export.py",
+        "presentation.py",
+        "profile.py",
+        "runner.py",
+    ]
+
+    from plugins.figure.runner import _ACTION_MAP
+
+    assert set(_ACTION_MAP) == {
+        "figure-profile.profile",
+        "figure-style.setup",
+        "figure-style.list-fonts",
+        "figure-export.export",
+        "figure-check.audit",
+        "figure-layout.labels",
+        "figure-layout.finalize",
+        "figure-qa.audit",
+        "figure-qa.preview",
+    }
+
+    from plugins.figure.check import check_figure
+    from plugins.figure.layout import finalize_figure
+    from plugins.figure.qa import audit_layout
+    from plugins.figure.style import setup_style
+
+    assert all(
+        callable(item)
+        for item in (check_figure, finalize_figure, audit_layout, setup_style)
+    )

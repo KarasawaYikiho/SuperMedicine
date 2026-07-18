@@ -19,11 +19,11 @@ from typing import Any
 # Sub-module imports
 # ---------------------------------------------------------------------------
 from . import profile as profile_mod
-from . import style as style_mod
 from . import export as export_mod
-from . import check as check_mod
-from . import layout as layout_mod
-from . import qa as qa_mod
+from . import audit as check_mod
+from . import audit as qa_mod
+from . import presentation as layout_mod
+from . import presentation as style_mod
 
 # ---------------------------------------------------------------------------
 # Path to reference documents bundled with the plugin
@@ -47,14 +47,42 @@ def _read_reference(filename: str) -> str:
 # workflow to decide which steps need emphasis.
 _INTENT_KEYWORDS: dict[str, list[str]] = {
     "profile": ["profile", "eda", "explore", "profiling", "数据探索", "数据概况"],
-    "style": ["style", "journal", "nature", "science", "ieee", "字体", "font", "样式", "cjk"],
+    "style": [
+        "style",
+        "journal",
+        "nature",
+        "science",
+        "ieee",
+        "字体",
+        "font",
+        "样式",
+        "cjk",
+    ],
     "export": ["export", "save", "pdf", "svg", "png", "导出", "保存"],
     "check": ["check", "audit", "compliance", "合规", "检查"],
     "layout": ["layout", "label", "panel", "align", "标签", "对齐", "子图"],
     "qa": ["qa", "preview", "visual", "review", "预览", "自检", "视觉"],
-    "plot": ["plot", "chart", "figure", "画图", "图表", "柱状图", "散点图",
-             "折线图", "箱线图", "热力图", "直方图", "bar", "scatter",
-             "line", "box", "heatmap", "histogram", "violin", "可视化"],
+    "plot": [
+        "plot",
+        "chart",
+        "figure",
+        "画图",
+        "图表",
+        "柱状图",
+        "散点图",
+        "折线图",
+        "箱线图",
+        "热力图",
+        "直方图",
+        "bar",
+        "scatter",
+        "line",
+        "box",
+        "heatmap",
+        "histogram",
+        "violin",
+        "可视化",
+    ],
 }
 
 
@@ -75,6 +103,7 @@ def _extract_intent(task: str) -> set[str]:
 # Chart-type recommendation (Step 2)
 # ---------------------------------------------------------------------------
 
+
 def _recommend_chart(profile_info: dict) -> list[str]:
     """Translate data profile into concrete chart-type recommendations.
 
@@ -85,8 +114,11 @@ def _recommend_chart(profile_info: dict) -> list[str]:
 
     columns = profile_info.get("columns", {})
     cont_cols = [c for c, m in columns.items() if m.get("type") == "continuous"]
-    cat_cols = [c for c, m in columns.items()
-                if m.get("type") in ("categorical", "boolean", "ordinal")]
+    cat_cols = [
+        c
+        for c, m in columns.items()
+        if m.get("type") in ("categorical", "boolean", "ordinal")
+    ]
     dt_cols = [c for c, m in columns.items() if m.get("type") == "datetime"]
 
     # Time-series
@@ -111,9 +143,7 @@ def _recommend_chart(profile_info: dict) -> list[str]:
 
     # Two continuous → scatter
     if len(cont_cols) >= 2:
-        suggestions.append(
-            f"Scatter + regression (x={cont_cols[0]}, y={cont_cols[1]})"
-        )
+        suggestions.append(f"Scatter + regression (x={cont_cols[0]}, y={cont_cols[1]})")
 
     # Many continuous → heatmap / pairplot
     if len(cont_cols) >= 3:
@@ -127,9 +157,9 @@ def _recommend_chart(profile_info: dict) -> list[str]:
 
     # Fall back to profiler suggestions
     if not suggestions:
-        suggestions = profile_info.get("suggestions", [
-            "See references/chart_selection.md for decision framework"
-        ])
+        suggestions = profile_info.get(
+            "suggestions", ["See references/chart_selection.md for decision framework"]
+        )
 
     return suggestions
 
@@ -183,6 +213,7 @@ def _journal_spec_summary(journal: str) -> dict[str, str]:
 # Full 8-step workflow
 # ---------------------------------------------------------------------------
 
+
 def execute_figure_workflow(
     task: str,
     data_path: str | None = None,
@@ -234,9 +265,7 @@ def execute_figure_workflow(
     profile_info: dict | None = None
     if data_path:
         try:
-            profile_info = profile_mod.profile_data(
-                data_path, group_cols=group_cols
-            )
+            profile_info = profile_mod.profile_data(data_path, group_cols=group_cols)
             report_text = profile_mod.render_report(profile_info)
             result["steps"]["step_1_profile"] = {
                 "status": "success",
@@ -384,15 +413,15 @@ def execute_figure_workflow(
 
 # Mapping from action id to (submodule, function name)
 _ACTION_MAP: dict[str, tuple[Any, str]] = {
-    "figure-profile.profile":     (profile_mod, "execute"),
-    "figure-style.setup":         (style_mod,   "execute"),
-    "figure-style.list-fonts":    (style_mod,   "execute"),
-    "figure-export.export":       (export_mod,  "execute"),
-    "figure-check.audit":         (check_mod,   "execute"),
-    "figure-layout.labels":       (layout_mod,  "execute"),
-    "figure-layout.finalize":     (layout_mod,  "execute"),
-    "figure-qa.audit":            (qa_mod,      "execute"),
-    "figure-qa.preview":          (qa_mod,      "execute"),
+    "figure-profile.profile": (profile_mod, "execute"),
+    "figure-style.setup": (style_mod, "execute_style"),
+    "figure-style.list-fonts": (style_mod, "execute_style"),
+    "figure-export.export": (export_mod, "execute"),
+    "figure-check.audit": (check_mod, "execute_check"),
+    "figure-layout.labels": (layout_mod, "execute_layout"),
+    "figure-layout.finalize": (layout_mod, "execute_layout"),
+    "figure-qa.audit": (qa_mod, "execute_qa"),
+    "figure-qa.preview": (qa_mod, "execute_qa"),
 }
 
 
