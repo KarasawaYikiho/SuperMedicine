@@ -12,6 +12,7 @@ import yaml
 
 from core.redaction import redact_sensitive
 from core.llm_providers.config import LLMProviderConfig, sanitized_headers
+from core.secure_files import secure_config_permissions
 from permission.access_mode import AccessMode, AccessModePolicy, normalize_access_mode
 
 
@@ -139,6 +140,7 @@ class ConfigCenter:
         with open(self._config_path, "w", encoding="utf-8") as f:
             yaml.dump(self._config, f, allow_unicode=True, default_flow_style=False)
             f.flush()
+        secure_config_permissions(self._config_path)
 
     def reload(self) -> None:
         """从磁盘重新读取配置文件，刷新内存中的配置。

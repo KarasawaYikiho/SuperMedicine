@@ -29,6 +29,7 @@ import yaml
 
 from core.llm_providers.config import LLMProviderConfig
 from core.redaction import redact_sensitive
+from core.secure_files import secure_config_permissions
 from permission.policy import ensure_default_policy
 from installer.component_installer import (
     ComponentDef,
@@ -180,6 +181,7 @@ def _write_config(config_file: Path, config: dict[str, Any]) -> None:
         header + yaml.safe_dump(config, sort_keys=False, allow_unicode=True),
         encoding="utf-8",
     )
+    secure_config_permissions(config_file)
 
 
 def _normalize_provider(provider: str | None) -> str | None:
