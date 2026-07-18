@@ -3,7 +3,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-from tests.feature_contract.inventory import discovered_surface
+from tests.feature_contract.inventory import collect_metrics, discovered_surface
 
 def test_manifest_has_unique_ids_and_required_contract_fields(manifest: dict[str, object]) -> None:
     records = manifest["features"]
@@ -91,3 +91,24 @@ def test_manifest_covers_release_entrypoints(manifest: dict[str, object]) -> Non
 def test_manifest_covers_database_schema(manifest: dict[str, object]) -> None:
     entries = {record["entrypoint"] for record in manifest["features"]}
     assert "database_table:agents" in entries
+
+
+def test_manifest_records_reproducible_structural_metrics(
+    repository_root: Path, manifest: dict[str, object]
+) -> None:
+    metrics = manifest["metrics"]
+    required = {
+        "feature_id_count",
+        "production_python_files",
+        "production_python_loc",
+        "production_python_effective_loc",
+        "functions_and_methods",
+        "public_top_level_symbols",
+        "functions_over_60_lines",
+        "functions_over_100_lines",
+        "top_level_dependency_edges",
+    }
+    assert required <= set(metrics)
+    assert all(isinstance(metrics[name], int) and metrics[name] >= 0 for name in required)
+    current_metrics = collect_metrics(repository_root)
+    assert current_metrics == {name: metrics[name] for name in current_metrics}

@@ -4,7 +4,15 @@
   "audit_reference": "49ac6f88264fe4e06090af39154f2a089a18d8ef",
   "baseline_relationship": "audit_reference_is_not_an_ancestor_of_implementation_baseline",
   "metrics": {
-    "feature_id_count": 158
+    "feature_id_count": 158,
+    "production_python_files": 182,
+    "production_python_loc": 38897,
+    "production_python_effective_loc": 33270,
+    "functions_and_methods": 1608,
+    "public_top_level_symbols": 472,
+    "functions_over_60_lines": 78,
+    "functions_over_100_lines": 28,
+    "top_level_dependency_edges": 17
   },
   "features": [
     {
@@ -1289,4 +1297,5 @@
     "web:WEBSOCKET /ws/chat"
   ]
 }
+
 

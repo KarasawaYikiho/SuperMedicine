@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import re
+import subprocess
 from pathlib import Path
 
 import yaml
@@ -126,6 +127,81 @@ def discover_database_tables(root: Path) -> set[str]:
             )
         )
     return tables
+
+
+def _tracked_production_python_files(root: Path) -> list[Path]:
+    result = subprocess.run(
+        ["git", "ls-files", "*.py"],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    excluded_roots = {"tests", "docs", "build", "dist"}
+    return [
+        root / relative
+        for line in result.stdout.splitlines()
+        if (relative := Path(line)).parts
+        and relative.parts[0] not in excluded_roots
+    ]
+
+
+def collect_metrics(root: Path) -> dict[str, int]:
+    source_paths = _tracked_production_python_files(root)
+    raw_loc = 0
+    effective_loc = 0
+    functions: list[ast.FunctionDef | ast.AsyncFunctionDef] = []
+    public_symbols = 0
+    dependency_edges: set[tuple[str, str]] = set()
+    project_modules = {
+        path.parts[0]
+        for path in (Path(item.relative_to(root)) for item in source_paths)
+    }
+
+    for source_path in source_paths:
+        source = source_path.read_text(encoding="utf-8")
+        lines = source.splitlines()
+        raw_loc += len(lines)
+        effective_loc += sum(
+            1 for line in lines if line.strip() and not line.lstrip().startswith("#")
+        )
+        tree = ast.parse(source)
+        functions.extend(
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        )
+        public_symbols += sum(
+            1
+            for node in tree.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+            and not node.name.startswith("_")
+        )
+
+        source_module = source_path.relative_to(root).parts[0]
+        for node in tree.body:
+            imported: str | None = None
+            if isinstance(node, ast.Import) and node.names:
+                imported = node.names[0].name.split(".", maxsplit=1)[0]
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                imported = node.module.split(".", maxsplit=1)[0]
+            if imported in project_modules and imported != source_module:
+                dependency_edges.add((source_module, imported))
+
+    function_lengths = [
+        (node.end_lineno or node.lineno) - node.lineno + 1 for node in functions
+    ]
+    return {
+        "production_python_files": len(source_paths),
+        "production_python_loc": raw_loc,
+        "production_python_effective_loc": effective_loc,
+        "functions_and_methods": len(functions),
+        "public_top_level_symbols": public_symbols,
+        "functions_over_60_lines": sum(length > 60 for length in function_lengths),
+        "functions_over_100_lines": sum(length > 100 for length in function_lengths),
+        "top_level_dependency_edges": len(dependency_edges),
+    }
 
 
 def discovered_surface(root: Path) -> dict[str, set[str]]:
