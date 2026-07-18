@@ -307,3 +307,21 @@ def test_permission_log_system_service_owns_log_write_and_list(tmp_path):
 
     assert written.ok is True
     assert listed.data[0]["session_id"] == "service-session"
+
+
+def test_agent_harness_service_owns_dialog_history(tmp_path):
+    from core.services import AgentHarnessService, WorkspaceService
+
+    WorkspaceService(tmp_path).create("trial-1")
+    service = AgentHarnessService(tmp_path)
+    appended = service.append_dialog_event(
+        "trial-1", event="task_completed", summary="Safe summary"
+    )
+    listed = service.list_dialog_events("trial-1")
+
+    assert appended.ok is True
+    assert listed.data == [appended.data]
+    assert listed.meta == {
+        "service": "agent_harness",
+        "operation": "list_dialog_events",
+    }

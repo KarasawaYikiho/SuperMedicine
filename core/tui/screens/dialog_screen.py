@@ -10,6 +10,7 @@ from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Select, Static
 
 from core.redaction import redact_sensitive
+from core.services import AgentHarnessService
 from core.tui.app import apply_status_style
 from core.tui.i18n import t
 
@@ -74,11 +75,9 @@ class DialogView(Vertical):
             )
             return
 
-        from core.tui.dialog_history import DialogHistoryStore
-
-        store = DialogHistoryStore(project_root=self._project_root)
         try:
-            events = store.load_events(workspace_id)
+            service = AgentHarnessService(self._project_root)
+            events = service.require_data(service.list_dialog_events(workspace_id))
             if not events:
                 self._set_status(
                     f"{t('dialog_refreshed')}：{t('dialog_no_history')}"
@@ -88,10 +87,10 @@ class DialogView(Vertical):
                 return
             for event in events:
                 table.add_row(
-                    event.event,
-                    event.summary[:80],
-                    event.created_at,
-                    key=event.id,
+                    str(event.get("event", "")),
+                    str(event.get("summary", ""))[:80],
+                    str(event.get("created_at", "")),
+                    key=str(event.get("id", "")),
                 )
             self._set_status(
                 f"{t('dialog_refreshed')}: {len(events)}"

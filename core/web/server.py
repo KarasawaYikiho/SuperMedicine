@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from core.services import (
+    AgentHarnessService,
     ExperimentToolService,
     ExperienceEvolutionService,
     LLMService,
@@ -102,6 +103,7 @@ def create_app() -> Any:
             "confirmation_required": 400,
             "evolution_artifact_not_found": 404,
             "system_error": 400,
+            "agent_harness_error": 400,
         }.get(code, 500)
         return _web_error(error.message if error else "Service failed", status_code)
 
@@ -611,14 +613,9 @@ def create_app() -> Any:
     @app.get("/api/v1/workspaces/{workspace_id}/dialog-history")
     async def dialog_history_list(workspace_id: str) -> Any:
         """List redacted dialog history summary events for a workspace."""
-        try:
-            from core.tui.dialog_history import DialogHistoryStore
-
-            events = DialogHistoryStore(project_root=Path.cwd()).load_events(workspace_id)
-            return [event.to_dict() for event in events]
-        except Exception as exc:
-            logger.exception("dialog_history_list error")
-            return _web_error(str(exc), 500)
+        return _service_data(
+            AgentHarnessService(Path.cwd()).list_dialog_events(workspace_id)
+        )
 
     # ---- Self Evolution endpoints ----------------------------------------
 
