@@ -94,6 +94,8 @@ def create_app() -> Any:
             "invalid_tool_manifest": 422,
             "invalid_tool_candidate": 422,
             "tool_not_found": 404,
+            "experiment_error": 400,
+            "experiment_session_not_found": 404,
         }.get(code, 500)
         return _web_error(error.message if error else "Service failed", status_code)
 
@@ -579,13 +581,14 @@ def create_app() -> Any:
         try:
             if session_file:
                 path = _experiment_session_path(session_file)
-                return _get_cli().experiment_show(path)
-            return _get_cli().experiment_list()
+                return _service_data(
+                    ExperimentToolService(Path.cwd()).show_experiment(path)
+                )
+            return _service_data(
+                ExperimentToolService(Path.cwd()).list_experiments()
+            )
         except ValueError as exc:
             return _web_error(str(exc), 400)
-        except Exception as exc:
-            logger.exception("experiment_list error")
-            return _web_error(str(exc), 500)
 
     @app.post("/api/v1/experiments")
     async def experiment_create(request: dict[str, Any]) -> dict[str, Any]:
@@ -593,11 +596,11 @@ def create_app() -> Any:
         protocol = request.get("protocol", "")
         if not protocol:
             return _web_error("No protocol specified", 400)
-        try:
-            return _get_cli().experiment_start(protocol, session_id=request.get("session_id"))
-        except Exception as exc:
-            logger.exception("experiment_create error")
-            return _web_error(str(exc), 500)
+        return _service_data(
+            ExperimentToolService(Path.cwd()).start_experiment(
+                protocol, session_id=request.get("session_id")
+            )
+        )
 
     @app.post("/api/v1/experiments/{session_file}/submit")
     async def experiment_submit(session_file: str, request: dict[str, Any]) -> dict[str, Any]:
@@ -607,12 +610,17 @@ def create_app() -> Any:
         if not all([step_id, input_json]):
             return _web_error("step_id and input_json are required", 400)
         try:
-            return _get_cli().experiment_submit(
-                session_file, step_id, input_json, calculate=request.get("calculate", False)
+            path = _experiment_session_path(session_file)
+        except ValueError as exc:
+            return _web_error(str(exc), 400)
+        return _service_data(
+            ExperimentToolService(Path.cwd()).submit_experiment(
+                path,
+                step_id,
+                input_json,
+                calculate=bool(request.get("calculate", False)),
             )
-        except Exception as exc:
-            logger.exception("experiment_submit error")
-            return _web_error(str(exc), 500)
+        )
 
     # ---- Dialog history endpoints ----------------------------------------
 

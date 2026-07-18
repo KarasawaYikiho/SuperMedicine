@@ -217,3 +217,32 @@ def test_experiment_tool_service_invalid_language_has_stable_error(tmp_path):
 
     assert result.ok is False
     assert result.error.code == "invalid_tool_language"
+
+
+def test_experiment_tool_service_owns_experiment_start_and_show(tmp_path):
+    from core.services import ExperimentToolService
+
+    service = ExperimentToolService(tmp_path)
+    started = service.start_experiment(
+        "wb", session_id="service-session", request_id="experiment-start-1"
+    )
+    shown = service.show_experiment(started.data["session_file"])
+
+    assert started.ok is True
+    assert started.data["session"]["session_id"] == "service-session"
+    assert shown.data["current_step"]["step_id"] == "sample_preparation"
+    assert started.meta == {
+        "service": "experiment_tool",
+        "operation": "start_experiment",
+    }
+
+
+def test_experiment_tool_service_missing_session_has_stable_error(tmp_path):
+    from core.services import ExperimentToolService
+
+    result = ExperimentToolService(tmp_path).show_experiment(
+        tmp_path / "missing.json"
+    )
+
+    assert result.ok is False
+    assert result.error.code == "experiment_session_not_found"

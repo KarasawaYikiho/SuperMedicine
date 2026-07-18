@@ -191,9 +191,14 @@ def test_llm_provider_list_uses_frontend_provider_schema(monkeypatch):
 
 
 def test_experiment_detail_endpoint_returns_persisted_session_details(monkeypatch):
-    class FakeCLI:
-        def experiment_show(self, session_file):
-            return {
+    from core.services import ServiceResult
+
+    class FakeExperimentToolService:
+        def __init__(self, project_root):
+            pass
+
+        def show_experiment(self, session_file):
+            return ServiceResult.success({
                 "session_file": session_file,
                 "status": "in_progress",
                 "current_step": {"step_id": "sample_preparation"},
@@ -206,10 +211,12 @@ def test_experiment_detail_endpoint_returns_persisted_session_details(monkeypatc
                         }
                     }
                 },
-            }
+            })
 
-    monkeypatch.setattr("cli_entry.CLI", FakeCLI)
     from core.web.server import create_app
+    monkeypatch.setattr(
+        "core.web.server.ExperimentToolService", FakeExperimentToolService
+    )
 
     response = TestClient(create_app()).get(
         "/api/v1/experiments",

@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from core.redaction import redact_sensitive
-from core.serialization import json_ready
 
 if TYPE_CHECKING:
     from core.experience import ExperienceScope, ExportFormat
@@ -153,72 +152,6 @@ def _load_params_json(raw_json: str) -> dict:
     if not isinstance(params, dict):
         raise ValueError("plugin params must be a JSON object")
     return params
-
-
-def _load_input_json(raw_json: str) -> dict:
-    """Parse experiment step input from a JSON object string."""
-    try:
-        payload = json.loads(raw_json)
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"--input-json must be valid JSON: {exc.msg}") from exc
-    if not isinstance(payload, dict):
-        raise ValueError("--input-json must be a JSON object")
-    return payload
-
-
-def _dict_payload(value: object, name: str) -> dict:
-    if value is None:
-        return {}
-    if not isinstance(value, dict):
-        raise ValueError(f"{name} must be a JSON object")
-    return value
-
-
-def _load_experiment_session(path: Path) -> dict:
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except FileNotFoundError as exc:
-        raise ValueError(f"experiment session file not found: {path}") from exc
-    except (OSError, json.JSONDecodeError) as exc:
-        raise ValueError(
-            f"could not read experiment session file {path}: {exc}"
-        ) from exc
-    if not isinstance(data, dict):
-        raise ValueError("experiment session file must contain a JSON object")
-    return data
-
-
-def _save_experiment_session(path: Path, data: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(json_ready(redact_sensitive(data)), ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
-
-
-def _experiment_response(
-    session,
-    *,
-    session_file: Path,
-    medical_boundary: str,
-    record: dict | None = None,
-    plugin_request: dict | None = None,
-    kernel_result: dict | None = None,
-) -> dict:
-    next_step = session.current_step
-    return {
-        "status": session.status.value
-        if hasattr(session.status, "value")
-        else str(session.status),
-        "session_file": str(session_file),
-        "session": session.to_dict(),
-        "current_step": next_step.to_dict() if next_step else None,
-        "record": record,
-        "plugin_request": plugin_request,
-        "kernel_result": kernel_result,
-        "progress": session.progress,
-        "medical_boundary": medical_boundary,
-    }
 
 
 def _load_params_file(path: str) -> dict:

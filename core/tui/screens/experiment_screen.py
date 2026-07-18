@@ -10,20 +10,14 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Input, Static, TextArea
 
-from core.config_center import ConfigCenter
 from core.experiment_guide import (
-    ExperimentGuide,
-    ExperimentGuideError,
     ExperimentSession,
     MEDICAL_BOUNDARY,
-    append_experiment_log_event,
 )
-from core.kernel import Kernel
-from core.log_report import LogReportStore
 from core.redaction import redact_sensitive
+from core.services import ExperimentToolService
 from core.tui.app import apply_status_style
 from core.tui.i18n import t
-from permission.policy import ensure_default_policy
 
 
 class ExperimentGuideView(Vertical):
@@ -32,22 +26,28 @@ class ExperimentGuideView(Vertical):
     def __init__(self, project_root: Path | str | None = None, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._project_root = Path(project_root) if project_root else Path.cwd()
-        self._guide = ExperimentGuide()
-        self._protocols = self._guide.list_protocols()
+        self._service = ExperimentToolService(self._project_root)
+        self._protocols = self._service.require_data(
+            self._service.experiment_protocols()
+        )
         if not self._protocols:
             raise ValueError("no experiment protocols are configured")
-        self._config = ConfigCenter(
-            self._project_root / ".supermedicine" / "config.yaml"
+        selected_protocol = self._service.require_data(
+            self._service.selected_experiment_protocol()
         )
-        selected_protocol = self._config.get_selected_experiment_protocol() or "wb"
+        selected_protocol = selected_protocol or "wb"
         self._sessions_by_protocol: dict[str, ExperimentSession] = {}
         try:
-            self._session: ExperimentSession = self._guide.create_session(
-                selected_protocol, metadata={"source": "tui"}
+            self._session: ExperimentSession = self._service.require_data(
+                self._service.create_live_session(
+                    selected_protocol, metadata={"source": "tui"}
+                )
             )
         except Exception:
-            self._session = self._guide.create_session(
-                self._protocols[0].protocol_id, metadata={"source": "tui"}
+            self._session = self._service.require_data(
+                self._service.create_live_session(
+                    self._protocols[0].protocol_id, metadata={"source": "tui"}
+                )
             )
         self._sync_selected_protocol()
         self._sessions_by_protocol[self._session.protocol.protocol_id] = self._session
@@ -236,9 +236,11 @@ class ExperimentGuideView(Vertical):
         next_protocol = self._protocols[(current_index + 1) % len(self._protocols)]
         next_session = self._sessions_by_protocol.get(next_protocol.protocol_id)
         if next_session is None:
-            next_session = self._guide.create_session(
-                next_protocol.protocol_id,
-                metadata={"source": "tui"},
+            next_session = self._service.require_data(
+                self._service.create_live_session(
+                    next_protocol.protocol_id,
+                    metadata={"source": "tui"},
+                )
             )
             self._sessions_by_protocol[next_protocol.protocol_id] = next_session
             self._session = next_session
@@ -259,9 +261,10 @@ class ExperimentGuideView(Vertical):
         """Persist selected experiment protocol so LLM context follows TUI state."""
 
         try:
-            self._config.set_selected_experiment_protocol(
-                self._session.protocol.protocol_id,
-                save=True,
+            self._service.require_data(
+                self._service.select_experiment_protocol(
+                    self._session.protocol.protocol_id
+                )
             )
         except Exception as exc:
             try:
@@ -276,46 +279,18 @@ class ExperimentGuideView(Vertical):
             return
         try:
             user_input = self._parse_user_data()
-            requests = self._session.build_plugin_requests(current_step.step_id)
-            if not requests:
+            calculation = self._service.require_data(
+                self._service.calculate_live_step(self._session, user_input)
+            )
+            if calculation.get("status") == "no_calculation":
                 self._last_calculation = None
                 self.query_one("#experiment-reagent-result", Static).update(
                     t("experiment_no_calculation")
                 )
                 self._set_status(t("experiment_no_calculation"))
                 return
-            ensure_default_policy(self._project_root)
-            kernel = Kernel(
-                config_path=self._project_root / ".supermedicine" / "config.yaml",
-                policies_dir=self._project_root / ".supermedicine" / "policies",
-            )
-            calculation_params = self._calculation_params_for_request(
-                requests[0], user_input
-            )
-            rendered_request = dict(requests[0])
-            rendered_request["params"] = {
-                **dict(rendered_request.get("params", {})),
-                **calculation_params.get(
-                    str(rendered_request.get("request_id") or ""), {}
-                ),
-            }
-            calculation = self._guide.execute_step_calculation(
-                kernel,
-                self._session,
-                current_step.step_id,
-                user_input=user_input,
-                calculation_params=calculation_params,
-                advance=False,
-            )
             self._last_calculation = calculation
             kernel_result = calculation.get("kernel_result") or {}
-            self._append_log_event(
-                "plugin_result",
-                step_id=current_step.step_id,
-                user_input=user_input,
-                plugin_request=calculation.get("plugin_request") or rendered_request,
-                kernel_result=kernel_result,
-            )
             if calculation.get("status") != "success":
                 self.query_one("#experiment-reagent-result", Static).update(
                     f"{t('error')}：\n{json.dumps(redact_sensitive(calculation), ensure_ascii=False, indent=2)}"
@@ -339,74 +314,36 @@ class ExperimentGuideView(Vertical):
         try:
             user_input = self._parse_user_data()
             outputs = self._parse_outputs()
-            record = self._session.submit_step(
-                current_step.step_id, user_input, outputs=outputs, advance=True
-            )
-            self._append_log_event(
-                "step_input_submitted",
-                step_id=current_step.step_id,
-                user_input=user_input,
-                outputs=outputs,
-                record=record.to_dict(),
-            )
-            self._append_log_event(
-                "experiment_completed"
-                if self._session.is_completed
-                else "step_guidance",
-                step_id=current_step.step_id,
-                record=record.to_dict(),
+            self._service.require_data(
+                self._service.submit_live_step(
+                    self._session, user_input, outputs
+                )
             )
             self.refresh_session_view(
                 t("experiment_completed")
                 if self._session.is_completed
                 else t("experiment_step_saved")
             )
-        except ExperimentGuideError as exc:
-            self._session.recover()
-            self._set_error(exc)
         except Exception as exc:
             self._set_error(exc)
 
     def _append_log_event(self, event_type: str, **kwargs: Any) -> None:
-        append_experiment_log_event(
-            LogReportStore(self._project_root),
-            event_type,
-            self._session,
-            **kwargs,
+        self._service.require_data(
+            self._service.append_live_event(
+                event_type, self._session, **kwargs
+            )
         )
 
     def _save_log(self) -> None:
-        payload = redact_sensitive(
-            {
-                "session_id": self._session.session_id,
-                "event": "experiment_log_saved",
-                "session": {
-                    "protocol_id": self._session.protocol.protocol_id,
-                    "status": self._session.status.value,
-                    "progress": self._session.progress,
-                    "current_step": self._session.current_step.step_id
-                    if self._session.current_step
-                    else None,
-                },
-                "last_calculation": self._compact_log_value(self._last_calculation),
-                "medical_boundary": MEDICAL_BOUNDARY,
-            }
-        )
         try:
-            result = LogReportStore(self._project_root).append(
-                json.dumps(payload, ensure_ascii=False, sort_keys=True),
-                session_id=self._session.session_id,
+            result = self._service.require_data(
+                self._service.save_live_log(
+                    self._session, self._last_calculation
+                )
             )
             self._set_status(f"{t('experiment_log_saved')}: {result.get('file')}")
         except Exception as exc:
             self._set_error(exc)
-
-    def _compact_log_value(self, value: Any, *, max_text: int = 1000) -> Any:
-        redacted = redact_sensitive(value)
-        text = json.dumps(redacted, ensure_ascii=False, sort_keys=True, default=str)
-        if len(text) <= max_text:
-            return redacted
-        return {"truncated": True, "preview": text[:max_text]}
 
     def _parse_user_data(self) -> dict[str, Any]:
         raw = self.query_one("#experiment-data-input", TextArea).text.strip()
@@ -429,41 +366,6 @@ class ExperimentGuideView(Vertical):
         if not raw:
             return {}
         return {"note": raw}
-
-    def _calculation_params_for_request(
-        self, request: dict[str, Any], user_input: dict[str, Any]
-    ) -> dict[str, dict[str, Any]]:
-        request_id = str(request.get("request_id") or "")
-        params = user_input.get("calculation_params")
-        if isinstance(params, dict):
-            nested = params.get(request_id)
-            if isinstance(nested, dict):
-                return {request_id: nested}
-            return {request_id: params}
-        if request.get("action") == "experiment.wb.normalize_loading":
-            sample_name = str(user_input.get("sample_id") or "sample-1")
-            raw_concentration = user_input.get(
-                "concentration", user_input.get("sample_concentration", 1.0)
-            )
-            raw_target = user_input.get("target_protein_amount", 10.0)
-            raw_final = user_input.get("final_well_volume", 20.0)
-            return {
-                request_id: {
-                    "samples": [
-                        {"name": sample_name, "concentration": raw_concentration}
-                    ],
-                    "target_protein_amount": raw_target,
-                    "final_well_volume": raw_final,
-                }
-            }
-        if request.get("action") == "experiment.wb.antibody_dilution":
-            return {
-                request_id: {
-                    "total_volume": user_input.get("total_volume", 1000.0),
-                    "dilution_ratio": user_input.get("dilution_ratio", "1:1000"),
-                }
-            }
-        return {}
 
     def _parse_mapping(self, raw: str) -> dict[str, Any]:
         if not raw:
