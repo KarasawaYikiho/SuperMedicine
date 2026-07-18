@@ -37,3 +37,9 @@ def test_markdown_link_checker_accepts_existing_relative_markdown_link(tmp_path)
 
     assert module.check_markdown_links(docs) == []
 
+
+def test_maintainer_readme_links_feature_parity_guide():
+    readme = (REPO_ROOT / "docs" / "maintainers" / "README.md").read_text(
+        encoding="utf-8"
+    )
+    assert "[feature-parity.md](feature-parity.md)" in readme

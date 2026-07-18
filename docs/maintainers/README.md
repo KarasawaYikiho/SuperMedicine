@@ -8,6 +8,7 @@ This directory is the starting point for repository maintenance.
 2. [entrypoints.md](entrypoints.md)
 3. [quality-gates.md](quality-gates.md)
 4. [maintenance-backlog.md](maintenance-backlog.md)
+5. [feature-parity.md](feature-parity.md)
 
 ## Sources of Truth
 
