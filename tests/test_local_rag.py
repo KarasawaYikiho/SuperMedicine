@@ -8,13 +8,13 @@ from unittest.mock import patch
 import pytest
 import yaml
 
-from permission.engine import PermissionEngine
 from core.config_center import ConfigCenter
 from core.rag_service import RAGService
-from plugins.rag.interface import RAGProviderConfig
-from plugins.rag.local_provider import LocalRAGProvider, MockExternalVectorStoreProvider
 from plugins.rag import main as rag_main
+from plugins.rag.providers import RAGProviderConfig
+from plugins.rag.providers import LocalRAGProvider, MockExternalVectorStoreProvider
 from plugins.rag.pubmed_provider import PubmedRAGProvider
+from permission.engine import PermissionEngine
 
 
 def _pubmed_engine_for(agent_id: str, allowed: bool) -> PermissionEngine:
@@ -329,6 +329,11 @@ class TestPubmedRAGProvider:
         assert result["status"] == "denied"
         assert result["errors"][0]["code"] == "permission_denied"
         assert result["metadata"]["security"]["permission_checked"] is True
+        audit_entry = json.loads(
+            (tmp_path / "audit.jsonl").read_text(encoding="utf-8")
+        )
+        assert audit_entry["result"] == "denied"
+        assert audit_entry["action"] == "rag.external.query"
 
     def test_pubmed_external_query_requires_permission_engine_before_http(self):
         provider = PubmedRAGProvider()

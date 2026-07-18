@@ -14,7 +14,7 @@ from core.kernel_constants import SUPERMEDICINE_SYSTEM_PROMPT
 from core.kernel_llm_chat import execute_llm_chat
 from core.llm_client import LLMClient
 from core.llm_manager import LLMConfigManager
-from plugins.rag.local_provider import LocalRAGProvider
+from plugins.rag.providers import LocalRAGProvider
 from permission.engine import PermissionEngine
 from permission.policy import PermissionResult
 from permission.prompt_generator import PromptGenerator

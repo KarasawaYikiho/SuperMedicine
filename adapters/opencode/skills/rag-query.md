@@ -61,8 +61,8 @@ items = result["output"]["items"]
 External-vector contract backend example:
 
 ```python
-from plugins.rag.interface import RAGProviderConfig
-from plugins.rag.local_provider import MockExternalVectorStoreProvider
+from plugins.rag.providers import RAGProviderConfig
+from plugins.rag.providers import MockExternalVectorStoreProvider
 
 provider = MockExternalVectorStoreProvider(
     RAGProviderConfig(

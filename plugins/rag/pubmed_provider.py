@@ -12,7 +12,7 @@ from typing import Any
 from permission.engine import PermissionEngine
 from permission.policy import PermissionResult
 
-from .interface import (
+from .providers import (
     RAGConnectionError,
     RAGProvider,
     RAGQueryTimeoutError,
@@ -44,7 +44,6 @@ class PubmedRAGProvider(RAGProvider):
         self._timeout_seconds = max(1.0, min(float(timeout_seconds), 120.0))
         self._permission_engine = permission_engine
         self._agent_id = agent_id
-        self._context: dict[str, Any] = {}
 
     def connect(self) -> dict[str, Any]:
         return {
@@ -180,7 +179,7 @@ class PubmedRAGProvider(RAGProvider):
             "tool": self._tool,
         }
         url = f"{self.BASE_URL}/esearch.fcgi?{urllib.parse.urlencode(params)}"
-        data = self._get_json(url)
+        data = self._get(url, parse_json=True)
         return data.get("esearchresult", {}).get("idlist", [])
 
     def _fetch(self, ids: list[str]) -> list[dict[str, Any]]:
@@ -194,7 +193,7 @@ class PubmedRAGProvider(RAGProvider):
             "tool": self._tool,
         }
         url = f"{self.BASE_URL}/efetch.fcgi?{urllib.parse.urlencode(params)}"
-        xml_text = self._get_text(url)
+        xml_text = self._get(url, parse_json=False)
         return self._parse_articles(xml_text)
 
     def _parse_articles(self, xml_text: str) -> list[dict[str, Any]]:
@@ -274,21 +273,17 @@ class PubmedRAGProvider(RAGProvider):
         except Exception:
             return None
 
-    def _get_json(self, url: str) -> dict[str, Any]:
-        """HTTP GET 并解析 JSON"""
+    def _get(self, url: str, *, parse_json: bool) -> Any:
+        """Perform one validated, size-limited PubMed HTTP request."""
         self._validate_pubmed_url(url)
         req = urllib.request.Request(url)
         with urllib.request.urlopen(req, timeout=self._timeout_seconds) as resp:
             raw = self._read_limited_response(resp)
-            parsed = json.loads(raw.decode("utf-8"))
-            return parsed if isinstance(parsed, dict) else {}
-
-    def _get_text(self, url: str) -> str:
-        """HTTP GET 返回文本"""
-        self._validate_pubmed_url(url)
-        req = urllib.request.Request(url)
-        with urllib.request.urlopen(req, timeout=self._timeout_seconds) as resp:
-            return self._read_limited_response(resp).decode("utf-8")
+        text = raw.decode("utf-8")
+        if not parse_json:
+            return text
+        parsed = json.loads(text)
+        return parsed if isinstance(parsed, dict) else {}
 
     def _read_limited_response(self, response: Any) -> bytes:
         raw = response.read(self.MAX_RESPONSE_BYTES + 1)
@@ -412,9 +407,3 @@ class PubmedRAGProvider(RAGProvider):
                 },
             },
         )
-
-    def store_context(self, key: str, data: Any) -> None:
-        self._context[key] = data
-
-    def retrieve_context(self, key: str) -> Any | None:
-        return self._context.get(key)

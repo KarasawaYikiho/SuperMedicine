@@ -12,7 +12,7 @@ from core.config_center import ConfigCenter
 from core.path_safety import validate_path_in_project_root
 from core.runtime_capabilities import RuntimeInvariantError
 from permission.engine import PermissionEngine
-from plugins.rag.local_provider import LocalRAGProvider
+from plugins.rag.providers import LocalRAGProvider
 from plugins.rag.pubmed_provider import PubmedRAGProvider
 
 

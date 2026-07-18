@@ -357,6 +357,63 @@ class TestPluginRegistry:
         assert result["output"] is None
         assert "Invalid harness-core input" in result["error"]
 
+    def test_required_plugin_every_manifest_provide_is_executable(self, tmp_path):
+        checkpoint = tmp_path / "checkpoints" / "task-1" / "step-1"
+        checkpoint.mkdir(parents=True)
+        (checkpoint / "status.json").write_text(
+            '{"state":"completed"}', encoding="utf-8"
+        )
+        audit_log = tmp_path / "audit.jsonl"
+        audit_log.write_text(
+            '{"agent_id":"alpha","result":"DENIED"}\n', encoding="utf-8"
+        )
+        performance_log = tmp_path / "performance.jsonl"
+        performance_log.write_text(
+            '{"agent_id":"alpha","success":false,"duration_ms":10,"retries":1}\n',
+            encoding="utf-8",
+        )
+        rag_dir = tmp_path / "rag"
+        calls = {
+            "rag.query": {"query": "cardiovascular", "storage_dir": str(rag_dir)},
+            "rag.context.store": {
+                "key": "trial",
+                "data": {"safe": True},
+                "storage_dir": str(rag_dir),
+            },
+            "rag.context.retrieve": {"key": "trial", "storage_dir": str(rag_dir)},
+            "harness.runtime.health": {},
+            "harness.integration.checkpoint": {
+                "checkpoint_dir": str(tmp_path / "checkpoints"),
+                "task_id": "task-1",
+            },
+            "harness.integration.checkpoint_all": {
+                "checkpoint_dir": str(tmp_path / "checkpoints")
+            },
+            "harness.monitor.permission_audit": {"audit_log_path": str(audit_log)},
+            "harness.monitor.denied_actions": {"audit_log_path": str(audit_log)},
+            "harness.monitor.anomaly": {"audit_log_path": str(audit_log)},
+            "harness.monitor.performance": {
+                "performance_log_path": str(performance_log)
+            },
+            "harness.monitor.failure_patterns": {
+                "performance_log_path": str(performance_log)
+            },
+        }
+        registry = PluginRegistry("plugins")
+        registry.discover()
+        declared: set[str] = set()
+        for plugin_name in ("rag-interface", "harness-core"):
+            plugin = registry.get(plugin_name)
+            meta = registry.get_meta(plugin_name)
+            assert plugin is not None and meta is not None
+            for provide in meta.provides:
+                action = provide["id"]
+                declared.add(action)
+                result = plugin.execute(action, calls[action])
+                assert result["status"] == "success", action
+
+        assert declared == set(calls)
+
     def test_medical_citation_manifest_actions_execute_with_stable_shape(self):
         r = PluginRegistry("plugins")
         metas = r.discover()

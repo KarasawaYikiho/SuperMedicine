@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from plugins.rag.interface import (
+from plugins.rag.providers import (
     EmptyRAGProvider,
     RAGConfigurationError,
     RAGConnectionError,
@@ -13,7 +13,7 @@ from plugins.rag.interface import (
     RAGResourceError,
     make_rag_result,
 )
-from plugins.rag.local_provider import LocalRAGProvider, MockExternalVectorStoreProvider
+from plugins.rag.providers import LocalRAGProvider, MockExternalVectorStoreProvider
 from plugins.rag.pubmed_provider import PubmedRAGProvider
 
 __all__ = [
