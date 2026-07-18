@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "implementation_baseline": "db74254255ef3815f05c4c130dfd95077db23225",
+  "implementation_baseline": "49ac6f88264fe4e06090af39154f2a089a18d8ef",
   "audit_reference": "49ac6f88264fe4e06090af39154f2a089a18d8ef",
-  "baseline_relationship": "audit_reference_is_not_an_ancestor_of_implementation_baseline",
+  "baseline_relationship": "implementation_baseline_equals_audit_reference",
   "metrics": {
     "feature_id_count": 158,
     "production_python_files": 182,
@@ -1297,5 +1297,4 @@
     "web:WEBSOCKET /ws/chat"
   ]
 }
-
 
