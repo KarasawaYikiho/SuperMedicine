@@ -65,6 +65,31 @@ class TestKernel:
 
         assert first["task_id"] != second["task_id"]
 
+    def test_persisted_multi_agent_switch_routes_through_full_chain(
+        self, tmp_path, monkeypatch
+    ):
+        kernel = self._create_kernel(tmp_path)
+        kernel.config.set_multi_agent_enabled(True)
+        captured: dict[str, Any] = {}
+
+        def fake_chain(
+            task, *, task_id, emit, rag_context, progress_callback=None
+        ):
+            captured.update(task=task, task_id=task_id, rag_context=rag_context)
+            return {"status": "success", "pipeline": "multi-agent"}
+
+        monkeypatch.setattr(kernel, "_execute_agent_chain", fake_chain)
+
+        result = kernel.execute_task("coordinated research task")
+
+        assert result["status"] == "success"
+        assert result["pipeline"] == "multi-agent"
+        assert result["metadata"]["agent_mode"] == "multi"
+        assert result["metadata"]["harness"]["finalized"] is True
+        assert result["metadata"]["rag"]["enabled"] is True
+        assert captured["task"] == "coordinated research task"
+        assert captured["rag_context"].status == "empty"
+
     def test_kernel_permission_engine_is_runtime_gate_not_prompt_generator(
         self, tmp_path
     ):
@@ -641,6 +666,7 @@ class TestKernelProgressCallback:
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 class StreamClient(LLMClient):
     """Minimal LLMClient that exposes ``chat_stream`` returning a fixed sequence."""
 
@@ -666,7 +692,10 @@ def _fake_config():
         config_path="/tmp/fake/config.yaml",
         get_selected_experiment_protocol=lambda: None,
         get_runtime_state=lambda: {},
-        get_file_access_config=lambda: {"mode": "full", "authorized_external_ropts": []},
+        get_file_access_config=lambda: {
+            "mode": "full",
+            "authorized_external_ropts": [],
+        },
         get_permission_mode_label=lambda: "完全访问",
         diagnostics=lambda: {"load_error": ""},
         get=lambda key, default=None: default,
@@ -729,6 +758,7 @@ def _collect_events() -> tuple[list[dict[str, Any]], Any]:
 # ---------------------------------------------------------------------------
 # Tests — basic streaming
 # ---------------------------------------------------------------------------
+
 
 class TestExecuteLLMChatStream:
     """Verify progress_callback events during streaming chat."""
@@ -794,6 +824,7 @@ class TestExecuteLLMChatStream:
 # ---------------------------------------------------------------------------
 # Tests — thinking / reasoning content
 # ---------------------------------------------------------------------------
+
 
 class TestExecuteLLMChatStreamThinking:
     """Verify thinking_content and thinking_done events."""
@@ -888,6 +919,7 @@ class TestExecuteLLMChatStreamThinking:
 # Tests — error handling in stream
 # ---------------------------------------------------------------------------
 
+
 class TestExecuteLLMChatStreamError:
     """Verify error chunk handling during streaming."""
 
@@ -920,6 +952,7 @@ class TestExecuteLLMChatStreamError:
 # ---------------------------------------------------------------------------
 # Tests — no chat_stream fallback
 # ---------------------------------------------------------------------------
+
 
 class TestExecuteLLMChatNoStream:
     """When client has no chat_stream, fall back to non-streaming chat()."""
@@ -1002,6 +1035,7 @@ class TestExecuteLLMChatNoStream:
 # ---------------------------------------------------------------------------
 # Tests — initial reasoning event
 # ---------------------------------------------------------------------------
+
 
 class TestExecuteLLMChatInitialReasoning:
     """The very first event emitted is always a 'reasoning' kind."""

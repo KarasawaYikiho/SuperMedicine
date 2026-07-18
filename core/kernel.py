@@ -146,7 +146,11 @@ class Kernel:
 
     def _refresh_runtime_capabilities(self) -> None:
         """Attach config-derived state to the validated shared health snapshot."""
-        agent_mode = self._config.get_agents_config()["mode"]
+        agent_mode = (
+            "multi"
+            if self._config.get_multi_agent_config()["enabled"]
+            else "single"
+        )
         project_root = (
             self._config_path.parent.parent
             if self._config_path.parent.name == ".supermedicine"
@@ -409,9 +413,9 @@ class Kernel:
     ) -> dict[str, Any]:
         """Execute every task inside the mandatory Harness lifecycle."""
         self._config.reload()
-        configured_mode = self._config.get_agents_config()["mode"]
+        configured_multi_agent = self._config.get_multi_agent_config()["enabled"]
         resolved_agent_mode = (
-            configured_mode == "multi"
+            configured_multi_agent
             if use_agent_chain is None
             else bool(use_agent_chain)
         )

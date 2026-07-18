@@ -52,15 +52,61 @@ def _load_release_exe_to_desktop():
 
 
 _FORWARDED_COMMAND_GROUPS = {
-    "cli.commands.workspace": ("workspace_init", "workspace_list", "workspace_show", "workspace_delete"),
-    "cli.commands.tool": ("tool_init", "tool_list", "tool_scan", "tool_add", "tool_show", "tool_run"),
+    "cli.commands.workspace": (
+        "workspace_init",
+        "workspace_list",
+        "workspace_show",
+        "workspace_delete",
+    ),
+    "cli.commands.tool": (
+        "tool_init",
+        "tool_list",
+        "tool_scan",
+        "tool_add",
+        "tool_show",
+        "tool_run",
+    ),
     "cli.commands.llm": ("llm_add", "llm_list", "llm_show", "llm_switch"),
-    "cli.commands.permission": ("permission_status", "permission_set_mode", "permission_authorize", "permission_revoke"),
+    "cli.commands.permission": (
+        "permission_status",
+        "permission_set_mode",
+        "permission_authorize",
+        "permission_revoke",
+        "multi_agent_status",
+        "multi_agent_set",
+    ),
     "cli.commands.self_evolve": ("self_evolve",),
-    "cli.commands.paper": ("paper_import", "paper_list", "paper_show", "paper_edit", "paper_enrich"),
-    "cli.commands.experience": ("experience_suggest", "experience_add", "experience_list", "experience_view", "experience_edit", "experience_delete", "experience_export"),
-    "cli.commands.experiment": ("experiment_start", "experiment_list", "experiment_context", "experiment_add_config", "experiment_show", "experiment_submit"),
-    "cli.commands.log": ("log_write", "log_list", "log_show", "log_location", "log_follow"),
+    "cli.commands.paper": (
+        "paper_import",
+        "paper_list",
+        "paper_show",
+        "paper_edit",
+        "paper_enrich",
+    ),
+    "cli.commands.experience": (
+        "experience_suggest",
+        "experience_add",
+        "experience_list",
+        "experience_view",
+        "experience_edit",
+        "experience_delete",
+        "experience_export",
+    ),
+    "cli.commands.experiment": (
+        "experiment_start",
+        "experiment_list",
+        "experiment_context",
+        "experiment_add_config",
+        "experiment_show",
+        "experiment_submit",
+    ),
+    "cli.commands.log": (
+        "log_write",
+        "log_list",
+        "log_show",
+        "log_location",
+        "log_follow",
+    ),
 }
 
 _FORWARDED_COMMANDS = {

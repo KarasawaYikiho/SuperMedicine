@@ -279,6 +279,17 @@ def _add_run_commands(subparsers):
     return {"run": run_parser}
 
 
+def _add_multi_agent_command(subparsers):
+    parser = subparsers.add_parser(
+        "multi-agent", help="查看或切换 Alpha/Beta/Gamma/Delta 完整角色流程"
+    )
+    commands = parser.add_subparsers(dest="multi_agent_command")
+    commands.add_parser("status", help="查看 Multi-Agent 开关")
+    commands.add_parser("enable", help="启用完整四角色流程")
+    commands.add_parser("disable", help="关闭并使用轻量单流程")
+    return {"multi-agent": parser}
+
+
 def _add_experiment_commands(subparsers):
     experiment_parser = subparsers.add_parser("experiment", help="实验指导器命令")
     experiment_subparsers = experiment_parser.add_subparsers(dest="experiment_command")
@@ -791,6 +802,7 @@ def _build_parser() -> tuple[
         _add_init_commands,
         _add_shell_commands,
         _add_run_commands,
+        _add_multi_agent_command,
         _add_experiment_commands,
         _add_log_commands,
         _add_workspace_commands,
@@ -927,6 +939,21 @@ def _dispatch_experiment_command(args, cli, parsers) -> bool:
         },
         parsers["experiment"],
         (KeyError, ValueError),
+    )
+    return True
+
+
+def _dispatch_multi_agent_command(args, cli, parsers) -> bool:
+    if args.command != "multi-agent":
+        return False
+    _dispatch_subcommand(
+        args.multi_agent_command,
+        {
+            "status": cli.multi_agent_status,
+            "enable": lambda: cli.multi_agent_set(True),
+            "disable": lambda: cli.multi_agent_set(False),
+        },
+        parsers["multi-agent"],
     )
     return True
 
@@ -1110,6 +1137,7 @@ def _dispatch_command(args, cli, parser, parsers) -> None:
     dispatchers = (
         _dispatch_setup_command,
         _dispatch_run_command,
+        _dispatch_multi_agent_command,
         _dispatch_experiment_command,
         _dispatch_log_command,
         _dispatch_workspace_command,

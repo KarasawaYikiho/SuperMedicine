@@ -79,3 +79,24 @@ def permission_revoke(cli, path: str | Path) -> dict[str, Any]:
     )
     _log_json(result)
     return result
+
+
+def multi_agent_status(cli) -> dict[str, Any]:
+    """Show whether the optional full four-role pipeline is enabled."""
+    service = PermissionLogSystemService(Path.cwd())
+    result = service.require_data(service.multi_agent_status())
+    _log_json(result)
+    return result
+
+
+def multi_agent_set(cli, enabled: bool) -> dict[str, Any]:
+    """Persistently switch the optional full four-role pipeline."""
+    service = PermissionLogSystemService(Path.cwd())
+    result = service.require_data(service.set_multi_agent_enabled(enabled))
+    result["message"] = (
+        "Multi-Agent 完整四角色流程已启用。"
+        if enabled
+        else "Multi-Agent 已关闭；后续任务使用轻量单流程。"
+    )
+    _log_json(result)
+    return result

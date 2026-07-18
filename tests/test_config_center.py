@@ -56,6 +56,14 @@ class TestConfigCenter:
         assert cc.get_experiment_guide_config() == DEFAULT_EXPERIMENT_GUIDE_CONFIG
         assert cc.get_log_report_config() == DEFAULT_LOG_REPORT_CONFIG
 
+    def test_multi_agent_defaults_off_and_persists_explicit_switch(self, tmp_path):
+        config_path = tmp_path / "config.yaml"
+        cc = ConfigCenter(config_path)
+
+        assert cc.get_multi_agent_config() == {"enabled": False}
+        assert cc.set_multi_agent_enabled(True) == {"enabled": True}
+        assert ConfigCenter(config_path).get_multi_agent_config() == {"enabled": True}
+
     def test_default_sections_merge_user_config_with_safe_defaults(self, tmp_path):
         """验证用户配置与默认值兼容合并。"""
         import yaml

@@ -22,17 +22,13 @@ class PermissionLogSystemService:
 
     def __init__(self, project_root: str | Path | None = None) -> None:
         self.project_root = Path(project_root or Path.cwd()).resolve()
-        self.config = ConfigCenter(
-            self.project_root / ".supermedicine" / "config.yaml"
-        )
+        self.config = ConfigCenter(self.project_root / ".supermedicine" / "config.yaml")
         self.logs = LogReportStore(self.project_root)
 
     def permission_status(self) -> ServiceResult[dict[str, Any]]:
         def action() -> dict[str, Any]:
             data = self.config.get_file_access_config()
-            data["config_load_error"] = self.config.diagnostics().get(
-                "load_error", ""
-            )
+            data["config_load_error"] = self.config.diagnostics().get("load_error", "")
             return data
 
         return self._call("permission_status", action)
@@ -96,6 +92,15 @@ class PermissionLogSystemService:
     def config_diagnostics(self) -> ServiceResult[dict[str, Any]]:
         return self._call("config_diagnostics", self.config.diagnostics)
 
+    def multi_agent_status(self) -> ServiceResult[dict[str, bool]]:
+        return self._call("multi_agent_status", self.config.get_multi_agent_config)
+
+    def set_multi_agent_enabled(self, enabled: bool) -> ServiceResult[dict[str, bool]]:
+        return self._call(
+            "set_multi_agent_enabled",
+            lambda: self.config.set_multi_agent_enabled(enabled, save=True),
+        )
+
     def write_log(
         self, message: str, *, session_id: str | None = None
     ) -> ServiceResult[dict[str, Any]]:
@@ -114,9 +119,7 @@ class PermissionLogSystemService:
     ) -> ServiceResult[dict[str, Any]]:
         return self._call(
             "log_storage",
-            lambda: self.logs.storage_info(
-                file_name=file_name, session_id=session_id
-            ),
+            lambda: self.logs.storage_info(file_name=file_name, session_id=session_id),
         )
 
     def list_log_entries(
@@ -124,9 +127,7 @@ class PermissionLogSystemService:
     ) -> ServiceResult[list[dict[str, Any]]]:
         return self._call(
             "list_log_entries",
-            lambda: self.logs.list_entries(
-                file_name=file_name, session_id=session_id
-            ),
+            lambda: self.logs.list_entries(file_name=file_name, session_id=session_id),
         )
 
     def log_statistics(
@@ -167,7 +168,9 @@ class PermissionLogSystemService:
             return result.data
         if result.error and result.error.code == "full_access_confirmation_required":
             raise FullAccessConfirmationRequired(result.error.message)
-        raise ValueError(result.error.message if result.error else "System service failed")
+        raise ValueError(
+            result.error.message if result.error else "System service failed"
+        )
 
     @staticmethod
     def _meta(operation: str) -> dict[str, str]:

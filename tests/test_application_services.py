@@ -240,9 +240,7 @@ def test_experiment_tool_service_owns_experiment_start_and_show(tmp_path):
 def test_experiment_tool_service_missing_session_has_stable_error(tmp_path):
     from core.services import ExperimentToolService
 
-    result = ExperimentToolService(tmp_path).show_experiment(
-        tmp_path / "missing.json"
-    )
+    result = ExperimentToolService(tmp_path).show_experiment(tmp_path / "missing.json")
 
     assert result.ok is False
     assert result.error.code == "experiment_session_not_found"
@@ -307,6 +305,18 @@ def test_permission_log_system_service_owns_log_write_and_list(tmp_path):
 
     assert written.ok is True
     assert listed.data[0]["session_id"] == "service-session"
+
+
+def test_permission_log_system_service_owns_multi_agent_switch(tmp_path):
+    from core.services import PermissionLogSystemService
+
+    service = PermissionLogSystemService(tmp_path)
+
+    assert service.multi_agent_status().data == {"enabled": False}
+    assert service.set_multi_agent_enabled(True).data == {"enabled": True}
+    assert PermissionLogSystemService(tmp_path).multi_agent_status().data == {
+        "enabled": True
+    }
 
 
 def test_agent_harness_service_owns_dialog_history(tmp_path):
