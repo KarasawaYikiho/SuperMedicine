@@ -220,6 +220,27 @@
       "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
     },
     {
+      "feature_id": "cli:multi-agent",
+      "category": "cli",
+      "entrypoint": "cli:multi-agent",
+      "expected_result": "Exposes the persisted optional four-role pipeline switch.",
+      "contract_test": "tests/test_cli_facade_slim.py::test_cli_parser_can_enable_and_disable_multi_agent"
+    },
+    {
+      "feature_id": "cli:enable",
+      "category": "cli",
+      "entrypoint": "cli:enable",
+      "expected_result": "Enables the full Alpha/Beta/Gamma/Delta pipeline.",
+      "contract_test": "tests/test_cli_facade_slim.py::test_cli_parser_can_enable_and_disable_multi_agent"
+    },
+    {
+      "feature_id": "cli:disable",
+      "category": "cli",
+      "entrypoint": "cli:disable",
+      "expected_result": "Restores the lightweight single-flow runtime.",
+      "contract_test": "tests/test_cli_facade_slim.py::test_cli_parser_can_enable_and_disable_multi_agent"
+    },
+    {
       "feature_id": "cli:revoke",
       "category": "cli",
       "entrypoint": "cli:revoke",
@@ -1297,4 +1318,3 @@
     "web:WEBSOCKET /ws/chat"
   ]
 }
-
