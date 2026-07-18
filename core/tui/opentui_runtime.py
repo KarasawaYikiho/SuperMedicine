@@ -25,6 +25,14 @@ class OpenTUIRuntimeError(RuntimeError):
     """Raised when the OpenTUI runtime bridge cannot be launched."""
 
 
+def _configure_output_errors() -> None:
+    """Keep Unicode bridge output printable on legacy Windows consoles."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            reconfigure(errors="replace")
+
+
 def runtime_info() -> OpenTUIRuntimeInfo:
     """Return the approved OpenTUI runtime package metadata."""
 
@@ -121,6 +129,8 @@ def smoke_opentui_runtime(*, project_root: Path | str | None = None) -> subproce
             command,
             cwd=Path(project_root or Path.cwd()),
             text=True,
+            encoding="utf-8",
+            errors="replace",
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             timeout=10,
@@ -143,6 +153,8 @@ def automated_nav_opentui_runtime(
             command,
             cwd=Path(project_root or Path.cwd()),
             text=True,
+            encoding="utf-8",
+            errors="replace",
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             timeout=10,
@@ -165,6 +177,8 @@ def full_page_interactions_opentui_runtime(
             command,
             cwd=Path(project_root or Path.cwd()),
             text=True,
+            encoding="utf-8",
+            errors="replace",
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             timeout=15,
@@ -179,6 +193,7 @@ def full_page_interactions_opentui_runtime(
 def main(argv: list[str] | None = None) -> int:
     """Standalone smoke/launch helper for packaging diagnostics."""
 
+    _configure_output_errors()
     argv = list(sys.argv[1:] if argv is None else argv)
     smoke = "--smoke" in argv
     automated_nav = "--automated-nav" in argv

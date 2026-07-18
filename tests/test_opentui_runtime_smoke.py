@@ -128,6 +128,8 @@ def test_scripted_opentui_helpers_use_expected_modes(
 
     assert expected_flag in captured_command
     assert captured_kwargs["cwd"] == tmp_path
+    assert captured_kwargs["encoding"] == "utf-8"
+    assert captured_kwargs["errors"] == "replace"
     assert stdout.split(" ", maxsplit=1)[0] in result.stdout
     assert expected_signal in result.stdout
 
