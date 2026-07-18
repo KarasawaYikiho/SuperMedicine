@@ -32,7 +32,7 @@ const THEME = {
 }
 
 function parseArgs(argv) {
-  const args = { mode: "interactive", projectRoot: process.cwd(), smokeMs: 350 }
+  const args = { mode: "interactive", projectRoot: process.cwd(), pythonExecutable: "python", smokeMs: 350 }
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i]
     if (arg === "--smoke") {
@@ -43,11 +43,38 @@ function parseArgs(argv) {
       args.mode = "full-page-interactions"
     } else if (arg === "--project-root") {
       args.projectRoot = argv[++i] || process.cwd()
+    } else if (arg === "--python-executable") {
+      args.pythonExecutable = argv[++i] || "python"
     } else if (arg === "--smoke-ms") {
       args.smokeMs = Number(argv[++i] || args.smokeMs)
     }
   }
   return args
+}
+
+function multiAgentBridge(options, action) {
+  const result = Bun.spawnSync({
+    cmd: [
+      options.pythonExecutable,
+      "-m",
+      "core.tui.service_bridge",
+      "multi-agent",
+      action,
+      options.projectRoot,
+    ],
+    cwd: options.projectRoot,
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  const stdout = new TextDecoder().decode(result.stdout || new Uint8Array()).trim()
+  if (result.exitCode !== 0 || !stdout) {
+    return { ok: false, data: null }
+  }
+  try {
+    return JSON.parse(stdout)
+  } catch {
+    return { ok: false, data: null }
+  }
 }
 
 function addText(renderer, parent, id, content, layout = {}) {
@@ -161,7 +188,7 @@ const PAGE_CATALOG = {
     intent: "OpenTUI security panel for conservative/full access mode and root policy visibility.",
     sections: ["Access Mode", "Root Policy", "Confirmations"],
     records: ["conservative    默认", "FULL           高风险确认", "policy         PermissionEngine"],
-    actions: ["Enter 查看策略", "f 完全访问确认", "Esc 返回"],
+    actions: ["Enter 查看策略", "f 完全访问确认", "a 切换 Multi-Agent", "Esc 返回"],
   },
   "self-evolution": {
     key: "e",
@@ -230,6 +257,9 @@ function parsedKey(name, options = {}) {
 }
 
 function mountShell(renderer, options) {
+  const initialMultiAgent = multiAgentBridge(options, "status")
+  let multiAgentEnabled = Boolean(initialMultiAgent.ok && initialMultiAgent.data?.enabled)
+  PAGE_CATALOG.permission.records[0] = `multi-agent     ${multiAgentEnabled ? "enabled" : "disabled"}`
   const state = {
     currentRoute: "chat",
     stack: ["chat"],
@@ -411,6 +441,19 @@ function mountShell(renderer, options) {
     setFocus("nav")
   }
 
+  function toggleMultiAgent() {
+    const action = multiAgentEnabled ? "disable" : "enable"
+    const result = multiAgentBridge(options, action)
+    if (result.ok) {
+      multiAgentEnabled = Boolean(result.data?.enabled)
+      PAGE_CATALOG.permission.records[0] = `multi-agent     ${multiAgentEnabled ? "enabled" : "disabled"}`
+      state.lastAction = multiAgentEnabled ? "启用 Multi-Agent" : "关闭 Multi-Agent"
+    } else {
+      state.lastAction = "Multi-Agent 切换失败"
+    }
+    renderNavigation()
+  }
+
   function renderNavigation() {
     const route = routeById(state.currentRoute)
     topLeft.content = `${route.icon} ${route.title}  ·  Stack: ${state.stack.join(" › ")}`
@@ -447,7 +490,7 @@ function mountShell(renderer, options) {
   renderer.root.add(root)
   setFocus("input")
   renderNavigation()
-  return { root, input, log, state, switchRoute, goBack, moveNav, setFocus, renderNavigation }
+  return { root, input, log, state, switchRoute, goBack, moveNav, setFocus, renderNavigation, toggleMultiAgent }
 }
 
 function routeKey(renderer, shell, event) {
@@ -469,6 +512,11 @@ function routeKey(renderer, shell, event) {
     const current = order.indexOf(shell.state.focus)
     const offset = event.shift ? -1 : 1
     shell.setFocus(order[(current + offset + order.length) % order.length])
+    return true
+  }
+  if (name === "a" && shell.state.currentRoute === "permission" && shell.state.focus !== "input") {
+    event.preventDefault()
+    shell.toggleMultiAgent()
     return true
   }
   if (name === "m") {

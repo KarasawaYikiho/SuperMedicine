@@ -18,6 +18,7 @@ from core.tui.opentui_runtime import (
     opentui_command,
     runtime_info,
 )
+from core.tui.service_bridge import multi_agent_operation
 
 
 def test_tui_dry_run_and_manifests_report_approved_opentui_runtime(
@@ -64,6 +65,22 @@ def test_opentui_command_targets_bridge(
     assert bridge.as_posix().lower().endswith(info.bridge.lower())
     assert expected_flag in command
     assert "--project-root" in command
+    assert "--python-executable" in command
+    assert command[command.index("--python-executable") + 1]
+
+
+def test_opentui_multi_agent_bridge_views_and_toggles_shared_service(tmp_path):
+    assert multi_agent_operation("status", tmp_path)["data"] == {"enabled": False}
+    assert multi_agent_operation("enable", tmp_path)["data"] == {"enabled": True}
+    assert multi_agent_operation("status", tmp_path)["data"] == {"enabled": True}
+    assert multi_agent_operation("disable", tmp_path)["data"] == {"enabled": False}
+
+    bridge = (
+        Path(__file__).resolve().parents[1] / "core" / "tui" / "opentui_runtime.mjs"
+    )
+    source = bridge.read_text(encoding="utf-8")
+    assert 'name === "a"' in source
+    assert "multiAgentBridge(options, action)" in source
 
 
 def test_opentui_command_prefers_release_bridge_when_npm_dependencies_exist(
@@ -111,7 +128,9 @@ def test_scripted_opentui_helpers_use_expected_modes(
     captured_command: list[str] = []
     captured_kwargs: dict[str, object] = {}
 
-    def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+    def fake_run(
+        command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
         captured_command.extend(command)
         captured_kwargs.update(kwargs)
         return subprocess.CompletedProcess(

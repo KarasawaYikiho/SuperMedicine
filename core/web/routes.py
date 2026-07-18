@@ -344,6 +344,23 @@ def register_llm_permission_routes(app: Any, runtime: WebRuntime) -> None:
         )
 
 
+def register_multi_agent_routes(app: Any, runtime: WebRuntime) -> None:
+    @app.get("/api/v1/multi-agent")
+    async def multi_agent_status() -> Any:
+        return service_data(
+            runtime.service("permission_log_system").multi_agent_status()
+        )
+
+    @app.post("/api/v1/multi-agent")
+    async def multi_agent_set(request: dict[str, Any]) -> Any:
+        enabled = request.get("enabled")
+        if not isinstance(enabled, bool):
+            return web_error("enabled must be a boolean", 400)
+        return service_data(
+            runtime.service("permission_log_system").set_multi_agent_enabled(enabled)
+        )
+
+
 def register_log_experiment_routes(app: Any, runtime: WebRuntime) -> None:
     # ---- Log endpoints ----------------------------------------------------
 

@@ -97,6 +97,7 @@ def opentui_command(
     root = Path(project_root) if project_root is not None else Path.cwd()
     bridge = _bridge_path(root)
     command = [_preferred_js_runtime(), str(bridge), "--project-root", str(root)]
+    command.extend(["--python-executable", sys.executable])
     if smoke:
         command.append("--smoke")
     if automated_nav:
@@ -120,7 +121,9 @@ def launch_opentui_runtime(*, project_root: Path | str | None = None) -> int:
     return int(completed.returncode or 0)
 
 
-def smoke_opentui_runtime(*, project_root: Path | str | None = None) -> subprocess.CompletedProcess[str]:
+def smoke_opentui_runtime(
+    *, project_root: Path | str | None = None
+) -> subprocess.CompletedProcess[str]:
     """Start the OpenTUI bridge in smoke mode for external verification."""
 
     command = opentui_command(project_root=project_root, smoke=True)

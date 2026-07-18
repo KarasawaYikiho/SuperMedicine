@@ -1,4 +1,5 @@
 """Tests for Self Evolution API endpoints."""
+
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 def client():
     """Create test client."""
     from core.web.server import create_app
+
     app = create_app()
     return TestClient(app)
 
@@ -32,11 +34,14 @@ def test_self_evolution_generate_missing_params(client):
 
 def test_self_evolution_generate_with_params(client):
     """Test POST /api/v1/self-evolution/generate with valid params."""
-    response = client.post("/api/v1/self-evolution/generate", json={
-        "instruction": "test instruction",
-        "type": "code",
-        "output": "/tmp/test_output.py",
-    })
+    response = client.post(
+        "/api/v1/self-evolution/generate",
+        json={
+            "instruction": "test instruction",
+            "type": "code",
+            "output": "/tmp/test_output.py",
+        },
+    )
     assert response.status_code == 200
     # Should return a result (may be error if self_evolve not fully implemented)
 
@@ -55,6 +60,27 @@ def test_self_evolution_delete_not_found(client):
     assert response.status_code == 404
     data = response.json()
     assert data.get("status") == "error"
+
+
+def test_multi_agent_api_views_and_toggles_persisted_state(
+    client, tmp_path, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+
+    assert client.get("/api/v1/multi-agent").json() == {"enabled": False}
+    response = client.post("/api/v1/multi-agent", json={"enabled": True})
+
+    assert response.status_code == 200
+    assert response.json() == {"enabled": True}
+    assert client.get("/api/v1/multi-agent").json() == {"enabled": True}
+
+    frontend = Path(__file__).resolve().parents[1] / "core" / "web" / "frontend"
+    assert 'id="multi-agent-enabled"' in (frontend / "index.html").read_text(
+        encoding="utf-8"
+    )
+    app_js = (frontend / "app.js").read_text(encoding="utf-8")
+    assert '"/api/v1/multi-agent"' in app_js
+    assert "btn-set-multi-agent" in app_js
 
 
 def test_diagnose_all(client):
@@ -132,31 +158,34 @@ def test_llm_provider_list_uses_frontend_provider_schema(monkeypatch):
             pass
 
         def list_providers(self):
-            return ServiceResult.success({
-                "current_provider": "openai",
-                "last_provider": "anthropic",
-                "providers": {
-                    "openai": {
-                        "api_format": "openai",
-                        "base_url": "https://api.openai.com/v1",
-                        "api_key": "<redacted>",
-                        "model": "gpt-test",
-                        "timeout": 60.0,
-                        "headers": {},
+            return ServiceResult.success(
+                {
+                    "current_provider": "openai",
+                    "last_provider": "anthropic",
+                    "providers": {
+                        "openai": {
+                            "api_format": "openai",
+                            "base_url": "https://api.openai.com/v1",
+                            "api_key": "<redacted>",
+                            "model": "gpt-test",
+                            "timeout": 60.0,
+                            "headers": {},
+                        },
+                        "anthropic": {
+                            "provider": "anthropic",
+                            "api_format": "anthropic",
+                            "base_url": "https://api.anthropic.com",
+                            "api_key": "<redacted>",
+                            "model": "claude-test",
+                            "timeout": 30.0,
+                            "headers": {},
+                        },
                     },
-                    "anthropic": {
-                        "provider": "anthropic",
-                        "api_format": "anthropic",
-                        "base_url": "https://api.anthropic.com",
-                        "api_key": "<redacted>",
-                        "model": "claude-test",
-                        "timeout": 30.0,
-                        "headers": {},
-                    },
-                },
-            })
+                }
+            )
 
     from core.web.server import create_app
+
     monkeypatch.setattr("core.web.server.LLMService", FakeLLMService)
 
     response = TestClient(create_app()).get("/api/v1/llm/providers")
@@ -198,22 +227,25 @@ def test_experiment_detail_endpoint_returns_persisted_session_details(monkeypatc
             pass
 
         def show_experiment(self, session_file):
-            return ServiceResult.success({
-                "session_file": session_file,
-                "status": "in_progress",
-                "current_step": {"step_id": "sample_preparation"},
-                "session": {
-                    "records": {
-                        "sample_preparation": {
-                            "user_input": {"sample_id": "S1"},
-                            "outputs": {"sample_record": "ready"},
-                            "calculation_results": [],
+            return ServiceResult.success(
+                {
+                    "session_file": session_file,
+                    "status": "in_progress",
+                    "current_step": {"step_id": "sample_preparation"},
+                    "session": {
+                        "records": {
+                            "sample_preparation": {
+                                "user_input": {"sample_id": "S1"},
+                                "outputs": {"sample_record": "ready"},
+                                "calculation_results": [],
+                            }
                         }
-                    }
-                },
-            })
+                    },
+                }
+            )
 
     from core.web.server import create_app
+
     monkeypatch.setattr(
         "core.web.server.ExperimentToolService", FakeExperimentToolService
     )
@@ -249,9 +281,13 @@ def test_experiment_detail_rejects_files_outside_session_storage(monkeypatch):
 
 
 def test_frontend_experiment_detail_button_fetches_real_session():
-    app_js = Path(__file__).resolve().parents[1].joinpath(
-        "core", "web", "frontend", "app.js"
-    ).read_text(encoding="utf-8")
+    app_js = (
+        Path(__file__)
+        .resolve()
+        .parents[1]
+        .joinpath("core", "web", "frontend", "app.js")
+        .read_text(encoding="utf-8")
+    )
 
     assert '"/api/v1/experiments?session_file="' in app_js
     assert "showExperimentDetails" in app_js
@@ -276,9 +312,8 @@ def test_paper_enrich_requires_explicit_confirmation(monkeypatch):
             return ServiceResult.success({"status": "ok"})
 
     from core.web.server import create_app
-    monkeypatch.setattr(
-        "core.web.server.PaperRAGService", FakePaperRAGService
-    )
+
+    monkeypatch.setattr("core.web.server.PaperRAGService", FakePaperRAGService)
 
     test_client = TestClient(create_app())
 
@@ -295,12 +330,16 @@ def test_paper_enrich_requires_explicit_confirmation(monkeypatch):
 def test_frontend_inline_handlers_escape_javascript_string_arguments():
     """Inline onclick handlers must not be broken by IDs containing quotes."""
 
-    app_js = Path(__file__).resolve().parents[1].joinpath(
-        "core", "web", "frontend", "app.js"
-    ).read_text(encoding="utf-8")
+    app_js = (
+        Path(__file__)
+        .resolve()
+        .parents[1]
+        .joinpath("core", "web", "frontend", "app.js")
+        .read_text(encoding="utf-8")
+    )
 
     assert "function escapeJsString" in app_js
-    assert "onclick=\\\"deleteWorkspace('\" + escapeHtml" not in app_js
-    assert "onclick=\\\"showLLM('\" + escapeHtml" not in app_js
-    assert "onclick=\\\"viewArtifact('\" + escapeHtml" not in app_js
-    assert "onclick=\\\"deleteArtifact('\" + escapeHtml" not in app_js
+    assert 'onclick=\\"deleteWorkspace(\'" + escapeHtml' not in app_js
+    assert 'onclick=\\"showLLM(\'" + escapeHtml' not in app_js
+    assert 'onclick=\\"viewArtifact(\'" + escapeHtml' not in app_js
+    assert 'onclick=\\"deleteArtifact(\'" + escapeHtml' not in app_js
