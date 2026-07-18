@@ -64,10 +64,33 @@ def discover_adapter_names(root: Path) -> set[str]:
     return names
 
 
+def discover_tui_actions(root: Path) -> set[str]:
+    actions: set[str] = set()
+    for source_path in (root / "core" / "tui").glob("**/*.py"):
+        tree = ast.parse(source_path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("action_"):
+                actions.add(f"tui_action:{node.name.removeprefix('action_')}")
+    return actions
+
+
+def discover_config_environment_keys(root: Path) -> set[str]:
+    keys: set[str] = set()
+    for source_path in sorted((root / "core").glob("**/*.py")):
+        tree = ast.parse(source_path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            value = _literal_text(node)
+            if value and value.startswith("SM_"):
+                keys.add(f"config_env:{value}")
+    return keys
+
+
 def discovered_surface(root: Path) -> dict[str, set[str]]:
     return {
         "cli": discover_cli_commands(root),
         "web": discover_web_routes(root),
         "plugin_provide": discover_plugin_provides(root),
         "adapter": discover_adapter_names(root),
+        "tui_action": discover_tui_actions(root),
+        "config_env": discover_config_environment_keys(root),
     }

@@ -4,7 +4,7 @@
   "audit_reference": "49ac6f88264fe4e06090af39154f2a089a18d8ef",
   "baseline_relationship": "audit_reference_is_not_an_ancestor_of_implementation_baseline",
   "metrics": {
-    "feature_id_count": 133
+    "feature_id_count": 141
   },
   "features": [
     {
@@ -345,6 +345,27 @@
       "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
     },
     {
+      "feature_id": "config_env:SM_",
+      "category": "config_env",
+      "entrypoint": "config_env:SM_",
+      "expected_result": "Preserves declared config env entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "config_env:SM_* environment variables",
+      "category": "config_env",
+      "entrypoint": "config_env:SM_* environment variables",
+      "expected_result": "Preserves declared config env entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "config_env:SM_CONFIG",
+      "category": "config_env",
+      "entrypoint": "config_env:SM_CONFIG",
+      "expected_result": "Preserves declared config env entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
       "feature_id": "installer:gui_entry.py",
       "category": "installer",
       "entrypoint": "installer:gui_entry.py",
@@ -634,6 +655,41 @@
       "contract_test": "tests/feature_contract/test_runtime_contract.py::test_required_plugins_are_discovered",
       "required": true,
       "default_enabled": true
+    },
+    {
+      "feature_id": "tui_action:command_palette",
+      "category": "tui_action",
+      "entrypoint": "tui_action:command_palette",
+      "expected_result": "Preserves declared tui action entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "tui_action:open_menu",
+      "category": "tui_action",
+      "entrypoint": "tui_action:open_menu",
+      "expected_result": "Preserves declared tui action entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "tui_action:show_help",
+      "category": "tui_action",
+      "entrypoint": "tui_action:show_help",
+      "expected_result": "Preserves declared tui action entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "tui_action:switch_view",
+      "category": "tui_action",
+      "entrypoint": "tui_action:switch_view",
+      "expected_result": "Preserves declared tui action entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "tui_action:toggle_maximize",
+      "category": "tui_action",
+      "entrypoint": "tui_action:toggle_maximize",
+      "expected_result": "Preserves declared tui action entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
     },
     {
       "feature_id": "web:DELETE /api/v1/self-evolution/{artifact_id}",

@@ -41,3 +41,11 @@ def test_manifest_matches_static_inventory(
         for entrypoint in values
     }
     assert discovered_entries <= manifest_entries
+
+
+def test_manifest_covers_tui_actions_and_configuration_keys(manifest: dict[str, object]) -> None:
+    entries = {record["entrypoint"] for record in manifest["features"]}
+    assert {
+        "tui_action:show_help",
+        "config_env:SM_CONFIG",
+    } <= entries
