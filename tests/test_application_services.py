@@ -281,3 +281,29 @@ def test_experience_evolution_service_requires_explicit_confirmation(tmp_path):
 
     assert result.ok is False
     assert result.error.code == "confirmation_required"
+
+
+def test_permission_log_system_service_owns_permission_state(tmp_path):
+    from core.services import PermissionLogSystemService
+
+    service = PermissionLogSystemService(tmp_path)
+    changed = service.set_permission_mode("conservative")
+    current = service.permission_status()
+
+    assert changed.ok is True
+    assert current.data["mode"] == "conservative"
+    assert current.meta == {
+        "service": "permission_log_system",
+        "operation": "permission_status",
+    }
+
+
+def test_permission_log_system_service_owns_log_write_and_list(tmp_path):
+    from core.services import PermissionLogSystemService
+
+    service = PermissionLogSystemService(tmp_path)
+    written = service.write_log("service log", session_id="service-session")
+    listed = service.list_logs()
+
+    assert written.ok is True
+    assert listed.data[0]["session_id"] == "service-session"

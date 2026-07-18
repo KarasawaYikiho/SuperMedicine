@@ -10,7 +10,11 @@ from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Input, Select, Static
 
 from core.redaction import redact_sensitive
-from core.services import ExperimentToolService, ExperienceEvolutionService
+from core.services import (
+    ExperimentToolService,
+    ExperienceEvolutionService,
+    PermissionLogSystemService,
+)
 from core.tui.app import apply_status_style
 from core.tui.i18n import t
 
@@ -415,12 +419,12 @@ class ToolView(Vertical):
         """Reflect the persisted permission mode in the self-evolution selector."""
 
         try:
-            from core.config_center import ConfigCenter
             from permission.access_mode import AccessMode
 
-            config = ConfigCenter(self._project_root / ".supermedicine" / "config.yaml")
+            service = PermissionLogSystemService(self._project_root)
+            config = service.require_data(service.permission_status())
             mode = str(
-                config.get_file_access_config().get("mode")
+                config.get("mode")
                 or AccessMode.CONSERVATIVE.value
             )
             select = self.query_one("#self-evolution-access-mode-select", Select)
@@ -428,7 +432,7 @@ class ToolView(Vertical):
                 select.value = mode
             if show_status:
                 self._set_self_evolution_status(
-                    f"已读取当前权限模式：{config.get_permission_mode_label()}。"
+                    f"已读取当前权限模式：{'完全访问' if mode == 'full' else '保守'}。"
                 )
         except Exception as exc:
             if show_status:

@@ -3255,14 +3255,14 @@ class TestLogScreenRefreshAndAggregation:
         assert "set_interval" not in source
         assert "Timer" not in source
 
-    def test_log_screen_store_property_creates_fresh_store(self, tmp_path):
+    def test_log_screen_service_property_creates_fresh_service(self, tmp_path):
         view = LogReportView(project_root=tmp_path)
 
-        store1 = view.store
-        store2 = view.store
+        store1 = view.service
+        store2 = view.service
 
         assert store1 is not store2
-        assert store1.project_dir == store2.project_dir
+        assert store1.project_root == store2.project_root
 
 
 # ═══ test_tui_paper_screens ═══

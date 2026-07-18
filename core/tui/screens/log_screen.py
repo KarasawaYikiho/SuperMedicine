@@ -10,9 +10,10 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Input, Static, TextArea
 
-from core.log_report import LogReportStore, detect_log_severity
+from core.log_report import detect_log_severity
 from core.log_severity import format_log_message
 from core.redaction import redact_sensitive
+from core.services import PermissionLogSystemService
 from core.tui.app import apply_status_style
 from core.tui.i18n import t
 
@@ -56,8 +57,8 @@ class LogReportView(Vertical):
         yield Static("", id="log-status")
 
     @property
-    def store(self) -> LogReportStore:
-        return LogReportStore(self._project_root)
+    def service(self) -> PermissionLogSystemService:
+        return PermissionLogSystemService(self._project_root)
 
     def on_mount(self) -> None:
         self.refresh_logs()
@@ -95,9 +96,9 @@ class LogReportView(Vertical):
             "文件", "报告 ID", "条目 ID", "会话", "时间", "级别", "存储位置", "摘要"
         )
         try:
-            storage = self.store.storage_info()
+            storage = self.service.require_data(self.service.log_storage())
             self._set_storage_location(storage)
-            entries = self.store.list_entries()
+            entries = self.service.require_data(self.service.list_log_entries())
             for entry in entries:
                 severity = self._entry_severity(entry)
                 message = self._entry_message(entry, severity=severity)
@@ -118,7 +119,7 @@ class LogReportView(Vertical):
                 new_row_count=len(entries),
             )
             stats_text = self._statistics_text(
-                self.store.statistics_for_entries(entries)
+                self.service.require_data(self.service.log_statistics(entries))
             )
             label = t("log_refreshed") if refreshed else t("log_list")
             follow_text = "自动跟随：开" if self._auto_follow else "自动跟随：关"
@@ -215,8 +216,14 @@ class LogReportView(Vertical):
             self.query_one("#log-session-id-input", Input).value.strip() or None
         )
         try:
-            self.store.write(message, session_id=session_id)
-            self._set_storage_location(self.store.storage_info(session_id=session_id))
+            self.service.require_data(
+                self.service.write_log(message, session_id=session_id)
+            )
+            self._set_storage_location(
+                self.service.require_data(
+                    self.service.log_storage(session_id=session_id)
+                )
+            )
             self.app.notify(t("log_saved"))
             list_status = self.refresh_logs()
             self._set_status(f"{t('log_saved')}；{list_status}")
@@ -246,7 +253,9 @@ class LogReportView(Vertical):
         file_name = str(row[0])
         entry_id = str(row[2])
         try:
-            entries = self.store.list_entries(file_name=file_name)
+            entries = self.service.require_data(
+                self.service.list_log_entries(file_name=file_name)
+            )
             selected_entry = next(
                 (
                     entry
@@ -262,10 +271,14 @@ class LogReportView(Vertical):
             message = self._wrapped_detail_text(
                 self._entry_message(selected_entry, severity=severity)
             )
-            storage = self.store.storage_info(file_name=file_name)
+            storage = self.service.require_data(
+                self.service.log_storage(file_name=file_name)
+            )
             self._set_storage_location(storage)
             stats_text = self._statistics_text(
-                self.store.statistics_for_entries([selected_entry])
+                self.service.require_data(
+                    self.service.log_statistics([selected_entry])
+                )
             )
             detail = (
                 f"{t('log_loaded')}: {selected_entry.get('file')}\n"

@@ -20,6 +20,7 @@ from core.services import (
     ExperienceEvolutionService,
     LLMService,
     PaperRAGService,
+    PermissionLogSystemService,
     ServiceResult,
     WorkspaceService,
 )
@@ -100,6 +101,7 @@ def create_app() -> Any:
             "experience_error": 400,
             "confirmation_required": 400,
             "evolution_artifact_not_found": 404,
+            "system_error": 400,
         }.get(code, 500)
         return _web_error(error.message if error else "Service failed", status_code)
 
@@ -493,11 +495,9 @@ def create_app() -> Any:
     @app.get("/api/v1/permissions")
     async def permission_status() -> dict[str, Any]:
         """Show current permission status."""
-        try:
-            return _get_cli().permission_status()
-        except Exception as exc:
-            logger.exception("permission_status error")
-            return _web_error(str(exc), 500)
+        return _service_data(
+            PermissionLogSystemService(Path.cwd()).permission_status()
+        )
 
     @app.post("/api/v1/permissions/mode")
     async def permission_set_mode(request: dict[str, Any]) -> dict[str, Any]:
@@ -505,15 +505,11 @@ def create_app() -> Any:
         mode = request.get("mode", "")
         if not mode:
             return _web_error("No mode specified", 400)
-        try:
-            return _get_cli().permission_set_mode(
-                mode,
-                confirm_full=request.get("confirm_full", False),
-                interactive=False,
+        return _service_data(
+            PermissionLogSystemService(Path.cwd()).set_permission_mode(
+                mode, explicit_confirmation=bool(request.get("confirm_full", False))
             )
-        except Exception as exc:
-            logger.exception("permission_set_mode error")
-            return _web_error(str(exc), 500)
+        )
 
     @app.post("/api/v1/permissions/authorize")
     async def permission_authorize(request: dict[str, Any]) -> dict[str, Any]:
@@ -521,11 +517,9 @@ def create_app() -> Any:
         path = request.get("path", "")
         if not path:
             return _web_error("No path specified", 400)
-        try:
-            return _get_cli().permission_authorize(path)
-        except Exception as exc:
-            logger.exception("permission_authorize error")
-            return _web_error(str(exc), 500)
+        return _service_data(
+            PermissionLogSystemService(Path.cwd()).authorize_directory(path)
+        )
 
     @app.post("/api/v1/permissions/revoke")
     async def permission_revoke(request: dict[str, Any]) -> dict[str, Any]:
@@ -533,31 +527,23 @@ def create_app() -> Any:
         path = request.get("path", "")
         if not path:
             return _web_error("No path specified", 400)
-        try:
-            return _get_cli().permission_revoke(path)
-        except Exception as exc:
-            logger.exception("permission_revoke error")
-            return _web_error(str(exc), 500)
+        return _service_data(
+            PermissionLogSystemService(Path.cwd()).revoke_directory(path)
+        )
 
     # ---- Log endpoints ----------------------------------------------------
 
     @app.get("/api/v1/logs")
     async def log_list() -> Any:
         """List available logs."""
-        try:
-            return _get_cli().log_list()
-        except Exception as exc:
-            logger.exception("log_list error")
-            return _web_error(str(exc), 500)
+        return _service_data(PermissionLogSystemService(Path.cwd()).list_logs())
 
     @app.get("/api/v1/logs/{name}")
     async def log_get(name: str) -> dict[str, Any]:
         """Show one log by name."""
-        try:
-            return _get_cli().log_show(name)
-        except Exception as exc:
-            logger.exception("log_get error")
-            return _web_error(str(exc), 500)
+        return _service_data(
+            PermissionLogSystemService(Path.cwd()).show_log(name)
+        )
 
     @app.post("/api/v1/logs")
     async def log_create(request: dict[str, Any]) -> dict[str, Any]:
@@ -565,11 +551,11 @@ def create_app() -> Any:
         message = request.get("message", "")
         if not message:
             return _web_error("No message provided", 400)
-        try:
-            return _get_cli().log_write(message, session_id=request.get("session_id"))
-        except Exception as exc:
-            logger.exception("log_create error")
-            return _web_error(str(exc), 500)
+        return _service_data(
+            PermissionLogSystemService(Path.cwd()).write_log(
+                message, session_id=request.get("session_id")
+            )
+        )
 
     # ---- Experiment endpoints ---------------------------------------------
 

@@ -9,12 +9,11 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Input, Select, Static
 
-from core.config_center import ConfigCenter
 from core.redaction import redact_sensitive
+from core.services import PermissionLogSystemService
 from core.tui.app import apply_status_style
 from permission.access_mode import (
     AccessMode,
-    FileAccessOperation,
     normalize_access_mode,
 )
 
@@ -31,50 +30,36 @@ class PermissionScreenController:
 
     def __init__(self, project_root: Path | str | None = None) -> None:
         self.project_root = Path(project_root) if project_root else Path.cwd()
-        self.config_path = self.project_root / ".supermedicine" / "config.yaml"
-        self.config = ConfigCenter(self.config_path)
+        self.service = PermissionLogSystemService(self.project_root)
 
     def current_config(self) -> dict[str, Any]:
-        return self.config.get_file_access_config()
+        return self.service.require_data(self.service.permission_status())
 
     def set_mode(self, mode: str, *, confirmation_text: str = "") -> dict[str, Any]:
         normalized = normalize_access_mode(mode)
         explicit_confirmation = (
             normalized != AccessMode.FULL or confirmation_text.strip() == "FULL"
         )
-        file_access = self.config.set_file_access_mode(
-            normalized,
-            explicit_confirmation=explicit_confirmation,
+        return self.service.require_data(
+            self.service.set_permission_mode(
+                normalized.value, explicit_confirmation=explicit_confirmation
+            )
         )
-        self.config.save()
-        return file_access
 
     def authorize_directory(self, path: str | Path) -> dict[str, Any]:
-        file_access = self.config.authorize_external_file_access_directory(path)
-        self.config.save()
-        return file_access
+        return self.service.require_data(self.service.authorize_directory(path))
 
     def revoke_directory(self, path: str | Path) -> dict[str, Any]:
-        file_access = self.config.revoke_external_file_access_directory(path)
-        self.config.save()
-        return file_access
+        return self.service.require_data(self.service.revoke_directory(path))
 
     def access_decision(
         self, path: str | Path, operation: str = "write"
     ) -> dict[str, str]:
         """Return a serializable decision from the unified permission policy."""
 
-        decision = self.config.get_file_access_policy(self.project_root).decide(
-            path,
-            FileAccessOperation(operation),
+        return self.service.require_data(
+            self.service.access_decision(path, operation)
         )
-        return {
-            "status": decision.status.value,
-            "mode": decision.mode.value,
-            "reason": decision.reason,
-            "path": str(decision.path),
-            "helper": decision.helper,
-        }
 
 
 class PermissionView(Vertical):

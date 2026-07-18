@@ -11,18 +11,17 @@ from cli.helpers import (
     _permission_result,
 )
 from cli.logging_setup import _log_json
+from core.services import PermissionLogSystemService
 
 logger = logging.getLogger(__name__)
 
 
 def permission_status(cli) -> dict[str, Any]:
     """Show current CLI file access mode and authorized external roots."""
-    from core.config_center import ConfigCenter
-
-    config = ConfigCenter(Path.cwd() / ".supermedicine" / "config.yaml")
-    file_access = config.get_file_access_config()
+    service = PermissionLogSystemService(Path.cwd())
+    file_access = service.require_data(service.permission_status())
     result = _permission_result(file_access, changed=False)
-    result["config_load_error"] = config.diagnostics().get("load_error", "")
+    result["config_load_error"] = file_access.get("config_load_error", "")
     _log_json(result)
     return result
 
@@ -35,19 +34,18 @@ def permission_set_mode(
     interactive: bool = True,
 ) -> dict[str, Any]:
     """Persistently switch CLI file access mode without privilege escalation."""
-    from core.config_center import ConfigCenter
     from permission.access_mode import AccessMode, normalize_access_mode
 
     normalized = normalize_access_mode(mode)
     explicit_confirmation = confirm_full
     if normalized == AccessMode.FULL and not explicit_confirmation and interactive:
         explicit_confirmation = _confirm_full_access_interactively()
-    config = ConfigCenter(Path.cwd() / ".supermedicine" / "config.yaml")
-    file_access = config.set_file_access_mode(
-        normalized,
-        explicit_confirmation=explicit_confirmation,
+    service = PermissionLogSystemService(Path.cwd())
+    file_access = service.require_data(
+        service.set_permission_mode(
+            normalized.value, explicit_confirmation=explicit_confirmation
+        )
     )
-    config.save()
     result = _permission_result(
         file_access,
         changed=True,
@@ -59,11 +57,8 @@ def permission_set_mode(
 
 def permission_authorize(cli, path: str | Path) -> dict[str, Any]:
     """Persistently authorize an external directory for conservative mode."""
-    from core.config_center import ConfigCenter
-
-    config = ConfigCenter(Path.cwd() / ".supermedicine" / "config.yaml")
-    file_access = config.authorize_external_file_access_directory(path)
-    config.save()
+    service = PermissionLogSystemService(Path.cwd())
+    file_access = service.require_data(service.authorize_directory(path))
     result = _permission_result(
         file_access,
         changed=True,
@@ -75,11 +70,8 @@ def permission_authorize(cli, path: str | Path) -> dict[str, Any]:
 
 def permission_revoke(cli, path: str | Path) -> dict[str, Any]:
     """Persistently remove an external directory authorization."""
-    from core.config_center import ConfigCenter
-
-    config = ConfigCenter(Path.cwd() / ".supermedicine" / "config.yaml")
-    file_access = config.revoke_external_file_access_directory(path)
-    config.save()
+    service = PermissionLogSystemService(Path.cwd())
+    file_access = service.require_data(service.revoke_directory(path))
     result = _permission_result(
         file_access,
         changed=True,
