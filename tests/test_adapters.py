@@ -18,7 +18,7 @@ from adapters.base_adapter import BaseAdapter
 from adapters.claude_code import ClaudeCodeAdapter
 from adapters.opencode.adapter import OpenCodeAdapter
 from adapters.standalone.adapter import StandaloneAdapter
-from agents.base_agent import BaseAgent
+from agents.roles import BaseAgent
 from agents.orchestrator import Orchestrator
 from permission.engine import PermissionEngine
 

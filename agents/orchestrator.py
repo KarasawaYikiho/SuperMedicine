@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Callable
 
-from .base_agent import BaseAgent
+from .roles import BaseAgent
 from .checkpoint import CheckpointManager
 from .state_machine import StateMachine, TaskState
 

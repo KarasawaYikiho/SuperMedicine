@@ -5,12 +5,12 @@ from __future__ import annotations
 import pytest
 from typing import Any
 
-from agents.alpha_agent import AlphaAgent
-from agents.beta_agent import BetaAgent
-from agents.gamma_agent import GammaAgent
-from agents.delta_agent import DeltaAgent
+from agents.roles import AlphaAgent
+from agents.roles import BetaAgent
+from agents.roles import GammaAgent
+from agents.roles import DeltaAgent
 from agents.orchestrator import Orchestrator
-from agents.base_agent import BaseAgent
+from agents.roles import BaseAgent
 from agents.checkpoint import CheckpointManager
 from agents.state_machine import TaskState, StateMachine
 
@@ -123,9 +123,7 @@ class TestBetaAgent:
 
     def test_execute_approves_clean_task(self):
         agent = BetaAgent()
-        result = agent.execute(
-            {"task": "Write a Python function", "requirements": []}
-        )
+        result = agent.execute({"task": "Write a Python function", "requirements": []})
         assert result["approved"] is True
         assert result["issues"] == []
         assert "passed" in result["feedback"].lower()
@@ -149,9 +147,7 @@ class TestBetaAgent:
     def test_completeness_warning_on_empty_task(self):
         agent = BetaAgent()
         result = agent.execute({})
-        warning_issues = [
-            i for i in result["issues"] if i.get("severity") == "warning"
-        ]
+        warning_issues = [i for i in result["issues"] if i.get("severity") == "warning"]
         assert len(warning_issues) >= 1
         assert any("completeness" in i["check"] for i in warning_issues)
 
@@ -186,20 +182,14 @@ class TestBetaAgent:
 
     def test_correctness_blocks_non_list_requirements(self):
         agent = BetaAgent()
-        result = agent.execute(
-            {"task": "Test", "requirements": "not a list"}
-        )
+        result = agent.execute({"task": "Test", "requirements": "not a list"})
         blocking = [i for i in result["issues"] if i.get("severity") == "blocking"]
         assert any("correctness" in i["check"] for i in blocking)
 
     def test_correctness_warns_on_non_dict_requirement_items(self):
         agent = BetaAgent()
-        result = agent.execute(
-            {"task": "Test", "requirements": ["string_item", 42]}
-        )
-        warnings = [
-            i for i in result["issues"] if i.get("severity") == "warning"
-        ]
+        result = agent.execute({"task": "Test", "requirements": ["string_item", 42]})
+        warnings = [i for i in result["issues"] if i.get("severity") == "warning"]
         assert any("correctness" in i["check"] for i in warnings)
 
     def test_flatten_text_recurses_nested(self):
@@ -263,8 +253,16 @@ class TestGammaAgent:
             {
                 "task": "Build login page",
                 "requirements": [
-                    {"id": "REQ-001", "text": "Must have username field", "priority": "high"},
-                    {"id": "REQ-002", "text": "Must have password field", "priority": "high"},
+                    {
+                        "id": "REQ-001",
+                        "text": "Must have username field",
+                        "priority": "high",
+                    },
+                    {
+                        "id": "REQ-002",
+                        "text": "Must have password field",
+                        "priority": "high",
+                    },
                 ],
             }
         )
@@ -354,17 +352,13 @@ class TestDeltaAgent:
 
     def test_explicit_target_override(self):
         agent = DeltaAgent()
-        result = agent.execute(
-            {"task": "Write docs", "target_agent": "beta"}
-        )
+        result = agent.execute({"task": "Write docs", "target_agent": "beta"})
         assert result["target_agent"] == "beta"
         assert "override" in result["route"].lower()
 
     def test_explicit_target_invalid_falls_back_to_auto(self):
         agent = DeltaAgent()
-        result = agent.execute(
-            {"task": "Write docs", "target_agent": "omega"}
-        )
+        result = agent.execute({"task": "Write docs", "target_agent": "omega"})
         # "omega" is not a valid target, so auto-route should kick in
         assert result["target_agent"] == "gamma"  # "write" keyword
 

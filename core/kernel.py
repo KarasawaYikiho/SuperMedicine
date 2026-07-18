@@ -9,10 +9,10 @@ from typing import Any, Callable, cast
 
 from agents.checkpoint import CheckpointManager
 from agents.orchestrator import Orchestrator
-from agents.alpha_agent import AlphaAgent
-from agents.beta_agent import BetaAgent
-from agents.gamma_agent import GammaAgent
-from agents.delta_agent import DeltaAgent
+from agents.roles import AlphaAgent
+from agents.roles import BetaAgent
+from agents.roles import GammaAgent
+from agents.roles import DeltaAgent
 from core.config_center import ConfigCenter
 from core.database.database import Database
 from core.database.migrations import MigrationManager
@@ -217,7 +217,9 @@ class Kernel:
         # Step 2: Alpha analysis
         emit("status", "Alpha agent analysing task…")
         alpha_input = {**task_dict, "context": context}
-        alpha_result = orch.dispatch(target if target == "alpha" else "alpha", alpha_input)
+        alpha_result = orch.dispatch(
+            target if target == "alpha" else "alpha", alpha_input
+        )
 
         # Step 3: Beta review
         emit("status", "Beta agent reviewing analysis…")
@@ -682,8 +684,13 @@ class Kernel:
         )
         if permission == PermissionResult.DENIED:
             return self._handle_permission_denied(
-                task, agent_id, selected_plugin, selected_action,
-                task_id, emit, execution_context,
+                task,
+                agent_id,
+                selected_plugin,
+                selected_action,
+                task_id,
+                emit,
+                execution_context,
             )
         emit("status", "权限检查通过，插件正在执行。")
 
@@ -691,13 +698,24 @@ class Kernel:
         plugin = self._plugin_registry.get(selected_plugin)
         if plugin is None:
             return self._handle_missing_plugin(
-                task, agent_id, selected_plugin, selected_action, task_id,
+                task,
+                agent_id,
+                selected_plugin,
+                selected_action,
+                task_id,
             )
 
         # --- execute plugin and shape result ---
         result = self._execute_plugin(
-            plugin, selected_action, params, execution_context,
-            task, agent_id, selected_plugin, task_id, emit,
+            plugin,
+            selected_action,
+            params,
+            execution_context,
+            task,
+            agent_id,
+            selected_plugin,
+            task_id,
+            emit,
         )
         if plugin_rag_context is not None:
             metadata = result.setdefault("metadata", {})
