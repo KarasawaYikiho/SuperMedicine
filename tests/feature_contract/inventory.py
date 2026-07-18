@@ -147,20 +147,58 @@ def _tracked_production_python_files(root: Path) -> list[Path]:
     ]
 
 
-def collect_metrics(root: Path) -> dict[str, int]:
-    source_paths = _tracked_production_python_files(root)
+def _production_sources(
+    root: Path, git_ref: str | None
+) -> list[tuple[Path, str]]:
+    if git_ref is None:
+        return [
+            (path.relative_to(root), path.read_text(encoding="utf-8"))
+            for path in _tracked_production_python_files(root)
+        ]
+
+    result = subprocess.run(
+        ["git", "ls-tree", "-r", "--name-only", git_ref],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    excluded_roots = {"tests", "docs", "build", "dist"}
+    relative_paths = [
+        relative
+        for line in result.stdout.splitlines()
+        if (relative := Path(line)).parts
+        and relative.suffix == ".py"
+        and relative.parts[0] not in excluded_roots
+    ]
+    sources: list[tuple[Path, str]] = []
+    for relative in relative_paths:
+        source = subprocess.run(
+            ["git", "show", f"{git_ref}:{relative.as_posix()}"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        ).stdout
+        sources.append((relative, source))
+    return sources
+
+
+def collect_metrics(root: Path, *, git_ref: str | None = None) -> dict[str, int]:
+    source_items = _production_sources(root, git_ref)
     raw_loc = 0
     effective_loc = 0
     functions: list[ast.FunctionDef | ast.AsyncFunctionDef] = []
     public_symbols = 0
     dependency_edges: set[tuple[str, str]] = set()
     project_modules = {
-        path.parts[0]
-        for path in (Path(item.relative_to(root)) for item in source_paths)
+        relative.parts[0]
+        for relative, _source in source_items
     }
 
-    for source_path in source_paths:
-        source = source_path.read_text(encoding="utf-8")
+    for relative, source in source_items:
         lines = source.splitlines()
         raw_loc += len(lines)
         effective_loc += sum(
@@ -179,7 +217,7 @@ def collect_metrics(root: Path) -> dict[str, int]:
             and not node.name.startswith("_")
         )
 
-        source_module = source_path.relative_to(root).parts[0]
+        source_module = relative.parts[0]
         for node in tree.body:
             imported: str | None = None
             if isinstance(node, ast.Import) and node.names:
@@ -193,7 +231,7 @@ def collect_metrics(root: Path) -> dict[str, int]:
         (node.end_lineno or node.lineno) - node.lineno + 1 for node in functions
     ]
     return {
-        "production_python_files": len(source_paths),
+        "production_python_files": len(source_items),
         "production_python_loc": raw_loc,
         "production_python_effective_loc": effective_loc,
         "functions_and_methods": len(functions),

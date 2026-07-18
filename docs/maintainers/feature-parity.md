@@ -66,8 +66,10 @@ syntax alone.
 | Top-level dependency edges | 17 |
 | Feature IDs | 158 |
 
-Metrics are calculated only from Git-tracked production Python files. Tests,
-documentation, build output, caches, and untracked local files are excluded.
+Metrics are recalculated from the immutable `audit_reference` Git tree, not the
+evolving working tree. Only production Python files tracked at that reference
+are counted; tests, documentation, build output, caches, and local files are
+excluded. This keeps the PR-00 baseline reproducible throughout later refactors.
 
 ## Review and Validation
 

@@ -110,5 +110,7 @@ def test_manifest_records_reproducible_structural_metrics(
     }
     assert required <= set(metrics)
     assert all(isinstance(metrics[name], int) and metrics[name] >= 0 for name in required)
-    current_metrics = collect_metrics(repository_root)
-    assert current_metrics == {name: metrics[name] for name in current_metrics}
+    baseline_metrics = collect_metrics(
+        repository_root, git_ref=str(manifest["audit_reference"])
+    )
+    assert baseline_metrics == {name: metrics[name] for name in baseline_metrics}
