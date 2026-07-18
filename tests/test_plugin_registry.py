@@ -93,6 +93,22 @@ class TestPluginRegistry:
         self._create_plugin(tmp_path, "b")
         assert len(PluginRegistry(tmp_path).discover()) == 2
 
+    def test_missing_source_directory_discovers_installed_package_plugins(
+        self, tmp_path, monkeypatch
+    ):
+        installed_plugins = tmp_path / "site-packages" / "plugins"
+        self._create_plugin(installed_plugins, "wheel-plugin")
+        monkeypatch.setattr(
+            "core.plugin_registry.resources.files",
+            lambda package: installed_plugins,
+        )
+
+        registry = PluginRegistry(tmp_path / "clean-project" / "plugins")
+        discovered = registry.discover()
+
+        assert [meta.name for meta in discovered] == ["wheel-plugin"]
+        assert registry.get("wheel-plugin") is not None
+
     def test_load_meta(self, tmp_path):
         self._create_plugin(tmp_path)
         r = PluginRegistry(tmp_path)

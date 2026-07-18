@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from importlib import resources
 from pathlib import Path
 from typing import Any
 
@@ -29,9 +30,10 @@ class PluginRegistry:
         self._metas = {}
         self._plugins = {}
         self._diagnostics = []
-        if not self._plugins_dir.exists():
+        plugins_dir = self._discovery_root()
+        if plugins_dir is None:
             return []
-        for yml in self._plugins_dir.rglob("plugin.yaml"):
+        for yml in plugins_dir.rglob("plugin.yaml"):
             try:
                 with open(yml, encoding="utf-8") as f:
                     data = yaml.safe_load(f)
@@ -57,6 +59,16 @@ class PluginRegistry:
             self._plugins[meta.name] = BasePlugin(meta, yml.parent)
             found.append(meta)
         return found
+
+    def _discovery_root(self) -> Path | None:
+        """Prefer an explicit source tree, then fall back to Wheel resources."""
+        if self._plugins_dir.is_dir():
+            return self._plugins_dir
+        try:
+            package_root = Path(str(resources.files("plugins")))
+        except (ModuleNotFoundError, TypeError):
+            return None
+        return package_root if package_root.is_dir() else None
 
     def diagnostics(self) -> list[dict[str, Any]]:
         return list(self._diagnostics)
