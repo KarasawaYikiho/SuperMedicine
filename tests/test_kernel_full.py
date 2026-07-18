@@ -52,6 +52,19 @@ class TestKernel:
     def test_event_bus(self, tmp_path):
         assert self._create_kernel(tmp_path).event_bus is not None
 
+    def test_identical_tasks_receive_unique_execution_ids(self, tmp_path, monkeypatch):
+        kernel = self._create_kernel(tmp_path)
+
+        def capture_task_id(task, *, task_id, **kwargs):
+            return {"status": "success", "task_id": task_id}
+
+        monkeypatch.setattr(kernel, "_execute_llm_chat", capture_task_id)
+
+        first = kernel.execute_task("repeatable task")
+        second = kernel.execute_task("repeatable task")
+
+        assert first["task_id"] != second["task_id"]
+
     def test_kernel_permission_engine_is_runtime_gate_not_prompt_generator(
         self, tmp_path
     ):

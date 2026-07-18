@@ -993,5 +993,3 @@ class Kernel:
     def _workspace_tool_runtime_context(self, workspace_id: str) -> dict[str, Any]:
         """Return currently imported workspace tools for LLM context when available."""
         return _workspace_tool_runtime_context_fn(workspace_id, self._config_path)
-
-
