@@ -1,12 +1,7 @@
 """SuperMedicine CLI package — re-exports for backward compatibility."""
 
 from cli.helpers import (
-    _EXPERIENCE_SCOPE_CHOICES,
-    _EXPORT_FORMAT_CHOICES,
     PERMISSION_RISK_NOTICE,
-    _as_experience_scope,
-    _as_export_format,
-    _as_optional_experience_scope,
     _confirm_full_access_interactively,
     _load_params_file,
     _load_params_json,
@@ -25,12 +20,7 @@ from cli.logging_setup import (
 
 __all__ = [
     "PERMISSION_RISK_NOTICE",
-    "_EXPERIENCE_SCOPE_CHOICES",
-    "_EXPORT_FORMAT_CHOICES",
     "_RedactingFormatter",
-    "_as_experience_scope",
-    "_as_export_format",
-    "_as_optional_experience_scope",
     "_configure_cli_logging",
     "_configure_stdio_errors",
     "_confirm_full_access_interactively",

@@ -17,6 +17,7 @@ from typing import Any, Iterable
 
 from core.services import (
     ExperimentToolService,
+    ExperienceEvolutionService,
     LLMService,
     PaperRAGService,
     ServiceResult,
@@ -96,6 +97,9 @@ def create_app() -> Any:
             "tool_not_found": 404,
             "experiment_error": 400,
             "experiment_session_not_found": 404,
+            "experience_error": 400,
+            "confirmation_required": 400,
+            "evolution_artifact_not_found": 404,
         }.get(code, 500)
         return _web_error(error.message if error else "Service failed", status_code)
 
@@ -361,11 +365,9 @@ def create_app() -> Any:
     @app.get("/api/v1/workspaces/{workspace_id}/experiences")
     async def experience_list(workspace_id: str) -> Any:
         """List experiences in a workspace."""
-        try:
-            return _get_cli().experience_list(workspace_id)
-        except Exception as exc:
-            logger.exception("experience_list error")
-            return _web_error(str(exc), 500)
+        return _service_data(
+            ExperienceEvolutionService(Path.cwd()).list_experiences(workspace_id)
+        )
 
     @app.post("/api/v1/workspaces/{workspace_id}/experiences")
     async def experience_create(workspace_id: str, request: dict[str, Any]) -> dict[str, Any]:
@@ -375,8 +377,8 @@ def create_app() -> Any:
         summary = request.get("summary", "")
         if not all([scope, title, summary]):
             return _web_error("scope, title, and summary are required", 400)
-        try:
-            return _get_cli().experience_add(
+        return _service_data(
+            ExperienceEvolutionService(Path.cwd()).add_experience(
                 workspace_id,
                 scope,
                 title,
@@ -384,18 +386,16 @@ def create_app() -> Any:
                 tags=request.get("tags"),
                 confirm=request.get("confirm", True),
             )
-        except Exception as exc:
-            logger.exception("experience_create error")
-            return _web_error(str(exc), 500)
+        )
 
     @app.get("/api/v1/workspaces/{workspace_id}/experiences/{experience_id}")
     async def experience_get(workspace_id: str, experience_id: str) -> dict[str, Any]:
         """View one experience by id."""
-        try:
-            return _get_cli().experience_view(experience_id, workspace_id)
-        except Exception as exc:
-            logger.exception("experience_get error")
-            return _web_error(str(exc), 500)
+        return _service_data(
+            ExperienceEvolutionService(Path.cwd()).view_experience(
+                experience_id, workspace_id
+            )
+        )
 
     @app.delete("/api/v1/workspaces/{workspace_id}/experiences/{experience_id}")
     async def experience_remove(workspace_id: str, experience_id: str, request: dict[str, Any]) -> dict[str, Any]:
@@ -403,13 +403,11 @@ def create_app() -> Any:
         scope = request.get("scope", "")
         if not scope:
             return _web_error("scope is required", 400)
-        try:
-            return _get_cli().experience_delete(
+        return _service_data(
+            ExperienceEvolutionService(Path.cwd()).delete_experience(
                 experience_id, workspace_id, scope, confirm=experience_id
             )
-        except Exception as exc:
-            logger.exception("experience_remove error")
-            return _web_error(str(exc), 500)
+        )
 
     # ---- Tool endpoints ---------------------------------------------------
 
@@ -641,30 +639,9 @@ def create_app() -> Any:
     @app.get("/api/v1/self-evolution")
     async def self_evolution_list() -> Any:
         """List self evolution artifacts."""
-        try:
-            from pathlib import Path as _P
-            project_dir = _P.cwd()
-            artifacts_dir = project_dir / "self_evolution"
-            if not artifacts_dir.exists():
-                return []
-            artifacts = []
-            for f in artifacts_dir.glob("*.json"):
-                try:
-                    import json as _json
-                    data = _json.loads(f.read_text(encoding="utf-8"))
-                    artifacts.append({
-                        "id": f.stem,
-                        "type": data.get("type", "unknown"),
-                        "instruction": data.get("instruction", ""),
-                        "status": data.get("status", "pending"),
-                        "path": str(f),
-                    })
-                except Exception:
-                    continue
-            return artifacts
-        except Exception as exc:
-            logger.exception("self_evolution_list error")
-            return _web_error(str(exc), 500)
+        return _service_data(
+            ExperienceEvolutionService(Path.cwd()).list_evolution_artifacts()
+        )
 
     @app.post("/api/v1/self-evolution/generate")
     async def self_evolution_generate(request: dict[str, Any]) -> dict[str, Any]:
@@ -674,46 +651,33 @@ def create_app() -> Any:
         output = request.get("output", "")
         if not all([instruction, output]):
             return _web_error("instruction and output are required", 400)
-        try:
-            return _get_cli().self_evolve(
+        return _service_data(
+            ExperienceEvolutionService(Path.cwd()).generate_evolution(
                 instruction=instruction,
                 artifact_type=artifact_type,
                 output=output,
-                preview=True,
+                confirmed=False,
+                metadata={"web_endpoint": "self_evolution_generate"},
             )
-        except Exception as exc:
-            logger.exception("self_evolution_generate error")
-            return _web_error(str(exc), 500)
+        )
 
     @app.get("/api/v1/self-evolution/{artifact_id}")
     async def self_evolution_get(artifact_id: str) -> dict[str, Any]:
         """View one self evolution artifact."""
-        try:
-            from pathlib import Path as _P
-            project_dir = _P.cwd()
-            artifact_path = project_dir / "self_evolution" / f"{artifact_id}.json"
-            if not artifact_path.exists():
-                return _web_error("Artifact not found", 404)
-            import json as _json
-            return _json.loads(artifact_path.read_text(encoding="utf-8"))
-        except Exception as exc:
-            logger.exception("self_evolution_get error")
-            return _web_error(str(exc), 500)
+        return _service_data(
+            ExperienceEvolutionService(Path.cwd()).get_evolution_artifact(
+                artifact_id
+            )
+        )
 
     @app.delete("/api/v1/self-evolution/{artifact_id}")
     async def self_evolution_delete(artifact_id: str) -> dict[str, Any]:
         """Delete one self evolution artifact."""
-        try:
-            from pathlib import Path as _P
-            project_dir = _P.cwd()
-            artifact_path = project_dir / "self_evolution" / f"{artifact_id}.json"
-            if not artifact_path.exists():
-                return _web_error("Artifact not found", 404)
-            artifact_path.unlink()
-            return {"success": True, "message": f"Artifact {artifact_id} deleted"}
-        except Exception as exc:
-            logger.exception("self_evolution_delete error")
-            return _web_error(str(exc), 500)
+        return _service_data(
+            ExperienceEvolutionService(Path.cwd()).delete_evolution_artifact(
+                artifact_id
+            )
+        )
 
     # ---- Diagnose endpoints ----------------------------------------------
 

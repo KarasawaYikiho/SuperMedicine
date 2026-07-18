@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from core.experience import ExperienceScope, ExperienceStore, ExportFormat
+from core.experience import ExperienceScope, ExportFormat
+from core.services import ExperienceEvolutionService
 
 
 @dataclass(slots=True)
@@ -16,8 +17,8 @@ class ExperienceScreenController:
     project_root: Path | str | None = None
 
     @property
-    def store(self) -> ExperienceStore:
-        return ExperienceStore(self.project_root)
+    def service(self) -> ExperienceEvolutionService:
+        return ExperienceEvolutionService(self.project_root)
 
     def suggest_classification(
         self,
@@ -28,14 +29,14 @@ class ExperienceScreenController:
         tags: list[str] | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        suggestion = self.store.suggest_classification(
-            workspace_id=workspace_id,
+        result = self.service.suggest_experience(
+            workspace_id,
+            summary,
             title=title,
-            summary=summary,
             tags=tags,
             metadata=metadata,
         )
-        payload = suggestion.to_dict()
+        payload = dict(self.service.require_data(result))
         payload["label"] = "经验分类建议"
         payload["message"] = "请确认后再写入经验库"
         return payload
@@ -53,28 +54,27 @@ class ExperienceScreenController:
     ) -> dict[str, Any]:
         if not confirm:
             raise ValueError("写入经验前需要用户最终确认")
-        record = self.store.confirm_classification(
-            workspace_id=workspace_id,
-            scope=scope,
-            title=title,
-            summary=summary,
+        result = self.service.add_experience(
+            workspace_id,
+            scope,
+            title,
+            summary,
             tags=tags,
+            confirm=confirm,
             source=source,
         )
-        payload = record.to_dict()
-        payload["label"] = f"经验：{record.title}"
+        payload = dict(self.service.require_data(result))
+        payload["label"] = f"经验：{payload['title']}"
         payload["message"] = "经验已确认写入"
         return payload
 
     def list_experiences(
         self, workspace_id: str, *, include_general: bool = False
     ) -> list[dict[str, Any]]:
-        return [
-            self._record_payload(record)
-            for record in self.store.list_experiences(
-                workspace_id, include_general=include_general
-            )
-        ]
+        result = self.service.list_experiences(
+            workspace_id, include_general=include_general
+        )
+        return [self._record_payload(record) for record in self.service.require_data(result)]
 
     def edit_experience(
         self,
@@ -86,30 +86,29 @@ class ExperienceScreenController:
         summary: str | None = None,
         tags: list[str] | None = None,
     ) -> dict[str, Any]:
-        record = self.store.edit_experience(
+        result = self.service.edit_experience(
             record_id,
-            workspace_id=workspace_id,
-            scope=scope,
+            workspace_id,
+            scope,
             title=title,
             summary=summary,
             tags=tags,
         )
-        return self._record_payload(record, message="经验已更新")
+        return self._record_payload(
+            self.service.require_data(result), message="经验已更新"
+        )
 
     def delete_experience(
         self, record_id: str, *, workspace_id: str, scope: ExperienceScope, confirm: str
     ) -> dict[str, Any]:
         if confirm != record_id:
             raise ValueError("删除经验需要输入完全一致的经验 ID 作为确认")
-        deleted = self.store.delete_experience(
-            record_id, workspace_id=workspace_id, scope=scope
+        result = self.service.delete_experience(
+            record_id, workspace_id, scope, confirm=confirm
         )
-        return {
-            "status": "deleted",
-            "id": deleted.id,
-            "scope": deleted.scope,
-            "message": "经验已删除",
-        }
+        payload = dict(self.service.require_data(result))
+        payload["message"] = "经验已删除"
+        return payload
 
     def export_experiences(
         self,
@@ -119,17 +118,20 @@ class ExperienceScreenController:
         include_general: bool = False,
         path: str | Path | None = None,
     ) -> dict[str, Any]:
-        rendered = self.store.export_experiences(
-            workspace_id=workspace_id,
-            format=format,
+        result = self.service.export_experiences(
+            workspace_id,
+            format,
             include_general=include_general,
             path=path,
         )
+        rendered = self.service.require_data(result)
         return {"format": format, "content": rendered, "message": "经验已导出"}
 
-    def _record_payload(self, record, message: str | None = None) -> dict[str, Any]:
-        payload = record.to_dict()
-        payload["label"] = f"经验：{record.title}"
+    def _record_payload(
+        self, record: dict[str, Any], message: str | None = None
+    ) -> dict[str, Any]:
+        payload = dict(record)
+        payload["label"] = f"经验：{payload['title']}"
         if message is not None:
             payload["message"] = message
         return payload

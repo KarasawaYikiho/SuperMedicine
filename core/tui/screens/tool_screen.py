@@ -10,7 +10,7 @@ from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Input, Select, Static
 
 from core.redaction import redact_sensitive
-from core.services import ExperimentToolService
+from core.services import ExperimentToolService, ExperienceEvolutionService
 from core.tui.app import apply_status_style
 from core.tui.i18n import t
 
@@ -464,12 +464,15 @@ class ToolView(Vertical):
         if request is None:
             return
         try:
-            from core.self_evolution import SelfEvolutionService
-
-            result = SelfEvolutionService(self._project_root).generate(
-                **request,
+            service = ExperienceEvolutionService(self._project_root)
+            result = service.require_data(service.generate_evolution(
+                instruction=str(request["user_intent"]),
+                artifact_type=str(request["artifact_type"]),
+                output=str(request["output_path"]),
+                access_mode=str(request["access_mode"]),
                 confirmed=False,
-            )
+                metadata=dict(request.get("metadata") or {}),
+            ))
         except Exception as exc:
             self._set_self_evolution_status(f"错误：{redact_sensitive(str(exc))}")
             return
@@ -503,19 +506,17 @@ class ToolView(Vertical):
             full_access_confirmed = False
             risk_notice_acknowledged = False
         try:
-            from core.self_evolution import SelfEvolutionService
-            from permission.audit import AuditLogger
-
-            audit_log = (
-                self._project_root / ".supermedicine" / "policies" / "audit.jsonl"
-            )
-            result = SelfEvolutionService(self._project_root).generate(
-                **request,
+            service = ExperienceEvolutionService(self._project_root)
+            result = service.require_data(service.generate_evolution(
+                instruction=str(request["user_intent"]),
+                artifact_type=str(request["artifact_type"]),
+                output=str(request["output_path"]),
+                access_mode=str(request["access_mode"]),
                 confirmed=True,
-                audit_logger=AuditLogger(audit_log),
-                full_access_confirmed=full_access_confirmed,
-                risk_notice_acknowledged=risk_notice_acknowledged,
-            )
+                confirm_full_access=full_access_confirmed,
+                acknowledge_risk=risk_notice_acknowledged,
+                metadata=dict(request.get("metadata") or {}),
+            ))
         except Exception as exc:
             self._set_self_evolution_status(f"错误：{redact_sensitive(str(exc))}")
             return

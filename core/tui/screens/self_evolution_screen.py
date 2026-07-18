@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +10,7 @@ from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Input, Select, Static, TextArea
 
 from core.redaction import redact_sensitive
+from core.services import ExperienceEvolutionService
 from core.tui.app import apply_status_style
 
 
@@ -44,24 +44,17 @@ class SelfEvolutionView(Vertical):
         table = self.query_one("#self-evolution-table", DataTable)
         table.clear(columns=True)
         table.add_columns("ID", "类型", "指令", "状态")
-        artifacts_dir = self._project_root / "self_evolution"
-        if not artifacts_dir.exists():
-            self._set_status("暂无自进化制品")
-            return
-        count = 0
-        for path in artifacts_dir.glob("*.json"):
-            try:
-                data = json.loads(path.read_text(encoding="utf-8"))
-            except Exception:
-                continue
+        service = ExperienceEvolutionService(self._project_root)
+        artifacts = service.require_data(service.list_evolution_artifacts())
+        for data in artifacts:
             table.add_row(
-                path.stem,
+                str(data.get("id", "")),
                 str(data.get("type", "-")),
                 str(data.get("instruction", "-"))[:80],
                 str(data.get("status", "pending")),
-                key=path.stem,
+                key=str(data.get("id", "")),
             )
-            count += 1
+        count = len(artifacts)
         self._set_status(f"自进化制品：{count}" if count else "暂无自进化制品")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -78,14 +71,14 @@ class SelfEvolutionView(Vertical):
             self._set_status("请填写指令和输出路径")
             return
         try:
-            from cli_entry import CLI
-
-            result = CLI().self_evolve(
+            service = ExperienceEvolutionService(self._project_root)
+            result = service.require_data(service.generate_evolution(
                 instruction=instruction,
                 artifact_type=str(artifact_type or "code"),
                 output=output,
-                preview=True,
-            )
+                confirmed=False,
+                metadata={"tui_entry": "self_evolution_screen"},
+            ))
             self._set_status(str(redact_sensitive(result.get("message") or result.get("status") or "制品已生成")))
             self.refresh_view_data()
         except Exception as exc:

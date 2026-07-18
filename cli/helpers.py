@@ -6,12 +6,9 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
 from core.redaction import redact_sensitive
-
-if TYPE_CHECKING:
-    from core.experience import ExperienceScope, ExportFormat
 
 logger = logging.getLogger(__name__)
 
@@ -20,28 +17,6 @@ PERMISSION_RISK_NOTICE = (
     "已经拥有的系统权限，不会静默提权、不会绕过系统权限。若系统权限不足，请通过"
     "管理员身份运行或操作系统 UAC/安全提示进行显式授权。"
 )
-
-_EXPERIENCE_SCOPE_CHOICES = frozenset({"general", "workspace"})
-_EXPORT_FORMAT_CHOICES = frozenset({"json", "md"})
-
-
-def _as_experience_scope(scope: str) -> ExperienceScope:
-    if scope not in _EXPERIENCE_SCOPE_CHOICES:
-        raise ValueError("experience scope must be one of: general, workspace")
-    return cast("ExperienceScope", scope)
-
-
-def _as_optional_experience_scope(scope: str | None) -> ExperienceScope | None:
-    if scope is None:
-        return None
-    return _as_experience_scope(scope)
-
-
-def _as_export_format(format: str) -> ExportFormat:
-    if format not in _EXPORT_FORMAT_CHOICES:
-        raise ValueError("export format must be one of: json, md")
-    return cast("ExportFormat", format)
-
 
 def _self_evolution_cli_result(
     result: dict[str, Any],

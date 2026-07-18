@@ -246,3 +246,38 @@ def test_experiment_tool_service_missing_session_has_stable_error(tmp_path):
 
     assert result.ok is False
     assert result.error.code == "experiment_session_not_found"
+
+
+def test_experience_evolution_service_owns_confirm_list_and_view(tmp_path):
+    from core.services import ExperienceEvolutionService, WorkspaceService
+
+    WorkspaceService(tmp_path).create("trial-1")
+    service = ExperienceEvolutionService(tmp_path)
+    added = service.add_experience(
+        "trial-1",
+        "workspace",
+        "Useful method",
+        "A concise reusable method.",
+        confirm=True,
+    )
+    listed = service.list_experiences("trial-1")
+    viewed = service.view_experience(added.data["id"], "trial-1")
+
+    assert added.ok is True
+    assert listed.data == [viewed.data]
+    assert added.meta == {
+        "service": "experience_evolution",
+        "operation": "add_experience",
+    }
+
+
+def test_experience_evolution_service_requires_explicit_confirmation(tmp_path):
+    from core.services import ExperienceEvolutionService, WorkspaceService
+
+    WorkspaceService(tmp_path).create("trial-1")
+    result = ExperienceEvolutionService(tmp_path).add_experience(
+        "trial-1", "workspace", "Title", "Summary", confirm=False
+    )
+
+    assert result.ok is False
+    assert result.error.code == "confirmation_required"
