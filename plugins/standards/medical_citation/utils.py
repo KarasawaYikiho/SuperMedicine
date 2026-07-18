@@ -210,3 +210,15 @@ def format_book_base(book) -> str:
         citation += f" {book.edition} ed."
     citation += f" {book.publisher}; {book.year}."
     return citation
+
+
+class CitationFormatter:
+    """Shared formatter skeleton with style differences declared as data."""
+
+    include_doi = False
+
+    def format_journal(self, article: JournalArticle) -> str:
+        return format_journal_base(article, include_doi=self.include_doi)
+
+    def format_book(self, book: Book) -> str:
+        return format_book_base(book)
