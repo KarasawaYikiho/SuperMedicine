@@ -6,8 +6,6 @@ from importlib import resources
 from pathlib import Path
 from typing import Any
 
-import yaml
-
 from plugins.base_plugin import BasePlugin, PluginMeta
 
 
@@ -33,13 +31,15 @@ class PluginRegistry:
         plugins_dir = self._discovery_root()
         if plugins_dir is None:
             return []
-        for yml in plugins_dir.rglob("plugin.yaml"):
+        plugin_manifests = set(plugins_dir.rglob("plugin.yaml"))
+        tool_manifests = {
+            path
+            for path in plugins_dir.rglob("tool.yaml")
+            if path.with_name("plugin.yaml") not in plugin_manifests
+        }
+        for yml in sorted(plugin_manifests | tool_manifests):
             try:
-                with open(yml, encoding="utf-8") as f:
-                    data = yaml.safe_load(f)
-                if not data or "name" not in data:
-                    continue
-                meta = PluginMeta.from_dict(data)
+                meta = PluginMeta.from_manifest(yml)
             except Exception as exc:
                 self._diagnostics.append(
                     {"status": "skipped", "manifest": str(yml), "error": str(exc)}

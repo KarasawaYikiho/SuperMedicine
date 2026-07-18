@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import yaml
 from core.plugin_registry import PluginRegistry
 from plugins.base_plugin import BasePlugin
@@ -69,6 +71,19 @@ class TestAdapterDiscoveryRegistry:
         assert adapters.list_adapter_registrations(include_optional=False) == [
             standalone
         ]
+
+
+def test_workspace_tool_manifests_are_dynamically_discoverable():
+    registry = PluginRegistry(Path("plugins"))
+    metas = registry.discover()
+    names = {meta.name for meta in metas}
+
+    assert {"heatmap", "python-data-analysis", "umap", "r-template"} <= names
+    for tool_id in ("heatmap", "python-data-analysis", "umap", "r-template"):
+        meta = registry.get_meta(tool_id)
+        assert meta is not None
+        assert meta.entry in {"runner.py", "runner.R"}
+        assert {item["id"] for item in meta.provides} == {f"workspace.tool.{tool_id}"}
 
 
 class TestPluginRegistry:
