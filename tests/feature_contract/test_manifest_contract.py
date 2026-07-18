@@ -73,3 +73,16 @@ def test_feature_id_baseline_never_regresses(manifest: dict[str, object]) -> Non
     baseline_ids = set(manifest["baseline_feature_ids"])
     assert baseline_ids <= current_ids
     assert len(current_ids) >= manifest["metrics"]["feature_id_count"]
+
+
+def test_manifest_covers_release_entrypoints(manifest: dict[str, object]) -> None:
+    entries = {record["entrypoint"] for record in manifest["features"]}
+    assert {
+        "entrypoint:cli_entry.py",
+        "entrypoint:gui_entry.py",
+        "entrypoint:install_entry.py",
+        "entrypoint:uninstall_entry.py",
+        "release_builder:scripts/ci/build_gui_exe.py",
+        "release_builder:scripts/ci/build_installer_exe.py",
+        "release_builder:scripts/ci/build_release_zip.py",
+    } <= entries

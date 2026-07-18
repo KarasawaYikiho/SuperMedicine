@@ -95,6 +95,24 @@ def discover_config_environment_keys(root: Path) -> set[str]:
     return keys
 
 
+def discover_release_entrypoints(root: Path) -> set[str]:
+    entrypoints = {
+        f"entrypoint:{path.name}"
+        for path in (
+            root / "cli_entry.py",
+            root / "gui_entry.py",
+            root / "install_entry.py",
+            root / "uninstall_entry.py",
+        )
+        if path.is_file()
+    }
+    entrypoints.update(
+        f"release_builder:{path.relative_to(root).as_posix()}"
+        for path in (root / "scripts" / "ci").glob("build_*.py")
+    )
+    return entrypoints
+
+
 def discovered_surface(root: Path) -> dict[str, set[str]]:
     return {
         "cli": discover_cli_commands(root),
@@ -103,4 +121,5 @@ def discovered_surface(root: Path) -> dict[str, set[str]]:
         "adapter": discover_adapter_names(root),
         "tui_action": discover_tui_actions(root),
         "config_env": discover_config_environment_keys(root),
+        "release_entrypoint": discover_release_entrypoints(root),
     }
