@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 
 from tests.feature_contract.inventory import discovered_surface
@@ -49,3 +50,18 @@ def test_manifest_covers_tui_actions_and_configuration_keys(manifest: dict[str, 
         "tui_action:show_help",
         "config_env:SM_CONFIG",
     } <= entries
+
+
+def test_each_manifest_contract_node_exists(
+    repository_root: Path, manifest: dict[str, object]
+) -> None:
+    for record in manifest["features"]:
+        path_text, function_name = record["contract_test"].split("::", maxsplit=1)
+        test_path = repository_root / path_text
+        assert test_path.is_file(), record["feature_id"]
+        functions = {
+            node.name
+            for node in ast.walk(ast.parse(test_path.read_text(encoding="utf-8")))
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        }
+        assert function_name in functions, record["feature_id"]
