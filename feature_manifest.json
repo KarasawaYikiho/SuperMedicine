@@ -807,6 +807,167 @@
       "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
     },
     {
+      "feature_id": "opentui:page:chat",
+      "category": "opentui",
+      "entrypoint": "opentui:page:chat",
+      "expected_result": "Preserves the OpenTUI page contract.",
+      "contract_test": "tests/test_opentui_runtime_smoke.py::test_opentui_feature_contract_covers_pages_and_interactions"
+    },
+    {
+      "feature_id": "opentui:page:dashboard",
+      "category": "opentui",
+      "entrypoint": "opentui:page:dashboard",
+      "expected_result": "Preserves the OpenTUI page contract.",
+      "contract_test": "tests/test_opentui_runtime_smoke.py::test_opentui_feature_contract_covers_pages_and_interactions"
+    },
+    {
+      "feature_id": "opentui:page:workspace",
+      "category": "opentui",
+      "entrypoint": "opentui:page:workspace",
+      "expected_result": "Preserves the OpenTUI page contract.",
+      "contract_test": "tests/test_opentui_runtime_smoke.py::test_opentui_feature_contract_covers_pages_and_interactions"
+    },
+    {
+      "feature_id": "opentui:page:paper-rag",
+      "category": "opentui",
+      "entrypoint": "opentui:page:paper-rag",
+      "expected_result": "Preserves the OpenTUI page contract.",
+      "contract_test": "tests/test_opentui_runtime_smoke.py::test_opentui_feature_contract_covers_pages_and_interactions"
+    },
+    {
+      "feature_id": "opentui:page:experience",
+      "category": "opentui",
+      "entrypoint": "opentui:page:experience",
+      "expected_result": "Preserves the OpenTUI page contract.",
+      "contract_test": "tests/test_opentui_runtime_smoke.py::test_opentui_feature_contract_covers_pages_and_interactions"
+    },
+    {
+      "feature_id": "opentui:page:tool",
+      "category": "opentui",
+      "entrypoint": "opentui:page:tool",
+      "expected_result": "Preserves the OpenTUI page contract.",
+      "contract_test": "tests/test_opentui_runtime_smoke.py::test_opentui_feature_contract_covers_pages_and_interactions"
+    },
+    {
+      "feature_id": "opentui:page:dialog",
+      "category": "opentui",
+      "entrypoint": "opentui:page:dialog",
+      "expected_result": "Preserves the OpenTUI page contract.",
+      "contract_test": "tests/test_opentui_runtime_smoke.py::test_opentui_feature_contract_covers_pages_and_interactions"
+    },
+    {
+      "feature_id": "opentui:page:llm",
+      "category": "opentui",
+      "entrypoint": "opentui:page:llm",
+      "expected_result": "Preserves the OpenTUI page contract.",
+      "contract_test": "tests/test_opentui_runtime_smoke.py::test_opentui_feature_contract_covers_pages_and_interactions"
+    },
+    {
+      "feature_id": "opentui:page:experiment",
+      "category": "opentui",
+      "entrypoint": "opentui:page:experiment",
+      "expected_result": "Preserves the OpenTUI page contract.",
+      "contract_test": "tests/test_opentui_runtime_smoke.py::test_opentui_feature_contract_covers_pages_and_interactions"
+    },
+    {
+      "feature_id": "opentui:page:log",
+      "category": "opentui",
+      "entrypoint": "opentui:page:log",
+      "expected_result": "Preserves the OpenTUI page contract.",
+      "contract_test": "tests/test_opentui_runtime_smoke.py::test_opentui_feature_contract_covers_pages_and_interactions"
+    },
+    {
+      "feature_id": "opentui:page:permission",
+      "category": "opentui",
+      "entrypoint": "opentui:page:permission",
+      "expected_result": "Preserves the OpenTUI page contract.",
+      "contract_test": "tests/test_opentui_runtime_smoke.py::test_opentui_feature_contract_covers_pages_and_interactions"
+    },
+    {
+      "feature_id": "opentui:page:self-evolution",
+      "category": "opentui",
+      "entrypoint": "opentui:page:self-evolution",
+      "expected_result": "Preserves the OpenTUI page contract.",
+      "contract_test": "tests/test_opentui_runtime_smoke.py::test_opentui_feature_contract_covers_pages_and_interactions"
+    },
+    {
+      "feature_id": "opentui:page:diagnose",
+      "category": "opentui",
+      "entrypoint": "opentui:page:diagnose",
+      "expected_result": "Preserves the OpenTUI page contract.",
+      "contract_test": "tests/test_opentui_runtime_smoke.py::test_opentui_feature_contract_covers_pages_and_interactions"
+    },
+    {
+      "feature_id": "opentui:interaction:keyboard",
+      "category": "opentui",
+      "entrypoint": "opentui:interaction:keyboard",
+      "expected_result": "Preserves the OpenTUI interaction contract.",
+      "contract_test": "tests/test_opentui_runtime_smoke.py::test_opentui_feature_contract_covers_pages_and_interactions"
+    },
+    {
+      "feature_id": "opentui:interaction:mouse",
+      "category": "opentui",
+      "entrypoint": "opentui:interaction:mouse",
+      "expected_result": "Preserves the OpenTUI interaction contract.",
+      "contract_test": "tests/test_opentui_runtime_smoke.py::test_opentui_feature_contract_covers_pages_and_interactions"
+    },
+    {
+      "feature_id": "opentui:interaction:scroll",
+      "category": "opentui",
+      "entrypoint": "opentui:interaction:scroll",
+      "expected_result": "Preserves the OpenTUI interaction contract.",
+      "contract_test": "tests/test_opentui_runtime_smoke.py::test_opentui_feature_contract_covers_pages_and_interactions"
+    },
+    {
+      "feature_id": "opentui:interaction:focus",
+      "category": "opentui",
+      "entrypoint": "opentui:interaction:focus",
+      "expected_result": "Preserves the OpenTUI interaction contract.",
+      "contract_test": "tests/test_opentui_runtime_smoke.py::test_opentui_feature_contract_covers_pages_and_interactions"
+    },
+    {
+      "feature_id": "opentui:interaction:resize",
+      "category": "opentui",
+      "entrypoint": "opentui:interaction:resize",
+      "expected_result": "Preserves the OpenTUI interaction contract.",
+      "contract_test": "tests/test_opentui_runtime_smoke.py::test_opentui_feature_contract_covers_pages_and_interactions"
+    },
+    {
+      "feature_id": "opentui:interaction:unicode-long-text",
+      "category": "opentui",
+      "entrypoint": "opentui:interaction:unicode-long-text",
+      "expected_result": "Preserves the OpenTUI interaction contract.",
+      "contract_test": "tests/test_opentui_runtime_smoke.py::test_opentui_feature_contract_covers_pages_and_interactions"
+    },
+    {
+      "feature_id": "opentui:interaction:stream-cancel",
+      "category": "opentui",
+      "entrypoint": "opentui:interaction:stream-cancel",
+      "expected_result": "Preserves the OpenTUI interaction contract.",
+      "contract_test": "tests/test_opentui_runtime_smoke.py::test_opentui_feature_contract_covers_pages_and_interactions"
+    },
+    {
+      "feature_id": "opentui:interaction:error-recovery",
+      "category": "opentui",
+      "entrypoint": "opentui:interaction:error-recovery",
+      "expected_result": "Preserves the OpenTUI interaction contract.",
+      "contract_test": "tests/test_opentui_runtime_smoke.py::test_opentui_feature_contract_covers_pages_and_interactions"
+    },
+    {
+      "feature_id": "opentui:interaction:state-restore",
+      "category": "opentui",
+      "entrypoint": "opentui:interaction:state-restore",
+      "expected_result": "Preserves the OpenTUI interaction contract.",
+      "contract_test": "tests/test_opentui_runtime_smoke.py::test_opentui_feature_contract_covers_pages_and_interactions"
+    },
+    {
+      "feature_id": "opentui:interaction:jsonl-bridge",
+      "category": "opentui",
+      "entrypoint": "opentui:interaction:jsonl-bridge",
+      "expected_result": "Preserves the OpenTUI interaction contract.",
+      "contract_test": "tests/test_opentui_runtime_smoke.py::test_opentui_feature_contract_covers_pages_and_interactions"
+    },
+    {
       "feature_id": "tui_action:command_palette",
       "category": "tui_action",
       "entrypoint": "tui_action:command_palette",

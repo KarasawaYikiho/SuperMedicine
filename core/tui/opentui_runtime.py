@@ -91,6 +91,7 @@ def opentui_command(
     smoke: bool = False,
     automated_nav: bool = False,
     full_page_interactions: bool = False,
+    interaction_matrix: bool = False,
 ) -> list[str]:
     """Build the command that starts the OpenTUI bridge."""
 
@@ -104,6 +105,8 @@ def opentui_command(
         command.append("--automated-nav")
     if full_page_interactions:
         command.append("--full-page-interactions")
+    if interaction_matrix:
+        command.append("--interaction-matrix")
     return command
 
 
@@ -193,6 +196,29 @@ def full_page_interactions_opentui_runtime(
         ) from exc
 
 
+def interaction_matrix_opentui_runtime(
+    *, project_root: Path | str | None = None
+) -> subprocess.CompletedProcess[str]:
+    """Exercise real mouse, resize, Unicode, cancellation, and recovery paths."""
+
+    command = opentui_command(project_root=project_root, interaction_matrix=True)
+    try:
+        return subprocess.run(
+            command,
+            cwd=Path(project_root or Path.cwd()),
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=15,
+        )
+    except FileNotFoundError as exc:
+        raise OpenTUIRuntimeError(
+            "OpenTUI runtime requires Bun for the interaction matrix."
+        ) from exc
+
+
 def main(argv: list[str] | None = None) -> int:
     """Standalone smoke/launch helper for packaging diagnostics."""
 
@@ -201,6 +227,12 @@ def main(argv: list[str] | None = None) -> int:
     smoke = "--smoke" in argv
     automated_nav = "--automated-nav" in argv
     full_page_interactions = "--full-page-interactions" in argv
+    interaction_matrix = "--interaction-matrix" in argv
+    if interaction_matrix:
+        result = interaction_matrix_opentui_runtime()
+        sys.stdout.write(result.stdout)
+        sys.stderr.write(result.stderr)
+        return int(result.returncode or 0)
     if full_page_interactions:
         result = full_page_interactions_opentui_runtime()
         sys.stdout.write(result.stdout)

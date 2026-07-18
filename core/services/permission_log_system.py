@@ -7,6 +7,7 @@ from typing import Any, Callable
 
 from core.config_center import ConfigCenter
 from core.log_report import LogReportError, LogReportStore
+from core.plugin_registry import PluginRegistry
 from core.redaction import redact_sensitive
 from core.services.result import ServiceResult
 from permission.access_mode import (
@@ -91,6 +92,33 @@ class PermissionLogSystemService:
 
     def config_diagnostics(self) -> ServiceResult[dict[str, Any]]:
         return self._call("config_diagnostics", self.config.diagnostics)
+
+    def runtime_state(self) -> ServiceResult[dict[str, Any]]:
+        return self._call("runtime_state", self.config.get_runtime_state)
+
+    def set_runtime_state_value(
+        self, key: str, value: Any
+    ) -> ServiceResult[dict[str, Any]]:
+        return self._call(
+            "set_runtime_state_value",
+            lambda: self.config.set_runtime_state_value(key, value, save=True),
+        )
+
+    def plugin_capabilities(self) -> ServiceResult[dict[str, dict[str, Any]]]:
+        def action() -> dict[str, dict[str, Any]]:
+            registry = PluginRegistry(self.project_root / "plugins")
+            return {
+                meta.name: {
+                    "enabled": True,
+                    "provides": [
+                        item.get("id") if isinstance(item, dict) else str(item)
+                        for item in meta.provides
+                    ],
+                }
+                for meta in registry.discover()
+            }
+
+        return self._call("plugin_capabilities", action)
 
     def multi_agent_status(self) -> ServiceResult[dict[str, bool]]:
         return self._call("multi_agent_status", self.config.get_multi_agent_config)
