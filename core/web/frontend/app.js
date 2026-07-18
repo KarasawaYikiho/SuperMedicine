@@ -726,7 +726,8 @@
             try {
                 var body = { protocol: protocol };
                 if (sessionId) body.session_id = sessionId;
-                await apiCall("POST", "/api/v1/experiments", body);
+                var started = await apiCall("POST", "/api/v1/experiments", body);
+                showExperimentDetails(started);
                 showToast("实验已启动", "success");
                 form.classList.add("hidden");
                 document.getElementById("exp-protocol").value = "";
@@ -765,9 +766,21 @@
         }).join("");
     }
 
+    function showExperimentDetails(data) {
+        alert(JSON.stringify(data, null, 2));
+    }
+
     window.viewExperiment = async function (sessionFile) {
-        // 可扩展为展示实验详情
-        showToast("查看实验: " + sessionFile, "info");
+        if (!sessionFile) return;
+        try {
+            var data = await apiCall(
+                "GET",
+                "/api/v1/experiments?session_file=" + encodeURIComponent(sessionFile)
+            );
+            showExperimentDetails(data);
+        } catch (err) {
+            showToast("加载实验详情失败: " + err.message, "error");
+        }
     };
 
     // ---- 对话历史 ---------------------------------------------------------

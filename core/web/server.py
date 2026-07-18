@@ -119,6 +119,23 @@ def create_app() -> Any:
             "metadata": workspace_info.metadata.to_dict(),
         }
 
+    def _experiment_session_path(session_file: str) -> Path:
+        """Resolve a Web-selected experiment only inside managed storage."""
+        storage = (Path.cwd() / ".supermedicine" / "experiments").resolve()
+        requested = Path(session_file)
+        candidate = (
+            requested.resolve()
+            if requested.is_absolute()
+            else (Path.cwd() / requested).resolve()
+        )
+        try:
+            candidate.relative_to(storage)
+        except ValueError as exc:
+            raise ValueError("Experiment session file is outside managed storage") from exc
+        if candidate.suffix.lower() != ".json":
+            raise ValueError("Experiment session file must be JSON")
+        return candidate
+
     def _execute_chat_message(
         message: str,
         *,
@@ -551,10 +568,15 @@ def create_app() -> Any:
     # ---- Experiment endpoints ---------------------------------------------
 
     @app.get("/api/v1/experiments")
-    async def experiment_list() -> Any:
-        """List available experiments."""
+    async def experiment_list(session_file: str | None = None) -> Any:
+        """List protocols or show one persisted experiment session in full."""
         try:
+            if session_file:
+                path = _experiment_session_path(session_file)
+                return _get_cli().experiment_show(path)
             return _get_cli().experiment_list()
+        except ValueError as exc:
+            return _web_error(str(exc), 400)
         except Exception as exc:
             logger.exception("experiment_list error")
             return _web_error(str(exc), 500)

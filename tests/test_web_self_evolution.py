@@ -186,6 +186,67 @@ def test_llm_provider_list_uses_frontend_provider_schema(monkeypatch):
     }
 
 
+def test_experiment_detail_endpoint_returns_persisted_session_details(monkeypatch):
+    class FakeCLI:
+        def experiment_show(self, session_file):
+            return {
+                "session_file": session_file,
+                "status": "in_progress",
+                "current_step": {"step_id": "sample_preparation"},
+                "session": {
+                    "records": {
+                        "sample_preparation": {
+                            "user_input": {"sample_id": "S1"},
+                            "outputs": {"sample_record": "ready"},
+                            "calculation_results": [],
+                        }
+                    }
+                },
+            }
+
+    monkeypatch.setattr("cli_entry.CLI", FakeCLI)
+    from core.web.server import create_app
+
+    response = TestClient(create_app()).get(
+        "/api/v1/experiments",
+        params={"session_file": ".supermedicine/experiments/wb-session.json"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["current_step"]["step_id"] == "sample_preparation"
+    record = data["session"]["records"]["sample_preparation"]
+    assert record["user_input"] == {"sample_id": "S1"}
+    assert record["outputs"] == {"sample_record": "ready"}
+
+
+def test_experiment_detail_rejects_files_outside_session_storage(monkeypatch):
+    class FakeCLI:
+        def experiment_show(self, session_file):
+            raise AssertionError("out-of-root session must not reach the CLI")
+
+    monkeypatch.setattr("cli_entry.CLI", FakeCLI)
+    from core.web.server import create_app
+
+    response = TestClient(create_app()).get(
+        "/api/v1/experiments",
+        params={"session_file": "../private-config.json"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["status"] == "error"
+
+
+def test_frontend_experiment_detail_button_fetches_real_session():
+    app_js = Path(__file__).resolve().parents[1].joinpath(
+        "core", "web", "frontend", "app.js"
+    ).read_text(encoding="utf-8")
+
+    assert '"/api/v1/experiments?session_file="' in app_js
+    assert "showExperimentDetails" in app_js
+    assert "可扩展为展示实验详情" not in app_js
+
+
 def test_paper_enrich_requires_explicit_confirmation(monkeypatch):
     """Web paper enrichment should preserve the CLI explicit-confirm boundary."""
 
