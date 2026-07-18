@@ -66,3 +66,10 @@ def test_each_manifest_contract_node_exists(
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
         }
         assert function_name in functions, record["feature_id"]
+
+
+def test_feature_id_baseline_never_regresses(manifest: dict[str, object]) -> None:
+    current_ids = {record["feature_id"] for record in manifest["features"]}
+    baseline_ids = set(manifest["baseline_feature_ids"])
+    assert baseline_ids <= current_ids
+    assert len(current_ids) >= manifest["metrics"]["feature_id_count"]
