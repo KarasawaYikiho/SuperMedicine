@@ -86,3 +86,8 @@ def test_manifest_covers_release_entrypoints(manifest: dict[str, object]) -> Non
         "release_builder:scripts/ci/build_installer_exe.py",
         "release_builder:scripts/ci/build_release_zip.py",
     } <= entries
+
+
+def test_manifest_covers_database_schema(manifest: dict[str, object]) -> None:
+    entries = {record["entrypoint"] for record in manifest["features"]}
+    assert "database_table:agents" in entries

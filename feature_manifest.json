@@ -4,7 +4,7 @@
   "audit_reference": "49ac6f88264fe4e06090af39154f2a089a18d8ef",
   "baseline_relationship": "audit_reference_is_not_an_ancestor_of_implementation_baseline",
   "metrics": {
-    "feature_id_count": 153
+    "feature_id_count": 158
   },
   "features": [
     {
@@ -391,6 +391,41 @@
       "category": "config_env",
       "entrypoint": "config_env:SM_LLM_PROVIDER",
       "expected_result": "Preserves declared config env entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "database_table:agents",
+      "category": "database_table",
+      "entrypoint": "database_table:agents",
+      "expected_result": "Preserves declared database table entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "database_table:migrations",
+      "category": "database_table",
+      "entrypoint": "database_table:migrations",
+      "expected_result": "Preserves declared database table entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "database_table:plugins",
+      "category": "database_table",
+      "entrypoint": "database_table:plugins",
+      "expected_result": "Preserves declared database table entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "database_table:sessions",
+      "category": "database_table",
+      "entrypoint": "database_table:sessions",
+      "expected_result": "Preserves declared database table entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "database_table:users",
+      "category": "database_table",
+      "entrypoint": "database_table:users",
+      "expected_result": "Preserves declared database table entrypoint.",
       "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
     },
     {
@@ -1148,6 +1183,11 @@
     "config_env:SM_LLM_BASE_URL",
     "config_env:SM_LLM_MODEL",
     "config_env:SM_LLM_PROVIDER",
+    "database_table:agents",
+    "database_table:migrations",
+    "database_table:plugins",
+    "database_table:sessions",
+    "database_table:users",
     "entrypoint:cli_entry.py",
     "entrypoint:gui_entry.py",
     "entrypoint:install_entry.py",

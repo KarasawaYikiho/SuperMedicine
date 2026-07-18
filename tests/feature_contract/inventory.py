@@ -113,6 +113,21 @@ def discover_release_entrypoints(root: Path) -> set[str]:
     return entrypoints
 
 
+def discover_database_tables(root: Path) -> set[str]:
+    tables: set[str] = set()
+    for source_path in (root / "core" / "database").glob("*.py"):
+        source = source_path.read_text(encoding="utf-8")
+        tables.update(
+            f"database_table:{name.lower()}"
+            for name in re.findall(
+                r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([A-Za-z_][A-Za-z0-9_]*)",
+                source,
+                flags=re.IGNORECASE,
+            )
+        )
+    return tables
+
+
 def discovered_surface(root: Path) -> dict[str, set[str]]:
     return {
         "cli": discover_cli_commands(root),
@@ -122,4 +137,5 @@ def discovered_surface(root: Path) -> dict[str, set[str]]:
         "tui_action": discover_tui_actions(root),
         "config_env": discover_config_environment_keys(root),
         "release_entrypoint": discover_release_entrypoints(root),
+        "database_table": discover_database_tables(root),
     }
