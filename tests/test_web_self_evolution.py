@@ -125,6 +125,67 @@ def test_unexpected_api_failure_returns_http_server_error(monkeypatch):
     }
 
 
+def test_llm_provider_list_uses_frontend_provider_schema(monkeypatch):
+    class FakeCLI:
+        def llm_list(self):
+            return {
+                "current_provider": "openai",
+                "last_provider": "anthropic",
+                "providers": {
+                    "openai": {
+                        "api_format": "openai",
+                        "base_url": "https://api.openai.com/v1",
+                        "api_key": "<redacted>",
+                        "model": "gpt-test",
+                        "timeout": 60.0,
+                        "headers": {},
+                    },
+                    "anthropic": {
+                        "provider": "anthropic",
+                        "api_format": "anthropic",
+                        "base_url": "https://api.anthropic.com",
+                        "api_key": "<redacted>",
+                        "model": "claude-test",
+                        "timeout": 30.0,
+                        "headers": {},
+                    },
+                },
+            }
+
+    monkeypatch.setattr("cli_entry.CLI", FakeCLI)
+    from core.web.server import create_app
+
+    response = TestClient(create_app()).get("/api/v1/llm/providers")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "current_provider": "openai",
+        "last_provider": "anthropic",
+        "providers": [
+            {
+                "provider": "openai",
+                "api_format": "openai",
+                "base_url": "https://api.openai.com/v1",
+                "api_key": "<redacted>",
+                "model": "gpt-test",
+                "timeout": 60.0,
+                "headers": {},
+                "current": True,
+            },
+            {
+                "provider": "anthropic",
+                "api_format": "anthropic",
+                "base_url": "https://api.anthropic.com",
+                "api_key": "<redacted>",
+                "model": "claude-test",
+                "timeout": 30.0,
+                "headers": {},
+                "current": False,
+            },
+        ],
+    }
+
+
 def test_paper_enrich_requires_explicit_confirmation(monkeypatch):
     """Web paper enrichment should preserve the CLI explicit-confirm boundary."""
 

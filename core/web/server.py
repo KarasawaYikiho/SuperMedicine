@@ -13,7 +13,7 @@ import asyncio
 import json
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +58,34 @@ def create_app() -> Any:
             status_code=status_code,
             content={"error": message, "status": "error"},
         )
+
+    def _llm_provider_list_response(result: Any) -> Any:
+        """Expose the provider collection as the list consumed by the Web UI."""
+        if not isinstance(result, dict):
+            return result
+        current = str(result.get("current_provider") or "")
+        raw_providers = result.get("providers", {})
+        provider_items: Iterable[tuple[str, Any]]
+        if isinstance(raw_providers, dict):
+            provider_items = raw_providers.items()
+        elif isinstance(raw_providers, list):
+            provider_items = (
+                (str(item.get("provider") or item.get("name") or ""), item)
+                for item in raw_providers
+                if isinstance(item, dict)
+            )
+        else:
+            provider_items = ()
+        providers: list[dict[str, Any]] = []
+        for name, values in provider_items:
+            if not isinstance(values, dict):
+                continue
+            provider = dict(values)
+            provider_name = str(provider.get("provider") or name)
+            provider["provider"] = provider_name
+            provider["current"] = provider_name == current
+            providers.append(provider)
+        return {**result, "providers": providers}
 
     def _get_kernel() -> Any:
         """Lazily initialise a Kernel instance (cached)."""
@@ -389,7 +417,7 @@ def create_app() -> Any:
     async def llm_providers() -> Any:
         """List configured LLM providers."""
         try:
-            return _get_cli().llm_list()
+            return _llm_provider_list_response(_get_cli().llm_list())
         except Exception as exc:
             logger.exception("llm_providers error")
             return _web_error(str(exc), 500)
