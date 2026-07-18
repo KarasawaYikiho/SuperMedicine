@@ -109,11 +109,10 @@ def test_chat_missing_message_returns_http_client_error(client):
 
 
 def test_unexpected_api_failure_returns_http_server_error(monkeypatch):
-    class ExplodingCLI:
-        def workspace_list(self):
-            raise RuntimeError("workspace backend failed")
-
-    monkeypatch.setattr("cli_entry.CLI", ExplodingCLI)
+    monkeypatch.setattr(
+        "core.services.workspace.WorkspaceManager.list_workspaces",
+        lambda self: (_ for _ in ()).throw(RuntimeError("workspace backend failed")),
+    )
     from core.web.server import create_app
 
     response = TestClient(create_app()).get("/api/v1/workspaces")

@@ -15,6 +15,8 @@ import logging
 from pathlib import Path
 from typing import Any, Iterable
 
+from core.services import ServiceResult, WorkspaceService
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -58,6 +60,22 @@ def create_app() -> Any:
             status_code=status_code,
             content={"error": message, "status": "error"},
         )
+
+    def _service_data(result: ServiceResult[Any]) -> Any:
+        """Return legacy data on success and stable HTTP semantics on failure."""
+        if result.ok:
+            return result.data
+        error = result.error
+        code = error.code if error else "service_error"
+        status_code = {
+            "invalid_workspace_id": 400,
+            "confirmation_mismatch": 400,
+            "workspace_exists": 409,
+            "workspace_not_found": 404,
+            "permission_denied": 403,
+            "required_file_missing": 500,
+        }.get(code, 500)
+        return _web_error(error.message if error else "Service failed", status_code)
 
     def _llm_provider_list_response(result: Any) -> Any:
         """Expose the provider collection as the list consumed by the Web UI."""
@@ -110,13 +128,12 @@ def create_app() -> Any:
         """Validate a selected workspace and build the shared execution context."""
         if not workspace_id:
             return None
-        from core.workspace import WorkspaceManager
-
-        workspace_info = WorkspaceManager(Path.cwd()).get_workspace(workspace_id)
+        service = WorkspaceService(Path.cwd())
+        workspace = service.require_data(service.show(workspace_id))
         return {
-            "id": workspace_info.id,
-            "path": str(workspace_info.path),
-            "metadata": workspace_info.metadata.to_dict(),
+            "id": workspace["id"],
+            "path": workspace["path"],
+            "metadata": workspace["metadata"],
         }
 
     def _experiment_session_path(session_file: str) -> Path:
@@ -244,11 +261,7 @@ def create_app() -> Any:
     @app.get("/api/v1/workspaces")
     async def workspace_list() -> Any:
         """List all workspaces."""
-        try:
-            return _get_cli().workspace_list()
-        except Exception as exc:
-            logger.exception("workspace_list error")
-            return _web_error(str(exc), 500)
+        return _service_data(WorkspaceService(Path.cwd()).list())
 
     @app.post("/api/v1/workspaces")
     async def workspace_create(request: dict[str, Any]) -> dict[str, Any]:
@@ -256,29 +269,23 @@ def create_app() -> Any:
         workspace_id = request.get("id", "")
         if not workspace_id:
             return _web_error("No workspace id provided", 400)
-        try:
-            return _get_cli().workspace_init(workspace_id, name=request.get("name"))
-        except Exception as exc:
-            logger.exception("workspace_create error")
-            return _web_error(str(exc), 500)
+        return _service_data(
+            WorkspaceService(Path.cwd()).create(
+                workspace_id, name=request.get("name"), fail_if_exists=True
+            )
+        )
 
     @app.get("/api/v1/workspaces/{workspace_id}")
     async def workspace_get(workspace_id: str) -> dict[str, Any]:
         """Show one workspace by id."""
-        try:
-            return _get_cli().workspace_show(workspace_id)
-        except Exception as exc:
-            logger.exception("workspace_get error")
-            return _web_error(str(exc), 500)
+        return _service_data(WorkspaceService(Path.cwd()).show(workspace_id))
 
     @app.delete("/api/v1/workspaces/{workspace_id}")
     async def workspace_remove(workspace_id: str) -> dict[str, Any]:
         """Delete a workspace after confirmation."""
-        try:
-            return _get_cli().workspace_delete(workspace_id, confirm=workspace_id)
-        except Exception as exc:
-            logger.exception("workspace_remove error")
-            return _web_error(str(exc), 500)
+        return _service_data(
+            WorkspaceService(Path.cwd()).delete(workspace_id, confirm=workspace_id)
+        )
 
     # ---- Paper endpoints --------------------------------------------------
 

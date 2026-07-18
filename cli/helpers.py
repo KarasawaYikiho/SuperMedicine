@@ -8,8 +8,6 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-import yaml
-
 from core.redaction import redact_sensitive
 from core.serialization import json_ready
 
@@ -26,29 +24,6 @@ PERMISSION_RISK_NOTICE = (
 
 _EXPERIENCE_SCOPE_CHOICES = frozenset({"general", "workspace"})
 _EXPORT_FORMAT_CHOICES = frozenset({"json", "md"})
-
-
-def _workspace_info_to_dict(info, name: str | None = None) -> dict:
-    """Return a JSON-serializable workspace representation."""
-    metadata = info.metadata.to_dict()
-    metadata_path = info.path / "workspace.yaml"
-    if metadata_path.is_file():
-        raw_metadata = yaml.safe_load(metadata_path.read_text(encoding="utf-8")) or {}
-        if (
-            isinstance(raw_metadata, dict)
-            and raw_metadata.get("display_name") is not None
-        ):
-            metadata["display_name"] = str(raw_metadata["display_name"])
-    data = {
-        "id": info.id,
-        "path": str(info.path),
-        "metadata": metadata,
-    }
-    if name is not None:
-        data["name"] = name
-    elif metadata.get("display_name") is not None:
-        data["name"] = metadata["display_name"]
-    return data
 
 
 def _as_experience_scope(scope: str) -> ExperienceScope:

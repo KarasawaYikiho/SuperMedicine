@@ -23,7 +23,6 @@ from cli.helpers import (
     _resolve_run_params,
     _save_experiment_session,
     _self_evolution_cli_result,
-    _workspace_info_to_dict,
 )
 from cli.logging_setup import (
     _configure_cli_logging,
@@ -59,5 +58,4 @@ __all__ = [
     "_resolve_run_params",
     "_save_experiment_session",
     "_self_evolution_cli_result",
-    "_workspace_info_to_dict",
 ]
