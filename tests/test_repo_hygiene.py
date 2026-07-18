@@ -1070,3 +1070,13 @@ def test_ci_workflow_runs_full_quality_gates_without_hardcoded_secrets():
         combined,
         re.IGNORECASE,
     )
+
+
+def test_feature_manifest_keeps_all_baseline_feature_ids():
+    """Later refactors may add IDs, but must not silently remove any baseline ID."""
+    manifest_path = REPO_ROOT / "feature_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    baseline_ids = set(manifest["baseline_feature_ids"])
+    current_ids = {record["feature_id"] for record in manifest["features"]}
+    assert baseline_ids <= current_ids
+    assert len(current_ids) >= manifest["metrics"]["feature_id_count"]
