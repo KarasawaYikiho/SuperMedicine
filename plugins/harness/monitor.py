@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from agents.checkpoint import CheckpointRepository
+
 
 def _jsonl_warning(
     path: Path, line_number: int, code: str, message: str
@@ -48,6 +50,51 @@ def _read_jsonl_objects(
                 continue
             entries.append(entry)
     return entries, warnings
+
+
+class CheckpointVerifier:
+    """Validate checkpoint structure through the shared Agent repository."""
+
+    def __init__(self, checkpoint_dir: Path):
+        self._repository = CheckpointRepository(checkpoint_dir)
+
+    def verify(self, task_id: str) -> dict[str, Any]:
+        scan = self._repository.scan(task_id)
+        if scan.error:
+            return {
+                "task_id": task_id,
+                "error": scan.error,
+                "complete": False,
+                "structurally_complete": False,
+                "final_state_success": False,
+                "warnings": scan.warnings,
+            }
+        existing = {int(item["step"]) for item in scan.steps}
+        max_step = max(existing) if existing else 0
+        missing = [step for step in range(1, max_step + 1) if step not in existing]
+        invalid_codes = {"missing_status", "malformed_json", "non_object_json"}
+        structurally_complete = (
+            not missing
+            and max_step > 0
+            and not any(item.get("code") in invalid_codes for item in scan.warnings)
+        )
+        final = scan.steps[-1] if scan.steps else None
+        final_state_success = bool(
+            final and final.get("state") in {"completed", "success", "succeeded"}
+        )
+        return {
+            "task_id": task_id,
+            "total_steps": len(scan.steps),
+            "steps": scan.steps,
+            "missing_steps": missing,
+            "complete": structurally_complete,
+            "structurally_complete": structurally_complete,
+            "final_state_success": final_state_success,
+            "warnings": scan.warnings,
+        }
+
+    def verify_all(self) -> list[dict[str, Any]]:
+        return [self.verify(task_id) for task_id in self._repository.task_ids()]
 
 
 class AgentMonitor:
