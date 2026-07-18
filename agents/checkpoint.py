@@ -3,10 +3,9 @@
 from __future__ import annotations
 import json
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-
-from core.time_utils import utc_now
 
 SENSITIVE_KEYS = {
     "api_key",
@@ -19,17 +18,14 @@ SENSITIVE_KEYS = {
 }
 
 
-def _is_sensitive_key(key: str) -> bool:
-    normalized = key.lower().replace("-", "_")
-    return any(marker in normalized for marker in SENSITIVE_KEYS)
-
-
 def sanitize_for_checkpoint(value: Any, max_string: int = 500) -> Any:
     """Return a JSON-safe summary with common secret fields redacted."""
     if isinstance(value, dict):
         return {
             str(k): "[REDACTED]"
-            if _is_sensitive_key(str(k))
+            if any(
+                marker in str(k).lower().replace("-", "_") for marker in SENSITIVE_KEYS
+            )
             else sanitize_for_checkpoint(v, max_string)
             for k, v in value.items()
         }
@@ -71,11 +67,6 @@ class CheckpointRepository:
             return None
         loaded = json.loads(status_file.read_text(encoding="utf-8"))
         return loaded if isinstance(loaded, dict) else None
-
-    def latest_step(self, task_id: str) -> int | None:
-        scan = self.scan(task_id)
-        steps = [int(item["step"]) for item in scan.steps]
-        return max(steps) if steps else None
 
     def scan(self, task_id: str) -> CheckpointScan:
         task_dir = self.base_dir / task_id
@@ -140,13 +131,9 @@ class CheckpointRepository:
 
 class CheckpointManager:
     def __init__(self, base_dir: Path):
-        self._base_dir = Path(base_dir)
-        self._base_dir.mkdir(parents=True, exist_ok=True)
-        self.repository = CheckpointRepository(self._base_dir)
-
-    @property
-    def base_dir(self) -> Path:
-        return self._base_dir
+        self.base_dir = Path(base_dir)
+        self.base_dir.mkdir(parents=True, exist_ok=True)
+        self.repository = CheckpointRepository(self.base_dir)
 
     def save(
         self,
@@ -164,7 +151,7 @@ class CheckpointManager:
         not_recoverable_reason: str | None = None,
         stage_history: list[dict[str, Any]] | None = None,
     ) -> Path:
-        step_dir = self._base_dir / task_id / f"step-{step}"
+        step_dir = self.base_dir / task_id / f"step-{step}"
         step_dir.mkdir(parents=True, exist_ok=True)
         safe_result = sanitize_for_checkpoint(result or {})
         checkpoint = {
@@ -173,7 +160,7 @@ class CheckpointManager:
             "step": step,
             "state": state,
             "status": status or state,
-            "timestamp": utc_now(),
+            "timestamp": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
             "input_summary": sanitize_for_checkpoint(input_data or {}),
             "output_summary": sanitize_for_checkpoint(
                 output_data if output_data is not None else safe_result
@@ -201,7 +188,8 @@ class CheckpointManager:
         return self.load(task_id, latest)
 
     def get_latest_step(self, task_id: str) -> int | None:
-        return self.repository.latest_step(task_id)
+        steps = [int(item["step"]) for item in self.repository.scan(task_id).steps]
+        return max(steps) if steps else None
 
     def recovery_report(self, task_id: str) -> dict[str, Any]:
         checkpoint = self.load_latest(task_id)

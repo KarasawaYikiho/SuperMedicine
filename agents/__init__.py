@@ -12,7 +12,7 @@ from agents.roles import (
     GammaAgent,
     RoleSpec,
 )
-from agents.state_machine import StateMachine, TaskState
+from agents.orchestrator import StateMachine, TaskState
 from agents.checkpoint import CheckpointManager
 
 __all__ = [

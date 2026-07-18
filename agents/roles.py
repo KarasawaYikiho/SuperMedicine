@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,31 +52,22 @@ ROLE_SPECS: dict[str, RoleSpec] = {
 }
 
 
-class BaseAgent(ABC):
+class BaseAgent:
     """Abstract base class for all agents in the orchestration system."""
 
-    def __init__(self, agent_id: str | RoleSpec, role: str | None = None):
-        self.spec = (
-            agent_id
-            if isinstance(agent_id, RoleSpec)
-            else RoleSpec(agent_id, role or "", "", (), (), None)
-        )
-        self._agent_id = self.spec.agent_id
-        self._role = self.spec.role
+    spec = RoleSpec("", "", "", (), (), None)
+    execute: Callable[[dict[str, Any]], dict[str, Any]]
 
-    @property
-    def agent_id(self) -> str:
-        return self._agent_id
-
-    @property
-    def role(self) -> str:
-        return self._role
+    def __init__(self, agent_id: str | RoleSpec | None = None, role: str | None = None):
+        if isinstance(agent_id, RoleSpec):
+            self.spec = agent_id
+        elif isinstance(agent_id, str):
+            self.spec = RoleSpec(agent_id, role or "", "", (), (), None)
+        self.agent_id = self.spec.agent_id
+        self.role = self.spec.role
 
     def describe_state(self) -> dict[str, Any]:
-        return {"agent_id": self._agent_id, "role": self._role, "status": "registered"}
-
-    @abstractmethod
-    def execute(self, task: dict[str, Any]) -> dict[str, Any]: ...
+        return {"agent_id": self.agent_id, "role": self.role, "status": "registered"}
 
 
 class AlphaAgent(BaseAgent):
@@ -88,8 +78,22 @@ class AlphaAgent(BaseAgent):
     recommendations for downstream agents.
     """
 
-    def __init__(self) -> None:
-        super().__init__(ROLE_SPECS["alpha"])
+    spec = ROLE_SPECS["alpha"]
+    _CONSTRAINT_MARKERS = (
+        "must",
+        "shall",
+        "required",
+        "mandatory",
+        "limit",
+        "maximum",
+        "minimum",
+        "constraint",
+        "forbidden",
+        "禁止",
+        "必须",
+        "限制",
+        "要求",
+    )
 
     def execute(self, task: dict[str, Any]) -> dict[str, Any]:
         """Analyze a task and return structured requirements.
@@ -123,8 +127,16 @@ class AlphaAgent(BaseAgent):
             "domain": domain,
             "priority": priority,
             "has_context": bool(context),
-            "entity_count": self._count_entities(description),
-            "constraint_keywords": self._extract_constraints(description),
+            "entity_count": sum(
+                1
+                for word in description.split()
+                if word[:1].isupper() and len(word) > 1
+            ),
+            "constraint_keywords": [
+                marker
+                for marker in self._CONSTRAINT_MARKERS
+                if marker in description.lower()
+            ],
         }
 
         requirements = self._extract_requirements(description, context)
@@ -143,32 +155,6 @@ class AlphaAgent(BaseAgent):
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
-
-    @staticmethod
-    def _count_entities(text: str) -> int:
-        """Rough count of distinct entity-like tokens (capitalised words)."""
-        return sum(1 for w in text.split() if w[:1].isupper() and len(w) > 1)
-
-    @staticmethod
-    def _extract_constraints(text: str) -> list[str]:
-        """Return constraint-related keywords found in *text*."""
-        constraint_markers = [
-            "must",
-            "shall",
-            "required",
-            "mandatory",
-            "limit",
-            "maximum",
-            "minimum",
-            "constraint",
-            "forbidden",
-            "禁止",
-            "必须",
-            "限制",
-            "要求",
-        ]
-        lower = text.lower()
-        return [kw for kw in constraint_markers if kw in lower]
 
     @staticmethod
     def _extract_requirements(
@@ -278,8 +264,7 @@ class BetaAgent(BaseAgent):
         "临床决策",
     ]
 
-    def __init__(self) -> None:
-        super().__init__(ROLE_SPECS["beta"])
+    spec = ROLE_SPECS["beta"]
 
     def execute(self, task: dict[str, Any]) -> dict[str, Any]:
         """Review input for completeness, correctness, and safety.
@@ -300,21 +285,9 @@ class BetaAgent(BaseAgent):
         """
         issues: list[dict[str, Any]] = []
 
-        # --- completeness check ---
-        completeness = self._check_completeness(task)
-        issues.extend(completeness["issues"])
-
-        # --- correctness check ---
-        correctness = self._check_correctness(task)
-        issues.extend(correctness["issues"])
-
-        # --- medical boundary check ---
-        medical = self._check_medical_boundary(task)
-        issues.extend(medical["issues"])
-
-        # --- safety check ---
-        safety = self._check_safety(task)
-        issues.extend(safety["issues"])
+        completeness, correctness, medical, safety = self._review_sections(task)
+        for section in (completeness, correctness, medical, safety):
+            issues.extend(section["issues"])
 
         approved = all(i.get("severity") != "blocking" for i in issues)
 
@@ -340,94 +313,68 @@ class BetaAgent(BaseAgent):
     # Private helpers
     # ------------------------------------------------------------------
 
-    def _check_completeness(self, task: dict[str, Any]) -> dict[str, Any]:
-        """Verify required fields are present."""
-        issues: list[dict[str, Any]] = []
-        present_keys = list(task.keys())
-
+    def _review_sections(self, task: dict[str, Any]) -> tuple[dict[str, Any], ...]:
+        text = self._flatten_text(task)
+        completeness_issues: list[dict[str, Any]] = []
         if (
             not task.get("task")
             and not task.get("description")
             and not task.get("content")
         ):
-            issues.append(
+            completeness_issues.append(
                 {
                     "check": "completeness",
                     "severity": "warning",
                     "message": "No task description or content provided.",
                 }
             )
-
-        return {"issues": issues, "present_keys": present_keys}
-
-    def _check_correctness(self, task: dict[str, Any]) -> dict[str, Any]:
-        """Basic structural correctness validation."""
-        issues: list[dict[str, Any]] = []
-
-        # Validate requirements list if present
+        correctness_issues: list[dict[str, Any]] = []
         requirements = task.get("requirements")
-        if requirements is not None:
-            if not isinstance(requirements, list):
-                issues.append(
-                    {
-                        "check": "correctness",
-                        "severity": "blocking",
-                        "message": "'requirements' must be a list.",
-                    }
-                )
-            else:
-                for idx, req in enumerate(requirements):
-                    if not isinstance(req, dict):
-                        issues.append(
-                            {
-                                "check": "correctness",
-                                "severity": "warning",
-                                "message": f"Requirement at index {idx} is not a dict.",
-                            }
-                        )
-
-        return {"issues": issues}
-
-    def _check_medical_boundary(self, task: dict[str, Any]) -> dict[str, Any]:
-        """Flag content that crosses the medical advice boundary."""
-        issues: list[dict[str, Any]] = []
-        text = self._flatten_text(task).lower()
-
-        for marker in self._MEDICAL_ADVICE_MARKERS:
-            if marker in text:
-                issues.append(
-                    {
-                        "check": "medical_boundary",
-                        "severity": "blocking",
-                        "message": (
-                            f"Content contains medical advice marker '{marker}'. "
-                            "SuperMedicine provides research support only and must "
-                            "not produce clinical decisions."
-                        ),
-                    }
-                )
-
-        return {"issues": issues}
-
-    def _check_safety(self, task: dict[str, Any]) -> dict[str, Any]:
-        """Check for unsafe patterns (secrets, injection hints, etc.)."""
-        issues: list[dict[str, Any]] = []
-        text = self._flatten_text(task)
-
-        # Detect embedded secrets
-        secret_patterns = ["api_key", "password", "token", "secret"]
-        lower = text.lower()
-        for pattern in secret_patterns:
-            if pattern in lower and "=" in text:
-                issues.append(
-                    {
-                        "check": "safety",
-                        "severity": "warning",
-                        "message": f"Possible embedded secret detected ('{pattern}').",
-                    }
-                )
-
-        return {"issues": issues}
+        if requirements is not None and not isinstance(requirements, list):
+            correctness_issues.append(
+                {
+                    "check": "correctness",
+                    "severity": "blocking",
+                    "message": "'requirements' must be a list.",
+                }
+            )
+        elif isinstance(requirements, list):
+            correctness_issues.extend(
+                {
+                    "check": "correctness",
+                    "severity": "warning",
+                    "message": f"Requirement at index {index} is not a dict.",
+                }
+                for index, requirement in enumerate(requirements)
+                if not isinstance(requirement, dict)
+            )
+        medical_issues = [
+            {
+                "check": "medical_boundary",
+                "severity": "blocking",
+                "message": (
+                    f"Content contains medical advice marker '{marker}'. "
+                    "SuperMedicine provides research support only and must not produce clinical decisions."
+                ),
+            }
+            for marker in self._MEDICAL_ADVICE_MARKERS
+            if marker in text.lower()
+        ]
+        safety_issues = [
+            {
+                "check": "safety",
+                "severity": "warning",
+                "message": f"Possible embedded secret detected ('{marker}').",
+            }
+            for marker in ("api_key", "password", "token", "secret")
+            if marker in text.lower() and "=" in text
+        ]
+        return (
+            {"issues": completeness_issues, "present_keys": list(task)},
+            {"issues": correctness_issues},
+            {"issues": medical_issues},
+            {"issues": safety_issues},
+        )
 
     @staticmethod
     def _flatten_text(task: dict[str, Any]) -> str:
@@ -455,8 +402,7 @@ class GammaAgent(BaseAgent):
     provided by upstream agents (typically Alpha and Beta).
     """
 
-    def __init__(self) -> None:
-        super().__init__(ROLE_SPECS["gamma"])
+    spec = ROLE_SPECS["gamma"]
 
     def execute(self, task: dict[str, Any]) -> dict[str, Any]:
         """Generate content based on analysis and requirements.
@@ -595,8 +541,7 @@ class DeltaAgent(BaseAgent):
         "content": "gamma",
     }
 
-    def __init__(self) -> None:
-        super().__init__(ROLE_SPECS["delta"])
+    spec = ROLE_SPECS["delta"]
 
     def execute(self, task: dict[str, Any]) -> dict[str, Any]:
         """Route the task to the appropriate agent.
