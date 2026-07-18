@@ -37,6 +37,7 @@ if str(_REPO_ROOT) not in sys.path:
 ENTRY_SCRIPT = "gui_standalone.py"
 OUTPUT_NAME = "SuperMedicineGUI"
 DIST_DIR = "dist"
+BUILD_EXTRAS = ".[desktop,web]"
 
 # Data files / directories to embed inside the frozen executable.
 # These are relative to the repository root.
@@ -49,6 +50,7 @@ _DATA_ITEMS: list[str] = [
 _HIDDEN_IMPORTS: list[str] = [
     "webview",
     "uvicorn",
+    "websockets",
     "fastapi",
     "core",
     "core.web",
@@ -90,6 +92,12 @@ def main() -> None:
             file=sys.stderr,
         )
         raise SystemExit(1)
+
+    dependency_result = subprocess.run(
+        [sys.executable, "-m", "pip", "install", BUILD_EXTRAS], cwd=root
+    )
+    if dependency_result.returncode != 0:
+        raise SystemExit(dependency_result.returncode)
 
     # Ensure dist directory exists
     dist = root / DIST_DIR

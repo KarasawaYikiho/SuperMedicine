@@ -127,11 +127,34 @@ def test_diagnose_install(client):
     assert "audit" in data or "error" in data
 
 
+def test_web_routes_delegate_status_and_diagnostics_to_application_services():
+    routes_source = (
+        Path(__file__)
+        .resolve()
+        .parents[1]
+        .joinpath("core", "web", "routes.py")
+        .read_text(encoding="utf-8")
+    )
+    assert "runtime.get_cli()" not in routes_source
+    assert "Path.cwd()" not in routes_source
+    assert '.system_diagnostics()' in routes_source
+    assert '.application_status()' in routes_source
+
+
 def test_chat_missing_message_returns_http_client_error(client):
     response = client.post("/api/v1/chat", json={})
 
     assert response.status_code == 400
     assert response.json() == {"error": "No message provided", "status": "error"}
+
+
+def test_websocket_chat_accepts_real_connection_and_validates_empty_message(client):
+    with client.websocket_connect("/ws/chat") as websocket:
+        websocket.send_json({})
+        assert websocket.receive_json() == {
+            "type": "error",
+            "content": "No message provided",
+        }
 
 
 def test_unexpected_api_failure_returns_http_server_error(monkeypatch):

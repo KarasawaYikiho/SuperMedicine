@@ -1003,6 +1003,13 @@
       "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
     },
     {
+      "feature_id": "web:GET /api/v1/health",
+      "category": "web",
+      "entrypoint": "web:GET /api/v1/health",
+      "expected_result": "Reports desktop backend readiness before opening the native window.",
+      "contract_test": "tests/test_desktop_runtime.py::test_desktop_self_test_checks_backend_health_frontend_and_storage"
+    },
+    {
       "feature_id": "web:DELETE /api/v1/self-evolution/{artifact_id}",
       "category": "web",
       "entrypoint": "web:DELETE /api/v1/self-evolution/{artifact_id}",

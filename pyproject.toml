@@ -38,6 +38,11 @@ Repository = "https://github.com/KarasawaYikiho/SuperMedicine"
 web = [
     "fastapi>=0.100.0",
     "uvicorn>=0.23.0",
+    "websockets>=12,<16",
+]
+desktop = [
+    "pywebview>=5.0,<7",
+    "pyinstaller>=6.0,<7",
 ]
 dev = [
     "fastapi>=0.100.0",
@@ -48,6 +53,7 @@ dev = [
     "ruff>=0.4.0",
     "types-PyYAML>=6.0",
     "uvicorn>=0.23.0",
+    "websockets>=12,<16",
 ]
 # Optional formal R/rpy2 survival backend. Also requires a local R installation
 # with the R survival package available.

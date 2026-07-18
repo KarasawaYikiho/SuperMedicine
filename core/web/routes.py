@@ -5,8 +5,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from pathlib import Path
 from typing import Any
+
+from fastapi import WebSocket
 
 from core.web.runtime import (
     WebRuntime,
@@ -22,43 +23,17 @@ logger = logging.getLogger(__name__)
 def register_status_routes(app: Any, runtime: WebRuntime) -> None:
     # ---- REST endpoints --------------------------------------------------
 
+    @app.get("/api/v1/health")
+    async def health() -> dict[str, str]:
+        """Return the minimal readiness signal used by the desktop launcher."""
+        return {"status": "ok"}
+
     @app.get("/api/v1/status")
-    async def get_status() -> dict[str, Any]:
+    async def get_status() -> Any:
         """Return project status information."""
-        from pathlib import Path as _P
-
-        project_dir = _P.cwd()
-        config_dir = project_dir / ".supermedicine"
-        plugins_dir = project_dir / "plugins"
-
-        status: dict[str, Any] = {
-            "version": "0.4.2",
-            "project_dir": str(project_dir),
-            "config_initialized": config_dir.exists(),
-            "plugin_count": (
-                len(list(plugins_dir.rglob("plugin.yaml")))
-                if plugins_dir.exists()
-                else 0
-            ),
-            "required_runtime": runtime.get_kernel().runtime_capabilities.to_dict(),
-        }
-        required_runtime = status["required_runtime"]
-        status["ok"] = bool(required_runtime["harness"]["healthy"]) and bool(
-            required_runtime["rag"]["healthy"]
+        return service_data(
+            runtime.service("permission_log_system").application_status()
         )
-
-        # Include LLM provider info if config is available
-        if config_dir.exists():
-            try:
-                provider_result = runtime.service("llm").show_provider()
-                provider = provider_result.data or {} if provider_result.ok else {}
-                status["llm_provider"] = (
-                    provider.get("provider", "未知") if provider else "未配置"
-                )
-            except Exception:
-                status["llm_provider"] = "读取配置失败"
-
-        return status
 
     @app.post("/api/v1/chat")
     async def chat(request: dict[str, Any]) -> dict[str, Any]:
@@ -494,51 +469,39 @@ def register_diagnostic_routes(app: Any, runtime: WebRuntime) -> None:
     # ---- Diagnose endpoints ----------------------------------------------
 
     @app.get("/api/v1/diagnose")
-    async def diagnose_all() -> dict[str, Any]:
+    async def diagnose_all() -> Any:
         """Get all diagnostics."""
-        try:
-            return runtime.get_cli().diagnose()
-        except Exception as exc:
-            logger.exception("diagnose_all error")
-            return web_error(str(exc), 500)
+        return service_data(
+            runtime.service("permission_log_system").system_diagnostics()
+        )
 
     @app.get("/api/v1/diagnose/all")
-    async def diagnose_all_compat() -> dict[str, Any]:
+    async def diagnose_all_compat() -> Any:
         """Compatibility alias for full diagnostics."""
         return await diagnose_all()
 
     @app.get("/api/v1/diagnose/config")
-    async def diagnose_config() -> dict[str, Any]:
+    async def diagnose_config() -> Any:
         """Get config diagnostics."""
-        try:
-            result = runtime.get_cli().diagnose()
-            return result.get("config", {})
-        except Exception as exc:
-            logger.exception("diagnose_config error")
-            return web_error(str(exc), 500)
+        result = runtime.service("permission_log_system").system_diagnostics()
+        return result.data.get("config", {}) if result.ok else service_data(result)
 
     @app.get("/api/v1/diagnose/llm")
-    async def diagnose_llm() -> dict[str, Any]:
+    async def diagnose_llm() -> Any:
         """Get LLM diagnostics."""
-        try:
-            result = runtime.get_cli().diagnose()
-            return result.get("llm", {})
-        except Exception as exc:
-            logger.exception("diagnose_llm error")
-            return web_error(str(exc), 500)
+        result = runtime.service("permission_log_system").system_diagnostics()
+        return result.data.get("llm", {}) if result.ok else service_data(result)
 
     @app.get("/api/v1/diagnose/install")
-    async def diagnose_install() -> dict[str, Any]:
+    async def diagnose_install() -> Any:
         """Get install diagnostics."""
-        try:
-            result = runtime.get_cli().diagnose()
-            return {
-                "audit": result.get("audit", {}),
-                "log_storage": result.get("log_storage", {}),
-            }
-        except Exception as exc:
-            logger.exception("diagnose_install error")
-            return web_error(str(exc), 500)
+        result = runtime.service("permission_log_system").system_diagnostics()
+        if not result.ok:
+            return service_data(result)
+        return {
+            "audit": result.data.get("audit", {}),
+            "log_storage": result.data.get("log_storage", {}),
+        }
 
     @app.post("/api/v1/shutdown")
     async def shutdown() -> dict[str, Any]:
@@ -550,7 +513,7 @@ def register_websocket_routes(app: Any, runtime: WebRuntime) -> None:
     # ---- WebSocket chat --------------------------------------------------
 
     @app.websocket("/ws/chat")
-    async def websocket_chat(websocket: Any) -> None:
+    async def websocket_chat(websocket: WebSocket) -> None:
         """Streaming chat via WebSocket with thinking/reasoning support."""
         await websocket.accept()
         logger.info("WebSocket client connected")
@@ -608,10 +571,11 @@ def register_websocket_routes(app: Any, runtime: WebRuntime) -> None:
 def register_static_routes(app: Any, runtime: WebRuntime) -> None:
     from fastapi.responses import HTMLResponse
     from fastapi.staticfiles import StaticFiles
+    from core.web.desktop import frontend_directory
 
     # ---- Static files & index --------------------------------------------
 
-    frontend_dir = Path(__file__).parent / "frontend"
+    frontend_dir = frontend_directory()
     if frontend_dir.is_dir():
         app.mount("/static", StaticFiles(directory=str(frontend_dir)), name="static")
 

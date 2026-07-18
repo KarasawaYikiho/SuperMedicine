@@ -129,13 +129,6 @@ class WebRuntime:
             )
         return self._instances["kernel"]
 
-    def get_cli(self) -> Any:
-        if "cli" not in self._instances:
-            from cli_entry import CLI
-
-            self._instances["cli"] = CLI()
-        return self._instances["cli"]
-
     def workspace_context(self, workspace_id: str | None) -> dict[str, Any] | None:
         if not workspace_id:
             return None

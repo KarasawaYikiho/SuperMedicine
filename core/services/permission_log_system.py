@@ -6,9 +6,15 @@ from pathlib import Path
 from typing import Any, Callable
 
 from core.config_center import ConfigCenter
-from core.log_report import LogReportError, LogReportStore
+from core.llm_manager import LLMConfigManager
+from core.log_report import (
+    LogReportError,
+    LogReportStore,
+    resolve_log_storage_locations,
+)
 from core.plugin_registry import PluginRegistry
 from core.redaction import redact_sensitive
+from core.runtime_capabilities import required_runtime_snapshot
 from core.services.result import ServiceResult
 from permission.access_mode import (
     AccessMode,
@@ -92,6 +98,71 @@ class PermissionLogSystemService:
 
     def config_diagnostics(self) -> ServiceResult[dict[str, Any]]:
         return self._call("config_diagnostics", self.config.diagnostics)
+
+    def application_status(self) -> ServiceResult[dict[str, Any]]:
+        """Return the shared lightweight status used by Web and desktop clients."""
+
+        def action() -> dict[str, Any]:
+            from core.services.llm import LLMService
+
+            provider_result = LLMService(self.project_root).show_provider()
+            provider = (
+                provider_result.data
+                if provider_result.ok and isinstance(provider_result.data, dict)
+                else {}
+            )
+            runtime = required_runtime_snapshot(self.project_root)
+            return {
+                "version": "0.4.2",
+                "project_dir": str(self.project_root),
+                "config_initialized": (self.project_root / ".supermedicine").exists(),
+                "plugin_count": len(
+                    PluginRegistry(self.project_root / "plugins").discover()
+                ),
+                "llm_provider": provider.get("provider", "未配置") if provider else "未配置",
+                "required_runtime": runtime,
+                "ok": bool(runtime["harness"]["healthy"])
+                and bool(runtime["rag"]["healthy"]),
+            }
+
+        return self._call("application_status", action)
+
+    def system_diagnostics(self) -> ServiceResult[dict[str, Any]]:
+        """Aggregate secret-safe config, LLM, audit, and log diagnostics."""
+
+        def action() -> dict[str, Any]:
+            manager = LLMConfigManager(self.config, restore_on_startup=False)
+            storage = resolve_log_storage_locations(self.project_root)
+            config_diag = self.config.diagnostics()
+            llm_diag = manager.diagnostics()
+            runtime = required_runtime_snapshot(self.project_root)
+            result: dict[str, Any] = {
+                "ok": bool(config_diag.get("exists"))
+                and bool(llm_diag.get("ok"))
+                and bool(runtime["harness"]["healthy"])
+                and bool(runtime["rag"]["healthy"]),
+                "stage": "diagnose",
+                "project_dir": str(self.project_root),
+                "config": config_diag,
+                "llm": llm_diag,
+                "audit": {
+                    "path": str(storage.audit_file),
+                    "exists": storage.audit_file.exists(),
+                    "writable_parent": storage.audit_file.parent.exists(),
+                },
+                "log_storage": storage.to_dict(),
+                "required_runtime": runtime,
+                "commands": {
+                    "init": "set provider API key env var first, then run: supermedicine init --provider <name> --base-url <url> --model <model>",
+                    "llm_list": "supermedicine llm list",
+                    "llm_switch": "supermedicine llm switch <provider>",
+                    "tui_dry_run": "supermedicine tui --dry-run",
+                    "uninstall_dry_run": "python Uninstall.py --dry-run",
+                },
+            }
+            return result
+
+        return self._call("system_diagnostics", action)
 
     def runtime_state(self) -> ServiceResult[dict[str, Any]]:
         return self._call("runtime_state", self.config.get_runtime_state)
