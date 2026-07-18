@@ -645,10 +645,10 @@ class SuperMedicineTUI(App[Any]):
 
     def _workspace_count(self) -> int:
         try:
-            from core.workspace import WorkspaceManager
+            from core.services import WorkspaceService
 
-            manager = WorkspaceManager(self.project_root)
-            return len(manager.list_workspaces())
+            service = WorkspaceService(self.project_root)
+            return len(service.require_data(service.list()))
         except Exception:
             return 0
 

@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from core.workspace import WorkspaceInfo, WorkspaceManager
+from core.services import WorkspaceService
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,8 +22,8 @@ class TUIState:
     project_root: Path | str | None = None
 
     @property
-    def workspace_manager(self) -> WorkspaceManager:
-        return WorkspaceManager(self.project_root)
+    def workspace_service(self) -> WorkspaceService:
+        return WorkspaceService(self.project_root)
 
     def save_recent_workspace(
         self,
@@ -32,53 +32,62 @@ class TUIState:
     ) -> Path:
         """Save TUI recent selection in the source workspace session state."""
 
-        return self.workspace_manager.save_recent_selection(
-            workspace_id, selected_workspace_id
+        return Path(
+            self.workspace_service.require_data(
+                self.workspace_service.save_selection(
+                    workspace_id, selected_workspace_id
+                )
+            )
         )
 
     def load_recent_workspace(self, workspace_id: str) -> str | None:
         """Load TUI recent selection only from the requested workspace state."""
 
-        return self.workspace_manager.load_recent_selection(workspace_id)
+        return self.workspace_service.require_data(
+            self.workspace_service.load_selection(workspace_id)
+        )
 
-    def list_workspaces(self) -> list[WorkspaceInfo]:
+    def list_workspaces(self) -> list[dict[str, Any]]:
         """List initialized workspaces from the shared persistent workspace store."""
 
-        return self.workspace_manager.list_workspaces()
+        return self.workspace_service.require_data(self.workspace_service.list())
 
-    def create_workspace(self, workspace_id: str) -> WorkspaceInfo:
+    def create_workspace(self, workspace_id: str) -> dict[str, Any]:
         """Create a workspace through the shared persistent workspace store."""
 
-        return self.workspace_manager.initialize_workspace(workspace_id)
+        return self.workspace_service.require_data(
+            self.workspace_service.create(workspace_id)
+        )
 
     def select_workspace(
         self,
         workspace_id: str,
         *,
         state_workspace_id: str | None = None,
-    ) -> WorkspaceInfo:
+    ) -> dict[str, Any]:
         """Persist a TUI workspace selection without changing CLI workspace behavior."""
 
-        info = self.workspace_manager.get_workspace(workspace_id)
-        self.save_recent_workspace(state_workspace_id or info.id, info.id)
+        info = self.workspace_service.require_data(
+            self.workspace_service.show(workspace_id)
+        )
+        self.save_recent_workspace(state_workspace_id or info["id"], info["id"])
         return info
 
     def workspace_payloads(self) -> list[dict[str, Any]]:
         """Return display-ready workspace records from the shared persistent list."""
 
         return [
-            self._workspace_payload(info, selected=False)
-            for info in self.list_workspaces()
+            self._workspace_payload(info, selected=False) for info in self.list_workspaces()
         ]
 
     @staticmethod
-    def _workspace_payload(info: WorkspaceInfo, *, selected: bool) -> dict[str, Any]:
+    def _workspace_payload(
+        info: dict[str, Any], *, selected: bool
+    ) -> dict[str, Any]:
         return {
-            "id": info.id,
-            "label": f"工作区：{info.id}",
-            "path": str(info.path),
+            **info,
+            "label": f"工作区：{info['id']}",
             "selected": selected,
-            "metadata": info.metadata.to_dict(),
         }
 
 
@@ -103,7 +112,9 @@ def load_recent_workspace(
     return TUIState(project_root).load_recent_workspace(workspace_id)
 
 
-def list_workspaces(project_root: Path | str | None = None) -> list[WorkspaceInfo]:
+def list_workspaces(
+    project_root: Path | str | None = None,
+) -> list[dict[str, Any]]:
     """Convenience wrapper listing TUI-visible workspaces from persistent state."""
 
     return TUIState(project_root).list_workspaces()

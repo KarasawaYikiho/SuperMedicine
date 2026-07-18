@@ -12,9 +12,9 @@ from textual.widgets import DataTable, Static
 
 from core.config_center import ConfigCenter
 from core.llm_manager import LLMConfigManager
+from core.services import WorkspaceService
 from core.tui.app import apply_status_style
 from core.tui.i18n import t
-from core.workspace import WorkspaceManager
 
 
 def collect_dashboard_context(project_root: Path | str | None = None) -> dict[str, Any]:
@@ -78,10 +78,9 @@ class DashboardOverviewController:
 
 
 def _safe_workspace_infos(root: Path) -> list[Any]:
-    try:
-        return WorkspaceManager(root).list_workspaces()
-    except Exception:
-        return []
+    service = WorkspaceService(root)
+    result = service.list()
+    return result.data if result.ok and result.data is not None else []
 
 
 def _count_plugins(root: Path) -> int:
@@ -148,18 +147,16 @@ def _safe_llm_status(root: Path) -> tuple[str, bool]:
 def _recent_workspace_hint(root: Path, workspace_infos: list[Any]) -> str:
     if not workspace_infos:
         return t("dashboard_no_workspace_hint")
-    manager = WorkspaceManager(root)
+    service = WorkspaceService(root)
     for workspace in workspace_infos:
-        workspace_id = str(getattr(workspace, "id", ""))
+        workspace_id = str(workspace.get("id", ""))
         if not workspace_id:
             continue
-        try:
-            recent = manager.load_recent_selection(workspace_id)
-        except Exception:
-            recent = None
+        result = service.load_selection(workspace_id)
+        recent = result.data if result.ok else None
         if recent:
             return f"{t('dashboard_recent_workspace_hint')}：{recent}"
-    return f"{t('dashboard_recent_workspace_hint')}：{getattr(workspace_infos[0], 'id', '')}"
+    return f"{t('dashboard_recent_workspace_hint')}：{workspace_infos[0].get('id', '')}"
 
 
 def _package_version() -> str:
