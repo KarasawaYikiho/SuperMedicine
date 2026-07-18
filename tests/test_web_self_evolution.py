@@ -252,19 +252,26 @@ def test_frontend_experiment_detail_button_fetches_real_session():
 
 
 def test_paper_enrich_requires_explicit_confirmation(monkeypatch):
-    """Web paper enrichment should preserve the CLI explicit-confirm boundary."""
+    """Web paper enrichment should preserve the explicit-confirm boundary."""
+
+    from core.services import ServiceResult
 
     captured: dict[str, object] = {}
 
-    class FakeCLI:
-        def paper_enrich(self, workspace_id, paper_id, *, confirm_enrich):
+    class FakePaperRAGService:
+        def __init__(self, project_root):
+            pass
+
+        def enrich_metadata(self, workspace_id, paper_id, *, confirm):
             captured["workspace_id"] = workspace_id
             captured["paper_id"] = paper_id
-            captured["confirm_enrich"] = confirm_enrich
-            return {"status": "ok"}
+            captured["confirm_enrich"] = confirm
+            return ServiceResult.success({"status": "ok"})
 
-    monkeypatch.setattr("cli_entry.CLI", FakeCLI)
     from core.web.server import create_app
+    monkeypatch.setattr(
+        "core.web.server.PaperRAGService", FakePaperRAGService
+    )
 
     test_client = TestClient(create_app())
 

@@ -44,10 +44,6 @@ def _as_export_format(format: str) -> ExportFormat:
     return cast("ExportFormat", format)
 
 
-def _paper_metadata_to_dict(metadata) -> dict:
-    return json_ready(metadata)
-
-
 def _self_evolution_cli_result(
     result: dict[str, Any],
     *,
@@ -133,21 +129,6 @@ def _self_evolution_cli_result(
             }
         ),
     )
-
-
-def _paper_import_result_to_dict(
-    import_result, warnings: list[str] | None = None
-) -> dict:
-    return {
-        "status": import_result.status,
-        "metadata": _paper_metadata_to_dict(import_result.metadata),
-        "source_path": str(import_result.source_path)
-        if import_result.source_path
-        else None,
-        "warnings": warnings if warnings is not None else list(import_result.warnings),
-        "duplicate": import_result.duplicate,
-        "duplicate_reason": import_result.duplicate_reason,
-    }
 
 
 def _paper_metadata_options(args) -> dict:

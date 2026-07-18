@@ -15,7 +15,7 @@ import logging
 from pathlib import Path
 from typing import Any, Iterable
 
-from core.services import LLMService, ServiceResult, WorkspaceService
+from core.services import LLMService, PaperRAGService, ServiceResult, WorkspaceService
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +80,9 @@ def create_app() -> Any:
             "missing_api_key": 422,
             "missing_model": 422,
             "incomplete_provider_config": 422,
+            "paper_source_missing": 404,
+            "paper_not_found": 404,
+            "unsupported_paper_format": 422,
         }.get(code, 500)
         return _web_error(error.message if error else "Service failed", status_code)
 
@@ -294,11 +297,7 @@ def create_app() -> Any:
     @app.get("/api/v1/workspaces/{workspace_id}/papers")
     async def paper_list(workspace_id: str) -> Any:
         """List papers in a workspace."""
-        try:
-            return _get_cli().paper_list(workspace_id)
-        except Exception as exc:
-            logger.exception("paper_list error")
-            return _web_error(str(exc), 500)
+        return _service_data(PaperRAGService(Path.cwd()).list_papers(workspace_id))
 
     @app.post("/api/v1/workspaces/{workspace_id}/papers")
     async def paper_create(workspace_id: str, request: dict[str, Any]) -> dict[str, Any]:
@@ -306,47 +305,43 @@ def create_app() -> Any:
         source_path = request.get("source_path", "")
         if not source_path:
             return _web_error("No source_path provided", 400)
-        try:
-            return _get_cli().paper_import(
+        return _service_data(
+            PaperRAGService(Path.cwd()).import_paper(
                 workspace_id,
                 source_path,
                 metadata=request.get("metadata"),
                 enrich=request.get("enrich", False),
                 confirm_enrich=request.get("confirm_enrich", False),
             )
-        except Exception as exc:
-            logger.exception("paper_create error")
-            return _web_error(str(exc), 500)
+        )
 
     @app.get("/api/v1/workspaces/{workspace_id}/papers/{paper_id}")
     async def paper_get(workspace_id: str, paper_id: str) -> dict[str, Any]:
         """Show one paper by id."""
-        try:
-            return _get_cli().paper_show(workspace_id, paper_id)
-        except Exception as exc:
-            logger.exception("paper_get error")
-            return _web_error(str(exc), 500)
+        return _service_data(
+            PaperRAGService(Path.cwd()).show_paper(workspace_id, paper_id)
+        )
 
     @app.patch("/api/v1/workspaces/{workspace_id}/papers/{paper_id}")
     async def paper_update(workspace_id: str, paper_id: str, request: dict[str, Any]) -> dict[str, Any]:
         """Edit paper metadata."""
         metadata = request.get("metadata", {})
-        try:
-            return _get_cli().paper_edit(workspace_id, paper_id, metadata)
-        except Exception as exc:
-            logger.exception("paper_update error")
-            return _web_error(str(exc), 500)
+        return _service_data(
+            PaperRAGService(Path.cwd()).edit_metadata(
+                workspace_id, paper_id, metadata
+            )
+        )
 
     @app.post("/api/v1/workspaces/{workspace_id}/papers/{paper_id}/enrich")
     async def paper_enrich(workspace_id: str, paper_id: str, request: dict[str, Any]) -> dict[str, Any]:
         """Enrich a paper with LLM-extracted metadata."""
-        try:
-            return _get_cli().paper_enrich(
-                workspace_id, paper_id, confirm_enrich=request.get("confirm_enrich", False)
+        return _service_data(
+            PaperRAGService(Path.cwd()).enrich_metadata(
+                workspace_id,
+                paper_id,
+                confirm=bool(request.get("confirm_enrich", False)),
             )
-        except Exception as exc:
-            logger.exception("paper_enrich error")
-            return _web_error(str(exc), 500)
+        )
 
     # ---- Experience endpoints ---------------------------------------------
 

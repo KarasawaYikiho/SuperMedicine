@@ -127,3 +127,68 @@ def test_llm_service_failure_preserves_manager_error_code(tmp_path):
     assert result.ok is False
     assert result.error.code == "provider_not_found"
     assert result.to_dict()["error"]["details"]["provider"] == "missing"
+
+
+def test_paper_rag_service_owns_import_list_show_and_edit(tmp_path):
+    from core.services import PaperRAGService, WorkspaceService
+
+    WorkspaceService(tmp_path).create("paper-study")
+    source = tmp_path / "source.md"
+    source.write_text("# Service paper\n", encoding="utf-8")
+    service = PaperRAGService(tmp_path)
+
+    imported = service.import_paper(
+        "paper-study",
+        source,
+        metadata={"title": "Original", "tags": ["draft"]},
+        request_id="paper-import-1",
+    )
+    paper_id = imported.data["metadata"]["id"]
+    listed = service.list_papers("paper-study")
+    shown = service.show_paper("paper-study", paper_id)
+    edited = service.edit_metadata(
+        "paper-study", paper_id, {"title": "Edited", "tags": ["ready"]}
+    )
+
+    assert imported.ok is True
+    assert listed.data == [shown.data]
+    assert shown.data["title"] == "Original"
+    assert edited.data["title"] == "Edited"
+    assert edited.data["tags"] == ["ready"]
+    assert imported.meta == {"service": "paper_rag", "operation": "import_paper"}
+
+
+def test_paper_rag_service_missing_paper_has_stable_error(tmp_path):
+    from core.services import PaperRAGService, WorkspaceService
+
+    WorkspaceService(tmp_path).create("paper-study")
+
+    result = PaperRAGService(tmp_path).show_paper(
+        "paper-study", "missing", request_id="paper-show-1"
+    )
+
+    assert result.ok is False
+    assert result.error.code == "paper_not_found"
+    assert result.request_id == "paper-show-1"
+    assert result.error.details == {
+        "workspace_id": "paper-study",
+        "paper_id": "missing",
+    }
+
+
+def test_paper_rag_service_enrichment_requires_confirmation(tmp_path):
+    from core.services import PaperRAGService, WorkspaceService
+
+    WorkspaceService(tmp_path).create("paper-study")
+    source = tmp_path / "source.md"
+    source.write_text("# Service paper\n", encoding="utf-8")
+    service = PaperRAGService(tmp_path)
+    imported = service.import_paper("paper-study", source)
+    paper_id = imported.data["metadata"]["id"]
+
+    result = service.enrich_metadata("paper-study", paper_id, confirm=False)
+
+    assert result.ok is True
+    assert result.data["status"] == "skipped"
+    assert result.data["applied_fields"] == []
+    assert result.data["metadata"]["id"] == paper_id
