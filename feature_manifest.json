@@ -4,47 +4,29 @@
   "audit_reference": "49ac6f88264fe4e06090af39154f2a089a18d8ef",
   "baseline_relationship": "audit_reference_is_not_an_ancestor_of_implementation_baseline",
   "metrics": {
-    "feature_id_count": 14
+    "feature_id_count": 133
   },
   "features": [
     {
-      "feature_id": "cli:supermedicine",
-      "category": "cli",
-      "entrypoint": "cli:supermedicine",
-      "expected_result": "Runs the packaged command facade.",
-      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_has_unique_ids_and_required_contract_fields"
+      "feature_id": "adapter:claude-code",
+      "category": "adapter",
+      "entrypoint": "adapter:claude-code",
+      "expected_result": "Preserves declared adapter entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
     },
     {
-      "feature_id": "cli:status",
-      "category": "cli_command",
-      "entrypoint": "cli:status",
-      "expected_result": "Reports project status.",
-      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_has_unique_ids_and_required_contract_fields"
+      "feature_id": "adapter:opencode",
+      "category": "adapter",
+      "entrypoint": "adapter:opencode",
+      "expected_result": "Preserves declared adapter entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
     },
     {
-      "feature_id": "cli:diagnose",
-      "category": "cli_command",
-      "entrypoint": "cli:diagnose",
-      "expected_result": "Reports redacted diagnostics.",
-      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_has_unique_ids_and_required_contract_fields"
-    },
-    {
-      "feature_id": "plugin:rag-interface",
-      "category": "plugin",
-      "entrypoint": "plugin:rag-interface",
-      "expected_result": "Provides local and permission-governed retrieval actions.",
-      "contract_test": "tests/feature_contract/test_runtime_contract.py::test_required_plugins_are_discovered",
-      "required": true,
-      "default_enabled": true
-    },
-    {
-      "feature_id": "plugin:harness-core",
-      "category": "plugin",
-      "entrypoint": "plugin:harness-core",
-      "expected_result": "Provides checkpoint verification and monitoring actions.",
-      "contract_test": "tests/feature_contract/test_runtime_contract.py::test_required_plugins_are_discovered",
-      "required": true,
-      "default_enabled": true
+      "feature_id": "adapter:standalone",
+      "category": "adapter",
+      "entrypoint": "adapter:standalone",
+      "expected_result": "Preserves declared adapter entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
     },
     {
       "feature_id": "agent:alpha",
@@ -65,15 +47,6 @@
       "optional_enabled": true
     },
     {
-      "feature_id": "agent:gamma",
-      "category": "multi_agent_role",
-      "entrypoint": "agent:gamma",
-      "expected_result": "Performs writing.",
-      "contract_test": "tests/feature_contract/test_runtime_contract.py::test_four_agent_roles_are_preserved",
-      "preserved": true,
-      "optional_enabled": true
-    },
-    {
       "feature_id": "agent:delta",
       "category": "multi_agent_role",
       "entrypoint": "agent:delta",
@@ -83,39 +56,900 @@
       "optional_enabled": true
     },
     {
-      "feature_id": "adapter:standalone",
-      "category": "adapter",
-      "entrypoint": "adapter:standalone",
-      "expected_result": "Provides the standalone host adapter.",
-      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_has_unique_ids_and_required_contract_fields"
+      "feature_id": "agent:gamma",
+      "category": "multi_agent_role",
+      "entrypoint": "agent:gamma",
+      "expected_result": "Performs writing.",
+      "contract_test": "tests/feature_contract/test_runtime_contract.py::test_four_agent_roles_are_preserved",
+      "preserved": true,
+      "optional_enabled": true
     },
     {
-      "feature_id": "adapter:opencode",
-      "category": "adapter",
-      "entrypoint": "adapter:opencode",
-      "expected_result": "Provides the OpenCode host adapter.",
-      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_has_unique_ids_and_required_contract_fields"
+      "feature_id": "cli:add",
+      "category": "cli",
+      "entrypoint": "cli:add",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
     },
     {
-      "feature_id": "adapter:claude-code",
-      "category": "adapter",
-      "entrypoint": "adapter:claude-code",
-      "expected_result": "Provides the Claude Code host adapter.",
-      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_has_unique_ids_and_required_contract_fields"
+      "feature_id": "cli:add-config",
+      "category": "cli",
+      "entrypoint": "cli:add-config",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
     },
     {
-      "feature_id": "installer:install",
+      "feature_id": "cli:authorize",
+      "category": "cli",
+      "entrypoint": "cli:authorize",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:context",
+      "category": "cli",
+      "entrypoint": "cli:context",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:delete",
+      "category": "cli",
+      "entrypoint": "cli:delete",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:diagnose",
+      "category": "cli",
+      "entrypoint": "cli:diagnose",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:edit",
+      "category": "cli",
+      "entrypoint": "cli:edit",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:enrich",
+      "category": "cli",
+      "entrypoint": "cli:enrich",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:experience",
+      "category": "cli",
+      "entrypoint": "cli:experience",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:experiment",
+      "category": "cli",
+      "entrypoint": "cli:experiment",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:export",
+      "category": "cli",
+      "entrypoint": "cli:export",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:follow",
+      "category": "cli",
+      "entrypoint": "cli:follow",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:import",
+      "category": "cli",
+      "entrypoint": "cli:import",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:init",
+      "category": "cli",
+      "entrypoint": "cli:init",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:list",
+      "category": "cli",
+      "entrypoint": "cli:list",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:llm",
+      "category": "cli",
+      "entrypoint": "cli:llm",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:location",
+      "category": "cli",
+      "entrypoint": "cli:location",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:log",
+      "category": "cli",
+      "entrypoint": "cli:log",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:mode",
+      "category": "cli",
+      "entrypoint": "cli:mode",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:paper",
+      "category": "cli",
+      "entrypoint": "cli:paper",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:permission",
+      "category": "cli",
+      "entrypoint": "cli:permission",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:revoke",
+      "category": "cli",
+      "entrypoint": "cli:revoke",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:roots",
+      "category": "cli",
+      "entrypoint": "cli:roots",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:run",
+      "category": "cli",
+      "entrypoint": "cli:run",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:sandbox",
+      "category": "cli",
+      "entrypoint": "cli:sandbox",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:scan",
+      "category": "cli",
+      "entrypoint": "cli:scan",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:self-evolve",
+      "category": "cli",
+      "entrypoint": "cli:self-evolve",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:show",
+      "category": "cli",
+      "entrypoint": "cli:show",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:start",
+      "category": "cli",
+      "entrypoint": "cli:start",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:status",
+      "category": "cli",
+      "entrypoint": "cli:status",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:submit",
+      "category": "cli",
+      "entrypoint": "cli:submit",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:suggest",
+      "category": "cli",
+      "entrypoint": "cli:suggest",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:switch",
+      "category": "cli",
+      "entrypoint": "cli:switch",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:test",
+      "category": "cli",
+      "entrypoint": "cli:test",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:tool",
+      "category": "cli",
+      "entrypoint": "cli:tool",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:tui",
+      "category": "cli",
+      "entrypoint": "cli:tui",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:view",
+      "category": "cli",
+      "entrypoint": "cli:view",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:web",
+      "category": "cli",
+      "entrypoint": "cli:web",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:workspace",
+      "category": "cli",
+      "entrypoint": "cli:workspace",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "cli:write",
+      "category": "cli",
+      "entrypoint": "cli:write",
+      "expected_result": "Preserves declared cli entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "installer:gui_entry.py",
+      "category": "installer",
+      "entrypoint": "installer:gui_entry.py",
+      "expected_result": "Preserves a documented installation or desktop entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "installer:gui_standalone.py",
+      "category": "installer",
+      "entrypoint": "installer:gui_standalone.py",
+      "expected_result": "Preserves a documented installation or desktop entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "installer:install_entry.py",
       "category": "installer",
       "entrypoint": "installer:install_entry.py",
-      "expected_result": "Provides the installation entrypoint.",
-      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_has_unique_ids_and_required_contract_fields"
+      "expected_result": "Preserves a documented installation or desktop entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
     },
     {
-      "feature_id": "installer:uninstall",
+      "feature_id": "installer:uninstall_entry.py",
       "category": "installer",
       "entrypoint": "installer:uninstall_entry.py",
-      "expected_result": "Provides the uninstall entrypoint.",
-      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_has_unique_ids_and_required_contract_fields"
+      "expected_result": "Preserves a documented installation or desktop entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:experiment.wb.antibody_dilution",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:experiment.wb.antibody_dilution",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:experiment.wb.normalize_loading",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:experiment.wb.normalize_loading",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:figure-check.audit",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:figure-check.audit",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:figure-export.export",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:figure-export.export",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:figure-layout.finalize",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:figure-layout.finalize",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:figure-layout.labels",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:figure-layout.labels",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:figure-profile.profile",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:figure-profile.profile",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:figure-qa.audit",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:figure-qa.audit",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:figure-qa.preview",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:figure-qa.preview",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:figure-style.list-fonts",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:figure-style.list-fonts",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:figure-style.setup",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:figure-style.setup",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:figure.workflow",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:figure.workflow",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:harness.integration.checkpoint",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:harness.integration.checkpoint",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:harness.integration.checkpoint_all",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:harness.integration.checkpoint_all",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:harness.monitor.anomaly",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:harness.monitor.anomaly",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:harness.monitor.denied_actions",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:harness.monitor.denied_actions",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:harness.monitor.failure_patterns",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:harness.monitor.failure_patterns",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:harness.monitor.performance",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:harness.monitor.performance",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:harness.monitor.permission_audit",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:harness.monitor.permission_audit",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:r.survival.cox",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:r.survival.cox",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:r.survival.km",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:r.survival.km",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:r.survival.logrank",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:r.survival.logrank",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:rag.context.retrieve",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:rag.context.retrieve",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:rag.context.store",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:rag.context.store",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:rag.query",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:rag.query",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:standard.citation.ama",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:standard.citation.ama",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:standard.citation.vancouver",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:standard.citation.vancouver",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:standard.consort",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:standard.consort",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:standard.prisma",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:standard.prisma",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:standard.stard",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:standard.stard",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:standard.strobe",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:standard.strobe",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:stats.anova",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:stats.anova",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:stats.descriptive",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:stats.descriptive",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:stats.regression",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:stats.regression",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin_provide:stats.ttest",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:stats.ttest",
+      "expected_result": "Preserves declared plugin provide entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "plugin:harness-core",
+      "category": "plugin",
+      "entrypoint": "plugin:harness-core",
+      "expected_result": "Provides checkpoint verification and monitoring actions.",
+      "contract_test": "tests/feature_contract/test_runtime_contract.py::test_required_plugins_are_discovered",
+      "required": true,
+      "default_enabled": true
+    },
+    {
+      "feature_id": "plugin:rag-interface",
+      "category": "plugin",
+      "entrypoint": "plugin:rag-interface",
+      "expected_result": "Provides local and permission-governed retrieval actions.",
+      "contract_test": "tests/feature_contract/test_runtime_contract.py::test_required_plugins_are_discovered",
+      "required": true,
+      "default_enabled": true
+    },
+    {
+      "feature_id": "web:DELETE /api/v1/self-evolution/{artifact_id}",
+      "category": "web",
+      "entrypoint": "web:DELETE /api/v1/self-evolution/{artifact_id}",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:DELETE /api/v1/workspaces/{workspace_id}",
+      "category": "web",
+      "entrypoint": "web:DELETE /api/v1/workspaces/{workspace_id}",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:DELETE /api/v1/workspaces/{workspace_id}/experiences/{experience_id}",
+      "category": "web",
+      "entrypoint": "web:DELETE /api/v1/workspaces/{workspace_id}/experiences/{experience_id}",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:GET /",
+      "category": "web",
+      "entrypoint": "web:GET /",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:GET /api/v1/diagnose",
+      "category": "web",
+      "entrypoint": "web:GET /api/v1/diagnose",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:GET /api/v1/diagnose/all",
+      "category": "web",
+      "entrypoint": "web:GET /api/v1/diagnose/all",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:GET /api/v1/diagnose/config",
+      "category": "web",
+      "entrypoint": "web:GET /api/v1/diagnose/config",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:GET /api/v1/diagnose/install",
+      "category": "web",
+      "entrypoint": "web:GET /api/v1/diagnose/install",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:GET /api/v1/diagnose/llm",
+      "category": "web",
+      "entrypoint": "web:GET /api/v1/diagnose/llm",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:GET /api/v1/experiments",
+      "category": "web",
+      "entrypoint": "web:GET /api/v1/experiments",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:GET /api/v1/llm/providers",
+      "category": "web",
+      "entrypoint": "web:GET /api/v1/llm/providers",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:GET /api/v1/llm/providers/{name}",
+      "category": "web",
+      "entrypoint": "web:GET /api/v1/llm/providers/{name}",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:GET /api/v1/logs",
+      "category": "web",
+      "entrypoint": "web:GET /api/v1/logs",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:GET /api/v1/logs/{name}",
+      "category": "web",
+      "entrypoint": "web:GET /api/v1/logs/{name}",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:GET /api/v1/permissions",
+      "category": "web",
+      "entrypoint": "web:GET /api/v1/permissions",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:GET /api/v1/self-evolution",
+      "category": "web",
+      "entrypoint": "web:GET /api/v1/self-evolution",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:GET /api/v1/self-evolution/{artifact_id}",
+      "category": "web",
+      "entrypoint": "web:GET /api/v1/self-evolution/{artifact_id}",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:GET /api/v1/status",
+      "category": "web",
+      "entrypoint": "web:GET /api/v1/status",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:GET /api/v1/tools/scan",
+      "category": "web",
+      "entrypoint": "web:GET /api/v1/tools/scan",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:GET /api/v1/workspaces",
+      "category": "web",
+      "entrypoint": "web:GET /api/v1/workspaces",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:GET /api/v1/workspaces/{workspace_id}",
+      "category": "web",
+      "entrypoint": "web:GET /api/v1/workspaces/{workspace_id}",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:GET /api/v1/workspaces/{workspace_id}/dialog-history",
+      "category": "web",
+      "entrypoint": "web:GET /api/v1/workspaces/{workspace_id}/dialog-history",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:GET /api/v1/workspaces/{workspace_id}/experiences",
+      "category": "web",
+      "entrypoint": "web:GET /api/v1/workspaces/{workspace_id}/experiences",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:GET /api/v1/workspaces/{workspace_id}/experiences/{experience_id}",
+      "category": "web",
+      "entrypoint": "web:GET /api/v1/workspaces/{workspace_id}/experiences/{experience_id}",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:GET /api/v1/workspaces/{workspace_id}/papers",
+      "category": "web",
+      "entrypoint": "web:GET /api/v1/workspaces/{workspace_id}/papers",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:GET /api/v1/workspaces/{workspace_id}/papers/{paper_id}",
+      "category": "web",
+      "entrypoint": "web:GET /api/v1/workspaces/{workspace_id}/papers/{paper_id}",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:GET /api/v1/workspaces/{workspace_id}/tools",
+      "category": "web",
+      "entrypoint": "web:GET /api/v1/workspaces/{workspace_id}/tools",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:PATCH /api/v1/workspaces/{workspace_id}/papers/{paper_id}",
+      "category": "web",
+      "entrypoint": "web:PATCH /api/v1/workspaces/{workspace_id}/papers/{paper_id}",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:POST /api/v1/chat",
+      "category": "web",
+      "entrypoint": "web:POST /api/v1/chat",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:POST /api/v1/experiments",
+      "category": "web",
+      "entrypoint": "web:POST /api/v1/experiments",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:POST /api/v1/experiments/{session_file}/submit",
+      "category": "web",
+      "entrypoint": "web:POST /api/v1/experiments/{session_file}/submit",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:POST /api/v1/llm/providers",
+      "category": "web",
+      "entrypoint": "web:POST /api/v1/llm/providers",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:POST /api/v1/llm/switch",
+      "category": "web",
+      "entrypoint": "web:POST /api/v1/llm/switch",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:POST /api/v1/logs",
+      "category": "web",
+      "entrypoint": "web:POST /api/v1/logs",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:POST /api/v1/permissions/authorize",
+      "category": "web",
+      "entrypoint": "web:POST /api/v1/permissions/authorize",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:POST /api/v1/permissions/mode",
+      "category": "web",
+      "entrypoint": "web:POST /api/v1/permissions/mode",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:POST /api/v1/permissions/revoke",
+      "category": "web",
+      "entrypoint": "web:POST /api/v1/permissions/revoke",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:POST /api/v1/self-evolution/generate",
+      "category": "web",
+      "entrypoint": "web:POST /api/v1/self-evolution/generate",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:POST /api/v1/shutdown",
+      "category": "web",
+      "entrypoint": "web:POST /api/v1/shutdown",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:POST /api/v1/workspaces",
+      "category": "web",
+      "entrypoint": "web:POST /api/v1/workspaces",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:POST /api/v1/workspaces/{workspace_id}/experiences",
+      "category": "web",
+      "entrypoint": "web:POST /api/v1/workspaces/{workspace_id}/experiences",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:POST /api/v1/workspaces/{workspace_id}/papers",
+      "category": "web",
+      "entrypoint": "web:POST /api/v1/workspaces/{workspace_id}/papers",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:POST /api/v1/workspaces/{workspace_id}/papers/{paper_id}/enrich",
+      "category": "web",
+      "entrypoint": "web:POST /api/v1/workspaces/{workspace_id}/papers/{paper_id}/enrich",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:POST /api/v1/workspaces/{workspace_id}/tools",
+      "category": "web",
+      "entrypoint": "web:POST /api/v1/workspaces/{workspace_id}/tools",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:WEBSOCKET /ws/chat",
+      "category": "web",
+      "entrypoint": "web:WEBSOCKET /ws/chat",
+      "expected_result": "Preserves declared web entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
     }
   ]
 }
+

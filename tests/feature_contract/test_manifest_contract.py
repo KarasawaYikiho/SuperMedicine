@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from pathlib import Path
+
+from tests.feature_contract.inventory import discovered_surface
 
 def test_manifest_has_unique_ids_and_required_contract_fields(manifest: dict[str, object]) -> None:
     records = manifest["features"]
@@ -16,3 +19,25 @@ def test_manifest_has_unique_ids_and_required_contract_fields(manifest: dict[str
     }
     for record in records:
         assert required_fields <= set(record)
+
+
+def test_manifest_covers_declared_web_and_plugin_entries(manifest: dict[str, object]) -> None:
+    entries = {record["entrypoint"] for record in manifest["features"]}
+    assert {
+        "web:GET /api/v1/status",
+        "web:POST /api/v1/chat",
+        "plugin_provide:harness.integration.checkpoint",
+        "plugin_provide:rag.query",
+    } <= entries
+
+
+def test_manifest_matches_static_inventory(
+    repository_root: Path, manifest: dict[str, object]
+) -> None:
+    manifest_entries = {record["entrypoint"] for record in manifest["features"]}
+    discovered_entries = {
+        entrypoint
+        for values in discovered_surface(repository_root).values()
+        for entrypoint in values
+    }
+    assert discovered_entries <= manifest_entries
