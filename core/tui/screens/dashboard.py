@@ -10,9 +10,7 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import DataTable, Static
 
-from core.config_center import ConfigCenter
-from core.llm_manager import LLMConfigManager
-from core.services import WorkspaceService
+from core.services import LLMService, WorkspaceService
 from core.tui.app import apply_status_style
 from core.tui.i18n import t
 
@@ -119,20 +117,20 @@ def _safe_token_stats(root: Path) -> dict[str, int]:
 
 def _safe_llm_status(root: Path) -> tuple[str, bool]:
     try:
-        manager = LLMConfigManager(
-            ConfigCenter(root / ".supermedicine" / "config.yaml")
-        )
-        providers = manager.list_providers(redacted=True)
-        current = manager.get_current_provider(redacted=True)
+        service = LLMService(root, restore_on_startup=True)
+        listed = service.list_providers()
+        current_result = service.show_provider()
+        providers = (listed.data or {}).get("providers", []) if listed.ok else []
+        current = current_result.data or {} if current_result.ok else {}
         provider = str(current.get("provider") or "")
         if not providers or not provider:
             return f"{t('llm_not_ready')}：{t('dashboard_llm_no_provider')}", False
-        validation = manager.validate_provider(provider)
-        if validation is None:
+        validation = service.validate_provider(provider)
+        if validation.ok:
             model = str(current.get("model") or "").strip()
             suffix = f"（{model}）" if model else ""
             return f"{t('llm_ready')}：{provider}{suffix}", True
-        missing = validation.get("error", {}).get("details", {}).get("missing", [])
+        missing = validation.error.details.get("missing", []) if validation.error else []
         missing_text = (
             "、".join(str(item) for item in missing) if missing else t("llm_not_ready")
         )

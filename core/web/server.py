@@ -15,7 +15,7 @@ import logging
 from pathlib import Path
 from typing import Any, Iterable
 
-from core.services import ServiceResult, WorkspaceService
+from core.services import LLMService, ServiceResult, WorkspaceService
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +74,12 @@ def create_app() -> Any:
             "workspace_not_found": 404,
             "permission_denied": 403,
             "required_file_missing": 500,
+            "missing_provider": 400,
+            "provider_not_found": 404,
+            "missing_base_url": 422,
+            "missing_api_key": 422,
+            "missing_model": 422,
+            "incomplete_provider_config": 422,
         }.get(code, 500)
         return _web_error(error.message if error else "Service failed", status_code)
 
@@ -215,12 +221,8 @@ def create_app() -> Any:
         # Include LLM provider info if config is available
         if config_dir.exists():
             try:
-                from core.config_center import ConfigCenter
-                from core.llm_manager import LLMConfigManager
-
-                config = ConfigCenter(config_dir / "config.yaml")
-                manager = LLMConfigManager(config, restore_on_startup=False)
-                provider = manager.get_current_provider(redacted=True)
+                provider_result = LLMService(project_dir).show_provider()
+                provider = provider_result.data or {} if provider_result.ok else {}
                 status["llm_provider"] = provider.get("provider", "未知") if provider else "未配置"
             except Exception:
                 status["llm_provider"] = "读取配置失败"
@@ -440,11 +442,9 @@ def create_app() -> Any:
     @app.get("/api/v1/llm/providers")
     async def llm_providers() -> Any:
         """List configured LLM providers."""
-        try:
-            return _llm_provider_list_response(_get_cli().llm_list())
-        except Exception as exc:
-            logger.exception("llm_providers error")
-            return _web_error(str(exc), 500)
+        return _llm_provider_list_response(
+            _service_data(LLMService(Path.cwd()).list_providers())
+        )
 
     @app.post("/api/v1/llm/providers")
     async def llm_provider_create(request: dict[str, Any]) -> dict[str, Any]:
@@ -452,30 +452,31 @@ def create_app() -> Any:
         provider = request.get("provider") or request.get("name") or ""
         if not provider:
             return _web_error("No provider specified", 400)
-        try:
-            return _get_cli().llm_add(
-                provider,
-                api_format=request.get("api_format"),
-                base_url=request.get("base_url"),
-                api_key=request.get("api_key"),
-                api_key_env=request.get("api_key_env"),
-                model=request.get("model"),
-                timeout=request.get("timeout"),
-                headers=request.get("headers"),
-                set_current=request.get("set_current", False),
+        values = {
+            key: request[key]
+            for key in (
+                "api_format",
+                "base_url",
+                "api_key",
+                "api_key_env",
+                "model",
+                "timeout",
+                "headers",
             )
-        except Exception as exc:
-            logger.exception("llm_provider_create error")
-            return _web_error(str(exc), 500)
+            if request.get(key) is not None
+        }
+        return _service_data(
+            LLMService(Path.cwd()).add_provider(
+                provider,
+                values,
+                set_current=bool(request.get("set_current", False)),
+            )
+        )
 
     @app.get("/api/v1/llm/providers/{name}")
     async def llm_provider_get(name: str) -> dict[str, Any]:
         """Show one LLM provider."""
-        try:
-            return _get_cli().llm_show(name)
-        except Exception as exc:
-            logger.exception("llm_provider_get error")
-            return _web_error(str(exc), 500)
+        return _service_data(LLMService(Path.cwd()).show_provider(name))
 
     @app.post("/api/v1/llm/switch")
     async def llm_switch(request: dict[str, Any]) -> dict[str, Any]:
@@ -483,11 +484,7 @@ def create_app() -> Any:
         provider = request.get("provider", "")
         if not provider:
             return _web_error("No provider specified", 400)
-        try:
-            return _get_cli().llm_switch(provider)
-        except Exception as exc:
-            logger.exception("llm_switch error")
-            return _web_error(str(exc), 500)
+        return _service_data(LLMService(Path.cwd()).switch_provider(provider))
 
     # ---- Permission endpoints ---------------------------------------------
 

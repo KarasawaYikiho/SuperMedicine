@@ -9,9 +9,8 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Input, Select, Static
 
-from core.config_center import ConfigCenter
-from core.llm_manager import LLMConfigManager
 from core.redaction import redact_sensitive
+from core.services import LLMService
 from core.tui.app import apply_status_style
 from core.tui.i18n import t
 
@@ -21,29 +20,32 @@ class LLMScreenController:
 
     def __init__(self, project_root: Path | str | None = None) -> None:
         self.project_root = Path(project_root) if project_root else Path.cwd()
-        self.config_path = self.project_root / ".supermedicine" / "config.yaml"
-        self.manager = LLMConfigManager(ConfigCenter(self.config_path))
+        self.service = LLMService(self.project_root, restore_on_startup=True)
 
     def list_providers(self) -> dict[str, Any]:
-        return self.manager.list_providers(redacted=True)
+        result = self.service.list_providers()
+        data = self.service.legacy_result(result)
+        return data.get("providers", {}) if isinstance(data, dict) else {}
 
     def current_provider(self) -> dict[str, Any]:
-        return self.manager.get_current_provider(redacted=True)
+        result = self.service.show_provider()
+        data = self.service.legacy_result(result)
+        return data if isinstance(data, dict) else {}
 
     def readiness(self) -> dict[str, Any]:
         current = self.current_provider()
         provider = str(current.get("provider") or "")
         if not provider:
             return {"ok": False, "provider": "", "message": t("llm_not_ready")}
-        validation = self.manager.validate_provider(provider)
-        if validation is None:
+        validation = self.service.validate_provider(provider)
+        if validation.ok:
             return {"ok": True, "provider": provider, "message": t("llm_ready")}
         return {
             "ok": False,
             "provider": provider,
             "message": str(
                 redact_sensitive(
-                    validation.get("error", {}).get("message") or t("llm_not_ready")
+                    validation.error.message if validation.error else t("llm_not_ready")
                 )
             ),
         }
@@ -65,16 +67,24 @@ class LLMScreenController:
         }
         if api_format.strip():
             values["api_format"] = api_format.strip()
-        return self.manager.add_provider(provider, values, set_current=set_current)
+        return self.service.legacy_result(
+            self.service.add_provider(provider, values, set_current=set_current)
+        )
 
     def switch_provider(self, provider: str) -> dict[str, Any]:
-        return self.manager.switch_provider(provider)
+        return self.service.legacy_result(self.service.switch_provider(provider))
 
     def delete_provider(self, provider: str) -> dict[str, Any]:
-        return self.manager.delete_provider(provider)
+        return self.service.legacy_result(self.service.delete_provider(provider))
 
     def save_exit_state(self) -> dict[str, Any]:
-        return self.manager.save_exit_state()
+        return self.service.legacy_result(self.service.save_exit_state())
+
+    def provider_is_valid(self, provider: str) -> bool:
+        return self.service.validate_provider(provider).ok
+
+    def validate_provider(self, provider: str) -> dict[str, Any]:
+        return self.service.legacy_result(self.service.validate_provider(provider))
 
 
 class LLMView(Vertical):
@@ -143,7 +153,7 @@ class LLMView(Vertical):
             options.append((provider_name, provider_name))
             status = (
                 t("llm_ready")
-                if self.controller.manager.validate_provider(provider_name) is None
+                if self.controller.provider_is_valid(provider_name)
                 else t("llm_not_ready")
             )
             table.add_row(

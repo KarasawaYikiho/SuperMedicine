@@ -2627,7 +2627,7 @@ def test_tui_controller_readiness_message_redacts_api_key(tmp_path):
         model="",
         set_current=False,
     )
-    switch_result = controller.manager.switch_provider("needs-model", save=False)
+    switch_result = controller.validate_provider("needs-model")
     readiness = controller.readiness()
 
     assert result["ok"] is True

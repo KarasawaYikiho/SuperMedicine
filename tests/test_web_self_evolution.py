@@ -125,9 +125,14 @@ def test_unexpected_api_failure_returns_http_server_error(monkeypatch):
 
 
 def test_llm_provider_list_uses_frontend_provider_schema(monkeypatch):
-    class FakeCLI:
-        def llm_list(self):
-            return {
+    from core.services import ServiceResult
+
+    class FakeLLMService:
+        def __init__(self, project_root):
+            pass
+
+        def list_providers(self):
+            return ServiceResult.success({
                 "current_provider": "openai",
                 "last_provider": "anthropic",
                 "providers": {
@@ -149,10 +154,10 @@ def test_llm_provider_list_uses_frontend_provider_schema(monkeypatch):
                         "headers": {},
                     },
                 },
-            }
+            })
 
-    monkeypatch.setattr("cli_entry.CLI", FakeCLI)
     from core.web.server import create_app
+    monkeypatch.setattr("core.web.server.LLMService", FakeLLMService)
 
     response = TestClient(create_app()).get("/api/v1/llm/providers")
 

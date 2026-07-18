@@ -327,30 +327,3 @@ def _parse_llm_headers(
             raise ValueError("--header key cannot be empty")
         headers[key] = value
     return headers
-
-
-def _llm_provider_values(
-    *,
-    api_format: str | None = None,
-    base_url: str | None = None,
-    api_key: str | None = None,
-    api_key_env: str | None = None,
-    model: str | None = None,
-    timeout: float | None = None,
-    headers: dict | None = None,
-) -> dict:
-    """Build provider values for LLMConfigManager without duplicating persistence logic."""
-    values: dict = {}
-    for key, value in {
-        "api_format": api_format,
-        "base_url": base_url,
-        "api_key": api_key,
-        "api_key_env": api_key_env,
-        "model": model,
-        "timeout": timeout,
-    }.items():
-        if value is not None:
-            values[key] = value
-    if headers:
-        values["headers"] = headers
-    return values

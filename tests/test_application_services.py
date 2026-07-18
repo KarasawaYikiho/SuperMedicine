@@ -92,3 +92,38 @@ def test_workspace_service_delete_confirmation_failure_is_stable_and_audited(
     entry = json.loads(audit_path.read_text(encoding="utf-8").splitlines()[-1])
     assert entry["action"] == "workspace.delete"
     assert entry["result"] == "cancelled"
+
+
+def test_llm_service_add_list_switch_share_one_result_contract(tmp_path):
+    from core.services import LLMService
+
+    service = LLMService(tmp_path)
+    added = service.add_provider(
+        "openai",
+        {
+            "base_url": "https://openai.test/v1",
+            "api_key": "sk-service-secret",
+            "model": "gpt-test",
+        },
+        set_current=True,
+        request_id="llm-add-1",
+    )
+    listed = service.list_providers(request_id="llm-list-1")
+    switched = service.switch_provider("openai", request_id="llm-switch-1")
+
+    assert added.ok is True
+    assert switched.ok is True
+    assert listed.data["current_provider"] == "openai"
+    assert listed.data["providers"]["openai"]["api_key"] == "[REDACTED]"
+    assert "sk-service-secret" not in str(added.to_dict())
+    assert listed.meta == {"service": "llm", "operation": "list_providers"}
+
+
+def test_llm_service_failure_preserves_manager_error_code(tmp_path):
+    from core.services import LLMService
+
+    result = LLMService(tmp_path).switch_provider("missing")
+
+    assert result.ok is False
+    assert result.error.code == "provider_not_found"
+    assert result.to_dict()["error"]["details"]["provider"] == "missing"

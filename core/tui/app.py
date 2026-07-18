@@ -20,7 +20,7 @@ from textual.widgets import Input, ListView, Static
 from textual.timer import Timer
 
 from core.config_center import ConfigCenter
-from core.llm_manager import LLMConfigManager
+from core.services import LLMService
 from core.tui.i18n import LABELS, t
 from core.tui.opentui_runtime import (
     OpenTUIRuntimeError,
@@ -895,16 +895,16 @@ class SuperMedicineTUI(App[Any]):
             "message": f"{header}\n{t('chat_result_output')}:\n{output}",
         }
 
-    def _llm_manager(self) -> LLMConfigManager:
-        config_path = self.project_root / ".supermedicine" / "config.yaml"
-        return LLMConfigManager(ConfigCenter(config_path))
+    def _llm_service(self) -> LLMService:
+        return LLMService(self.project_root, restore_on_startup=True)
 
     def _llm_status_label(self) -> str:
         try:
-            manager = self._llm_manager()
-            current = manager.get_current_provider(redacted=True)
+            service = self._llm_service()
+            current_result = service.show_provider()
+            current = current_result.data or {} if current_result.ok else {}
             provider = str(current.get("provider") or "")
-            if provider and manager.validate_provider(provider) is None:
+            if provider and service.validate_provider(provider).ok:
                 return f"🤖 {provider} {t('llm_ready')}"
             return f"🤖 {t('llm_not_ready')}"
         except Exception:
@@ -928,7 +928,7 @@ class SuperMedicineTUI(App[Any]):
 
     def _save_llm_exit_state(self) -> None:
         try:
-            self._llm_manager().save_exit_state()
+            self._llm_service().save_exit_state()
         except Exception:
             pass
 

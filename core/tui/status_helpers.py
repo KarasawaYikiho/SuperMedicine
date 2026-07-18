@@ -7,8 +7,7 @@ from pathlib import Path
 
 from textual.widgets import Static
 
-from core.config_center import ConfigCenter
-from core.llm_manager import LLMConfigManager
+from core.services import LLMService
 from core.tui.i18n import t
 
 
@@ -66,15 +65,13 @@ def _console_safe_text(value: str, encoding: str | None = None) -> str:
 
 def _describe_llm_status(project_root: Path | str) -> tuple[bool, str]:
     try:
-        root = Path(project_root)
-        manager = LLMConfigManager(
-            ConfigCenter(root / ".supermedicine" / "config.yaml")
-        )
-        current = manager.get_current_provider(redacted=True)
+        service = LLMService(Path(project_root), restore_on_startup=True)
+        current_result = service.show_provider()
+        current = current_result.data or {} if current_result.ok else {}
         provider = str(current.get("provider") or "")
         if not provider:
             return False, ""
-        return manager.validate_provider(provider) is None, provider
+        return service.validate_provider(provider).ok, provider
     except Exception as exc:
         logger.warning(
             "TUI LLM status diagnostic failed: stage=config project_root=%s error=%s",
