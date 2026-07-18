@@ -9,6 +9,8 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+from plugins.tools._common import validate_survival_sample
+
 
 @dataclass
 class KMSurvivalPoint:
@@ -44,12 +46,7 @@ def kaplan_meier(times: list[float], events: list[int]) -> KMResult:
     Returns:
         KMResult 包含生存曲线数据点和中位生存时间
     """
-    if len(times) != len(events):
-        raise ValueError("Times 和 Events 长度必须相同")
-    if len(times) == 0:
-        raise ValueError("数据不能为空")
-    if any(event not in (0, 1) for event in events):
-        raise ValueError("Events 必须只包含 0 或 1")
+    validate_survival_sample(times, events)
 
     n = len(times)
 

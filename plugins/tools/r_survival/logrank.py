@@ -9,6 +9,8 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+from plugins.tools._common import validate_survival_sample
+
 
 @dataclass
 class LogRankResult:
@@ -39,12 +41,8 @@ def logrank_test(
     Returns:
         LogRankResult 包含检验统计量和 p 值
     """
-    if len(times1) != len(events1) or len(times2) != len(events2):
-        raise ValueError("时间和事件列表长度必须相同")
-    if not times1 or not times2:
-        raise ValueError("每组数据不能为空")
-    if any(event not in (0, 1) for event in events1 + events2):
-        raise ValueError("事件指示必须只包含 0 或 1")
+    validate_survival_sample(times1, events1, label="group 1")
+    validate_survival_sample(times2, events2, label="group 2")
 
     n1 = len(times1)
     n2 = len(times2)

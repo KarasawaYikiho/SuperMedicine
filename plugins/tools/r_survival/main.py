@@ -13,6 +13,7 @@ from functools import lru_cache
 from typing import Any
 
 from plugins.base_plugin import plugin_result
+from core.serialization import json_ready
 from plugins.tools._common import as_float_groups, as_float_list, param_or_default
 
 from .kaplan_meier import kaplan_meier
@@ -174,24 +175,7 @@ def _r_backend_status() -> dict[str, Any]:
 
 def km_tool(times: list[float], events: list[int]) -> dict:
     """Kaplan-Meier 生存分析工具接口"""
-    result = kaplan_meier(times, events)
-    return {
-        "time_points": [
-            {
-                "time": p.time,
-                "survival_prob": p.survival_prob,
-                "confidence_lower": p.confidence_lower,
-                "confidence_upper": p.confidence_upper,
-                "at_risk": p.at_risk,
-                "events": p.events,
-                "censored": p.censored,
-            }
-            for p in result.time_points
-        ],
-        "median_survival": result.median_survival,
-        "total_subjects": result.total_subjects,
-        "total_events": result.total_events,
-    }
+    return json_ready(kaplan_meier(times, events))
 
 
 def logrank_tool(
@@ -201,14 +185,7 @@ def logrank_tool(
     events2: list[int],
 ) -> dict:
     """Log-Rank 检验工具接口"""
-    result = logrank_test(times1, events1, times2, events2)
-    return {
-        "statistic": result.statistic,
-        "p_value": result.p_value,
-        "df": result.df,
-        "median_group1": result.median_group1,
-        "median_group2": result.median_group2,
-    }
+    return json_ready(logrank_test(times1, events1, times2, events2))
 
 
 def cox_tool(
@@ -217,17 +194,7 @@ def cox_tool(
     covariates: list[list[float]],
 ) -> dict:
     """Cox 比例风险模型工具接口"""
-    result = cox_ph(times, events, covariates)
-    return {
-        "coefficients": result.coefficients,
-        "hazard_ratios": result.hazard_ratios,
-        "standard_errors": result.standard_errors,
-        "confidence_intervals": [list(ci) for ci in result.confidence_intervals],
-        "p_values": result.p_values,
-        "log_likelihood": result.log_likelihood,
-        "n_subjects": result.n_subjects,
-        "n_events": result.n_events,
-    }
+    return json_ready(cox_ph(times, events, covariates))
 
 
 def km_tool_r(times: list[float], events: list[int]) -> dict[str, Any]:

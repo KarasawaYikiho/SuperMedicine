@@ -10,7 +10,11 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from plugins.tools._common import normal_cdf
+from plugins.tools._common import (
+    normal_cdf,
+    validate_survival_covariates,
+    validate_survival_sample,
+)
 
 
 @dataclass
@@ -46,16 +50,8 @@ def cox_ph(
     n = len(times)
     n_covs = len(covariates)
 
-    if len(times) != len(events):
-        raise ValueError("时间和事件列表长度必须相同")
-    if n == 0:
-        raise ValueError("数据不能为空")
-    if any(event not in (0, 1) for event in events):
-        raise ValueError("事件指示必须只包含 0 或 1")
-    if n_covs == 0:
-        raise ValueError("至少需要一个协变量")
-    if any(len(covariate) != n for covariate in covariates):
-        raise ValueError("每个协变量长度必须与观察时间长度相同")
+    validate_survival_sample(times, events)
+    validate_survival_covariates(covariates, n)
 
     # 初始化系数
     beta = [0.0] * n_covs
