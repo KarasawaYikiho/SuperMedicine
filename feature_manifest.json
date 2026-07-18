@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "implementation_baseline": "db74254255ef3815f05c4c130dfd95077db23225",
+  "audit_reference": "49ac6f88264fe4e06090af39154f2a089a18d8ef",
+  "baseline_relationship": "audit_reference_is_not_an_ancestor_of_implementation_baseline",
+  "metrics": {
+    "feature_id_count": 14
+  },
+  "features": [
+    {
+      "feature_id": "cli:supermedicine",
+      "category": "cli",
+      "entrypoint": "cli:supermedicine",
+      "expected_result": "Runs the packaged command facade.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_has_unique_ids_and_required_contract_fields"
+    },
+    {
+      "feature_id": "cli:status",
+      "category": "cli_command",
+      "entrypoint": "cli:status",
+      "expected_result": "Reports project status.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_has_unique_ids_and_required_contract_fields"
+    },
+    {
+      "feature_id": "cli:diagnose",
+      "category": "cli_command",
+      "entrypoint": "cli:diagnose",
+      "expected_result": "Reports redacted diagnostics.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_has_unique_ids_and_required_contract_fields"
+    },
+    {
+      "feature_id": "plugin:rag-interface",
+      "category": "plugin",
+      "entrypoint": "plugin:rag-interface",
+      "expected_result": "Provides local and permission-governed retrieval actions.",
+      "contract_test": "tests/feature_contract/test_runtime_contract.py::test_required_plugins_are_discovered",
+      "required": true,
+      "default_enabled": true
+    },
+    {
+      "feature_id": "plugin:harness-core",
+      "category": "plugin",
+      "entrypoint": "plugin:harness-core",
+      "expected_result": "Provides checkpoint verification and monitoring actions.",
+      "contract_test": "tests/feature_contract/test_runtime_contract.py::test_required_plugins_are_discovered",
+      "required": true,
+      "default_enabled": true
+    },
+    {
+      "feature_id": "agent:alpha",
+      "category": "multi_agent_role",
+      "entrypoint": "agent:alpha",
+      "expected_result": "Performs analysis.",
+      "contract_test": "tests/feature_contract/test_runtime_contract.py::test_four_agent_roles_are_preserved",
+      "preserved": true,
+      "optional_enabled": true
+    },
+    {
+      "feature_id": "agent:beta",
+      "category": "multi_agent_role",
+      "entrypoint": "agent:beta",
+      "expected_result": "Performs review.",
+      "contract_test": "tests/feature_contract/test_runtime_contract.py::test_four_agent_roles_are_preserved",
+      "preserved": true,
+      "optional_enabled": true
+    },
+    {
+      "feature_id": "agent:gamma",
+      "category": "multi_agent_role",
+      "entrypoint": "agent:gamma",
+      "expected_result": "Performs writing.",
+      "contract_test": "tests/feature_contract/test_runtime_contract.py::test_four_agent_roles_are_preserved",
+      "preserved": true,
+      "optional_enabled": true
+    },
+    {
+      "feature_id": "agent:delta",
+      "category": "multi_agent_role",
+      "entrypoint": "agent:delta",
+      "expected_result": "Performs orchestration.",
+      "contract_test": "tests/feature_contract/test_runtime_contract.py::test_four_agent_roles_are_preserved",
+      "preserved": true,
+      "optional_enabled": true
+    },
+    {
+      "feature_id": "adapter:standalone",
+      "category": "adapter",
+      "entrypoint": "adapter:standalone",
+      "expected_result": "Provides the standalone host adapter.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_has_unique_ids_and_required_contract_fields"
+    },
+    {
+      "feature_id": "adapter:opencode",
+      "category": "adapter",
+      "entrypoint": "adapter:opencode",
+      "expected_result": "Provides the OpenCode host adapter.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_has_unique_ids_and_required_contract_fields"
+    },
+    {
+      "feature_id": "adapter:claude-code",
+      "category": "adapter",
+      "entrypoint": "adapter:claude-code",
+      "expected_result": "Provides the Claude Code host adapter.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_has_unique_ids_and_required_contract_fields"
+    },
+    {
+      "feature_id": "installer:install",
+      "category": "installer",
+      "entrypoint": "installer:install_entry.py",
+      "expected_result": "Provides the installation entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_has_unique_ids_and_required_contract_fields"
+    },
+    {
+      "feature_id": "installer:uninstall",
+      "category": "installer",
+      "entrypoint": "installer:uninstall_entry.py",
+      "expected_result": "Provides the uninstall entrypoint.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_has_unique_ids_and_required_contract_fields"
+    }
+  ]
+}
