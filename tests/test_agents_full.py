@@ -12,7 +12,7 @@ from agents.roles import DeltaAgent
 from agents.orchestrator import Orchestrator
 from agents.roles import BaseAgent
 from agents.checkpoint import CheckpointManager
-from agents.state_machine import TaskState, StateMachine
+from agents.orchestrator import StateMachine, TaskState
 
 
 # ═══ Agent Unit Tests ═══
@@ -447,15 +447,18 @@ class TestOrchestrator:
         assert latest["agent_id"] == "a"
         assert len(latest["stage_history"]) >= 4
 
-    def test_failure_checkpoint_is_not_recoverable(self, tmp_path):
+    def test_failure_checkpoint_is_recoverable_and_dispatch_can_resume(self, tmp_path):
         orch = Orchestrator(checkpoint_manager=CheckpointManager(tmp_path))
         orch.register_agent(FailingAgent("a", "r"))
         with pytest.raises(RuntimeError):
             orch.dispatch("a", {"task_id": "task-fail", "token": "secret"})
         report = orch.recovery_report("task-fail")
-        assert report["recoverable"] is False
-        assert "manual review" in report["reason"]
+        assert report["recoverable"] is True
         assert report["checkpoint"]["input_summary"]["token"] == "[REDACTED]"
+
+        orch.register_agent(DummyAgent("a", "r"))
+        resumed = orch.dispatch("a", {"task_id": "task-fail", "action": "retry"})
+        assert resumed["state"] == "completed"
 
 
 # ═══ State Machine Tests ═══
@@ -536,4 +539,4 @@ class TestStateMachine:
         sm.transition(TaskState.DISPATCH)
         sm.transition(TaskState.RUNNING)
         sm.transition(TaskState.FAILED)
-        assert sm.snapshot()["recoverable"] is False
+        assert sm.snapshot()["recoverable"] is True

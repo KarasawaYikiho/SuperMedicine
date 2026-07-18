@@ -90,6 +90,18 @@ class TestKernel:
         assert captured["task"] == "coordinated research task"
         assert captured["rag_context"].status == "empty"
 
+    def test_enabled_multi_agent_pipeline_executes_all_four_roles(self, tmp_path):
+        kernel = self._create_kernel(tmp_path)
+        kernel.config.set_multi_agent_enabled(True)
+
+        result = kernel.execute_task("prepare a structured research summary")
+
+        assert result["status"] == "success"
+        assert result["agent"] == "gamma"
+        assert result["metadata"]["chain"] == ["delta", "alpha", "beta", "gamma"]
+        assert result["metadata"]["beta_result"]["approved"] is True
+        assert result["output"].startswith("# Task:")
+
     def test_kernel_permission_engine_is_runtime_gate_not_prompt_generator(
         self, tmp_path
     ):

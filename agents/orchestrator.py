@@ -28,7 +28,7 @@ VALID_TRANSITIONS: dict[TaskState, list[TaskState]] = {
     TaskState.VERIFYING: [TaskState.COMPLETED, TaskState.RETRY],
     TaskState.RETRY: [TaskState.DISPATCH],
     TaskState.COMPLETED: [],
-    TaskState.FAILED: [],
+    TaskState.FAILED: [TaskState.RETRY],
 }
 
 
@@ -90,7 +90,9 @@ class StateMachine:
         )
 
     def can_resume(self) -> bool:
-        return self.state not in {TaskState.COMPLETED, TaskState.FAILED}
+        return (
+            self.state != TaskState.COMPLETED and self.retry_count < self._max_retries
+        )
 
     def snapshot(self) -> dict[str, Any]:
         return {
@@ -177,12 +179,21 @@ class Orchestrator:
             or f"task-{len(self._task_states) + 1}"
         )
         state_key = f"{task_id}:{agent_id}"
-        machine = self._task_states.get(state_key) or StateMachine(task_id=task_id)
+        machine = self._task_states.get(state_key)
+        if machine is None or machine.state == TaskState.COMPLETED:
+            machine = StateMachine(task_id=task_id)
         self._task_states[state_key] = machine
         if machine.state == TaskState.PLANNING:
             machine.transition(
                 TaskState.DISPATCH,
                 status="agent_selected",
+                details={"agent_id": agent_id},
+            )
+        elif machine.state == TaskState.FAILED:
+            machine.transition(TaskState.RETRY, status="resume_requested")
+            machine.transition(
+                TaskState.DISPATCH,
+                status="agent_reselected",
                 details={"agent_id": agent_id},
             )
         self._save_stage(
@@ -281,8 +292,12 @@ class Orchestrator:
                 state=TaskState.FAILED,
                 task=task,
                 error=str(exc),
-                recoverable=False,
-                not_recoverable_reason="Agent execution raised an exception; manual review required before retry.",
+                recoverable=machine.can_resume(),
+                not_recoverable_reason=(
+                    None
+                    if machine.can_resume()
+                    else "Agent execution exceeded the configured retry limit."
+                ),
             )
             raise
 
