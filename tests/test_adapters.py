@@ -14,7 +14,7 @@ from typing import TypeVar
 import pytest
 import yaml
 
-from adapters.base_adapter import BaseAdapter
+from adapters.base_adapter import AdapterProtocol, BaseAdapter
 from adapters.claude_code import ClaudeCodeAdapter
 from adapters.opencode.adapter import OpenCodeAdapter
 from adapters.standalone.adapter import StandaloneAdapter
@@ -133,6 +133,7 @@ class TestClaudeCodeAdapter:
         _write_policy(tmp_path)
         adapter = ClaudeCodeAdapter(project_dir=tmp_path)
         assert isinstance(adapter, BaseAdapter)
+        assert isinstance(adapter, AdapterProtocol)
 
     def test_explicit_optional_import_degrades_without_claude_runtime(
         self, tmp_path, monkeypatch

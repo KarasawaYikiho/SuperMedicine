@@ -1,6 +1,7 @@
 """Shared application services used by CLI, TUI, Web, and GUI adapters."""
 
 from core.services.agent_harness import AgentHarnessService
+from core.services.adapter import AdapterService
 from core.services.experiment_tool import ExperimentToolService
 from core.services.experience_evolution import ExperienceEvolutionService
 from core.services.llm import LLMService
@@ -11,6 +12,7 @@ from core.services.workspace import WorkspaceService
 
 __all__ = [
     "AgentHarnessService",
+    "AdapterService",
     "ExperimentToolService",
     "ExperienceEvolutionService",
     "LLMService",

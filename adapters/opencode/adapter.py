@@ -11,9 +11,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from adapters.base_adapter import BaseAdapter
+from adapters.base_adapter import ADAPTER_HOST_CONFIGS, BaseAdapter
 from core.redaction import redact_sensitive
-from permission.engine import PermissionEngine
 
 
 class OpenCodeAdapter(BaseAdapter):
@@ -100,11 +99,14 @@ class OpenCodeAdapter(BaseAdapter):
         "degraded_without_orchestrator": True,
         "boundary": "Optional add-on; provider config is supplied by installer/runtime/project config and is visible only through the SuperMedicine OpenCode agent surface.",
     }
+    DEFAULT_AGENT_ID = "beta"
+    HOST_CONFIG = ADAPTER_HOST_CONFIGS["opencode"]
+    REGISTRATION_EXTRAS = {"ai_provider_support": AI_PROVIDER_SUPPORT}
 
     def __init__(
         self,
         orchestrator=None,
-        permission_engine: PermissionEngine | None = None,
+        permission_engine=None,
         project_dir: Path | None = None,
         default_agent_id: str = "beta",
     ):
@@ -122,31 +124,6 @@ class OpenCodeAdapter(BaseAdapter):
         "gamma": "Manuscript composition and formatting",
         "delta": "Workflow coordination and dispatch",
     }
-
-    @property
-    def platform_name(self) -> str:
-        return "opencode"
-
-    @property
-    def registration(self) -> dict[str, Any]:
-        """Return adapter discovery metadata for registries and callers."""
-        return {
-            "platform": self.platform_name,
-            "adapter_class": self.__class__.__name__,
-            "status": "optional_add_on",
-            "optional": True,
-            "core": False,
-            "default": False,
-            "module": "adapters.opencode.adapter",
-            "capability_tool": "opencode.capabilities",
-            "requires_core_runtime": False,
-            "ai_provider_support": self.AI_PROVIDER_SUPPORT,
-            "limitations": [
-                "Optional add-on; not imported, initialized, or probed by default.",
-                "Native OpenCode dispatch requires an explicit orchestrator/runtime bridge.",
-                "Only SuperMedicine is exposed as a user-facing platform agent; alpha/beta/gamma/delta files are internal role context only.",
-            ],
-        }
 
     def capabilities(self) -> dict[str, Any]:
         """Report OpenCode adapter features and limitations truthfully."""
@@ -194,8 +171,8 @@ class OpenCodeAdapter(BaseAdapter):
             "edit": self._tool_edit,
             "glob": self._tool_glob,
             "grep": self._tool_grep,
-            "skill": self._tool_skill,
-            "task": self._tool_task,
+            "skill": lambda values: self._delegate_tool(values, "skill", "alpha"),
+            "task": lambda values: self._delegate_tool(values, "task", "alpha"),
             "opencode.capabilities": lambda _params: self.capabilities(),
         }
         result = self._execute_permissioned_tool_call(
@@ -214,18 +191,6 @@ class OpenCodeAdapter(BaseAdapter):
             degraded.setdefault("tool", tool_id)
             return degraded
         return result
-
-    def _tool_skill(self, params: dict[str, Any]) -> str:
-        """加载技能（委托给 skill_load）"""
-        skill_name = params.get("name", "")
-        return self.skill_load(skill_name)
-
-    def _tool_task(self, params: dict[str, Any]) -> dict[str, Any]:
-        """派发子代理任务（委托给 subagent_dispatch）"""
-        agent_id = params.get("agent_id", params.get("subagent_type", "alpha"))
-        task = params.get("task", params.get("prompt", ""))
-        task_dict = task if isinstance(task, dict) else {"description": task}
-        return self.subagent_dispatch(agent_id, task_dict)
 
     # ── skill_load ─────────────────────────────────────────────
 
