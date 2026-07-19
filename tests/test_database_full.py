@@ -435,7 +435,7 @@ def _make_kernel(tmp_path: Path) -> Kernel:
     )
     return Kernel(
         config_path=config_path,
-        plugins_dir="plugins",
+        plugins_dir=Path("plugins"),
         policies_dir=tmp_path / "policies",
     )
 

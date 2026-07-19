@@ -21,10 +21,10 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
         python-version: ["3.10", "3.11", "3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -75,15 +75,15 @@ jobs:
       release_title: ${{ steps.source_zip.outputs.release_title }}
       archive_name: ${{ steps.source_zip.outputs.archive_name }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
       - name: Set up Node.js for OpenTUI dependency install
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: npm
@@ -142,7 +142,7 @@ jobs:
           python scripts/ci/build_release_zip.py
 
       - name: Upload release Zip artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.source_zip.outputs.release_label }}
           path: ${{ steps.source_zip.outputs.archive_name }}
@@ -161,12 +161,12 @@ jobs:
       RELEASE_TITLE: ${{ needs.packaging-smoke.outputs.release_title }}
       ARCHIVE_NAME: ${{ needs.packaging-smoke.outputs.archive_name }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Download release Zip artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: ${{ needs.packaging-smoke.outputs.release_label }}
           path: release-artifacts

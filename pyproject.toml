@@ -122,6 +122,8 @@ module = [
     "PIL",
     "PIL.*",
     "pypdf",
+    "pypdf.*",
+    "webview",
     "PyPDF2",
     "scienceplots",
     "numpy",
