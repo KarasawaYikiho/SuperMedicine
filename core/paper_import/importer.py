@@ -5,18 +5,17 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from core.paper_import.errors import (
+from core.paper_import.contracts import (
     MissingPaperSourceError,
-    UnsupportedPaperFormatError,
-)
-from core.paper_import.models import (
     SUPPORTED_PAPER_EXTENSIONS,
     PaperImportResult,
     PaperMetadata,
+    UnsupportedPaperFormatError,
 )
 from core.path_safety import _is_relative_to, validate_path_in_project_root
 from core.rag_service import RAGService
@@ -33,6 +32,14 @@ _EDITABLE_METADATA_FIELDS: tuple[str, ...] = (
     "notes",
     "tags",
 )
+
+
+@dataclass(frozen=True)
+class _ImportPaths:
+    stored: Path
+    metadata: Path
+    metadata_dir: Path
+    log: Path
 
 
 def _metadata_value(metadata: PaperMetadata | dict[str, Any] | None, field: str) -> Any:
@@ -92,107 +99,114 @@ class PaperImporter:
     ) -> PaperImportResult:
         """Copy *source_path* into *workspace_id* and persist metadata/log records."""
 
+        source, extension, source_bytes, sha256 = self._read_source(source_path)
         workspace = self.workspace_manager.get_workspace(workspace_id)
+        paths = self._prepare_import_paths(workspace, sha256, extension)
+        now = utc_now_datetime()
+        duplicate = self._duplicate_result(
+            paths, source, sha256, now, metadata
+        )
+        if duplicate is not None:
+            return duplicate
+        return self._store_new_paper(
+            workspace, paths, source, extension, source_bytes, sha256, now, metadata
+        )
+
+    @staticmethod
+    def _read_source(source_path: str | Path) -> tuple[Path, str, bytes, str]:
         source = Path(source_path).expanduser()
         if not source.exists() or not source.is_file():
             raise MissingPaperSourceError(
                 f"Paper source must exist and be a file: {source}"
             )
-
         extension = source.suffix.lower()
         if extension not in SUPPORTED_PAPER_EXTENSIONS:
             raise UnsupportedPaperFormatError(
                 f"Unsupported paper format: {extension or '<none>'}"
             )
-
         source_bytes = source.read_bytes()
-        sha256 = hashlib.sha256(source_bytes).hexdigest()
-        now = utc_now_datetime()
+        return source, extension, source_bytes, hashlib.sha256(source_bytes).hexdigest()
 
-        originals_dir = self._workspace_child(workspace, "papers", "originals")
-        metadata_dir = self._workspace_child(workspace, "papers", "metadata")
-        imports_dir = self._workspace_child(workspace, "papers", "imports")
-        originals_dir.mkdir(parents=True, exist_ok=True)
-        metadata_dir.mkdir(parents=True, exist_ok=True)
-        imports_dir.mkdir(parents=True, exist_ok=True)
-
-        stored_path = self._workspace_child(
-            workspace, "papers", "originals", f"{sha256}{extension}"
-        )
-        metadata_path = self._workspace_child(
-            workspace,
-            "papers",
-            "metadata",
-            f"{sha256}.json",
-        )
-        import_log_path = self._workspace_child(
-            workspace,
-            "papers",
-            "imports",
-            "import-log.jsonl",
+    def _prepare_import_paths(
+        self, workspace: WorkspaceInfo, sha256: str, extension: str
+    ) -> _ImportPaths:
+        originals = self._workspace_child(workspace, "papers", "originals")
+        metadata = self._workspace_child(workspace, "papers", "metadata")
+        imports = self._workspace_child(workspace, "papers", "imports")
+        for directory in (originals, metadata, imports):
+            directory.mkdir(parents=True, exist_ok=True)
+        return _ImportPaths(
+            stored=self._workspace_child(
+                workspace, "papers", "originals", f"{sha256}{extension}"
+            ),
+            metadata=self._workspace_child(
+                workspace, "papers", "metadata", f"{sha256}.json"
+            ),
+            metadata_dir=metadata,
+            log=self._workspace_child(
+                workspace, "papers", "imports", "import-log.jsonl"
+            ),
         )
 
-        if metadata_path.exists():
-            existing_metadata = self._load_metadata(metadata_path)
-            duplicate_reason = "sha256_already_imported"
-            self._log_duplicate_import(
-                import_log_path=import_log_path,
-                imported_at=now,
-                paper_id=existing_metadata.id,
-                sha256=sha256,
-                source_path=source,
-                stored_path=existing_metadata.stored_path,
-                metadata_path=metadata_path,
-                duplicate_reason=duplicate_reason,
+    def _duplicate_result(
+        self,
+        paths: _ImportPaths,
+        source: Path,
+        sha256: str,
+        now: datetime,
+        metadata: PaperMetadata | dict[str, Any] | None,
+    ) -> PaperImportResult | None:
+        duplicate = None
+        if paths.metadata.exists():
+            duplicate = (
+                paths.metadata,
+                self._load_metadata(paths.metadata),
+                "sha256_already_imported",
             )
-            return PaperImportResult(
-                metadata=existing_metadata,
-                source_path=source,
-                duplicate=True,
-                duplicate_reason=duplicate_reason,
-            )
+        if duplicate is None:
+            duplicate = self._find_metadata_duplicate(paths.metadata_dir, metadata)
+        if duplicate is None:
+            return None
+        metadata_path, existing, reason = duplicate
+        self._log_duplicate_import(
+            import_log_path=paths.log,
+            imported_at=now,
+            paper_id=existing.id,
+            sha256=sha256,
+            source_path=source,
+            stored_path=existing.stored_path,
+            metadata_path=metadata_path,
+            duplicate_reason=reason,
+        )
+        return PaperImportResult(
+            metadata=existing,
+            source_path=source,
+            duplicate=True,
+            duplicate_reason=reason,
+        )
 
-        metadata_duplicate = self._find_metadata_duplicate(metadata_dir, metadata)
-        if metadata_duplicate is not None:
-            existing_metadata_path, existing_metadata, duplicate_reason = (
-                metadata_duplicate
-            )
-            self._log_duplicate_import(
-                import_log_path=import_log_path,
-                imported_at=now,
-                paper_id=existing_metadata.id,
-                sha256=sha256,
-                source_path=source,
-                stored_path=existing_metadata.stored_path,
-                metadata_path=existing_metadata_path,
-                duplicate_reason=duplicate_reason,
-            )
-            return PaperImportResult(
-                metadata=existing_metadata,
-                source_path=source,
-                duplicate=True,
-                duplicate_reason=duplicate_reason,
-            )
-
-        stored_path.write_bytes(source_bytes)
-
-        paper_metadata = PaperMetadata(
+    def _store_new_paper(
+        self,
+        workspace: WorkspaceInfo,
+        paths: _ImportPaths,
+        source: Path,
+        extension: str,
+        source_bytes: bytes,
+        sha256: str,
+        now: datetime,
+        metadata: PaperMetadata | dict[str, Any] | None,
+    ) -> PaperImportResult:
+        paths.stored.write_bytes(source_bytes)
+        paper = PaperMetadata(
             id=sha256,
             sha256=sha256,
-            stored_path=stored_path,
+            stored_path=paths.stored,
             format=extension,
             imported_at=now,
             updated_at=now,
         )
-        self._apply_editable_metadata(paper_metadata, metadata)
-
-        metadata_path.write_text(
-            json.dumps(
-                json_ready(paper_metadata), ensure_ascii=False, sort_keys=True, indent=2
-            )
-            + "\n",
-            encoding="utf-8",
-        )
+        self._apply_editable_metadata(paper, metadata)
+        self._write_metadata(paths.metadata, paper)
         import_status = "imported"
         import_warnings: list[str] = []
         if extension in {".md", ".txt", ".pdf"}:
@@ -202,7 +216,7 @@ class PaperImporter:
                 if extension == ".pdf":
                     from pypdf import PdfReader
 
-                    reader = PdfReader(stored_path)
+                    reader = PdfReader(paths.stored)
                     page_texts = [
                         (page_number, page.extract_text() or "")
                         for page_number, page in enumerate(reader.pages, start=1)
@@ -217,33 +231,31 @@ class PaperImporter:
                     RAGService.index_workspace_document(
                         workspace.path,
                         text=text,
-                        document_id=paper_metadata.id or sha256,
-                        source_path=stored_path,
-                        title=paper_metadata.title,
+                        document_id=paper.id or sha256,
+                        source_path=paths.stored,
+                        title=paper.title,
                         page_texts=page_texts,
                     )
             except Exception:
                 import_status = "imported_with_index_error"
                 import_warnings.append("rag_index_failed: retry paper indexing")
-
         log_record = {
             "event": "paper_imported",
             "imported_at": now,
-            "paper_id": paper_metadata.id,
+            "paper_id": paper.id,
             "sha256": sha256,
             "source_path": source,
-            "stored_path": stored_path,
-            "metadata_path": metadata_path,
+            "stored_path": paths.stored,
+            "metadata_path": paths.metadata,
             "index_status": import_status,
         }
-        with import_log_path.open("a", encoding="utf-8") as log_file:
+        with paths.log.open("a", encoding="utf-8") as log_file:
             log_file.write(
                 json.dumps(json_ready(log_record), ensure_ascii=False, sort_keys=True)
                 + "\n"
             )
-
         return PaperImportResult(
-            metadata=paper_metadata,
+            metadata=paper,
             source_path=source,
             status=import_status,
             warnings=import_warnings,

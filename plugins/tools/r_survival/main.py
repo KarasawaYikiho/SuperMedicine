@@ -389,20 +389,16 @@ def cox_tool_r(
     }
 
 
-def execute(
-    action: str,
-    params: dict[str, Any] | None = None,
-    context: dict[str, Any] | None = None,
+def _execution_metadata(
+    *,
+    r_backend_requested: bool,
+    r_backend: dict[str, Any],
+    context: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    """真实执行生存分析插件动作（当前阶段接口，不承诺生产级统计）。"""
-    params = params or {}
-    backend = str(params.get("backend", "python")).lower()
-    r_backend_requested = backend in R_BACKEND_REQUEST_VALUES
-    if backend not in R_BACKEND_REQUEST_VALUES | PYTHON_BACKEND_REQUEST_VALUES:
-        backend = "python"
-        r_backend_requested = False
-    r_backend = _r_backend_status()
-    metadata = {
+    selected_backend = (
+        "r" if r_backend_requested and r_backend["available"] else "python"
+    )
+    return {
         "medical_boundary": MEDICAL_BOUNDARY,
         "statistics_boundary": STATISTICS_BOUNDARY,
         "prototype_only": True,
@@ -416,9 +412,7 @@ def execute(
         },
         "r_backend": {
             "requested": r_backend_requested,
-            "selected": "r"
-            if r_backend_requested and r_backend["available"]
-            else "python",
+            "selected": selected_backend,
             "available": r_backend["available"],
             "reason": r_backend.get("reason"),
             "detail": r_backend.get("detail"),
@@ -432,12 +426,87 @@ def execute(
             "prototype_path": True,
             "rpy2_available": r_backend.get("rpy2_available", False),
             "r_backend_available": r_backend["available"],
-            "r_backend_selected": "r"
-            if r_backend_requested and r_backend["available"]
-            else "python",
+            "r_backend_selected": selected_backend,
             "context_keys": sorted((context or {}).keys()),
         },
     }
+
+
+def _execute_km(params: dict[str, Any], *, use_r: bool) -> dict[str, Any]:
+    action = "r.survival.km"
+    times = as_float_list(
+        param_or_default(params, "times", DEFAULT_PARAMS[action]["times"]), "times"
+    )
+    events = _as_event_list(
+        param_or_default(params, "events", DEFAULT_PARAMS[action]["events"]),
+        "events",
+    )
+    return km_tool_r(times, events) if use_r else km_tool(times, events)
+
+
+def _execute_logrank(params: dict[str, Any], *, use_r: bool) -> dict[str, Any]:
+    action = "r.survival.logrank"
+    times1 = as_float_list(
+        param_or_default(params, "times1", DEFAULT_PARAMS[action]["times1"]),
+        "times1",
+    )
+    events1 = _as_event_list(
+        param_or_default(params, "events1", DEFAULT_PARAMS[action]["events1"]),
+        "events1",
+    )
+    times2 = as_float_list(
+        param_or_default(params, "times2", DEFAULT_PARAMS[action]["times2"]),
+        "times2",
+    )
+    events2 = _as_event_list(
+        param_or_default(params, "events2", DEFAULT_PARAMS[action]["events2"]),
+        "events2",
+    )
+    tool = logrank_tool_r if use_r else logrank_tool
+    return tool(times1, events1, times2, events2)
+
+
+def _execute_cox(params: dict[str, Any], *, use_r: bool) -> dict[str, Any]:
+    action = "r.survival.cox"
+    times = as_float_list(
+        param_or_default(params, "times", DEFAULT_PARAMS[action]["times"]), "times"
+    )
+    events = _as_event_list(
+        param_or_default(params, "events", DEFAULT_PARAMS[action]["events"]),
+        "events",
+    )
+    covariates = as_float_groups(
+        param_or_default(params, "covariates", DEFAULT_PARAMS[action]["covariates"]),
+        "covariates",
+    )
+    tool = cox_tool_r if use_r else cox_tool
+    return tool(times, events, covariates)
+
+
+_ACTION_EXECUTORS = {
+    "r.survival.km": _execute_km,
+    "r.survival.logrank": _execute_logrank,
+    "r.survival.cox": _execute_cox,
+}
+
+
+def execute(
+    action: str,
+    params: dict[str, Any] | None = None,
+    context: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Execute a validated survival action with an explicit backend contract."""
+    params = params or {}
+    backend = str(params.get("backend", "python")).lower()
+    r_backend_requested = backend in R_BACKEND_REQUEST_VALUES
+    if backend not in R_BACKEND_REQUEST_VALUES | PYTHON_BACKEND_REQUEST_VALUES:
+        r_backend_requested = False
+    r_backend = _r_backend_status()
+    metadata = _execution_metadata(
+        r_backend_requested=r_backend_requested,
+        r_backend=r_backend,
+        context=context,
+    )
     if r_backend_requested and not r_backend["available"]:
         return plugin_result(
             status="plugin_unavailable",
@@ -446,71 +515,17 @@ def execute(
             error=f"R survival backend unavailable: {r_backend['reason']}",
             metadata=metadata,
         )
+    executor = _ACTION_EXECUTORS.get(action)
+    if executor is None:
+        return plugin_result(
+            status="plugin_error",
+            plugin="r-survival",
+            action=action,
+            error=f"Unsupported r-survival action: {action}",
+            metadata=metadata,
+        )
     try:
-        if action == "r.survival.km":
-            times = as_float_list(
-                param_or_default(params, "times", DEFAULT_PARAMS[action]["times"]),
-                "times",
-            )
-            events = _as_event_list(
-                param_or_default(params, "events", DEFAULT_PARAMS[action]["events"]),
-                "events",
-            )
-            result = (
-                km_tool_r(times, events)
-                if r_backend_requested
-                else km_tool(times, events)
-            )
-        elif action == "r.survival.logrank":
-            times1 = as_float_list(
-                param_or_default(params, "times1", DEFAULT_PARAMS[action]["times1"]),
-                "times1",
-            )
-            events1 = _as_event_list(
-                param_or_default(params, "events1", DEFAULT_PARAMS[action]["events1"]),
-                "events1",
-            )
-            times2 = as_float_list(
-                param_or_default(params, "times2", DEFAULT_PARAMS[action]["times2"]),
-                "times2",
-            )
-            events2 = _as_event_list(
-                param_or_default(params, "events2", DEFAULT_PARAMS[action]["events2"]),
-                "events2",
-            )
-            result = (
-                logrank_tool_r(times1, events1, times2, events2)
-                if r_backend_requested
-                else logrank_tool(times1, events1, times2, events2)
-            )
-        elif action == "r.survival.cox":
-            times = as_float_list(
-                param_or_default(params, "times", DEFAULT_PARAMS[action]["times"]),
-                "times",
-            )
-            events = _as_event_list(
-                param_or_default(params, "events", DEFAULT_PARAMS[action]["events"]),
-                "events",
-            )
-            covariates = as_float_groups(
-                param_or_default(
-                    params, "covariates", DEFAULT_PARAMS[action]["covariates"]
-                ),
-                "covariates",
-            )
-            result = (
-                cox_tool_r(times, events, covariates)
-                if r_backend_requested
-                else cox_tool(times, events, covariates)
-            )
-        else:
-            return plugin_result(
-                status="plugin_error",
-                plugin="r-survival",
-                action=action,
-                error=f"Unsupported r-survival action: {action}",
-                metadata=metadata,
-            )
+        result = executor(params, use_r=r_backend_requested)
     except (TypeError, ValueError, ZeroDivisionError, IndexError) as exc:
         return plugin_result(
             status="plugin_error",

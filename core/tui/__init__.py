@@ -2,10 +2,35 @@
 
 from __future__ import annotations
 
-from core.tui.app import TUIStatus, launch_tui, main
-from core.tui.i18n import LABELS, t
-from core.tui.permissions import TUIToolActionRequest, prepare_tool_action
-from core.tui.state import TUIState, load_recent_workspace, save_recent_workspace
+import sys
+
+from core.tui import support as _support
+
+for _legacy_module in (
+    "dialog_history",
+    "kernel_output",
+    "menu_screens",
+    "nav_widgets",
+    "permissions",
+    "prompt_input",
+    "resources",
+    "state",
+    "status_helpers",
+    "stream_capture",
+    "types",
+):
+    sys.modules.setdefault(f"core.tui.{_legacy_module}", _support)
+    globals()[_legacy_module] = _support
+
+from core.tui.app import TUIStatus, launch_tui, main  # noqa: E402
+from core.tui.i18n import LABELS, t  # noqa: E402
+from core.tui.support import (  # noqa: E402
+    TUIToolActionRequest,
+    TUIState,
+    load_recent_workspace,
+    prepare_tool_action,
+    save_recent_workspace,
+)
 
 # Backward-compatible aliases for legacy Screen class names — resolved lazily
 _SCREEN_ALIASES = {

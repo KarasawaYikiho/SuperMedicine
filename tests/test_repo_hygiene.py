@@ -27,7 +27,7 @@ FRONTEND_STREAMING_HINT_SCAN_PATHS = (
     "core/web/frontend/app.js",
     "core/web/frontend/index.html",
     "core/web/frontend/style.css",
-    "core/tui/screens/chat_view.py",
+    "core/tui/screens/core_views.py",
     "core/tui/i18n.py",
     "core/tui/app.py",
     "core/kernel_llm_chat.py",

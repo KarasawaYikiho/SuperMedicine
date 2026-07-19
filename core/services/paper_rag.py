@@ -6,13 +6,14 @@ from pathlib import Path
 from typing import Any, Callable
 
 from core.paper_import.enrichment import PaperEnricher, PaperEnrichmentResult
-from core.paper_import.errors import (
+from core.paper_import.contracts import (
     MissingPaperSourceError,
     PaperImportError,
+    PaperImportResult,
+    PaperMetadata,
     UnsupportedPaperFormatError,
 )
 from core.paper_import.importer import PaperImporter
-from core.paper_import.models import PaperImportResult, PaperMetadata
 from core.redaction import redact_sensitive
 from core.services.result import ServiceResult
 from core.workspace import InvalidWorkspaceId, WorkspaceError, WorkspaceNotFoundError

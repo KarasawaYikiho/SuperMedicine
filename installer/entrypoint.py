@@ -656,6 +656,203 @@ def _log_interactive_summary(
     logger.info("%s", INSTALLER_RULE)
 
 
+@dataclass
+class _InteractiveInstallPlan:
+    install_path: Path
+    existing_action: str
+    preserve_user_data: bool
+    extract_release: bool
+    selected_components: list[str] | None
+    init_config_enabled: bool
+    llm_config: dict[str, str | None]
+    create_shortcut: bool
+    add_to_path: bool
+    release_exe: Path | None
+
+
+def _load_interactive_components() -> tuple[InstallService | None, dict[str, ComponentDef]]:
+    source_root = _release_entrypoint_dir()
+    try:
+        service = InstallService.from_manifest(
+            source_root / "install.json", source_root=source_root
+        )
+        return service, service.components
+    except (FileNotFoundError, KeyError, ComponentError):
+        return None, {}
+
+
+def _prompt_install_target() -> tuple[Path, str, bool, bool]:
+    install_path = _prompt_path("安装/项目路径", Path.cwd())
+    detection = detect_existing_install(install_path, include_payload=False)
+    existing_action = "ignore"
+    preserve_user_data = True
+    if detection.installed:
+        existing_action = _prompt_existing_install_action(detection)
+        if existing_action == "cancel":
+            return install_path, existing_action, preserve_user_data, False
+        if existing_action == "uninstall":
+            preserve_user_data = _prompt_preserve_user_data()
+    extract_release = _prompt_yes_no(
+        "释放完整程序文件到该目录", bool(getattr(sys, "frozen", False))
+    )
+    return install_path, existing_action, preserve_user_data, extract_release
+
+
+def _prompt_interactive_llm_config(
+    args: argparse.Namespace, install_path: Path, existing_action: str
+) -> tuple[bool, dict[str, str | None]]:
+    enabled = _prompt_yes_no("初始化 .supermedicine 配置", True)
+    empty: dict[str, str | None] = {
+        "provider": None,
+        "base_url": None,
+        "api_key": None,
+        "model": None,
+    }
+    if not enabled:
+        return enabled, empty
+    if existing_action == "update" and (install_path / CONFIG_RELATIVE).is_file():
+        logger.info("更新模式: 跳过 LLM 重新填写，保留现有 config.yaml。")
+        return enabled, empty
+    imported = _load_llm_config_file(args.llm_config) if args.llm_config else {}
+    provider = _resolve_install_value("provider", args.provider) or cast(
+        str | None, imported.get("provider")
+    )
+    normalized = _normalize_provider(provider)
+    return enabled, _collect_interactive_llm_config(
+        provider=normalized,
+        base_url=_resolve_install_value("base_url", args.base_url)
+        or cast(str | None, imported.get("base_url")),
+        api_key=_resolve_api_key(normalized, args.api_key)
+        or cast(str | None, imported.get("api_key")),
+        model=_resolve_install_value("model", args.model)
+        or cast(str | None, imported.get("model")),
+    )
+
+
+def _prompt_interactive_plan(
+    args: argparse.Namespace, components: dict[str, ComponentDef]
+) -> _InteractiveInstallPlan | None:
+    step_total = 5 if components else 4
+    logger.info("\n[1/%d] 选择安装位置", step_total)
+    install_path, action, preserve, extract = _prompt_install_target()
+    if action == "cancel":
+        return None
+    step = 1
+    selected = None
+    if components:
+        step += 1
+        logger.info("\n[%d/%d] 选择安装组件", step, step_total)
+        selected = _prompt_component_selection(components)
+    step += 1
+    logger.info("\n[%d/%d] 初始化项目配置", step, step_total)
+    init_enabled, llm_config = _prompt_interactive_llm_config(
+        args, install_path, action
+    )
+    step += 1
+    logger.info("\n[%d/%d] 可选快捷入口", step, step_total)
+    shortcut = _prompt_yes_no("记录创建快捷方式意向", False)
+    add_to_path = _prompt_yes_no("显示 PATH 手动配置提示", False)
+    release_exe = None
+    if _prompt_yes_no("复制 SuperMedicine.exe 到桌面", bool(args.release_exe)):
+        release_exe = _prompt_path(
+            "Exe 路径", args.release_exe or Path("dist") / "SuperMedicine.exe"
+        )
+    logger.info("\n[%d/%d] 确认安装", step + 1, step_total)
+    return _InteractiveInstallPlan(
+        install_path, action, preserve, extract, selected, init_enabled,
+        llm_config, shortcut, add_to_path, release_exe,
+    )
+
+
+def _confirm_interactive_plan(plan: _InteractiveInstallPlan) -> bool:
+    _log_interactive_summary(
+        install_path=plan.install_path,
+        init_config_enabled=plan.init_config_enabled,
+        provider=plan.llm_config.get("provider"),
+        base_url=plan.llm_config.get("base_url"),
+        model=plan.llm_config.get("model"),
+        create_shortcut=plan.create_shortcut,
+        add_to_path=plan.add_to_path,
+        release_exe=plan.release_exe,
+        extract_release=plan.extract_release,
+        selected_components=plan.selected_components,
+    )
+    return _prompt_yes_no("开始安装", True)
+
+
+def _apply_interactive_config(plan: _InteractiveInstallPlan) -> None:
+    if plan.existing_action == "uninstall":
+        _uninstall_existing_install(
+            plan.install_path, preserve_user_data=plan.preserve_user_data
+        )
+    if not plan.init_config_enabled:
+        return
+    if (
+        plan.existing_action == "update"
+        and (plan.install_path / CONFIG_RELATIVE).is_file()
+    ):
+        _refresh_existing_project_config(plan.install_path)
+    else:
+        init_config(plan.install_path, **plan.llm_config)
+    logger.info("配置完成: %s", plan.install_path / ".supermedicine")
+
+
+def _execute_interactive_plan(
+    args: argparse.Namespace,
+    plan: _InteractiveInstallPlan,
+    service: InstallService | None,
+) -> None:
+    if plan.existing_action == "update":
+        args.extract_overwrite = True
+        args.exe_overwrite = True
+        logger.info("更新模式: 将保留 .supermedicine/config.yaml 和用户数据。")
+    _apply_interactive_config(plan)
+    payload_result = None
+    if plan.extract_release:
+        args.extract_release_to = plan.install_path
+        payload_result = _extract_release_from_args(args)
+    if plan.selected_components and service is not None:
+        component_result = service.install(
+            plan.selected_components,
+            plan.install_path,
+            overwrite=plan.existing_action == "update",
+        )
+        logger.info(
+            "组件安装完成: status=%s files=%d",
+            component_result.get("status"),
+            component_result.get("file_count", 0),
+        )
+    exe_result = None
+    if plan.release_exe:
+        args.release_exe = plan.release_exe
+        if plan.extract_release:
+            _align_release_exe_with_extracted_payload(args)
+        exe_result = _release_exe_from_args(args)
+    if plan.init_config_enabled or plan.extract_release or plan.release_exe or plan.selected_components:
+        write_install_record(
+            plan.install_path,
+            artifacts=_install_record_artifacts_from_results(
+                payload_result=payload_result,
+                exe_result=exe_result,
+                selected_components=plan.selected_components,
+            ),
+            mode="update" if plan.existing_action == "update" else "init",
+        )
+    _log_interactive_completion(plan)
+
+
+def _log_interactive_completion(plan: _InteractiveInstallPlan) -> None:
+    if plan.add_to_path:
+        logger.info(
+            "PATH 提示: 可将 Python Scripts 目录加入系统 PATH，或使用 python Cli.py。"
+        )
+    if plan.create_shortcut:
+        logger.info(
+            "快捷方式提示: 当前版本请手动创建指向 supermedicine 或 python Cli.py 的快捷方式。"
+        )
+    logger.info("安装完成。可运行 python Cli.py status 检查状态。")
+
+
 def _run_interactive_installer(args: argparse.Namespace) -> None:
     logger.info("%s", INSTALLER_RULE)
     logger.info("%s", INSTALLER_TITLE)
@@ -663,196 +860,23 @@ def _run_interactive_installer(args: argparse.Namespace) -> None:
     logger.info("回车使用默认值；API key 不会显示在屏幕上。")
     logger.info("准备: 建议先执行 pip install -e .；命令不可用时可用 python Cli.py。")
 
-    source_root = _release_entrypoint_dir()
-    install_json_path = source_root / "install.json"
-    install_service: InstallService | None = None
-    components: dict[str, ComponentDef] | None = None
-    try:
-        install_service = InstallService.from_manifest(
-            install_json_path, source_root=source_root
-        )
-        components = install_service.components
-    except (FileNotFoundError, KeyError, ComponentError):
-        components = None
-    has_components = components is not None and bool(components)
-    step_total = 5 if has_components else 4
-
+    install_service, components = _load_interactive_components()
     while True:
-        step = 0
-
-        step += 1
-        logger.info("")
-        logger.info("[%d/%d] 选择安装位置", step, step_total)
-        install_path = _prompt_path("安装/项目路径", Path.cwd())
-        detection = detect_existing_install(install_path, include_payload=False)
-        existing_action = "ignore"
-        preserve_user_data = True
-        if detection.installed:
-            existing_action = _prompt_existing_install_action(detection)
-            if existing_action == "cancel":
-                logger.info("安装已取消。")
-                return
-            if existing_action == "uninstall":
-                try:
-                    preserve_user_data = _prompt_preserve_user_data()
-                except KeyboardInterrupt:
-                    continue
-        extract_release = _prompt_yes_no(
-            "释放完整程序文件到该目录", bool(getattr(sys, "frozen", False))
-        )
-
-        selected_components: list[str] | None = None
-        if has_components and components is not None:
-            step += 1
-            logger.info("")
-            logger.info("[%d/%d] 选择安装组件", step, step_total)
-            selected_components = _prompt_component_selection(components)
-
-        step += 1
-        logger.info("")
-        logger.info("[%d/%d] 初始化项目配置", step, step_total)
-        init_config_enabled = _prompt_yes_no("初始化 .supermedicine 配置", True)
-        llm_config: dict[str, str | None] = {
-            "provider": None,
-            "base_url": None,
-            "api_key": None,
-            "model": None,
-        }
-        if (
-            init_config_enabled
-            and existing_action == "update"
-            and (install_path / CONFIG_RELATIVE).is_file()
-        ):
-            logger.info("更新模式: 跳过 LLM 重新填写，保留现有 config.yaml。")
-        elif init_config_enabled:
-            imported_config = (
-                _load_llm_config_file(args.llm_config) if args.llm_config else {}
-            )
-            provider = _resolve_install_value("provider", args.provider) or cast(
-                str | None, imported_config.get("provider")
-            )
-            base_url = _resolve_install_value("base_url", args.base_url) or cast(
-                str | None, imported_config.get("base_url")
-            )
-            model = _resolve_install_value("model", args.model) or cast(
-                str | None, imported_config.get("model")
-            )
-            normalized_provider = _normalize_provider(provider)
-            api_key = _resolve_api_key(normalized_provider, args.api_key) or cast(
-                str | None, imported_config.get("api_key")
-            )
-            llm_config = _collect_interactive_llm_config(
-                provider=normalized_provider,
-                base_url=base_url,
-                api_key=api_key,
-                model=model,
-            )
-
-        step += 1
-        logger.info("")
-        logger.info("[%d/%d] 可选快捷入口", step, step_total)
-        create_shortcut = _prompt_yes_no("记录创建快捷方式意向", False)
-        add_to_path = _prompt_yes_no("显示 PATH 手动配置提示", False)
-
-        release_exe: Path | None = None
-        if _prompt_yes_no("复制 SuperMedicine.exe 到桌面", bool(args.release_exe)):
-            default_exe = args.release_exe or Path("dist") / "SuperMedicine.exe"
-            release_exe = _prompt_path("Exe 路径", default_exe)
-
-        step += 1
-        logger.info("")
-        logger.info("[%d/%d] 确认安装", step, step_total)
-        _log_interactive_summary(
-            install_path=install_path,
-            init_config_enabled=init_config_enabled,
-            provider=llm_config.get("provider"),
-            base_url=llm_config.get("base_url"),
-            model=llm_config.get("model"),
-            create_shortcut=create_shortcut,
-            add_to_path=add_to_path,
-            release_exe=release_exe,
-            extract_release=extract_release,
-            selected_components=selected_components,
-        )
-        if not _prompt_yes_no("开始安装", True):
+        try:
+            plan = _prompt_interactive_plan(args, components)
+        except KeyboardInterrupt:
+            continue
+        if plan is None:
+            logger.info("安装已取消。")
+            return
+        if not _confirm_interactive_plan(plan):
             if _prompt_yes_no("返回重新填写", True):
                 continue
             logger.info("安装已取消。")
             return
-
         try:
-            logger.info("")
-            logger.info("正在安装...")
-            if existing_action == "uninstall":
-                _uninstall_existing_install(
-                    install_path, preserve_user_data=preserve_user_data
-                )
-            elif existing_action == "update":
-                args.extract_overwrite = True
-                args.exe_overwrite = True
-                logger.info("更新模式: 将保留 .supermedicine/config.yaml 和用户数据。")
-            payload_result: dict[str, Any] | None = None
-            exe_result: dict[str, Any] | None = None
-            if init_config_enabled:
-                if (
-                    existing_action == "update"
-                    and (install_path / CONFIG_RELATIVE).is_file()
-                ):
-                    _refresh_existing_project_config(install_path)
-                else:
-                    init_config(
-                        install_path,
-                        provider=llm_config.get("provider"),
-                        base_url=llm_config.get("base_url"),
-                        api_key=llm_config.get("api_key"),
-                        model=llm_config.get("model"),
-                    )
-                logger.info("配置完成: %s", install_path / ".supermedicine")
-            if extract_release:
-                args.extract_release_to = install_path
-                payload_result = _extract_release_from_args(args)
-            if selected_components and install_service is not None:
-                component_result = install_service.install(
-                    selected_components,
-                    install_path,
-                    overwrite=existing_action == "update",
-                )
-                logger.info(
-                    "组件安装完成: status=%s files=%d",
-                    component_result.get("status"),
-                    component_result.get("file_count", 0),
-                )
-            if release_exe:
-                args.release_exe = release_exe
-                if extract_release:
-                    _align_release_exe_with_extracted_payload(args)
-                exe_result = _release_exe_from_args(args)
-            has_install_actions = (
-                init_config_enabled
-                or extract_release
-                or release_exe
-                or bool(selected_components)
-            )
-            if has_install_actions:
-                artifacts = _install_record_artifacts_from_results(
-                    payload_result=payload_result,
-                    exe_result=exe_result,
-                    selected_components=selected_components,
-                )
-                write_install_record(
-                    install_path,
-                    artifacts=artifacts,
-                    mode="update" if existing_action == "update" else "init",
-                )
-            if add_to_path:
-                logger.info(
-                    "PATH 提示: 可将 Python Scripts 目录加入系统 PATH，或使用 python Cli.py。"
-                )
-            if create_shortcut:
-                logger.info(
-                    "快捷方式提示: 当前版本请手动创建指向 supermedicine 或 python Cli.py 的快捷方式。"
-                )
-            logger.info("安装完成。可运行 python Cli.py status 检查状态。")
+            logger.info("\n正在安装...")
+            _execute_interactive_plan(args, plan, install_service)
             return
         except (ValueError, OSError, SystemExit) as exc:
             logger.error("安装失败: %s", redact_sensitive(str(exc)))
@@ -1387,9 +1411,7 @@ def _install_record_artifacts_from_results(
     return artifacts
 
 
-def main(argv: list[str] | None = None) -> None:
-    _configure_stdio_errors()
-    logging.basicConfig(level=logging.INFO, format="%(message)s")
+def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="SuperMedicine 安装器：初始化配置、释放程序文件、复制桌面 Exe。",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1490,7 +1512,14 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="配合 --if-installed uninstall 使用：卸载旧版本时删除记录的用户数据",
     )
-    args = parser.parse_args(argv)
+    return parser
+
+
+def _run_scripted_installer(
+    args: argparse.Namespace,
+    parser: argparse.ArgumentParser,
+    argv: list[str] | None,
+) -> None:
     if args.preserve_user_data and args.remove_user_data:
         parser.error(
             "--preserve-user-data and --remove-user-data are mutually exclusive"
@@ -1598,6 +1627,14 @@ def main(argv: list[str] | None = None) -> None:
             )
         return
     parser.print_help()
+
+
+def main(argv: list[str] | None = None) -> None:
+    _configure_stdio_errors()
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    parser = _build_parser()
+    args = parser.parse_args(argv)
+    _run_scripted_installer(args, parser, argv)
 
 
 __all__ = [

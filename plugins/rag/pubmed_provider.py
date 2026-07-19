@@ -9,9 +9,6 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from typing import Any
 
-from permission.engine import PermissionEngine
-from permission.policy import PermissionResult
-
 from .providers import (
     RAGConnectionError,
     RAGProvider,
@@ -36,7 +33,7 @@ class PubmedRAGProvider(RAGProvider):
         email: str = "supermedicine@example.com",
         tool: str = "supermedicine",
         timeout_seconds: float = 10.0,
-        permission_engine: PermissionEngine | None = None,
+        permission_engine: Any | None = None,
         agent_id: str | None = None,
     ):
         self._email = email
@@ -379,7 +376,7 @@ class PubmedRAGProvider(RAGProvider):
                 "timeout_seconds": self._timeout_seconds,
             },
         )
-        if result == PermissionResult.ALLOWED:
+        if result.value == "allowed":
             return None
 
         return make_rag_result(

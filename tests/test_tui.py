@@ -1783,17 +1783,10 @@ def test_tui_stylesheet_selectors_match_declared_widgets_and_classes():
         path.read_text(encoding="utf-8")
         for path in [
             root.joinpath("core", "tui", "app.py"),
-            root.joinpath("core", "tui", "menu_screens.py"),
-            *root.joinpath("core", "tui", "screens").glob("*_screen.py"),
+                root.joinpath("core", "tui", "support.py"),
+                *root.joinpath("core", "tui", "screens").glob("*_views.py"),
         ]
     )
-    tui_sources += root.joinpath("core", "tui", "screens", "chat_view.py").read_text(
-        encoding="utf-8"
-    )
-    tui_sources += root.joinpath("core", "tui", "screens", "dashboard.py").read_text(
-        encoding="utf-8"
-    )
-
     declared_ids = set(re.findall(r'id="([a-zA-Z0-9_-]+)"', tui_sources))
     declared_classes = {
         class_name

@@ -41,7 +41,7 @@ from core.workspace_tool_models import (
     validate_tool_id,
 )
 from core.workspace_tool_spec import TOOL_AUTHORING_SPEC, build_tool_authoring_llm_context  # noqa: F401
-from core.workspace_tool_templates import BUILTIN_TEMPLATES
+from core.workspace_tool_spec import BUILTIN_TEMPLATES
 from permission.audit import AuditLogger
 from permission.engine import PermissionEngine
 

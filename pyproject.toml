@@ -104,6 +104,9 @@ markers = [
 [tool.ruff]
 exclude = [".pytest-tmp", ".pytest_tmp"]
 
+[tool.ruff.lint.per-file-ignores]
+"*.pyi" = ["F403"]
+
 [tool.mypy]
 exclude = "^build/|\\.pytest-tmp|\\.pytest_tmp|^workspaces/|^workspaces\\\\"
 

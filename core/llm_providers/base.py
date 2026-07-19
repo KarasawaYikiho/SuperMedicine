@@ -824,3 +824,31 @@ class AnthropicClient(ConfiguredLLMClient):
         if "api_format" not in kwargs and "format" not in kwargs:
             kwargs["api_format"] = "anthropic"
         super().__init__(LLMProviderConfig.from_mapping("anthropic", kwargs))
+
+
+class OpenRouterClient(ConfiguredLLMClient):
+    """OpenRouter client using its OpenAI-compatible API contract."""
+
+    DEFAULT_MODEL = "anthropic/claude-3.5-sonnet"
+
+    def __init__(
+        self, api_key: str | None = None, model: str | None = None, **kwargs: Any
+    ):
+        headers = {
+            "HTTP-Referer": "https://github.com/KarasawaYikiho/SuperMedicine",
+            "X-Title": "SuperMedicine",
+            **kwargs.pop("headers", {}),
+        }
+        config = LLMProviderConfig.from_mapping(
+            "openrouter",
+            kwargs,
+            api_key=api_key,
+            model=self.DEFAULT_MODEL if model is None else model,
+            headers=headers,
+            api_format="openai",
+        )
+        super().__init__(config)
+
+    def _request(self, messages: list[dict[str, str]], **kwargs: Any) -> dict[str, Any]:
+        """Backward-compatible request hook used by existing extensions."""
+        return self.chat(messages, **kwargs)
