@@ -9,13 +9,18 @@ from pathlib import Path
 
 
 def test_desktop_paths_use_user_storage_not_bundle_root(tmp_path, monkeypatch):
-    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "Local App Data"))
+    if sys.platform == "win32":
+        base = tmp_path / "Local App Data"
+        monkeypatch.setenv("LOCALAPPDATA", str(base))
+    else:
+        base = tmp_path / "share"
+        monkeypatch.setenv("XDG_DATA_HOME", str(base))
     monkeypatch.setattr(sys, "_MEIPASS", str(tmp_path / "bundle"), raising=False)
 
     from core.web.desktop import desktop_paths
 
     paths = desktop_paths()
-    assert paths.data_dir == tmp_path / "Local App Data" / "SuperMedicine"
+    assert paths.data_dir == base / "SuperMedicine"
     assert paths.log_dir == paths.data_dir / ".supermedicine" / "logs"
     assert not paths.data_dir.is_relative_to(Path(sys._MEIPASS))
 
@@ -38,7 +43,10 @@ def test_desktop_server_reserves_bound_loopback_socket():
 
 
 def test_desktop_self_test_checks_backend_health_frontend_and_storage(tmp_path, monkeypatch):
-    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "Desktop Data"))
+    if sys.platform == "win32":
+        monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "Desktop Data"))
+    else:
+        monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "desktop-data"))
     monkeypatch.chdir(tmp_path)
 
     from core.web.desktop import desktop_self_test
