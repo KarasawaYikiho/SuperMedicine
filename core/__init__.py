@@ -3,6 +3,13 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
+import sys
+
+from core import workspace_tool_spec as _workspace_tool_spec
+from core import log_report_models as _log_report_models
+
+sys.modules.setdefault("core.workspace_tool_templates", _workspace_tool_spec)
+sys.modules.setdefault("core.log_severity", _log_report_models)
 
 if TYPE_CHECKING:
     from core.config_center import ConfigCenter

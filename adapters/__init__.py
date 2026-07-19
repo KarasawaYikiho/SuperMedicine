@@ -10,91 +10,20 @@ initialization, or runtime probing.
 from __future__ import annotations
 
 import importlib
-from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
 
-from adapters.base_adapter import BaseAdapter
+from adapters.base_adapter import (
+    ADAPTER_HOST_CONFIGS,
+    AdapterHostConfig,
+    AdapterProtocol,
+    BaseAdapter,
+)
 
 
-@dataclass(frozen=True)
-class AdapterRegistration:
-    """Static adapter discovery contract that does not import adapter modules."""
-
-    platform: str
-    adapter_class: str
-    module: str
-    status: str
-    optional: bool
-    core: bool
-    default: bool
-    requires_core_runtime: bool
-    capability_tool: str | None = None
-    limitations: tuple[str, ...] = ()
-
-    def as_dict(self) -> dict[str, Any]:
-        return {
-            "platform": self.platform,
-            "adapter_class": self.adapter_class,
-            "module": self.module,
-            "status": self.status,
-            "optional": self.optional,
-            "core": self.core,
-            "default": self.default,
-            "requires_core_runtime": self.requires_core_runtime,
-            "capability_tool": self.capability_tool,
-            "limitations": list(self.limitations),
-        }
-
-
-_ADAPTER_REGISTRY: MappingProxyType[str, AdapterRegistration] = MappingProxyType(
-    {
-        "standalone": AdapterRegistration(
-            platform="standalone",
-            adapter_class="StandaloneAdapter",
-            module="adapters.standalone.adapter",
-            status="core_default",
-            optional=False,
-            core=True,
-            default=True,
-            requires_core_runtime=True,
-            capability_tool=None,
-            limitations=(
-                "Self-contained core adapter; does not load OpenCode or Claude Code platform resources.",
-                "Skill loading returns core-neutral metadata instead of platform skill files.",
-            ),
-        ),
-        "opencode": AdapterRegistration(
-            platform="opencode",
-            adapter_class="OpenCodeAdapter",
-            module="adapters.opencode.adapter",
-            status="optional_add_on",
-            optional=True,
-            core=False,
-            default=False,
-            requires_core_runtime=False,
-            capability_tool="opencode.capabilities",
-            limitations=(
-                "Optional add-on; not imported, initialized, or probed by default.",
-                "Native OpenCode dispatch requires an explicit orchestrator/runtime bridge.",
-            ),
-        ),
-        "claude-code": AdapterRegistration(
-            platform="claude-code",
-            adapter_class="ClaudeCodeAdapter",
-            module="adapters.claude_code.adapter",
-            status="optional_minimal",
-            optional=True,
-            core=False,
-            default=False,
-            requires_core_runtime=False,
-            capability_tool="claude.capabilities",
-            limitations=(
-                "Optional minimal add-on; not imported, initialized, or probed by default.",
-                "Invocation requires an explicitly selected adapter and local Claude Code CLI runtime.",
-            ),
-        ),
-    }
+AdapterRegistration = AdapterHostConfig
+_ADAPTER_REGISTRY: MappingProxyType[str, AdapterHostConfig] = MappingProxyType(
+    ADAPTER_HOST_CONFIGS
 )
 
 ADAPTER_REGISTRY = _ADAPTER_REGISTRY
@@ -132,6 +61,8 @@ def __getattr__(name: str) -> Any:
 
 __all__ = [
     "ADAPTER_REGISTRY",
+    "AdapterHostConfig",
+    "AdapterProtocol",
     "AdapterRegistration",
     "BaseAdapter",
     "default_adapter_registration",

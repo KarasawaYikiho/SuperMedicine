@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from core.paper_import.models import PaperMetadata
+from core.paper_import.contracts import PaperMetadata
 from permission.audit import AuditLogger
 from permission.engine import PermissionEngine
 from permission.policy import PermissionResult

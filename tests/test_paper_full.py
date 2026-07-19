@@ -19,7 +19,7 @@ from core.workspace import WorkspaceNotFoundError
 from permission.audit import AuditLogger
 from permission.engine import PermissionEngine
 from permission.policy import ensure_default_policy
-from plugins.rag.local_provider import LocalRAGProvider
+from plugins.rag.providers import LocalRAGProvider
 from core.rag_service import RAGService
 
 

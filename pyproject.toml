@@ -38,16 +38,22 @@ Repository = "https://github.com/KarasawaYikiho/SuperMedicine"
 web = [
     "fastapi>=0.100.0",
     "uvicorn>=0.23.0",
+    "websockets>=12,<16",
+]
+desktop = [
+    "pywebview>=5.0,<7",
+    "pyinstaller>=6.0,<7",
 ]
 dev = [
     "fastapi>=0.100.0",
-    "httpx2>=0.28.1",
+    "httpx>=0.28.1,<1",
     "mypy>=1.0",
     "pytest>=7.0",
     "pytest-cov>=4.0",
     "ruff>=0.4.0",
     "types-PyYAML>=6.0",
     "uvicorn>=0.23.0",
+    "websockets>=12,<16",
 ]
 # Optional formal R/rpy2 survival backend. Also requires a local R installation
 # with the R survival package available.
@@ -97,6 +103,9 @@ markers = [
 
 [tool.ruff]
 exclude = [".pytest-tmp", ".pytest_tmp"]
+
+[tool.ruff.lint.per-file-ignores]
+"*.pyi" = ["F403"]
 
 [tool.mypy]
 exclude = "^build/|\\.pytest-tmp|\\.pytest_tmp|^workspaces/|^workspaces\\\\"

@@ -64,8 +64,9 @@ def export_figure(
     formats = [f.lower().lstrip(".") for f in formats]
     unknown = [f for f in formats if f not in SUPPORTED_FORMATS]
     if unknown:
-        raise ValueError(f"Unsupported formats: {unknown}. "
-                         f"Supported: {sorted(SUPPORTED_FORMATS)}")
+        raise ValueError(
+            f"Unsupported formats: {unknown}. Supported: {sorted(SUPPORTED_FORMATS)}"
+        )
 
     if size_inches is not None:
         if len(size_inches) != 2:
@@ -80,9 +81,11 @@ def export_figure(
     saved: list[str] = []
     for fmt in formats:
         if fmt in {"jpg", "jpeg"}:
-            print(f"[figure-export] WARNING: skipping {fmt} -- "
-                  "JPEG is lossy and unsuitable for line/text figures.",
-                  file=sys.stderr)
+            print(
+                f"[figure-export] WARNING: skipping {fmt} -- "
+                "JPEG is lossy and unsuitable for line/text figures.",
+                file=sys.stderr,
+            )
             continue
         path = f"{basename}.{fmt}"
         _ensure_parent(path)
@@ -109,8 +112,10 @@ def _grayscale_from(fig, basename: str, dpi: int) -> str | None:
     try:
         from PIL import Image
     except ImportError:
-        print("[figure-export] Pillow not available; "
-              "grayscale preview skipped.", file=sys.stderr)
+        print(
+            "[figure-export] Pillow not available; grayscale preview skipped.",
+            file=sys.stderr,
+        )
         return None
 
     png_path = f"{basename}.png"

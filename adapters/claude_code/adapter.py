@@ -7,9 +7,7 @@ import subprocess
 from pathlib import Path
 from typing import Any, ClassVar
 
-from adapters.base_adapter import BaseAdapter, redact_sensitive
-from permission.engine import PermissionEngine
-from permission.policy import DEFAULT_POLICY_RELATIVE_PATH, PermissionResult
+from adapters.base_adapter import ADAPTER_HOST_CONFIGS, BaseAdapter, redact_sensitive
 
 
 class ClaudeCodeAdapter(BaseAdapter):
@@ -66,10 +64,15 @@ class ClaudeCodeAdapter(BaseAdapter):
             "for SuperMedicine/Claude Code invocation context and must never be embedded as plaintext keys."
         ),
     }
+    HOST_CONFIG = ADAPTER_HOST_CONFIGS["claude-code"]
+    REGISTRATION_EXTRAS = {
+        "requires_local_runtime_for_invoke": True,
+        "ai_provider_support": AI_PROVIDER_SUPPORT,
+    }
 
     def __init__(
         self,
-        permission_engine: PermissionEngine | None = None,
+        permission_engine=None,
         project_dir: Path | None = None,
         default_agent_id: str = "alpha",
         runtime_command: str = "claude",
@@ -84,34 +87,6 @@ class ClaudeCodeAdapter(BaseAdapter):
         self._default_agent_id = default_agent_id
         self._runtime_command = runtime_command
         self._timeout_seconds = timeout_seconds
-        self._permission_engine = permission_engine
-
-    @property
-    def platform_name(self) -> str:
-        return "claude-code"
-
-    @property
-    def registration(self) -> dict[str, Any]:
-        """Return adapter discovery metadata for registries and callers."""
-        return {
-            "platform": self.platform_name,
-            "adapter_class": self.__class__.__name__,
-            "status": "optional_minimal",
-            "optional": True,
-            "core": False,
-            "default": False,
-            "module": "adapters.claude_code.adapter",
-            "capability_tool": "claude.capabilities",
-            "requires_core_runtime": False,
-            "requires_local_runtime_for_invoke": True,
-            "ai_provider_support": self.AI_PROVIDER_SUPPORT,
-            "limitations": [
-                "Optional minimal add-on; not imported, initialized, or probed by default.",
-                "Invocation requires an explicitly selected adapter and local Claude Code CLI runtime.",
-                "Only SuperMedicine is exposed as a user-facing platform agent; alpha/beta/gamma/delta are internal role contexts only.",
-                "OpenAI/Anthropic provider config is injected by installer/runtime/project config; manifests and docs must not contain plaintext API keys.",
-            ],
-        }
 
     def capabilities(self) -> dict[str, Any]:
         """Report supported capabilities and current limits without exaggeration."""
@@ -175,7 +150,9 @@ class ClaudeCodeAdapter(BaseAdapter):
             }
 
         agent_id = params.get("agent_id", self._default_agent_id)
-        denied = self._permission_denied(agent_id, "tool_call", tool_id)
+        denied = self._permission_denied_result(
+            tool_id, str(agent_id), "tool_call", tool_id
+        )
         if denied is not None:
             denied["tool"] = tool_id
             return denied
@@ -198,8 +175,8 @@ class ClaudeCodeAdapter(BaseAdapter):
         Native Claude Code skill loading is intentionally not claimed as supported yet, but
         this method is a real permission-checked adapter response rather than Coming Soon.
         """
-        denied = self._permission_denied(
-            self._default_agent_id, "skill_load", skill_name
+        denied = self._permission_denied_result(
+            skill_name, self._default_agent_id, "skill_load", skill_name
         )
         if denied is not None:
             return f"Permission denied loading Claude Code skill '{skill_name}': {denied['error']}"
@@ -210,8 +187,11 @@ class ClaudeCodeAdapter(BaseAdapter):
 
     def subagent_dispatch(self, agent_id: str, task: dict[str, Any]) -> dict[str, Any]:
         """Report explicit unavailable state for native Claude Code sub-agent dispatch."""
-        denied = self._permission_denied(
-            agent_id, "execute", f"claude.subagent.{agent_id}"
+        denied = self._permission_denied_result(
+            f"claude.subagent.{agent_id}",
+            agent_id,
+            "execute",
+            f"claude.subagent.{agent_id}",
         )
         if denied is not None:
             denied["agent_id"] = agent_id
@@ -353,53 +333,3 @@ class ClaudeCodeAdapter(BaseAdapter):
                 "custom_base_url": self.AI_PROVIDER_SUPPORT["custom_base_url"],
             },
         }
-
-    def _permission_denied(
-        self, agent_id: str, action: str, resource: str
-    ) -> dict[str, Any] | None:
-        engine = self._get_permission_engine_or_error()
-        if isinstance(engine, dict):
-            return engine
-        result = engine.check(
-            agent_id,
-            action,
-            resource,
-            context={
-                "adapter": self.platform_name,
-                "policy_path": str(self._project_dir / DEFAULT_POLICY_RELATIVE_PATH),
-            },
-        )
-        if result == PermissionResult.ALLOWED:
-            return None
-        return {
-            "status": "denied",
-            "platform": self.platform_name,
-            "agent": agent_id,
-            "action": action,
-            "resource": resource,
-            "error": "Permission denied by canonical policy chain.",
-            "error_code": "permission_denied",
-            "metadata": {
-                "policy_path": str(self._project_dir / DEFAULT_POLICY_RELATIVE_PATH),
-                "security": {"permission": "denied", "permission_checked": True},
-            },
-        }
-
-    def _get_permission_engine_or_error(self) -> PermissionEngine | dict[str, Any]:
-        if self._permission_engine is not None:
-            return self._permission_engine
-        policy_dir = self._project_dir / DEFAULT_POLICY_RELATIVE_PATH.parent
-        try:
-            self._permission_engine = PermissionEngine(
-                policy_dir, policy_dir / "audit.jsonl"
-            )
-        except Exception as exc:
-            return {
-                "status": "configuration_error",
-                "platform": self.platform_name,
-                "error": f"Unable to load canonical permission policy: {exc}",
-                "metadata": {
-                    "policy_path": str(policy_dir / DEFAULT_POLICY_RELATIVE_PATH.name)
-                },
-            }
-        return self._permission_engine

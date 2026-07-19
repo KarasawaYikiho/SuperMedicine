@@ -29,14 +29,7 @@ def _dispatch_subcommand(command, handlers, parser, error_types=(ValueError,)):
         parser.error(str(exc))
 
 
-def main(argv: list[str] | None = None) -> None:
-    _configure_stdio_errors()
-    parser = argparse.ArgumentParser(
-        prog="supermedicine",
-        description="SuperMedicine - 模块化医学科研 Agent 框架",
-    )
-    subparsers = parser.add_subparsers(dest="command")
-
+def _add_init_commands(subparsers):
     # Init 命令
     init_parser = subparsers.add_parser("init", help="初始化项目；可选释放桌面 Exe")
     init_parser.add_argument("--dir", type=str, default=".", help="项目目录")
@@ -88,6 +81,10 @@ def main(argv: list[str] | None = None) -> None:
         "--exe-dry-run", action="store_true", help="仅报告桌面 Exe 释放动作，不复制文件"
     )
 
+    return {"init": init_parser}
+
+
+def _add_shell_commands(subparsers):
     # Status 命令
     subparsers.add_parser("status", help="显示项目状态")
 
@@ -161,12 +158,6 @@ def main(argv: list[str] | None = None) -> None:
         description="启动基于 FastAPI 的 Web 界面；需要安装可选依赖：pip install supermedicine[web]",
     )
     web_parser.add_argument(
-        "--auth-token-file",
-        type=Path,
-        default=None,
-        help="Remote Web binding Bearer token file (minimum 32 bytes)",
-    )
-    web_parser.add_argument(
         "--host",
         type=str,
         default="127.0.0.1",
@@ -179,6 +170,21 @@ def main(argv: list[str] | None = None) -> None:
         "--reload", action="store_true", help="启用自动重载（开发模式）"
     )
 
+    web_parser.add_argument(
+        "--auth-token-file",
+        type=Path,
+        default=None,
+        help="Bearer token file required when binding beyond loopback",
+    )
+
+    return {
+        "permission": permission_parser,
+        "sandbox": sandbox_parser,
+        "web": web_parser,
+    }
+
+
+def _add_run_commands(subparsers):
     # Run 命令
     run_parser = subparsers.add_parser("run", help="执行任务")
     run_parser.add_argument("task", type=str, help="任务描述")
@@ -277,6 +283,21 @@ def main(argv: list[str] | None = None) -> None:
         help="确认已理解 full 模式风险、OS 权限/UAC 语义与不静默提权限制",
     )
 
+    return {"run": run_parser}
+
+
+def _add_multi_agent_command(subparsers):
+    parser = subparsers.add_parser(
+        "multi-agent", help="查看或切换 Alpha/Beta/Gamma/Delta 完整角色流程"
+    )
+    commands = parser.add_subparsers(dest="multi_agent_command")
+    commands.add_parser("status", help="查看 Multi-Agent 开关")
+    commands.add_parser("enable", help="启用完整四角色流程")
+    commands.add_parser("disable", help="关闭并使用轻量单流程")
+    return {"multi-agent": parser}
+
+
+def _add_experiment_commands(subparsers):
     experiment_parser = subparsers.add_parser("experiment", help="实验指导器命令")
     experiment_subparsers = experiment_parser.add_subparsers(dest="experiment_command")
 
@@ -341,6 +362,10 @@ def main(argv: list[str] | None = None) -> None:
         "--calculate", action="store_true", help="触发支持的 WB 插件计算"
     )
 
+    return {"experiment": experiment_parser}
+
+
+def _add_log_commands(subparsers):
     log_parser = subparsers.add_parser("log", help="日志报告命令")
     log_subparsers = log_parser.add_subparsers(dest="log_command")
 
@@ -396,6 +421,10 @@ def main(argv: list[str] | None = None) -> None:
         "--no-clear", action="store_true", help="刷新间不清屏/分隔，便于测试捕获"
     )
 
+    return {"log": log_parser}
+
+
+def _add_workspace_commands(subparsers):
     # Workspace 命令
     workspace_parser = subparsers.add_parser(
         "workspace", help="管理 workspaces/<id> 显式 slug 工作区"
@@ -430,6 +459,10 @@ def main(argv: list[str] | None = None) -> None:
         "--confirm", required=True, type=str, help="必须与工作区 ID 完全一致"
     )
 
+    return {"workspace": workspace_parser, "workspace-delete": workspace_delete_parser}
+
+
+def _add_tool_commands(subparsers):
     # Tool 命令（全部要求显式 --workspace；不会读取 TUI 最近状态）
     tool_parser = subparsers.add_parser("tool", help="管理工作区内 Python/R 模块化工具")
     tool_subparsers = tool_parser.add_subparsers(dest="tool_command")
@@ -504,6 +537,10 @@ def main(argv: list[str] | None = None) -> None:
         "--output", type=str, default=None, help="工作区内输出路径"
     )
 
+    return {"tool": tool_parser, "tool-add": tool_add_parser}
+
+
+def _add_llm_commands(subparsers):
     # LLM 命令
     llm_parser = subparsers.add_parser("llm", help="管理 LLM API provider")
     llm_subparsers = llm_parser.add_subparsers(dest="llm_command")
@@ -561,6 +598,10 @@ def main(argv: list[str] | None = None) -> None:
     )
     llm_switch_parser.add_argument("provider", type=str, help="Provider 名称")
 
+    return {"llm": llm_parser}
+
+
+def _add_paper_commands(subparsers):
     # Paper 命令（全部要求显式 --workspace；不会读取 TUI 最近状态）
     paper_parser = subparsers.add_parser("paper", help="管理工作区论文导入与元数据")
     paper_subparsers = paper_parser.add_subparsers(dest="paper_command")
@@ -632,6 +673,10 @@ def main(argv: list[str] | None = None) -> None:
         help="显式确认允许发起补全授权检查、网络/API 限制检查与审计",
     )
 
+    return {"paper": paper_parser}
+
+
+def _add_experience_write_commands(subparsers):
     # Experience 命令（全部要求显式 --workspace；建议不会持久化）
     experience_parser = subparsers.add_parser(
         "experience",
@@ -681,6 +726,10 @@ def main(argv: list[str] | None = None) -> None:
         "--confirm", action="store_true", required=True, help="显式确认写入"
     )
 
+    return experience_parser, experience_subparsers
+
+
+def _add_experience_read_commands(experience_subparsers):
     experience_list_parser = experience_subparsers.add_parser("list", help="列出经验")
     experience_list_parser.add_argument(
         "--workspace", required=True, type=str, help="工作区 ID"
@@ -746,15 +795,38 @@ def main(argv: list[str] | None = None) -> None:
         "--output", type=str, default=None, help="可选 UTF-8 输出文件"
     )
 
-    args = parser.parse_args(argv)
-    if args.command != "tui":
-        _configure_cli_logging()
 
-    # Lazy import to avoid circular dependency
-    from cli_entry import CLI
+def _build_parser() -> tuple[
+    argparse.ArgumentParser, dict[str, argparse.ArgumentParser]
+]:
+    parser = argparse.ArgumentParser(
+        prog="supermedicine",
+        description="SuperMedicine - ??????? Agent ??",
+    )
+    subparsers = parser.add_subparsers(dest="command")
+    command_parsers: dict[str, argparse.ArgumentParser] = {}
+    for register in (
+        _add_init_commands,
+        _add_shell_commands,
+        _add_run_commands,
+        _add_multi_agent_command,
+        _add_experiment_commands,
+        _add_log_commands,
+        _add_workspace_commands,
+        _add_tool_commands,
+        _add_llm_commands,
+        _add_paper_commands,
+    ):
+        command_parsers.update(register(subparsers))
+    experience_parser, experience_subparsers = _add_experience_write_commands(
+        subparsers
+    )
+    _add_experience_read_commands(experience_subparsers)
+    command_parsers["experience"] = experience_parser
+    return parser, command_parsers
 
-    cli = CLI()
 
+def _dispatch_setup_command(args, cli, parsers) -> bool:
     if args.command == "init":
         from installer.entrypoint import (
             _normalize_provider,
@@ -763,17 +835,14 @@ def main(argv: list[str] | None = None) -> None:
         )
 
         provider = _resolve_install_value("provider", args.provider)
-        base_url = _resolve_install_value("base_url", args.base_url)
-        model = _resolve_install_value("model", args.model)
         normalized_provider = _normalize_provider(provider)
-        api_key = _resolve_api_key(normalized_provider, args.api_key)
         try:
             cli.init(
                 Path(args.dir),
                 provider=normalized_provider,
-                base_url=base_url,
-                api_key=api_key,
-                model=model,
+                base_url=_resolve_install_value("base_url", args.base_url),
+                api_key=_resolve_api_key(normalized_provider, args.api_key),
+                model=_resolve_install_value("model", args.model),
                 release_exe=args.release_exe,
                 desktop_dir=args.desktop_dir,
                 exe_target_name=args.exe_target_name,
@@ -781,7 +850,7 @@ def main(argv: list[str] | None = None) -> None:
                 exe_dry_run=args.exe_dry_run,
             )
         except (ValueError, FileNotFoundError, OSError) as exc:
-            init_parser.error(str(exc))
+            parsers["init"].error(str(exc))
     elif args.command == "status":
         cli.status()
     elif args.command == "diagnose":
@@ -800,11 +869,11 @@ def main(argv: list[str] | None = None) -> None:
                 "authorize": lambda: cli.permission_authorize(args.path),
                 "revoke": lambda: cli.permission_revoke(args.path),
             },
-            permission_parser,
+            parsers["permission"],
             (ValueError, PermissionError),
         )
     elif args.command == "sandbox":
-        sandbox_parser.print_help()
+        parsers["sandbox"].print_help()
     elif args.command == "test":
         cli.test()
     elif args.command == "tui":
@@ -818,16 +887,21 @@ def main(argv: list[str] | None = None) -> None:
                 auth_token_file=args.auth_token_file,
             )
         except (ImportError, ValueError) as exc:
-            web_parser.error(str(exc))
-    elif args.command == "run":
-        verbose = getattr(args, "verbose", False)
+            parsers["web"].error(str(exc))
+    else:
+        return False
+    return True
+
+
+def _dispatch_run_command(args, cli, parsers) -> bool:
+    if args.command == "run":
         try:
             params = _resolve_run_params(args.params_json, args.params_file)
         except ValueError as exc:
-            run_parser.error(str(exc))
+            parsers["run"].error(str(exc))
         cli.run(
             args.task,
-            verbose=verbose,
+            verbose=getattr(args, "verbose", False),
             plugin=args.plugin,
             action=args.action,
             params=params,
@@ -848,178 +922,253 @@ def main(argv: list[str] | None = None) -> None:
             confirm_full_access=args.confirm_full_access,
             acknowledge_risk=args.acknowledge_risk,
         )
-    elif args.command == "experiment":
-        _dispatch_subcommand(
-            args.experiment_command,
-            {
-                "start": lambda: cli.experiment_start(
-                    args.protocol, session_id=args.session_id
-                ),
-                "list": cli.experiment_list,
-                "context": lambda: cli.experiment_context(args.protocol),
-                "add-config": lambda: cli.experiment_add_config(
-                    instruction=args.instruction,
-                    config_json=args.config_json,
-                    filename=args.filename,
-                    overwrite=args.overwrite,
-                ),
-                "show": lambda: cli.experiment_show(args.session_file),
-                "submit": lambda: cli.experiment_submit(
-                    args.session_file,
-                    args.step,
-                    args.input_json,
-                    calculate=args.calculate,
-                ),
-            },
-            experiment_parser,
-            (KeyError, ValueError),
-        )
-    elif args.command == "log":
-        _dispatch_subcommand(
-            args.log_command,
-            {
-                "write": lambda: cli.log_write(
-                    args.message, session_id=args.session_id
-                ),
-                "list": cli.log_list,
-                "show": lambda: cli.log_show(args.file),
-                "location": lambda: cli.log_location(
-                    file_name=args.file, session_id=args.session_id
-                ),
-                "follow": lambda: cli.log_follow(
-                    file_name=args.file,
-                    session_id=args.session_id,
-                    interval=args.interval,
-                    max_entries=args.max_entries,
-                    max_lines=args.max_lines,
-                    iterations=args.iterations,
-                    once=args.once,
-                    no_clear=args.no_clear,
-                ),
-            },
-            log_parser,
-        )
-    elif args.command == "workspace":
-        _dispatch_subcommand(
-            args.workspace_command,
-            {
-                "init": lambda: cli.workspace_init(args.workspace, name=args.name),
-                "list": cli.workspace_list,
-                "show": lambda: cli.workspace_show(args.workspace),
-                "delete": lambda: cli.workspace_delete(args.workspace, args.confirm),
-            },
-            workspace_delete_parser
-            if args.workspace_command == "delete"
-            else workspace_parser,
-        )
-    elif args.command == "tool":
-        _dispatch_subcommand(
-            args.tool_command,
-            {
-                "init": lambda: cli.tool_init(args.workspace),
-                "list": lambda: cli.tool_list(args.workspace, language=args.language),
-                "scan": lambda: cli.tool_scan(language=args.language),
-                "add": lambda: cli.tool_add(
-                    args.workspace,
-                    selections=args.select,
-                    language=args.language,
-                    overwrite=args.overwrite,
-                ),
-                "show": lambda: cli.tool_show(args.workspace, args.language, args.tool),
-                "run": lambda: cli.tool_run(
-                    args.workspace,
-                    args.language,
-                    args.tool,
-                    dry_run=args.dry_run,
-                    input_path=args.input,
-                    output_path=args.output,
-                ),
-            },
-            tool_add_parser if args.tool_command == "add" else tool_parser,
-        )
-    elif args.command == "llm":
-        _dispatch_subcommand(
-            args.llm_command,
-            {
-                "add": lambda: cli.llm_add(
-                    args.provider,
-                    api_format=args.api_format,
-                    base_url=args.base_url,
-                    api_key=args.api_key,
-                    api_key_env=args.api_key_env,
-                    model=args.model,
-                    timeout=args.timeout,
-                    headers=_parse_llm_headers(args.header, args.headers_json),
-                    set_current=args.set_current,
-                ),
-                "list": cli.llm_list,
-                "show": lambda: cli.llm_show(args.provider),
-                "switch": lambda: cli.llm_switch(args.provider),
-            },
-            llm_parser,
-        )
-    elif args.command == "paper":
-        _dispatch_subcommand(
-            args.paper_command,
-            {
-                "import": lambda: cli.paper_import(
-                    args.workspace,
-                    args.path,
-                    metadata=_paper_metadata_options(args),
-                    enrich=args.enrich,
-                    confirm_enrich=args.confirm_enrich,
-                ),
-                "list": lambda: cli.paper_list(args.workspace),
-                "show": lambda: cli.paper_show(args.workspace, args.paper_id),
-                "edit": lambda: cli.paper_edit(
-                    args.workspace, args.paper_id, _paper_metadata_options(args)
-                ),
-                "enrich": lambda: cli.paper_enrich(
-                    args.workspace, args.paper_id, args.confirm_enrich
-                ),
-            },
-            paper_parser,
-        )
-    elif args.command == "experience":
-        _dispatch_subcommand(
-            args.experience_command,
-            {
-                "suggest": lambda: cli.experience_suggest(
-                    args.workspace, args.summary, title=args.title, tags=args.tag
-                ),
-                "add": lambda: cli.experience_add(
-                    args.workspace,
-                    args.scope,
-                    args.title,
-                    args.summary,
-                    tags=args.tag,
-                    confirm=args.confirm,
-                ),
-                "list": lambda: cli.experience_list(
-                    args.workspace, include_general=args.include_general
-                ),
-                "view": lambda: cli.experience_view(
-                    args.record_id, args.workspace, scope=args.scope
-                ),
-                "edit": lambda: cli.experience_edit(
-                    args.record_id,
-                    args.workspace,
-                    args.scope,
-                    title=args.title,
-                    summary=args.summary,
-                    tags=args.tag,
-                ),
-                "delete": lambda: cli.experience_delete(
-                    args.record_id, args.workspace, args.scope, args.confirm
-                ),
-                "export": lambda: cli.experience_export(
-                    args.workspace,
-                    args.format,
-                    include_general=args.include_general,
-                    output=args.output,
-                ),
-            },
-            experience_parser,
-        )
     else:
+        return False
+    return True
+
+
+def _dispatch_experiment_command(args, cli, parsers) -> bool:
+    if args.command != "experiment":
+        return False
+    _dispatch_subcommand(
+        args.experiment_command,
+        {
+            "start": lambda: cli.experiment_start(
+                args.protocol, session_id=args.session_id
+            ),
+            "list": cli.experiment_list,
+            "context": lambda: cli.experiment_context(args.protocol),
+            "add-config": lambda: cli.experiment_add_config(
+                instruction=args.instruction,
+                config_json=args.config_json,
+                filename=args.filename,
+                overwrite=args.overwrite,
+            ),
+            "show": lambda: cli.experiment_show(args.session_file),
+            "submit": lambda: cli.experiment_submit(
+                args.session_file, args.step, args.input_json, calculate=args.calculate
+            ),
+        },
+        parsers["experiment"],
+        (KeyError, ValueError),
+    )
+    return True
+
+
+def _dispatch_multi_agent_command(args, cli, parsers) -> bool:
+    if args.command != "multi-agent":
+        return False
+    _dispatch_subcommand(
+        args.multi_agent_command,
+        {
+            "status": cli.multi_agent_status,
+            "enable": lambda: cli.multi_agent_set(True),
+            "disable": lambda: cli.multi_agent_set(False),
+        },
+        parsers["multi-agent"],
+    )
+    return True
+
+
+def _dispatch_log_command(args, cli, parsers) -> bool:
+    if args.command != "log":
+        return False
+    _dispatch_subcommand(
+        args.log_command,
+        {
+            "write": lambda: cli.log_write(args.message, session_id=args.session_id),
+            "list": cli.log_list,
+            "show": lambda: cli.log_show(args.file),
+            "location": lambda: cli.log_location(
+                file_name=args.file, session_id=args.session_id
+            ),
+            "follow": lambda: cli.log_follow(
+                file_name=args.file,
+                session_id=args.session_id,
+                interval=args.interval,
+                max_entries=args.max_entries,
+                max_lines=args.max_lines,
+                iterations=args.iterations,
+                once=args.once,
+                no_clear=args.no_clear,
+            ),
+        },
+        parsers["log"],
+    )
+    return True
+
+
+def _dispatch_workspace_command(args, cli, parsers) -> bool:
+    if args.command != "workspace":
+        return False
+    _dispatch_subcommand(
+        args.workspace_command,
+        {
+            "init": lambda: cli.workspace_init(args.workspace, name=args.name),
+            "list": cli.workspace_list,
+            "show": lambda: cli.workspace_show(args.workspace),
+            "delete": lambda: cli.workspace_delete(args.workspace, args.confirm),
+        },
+        parsers["workspace-delete"]
+        if args.workspace_command == "delete"
+        else parsers["workspace"],
+    )
+    return True
+
+
+def _dispatch_tool_command(args, cli, parsers) -> bool:
+    if args.command != "tool":
+        return False
+    _dispatch_subcommand(
+        args.tool_command,
+        {
+            "init": lambda: cli.tool_init(args.workspace),
+            "list": lambda: cli.tool_list(args.workspace, language=args.language),
+            "scan": lambda: cli.tool_scan(language=args.language),
+            "add": lambda: cli.tool_add(
+                args.workspace,
+                selections=args.select,
+                language=args.language,
+                overwrite=args.overwrite,
+            ),
+            "show": lambda: cli.tool_show(args.workspace, args.language, args.tool),
+            "run": lambda: cli.tool_run(
+                args.workspace,
+                args.language,
+                args.tool,
+                dry_run=args.dry_run,
+                input_path=args.input,
+                output_path=args.output,
+            ),
+        },
+        parsers["tool-add"] if args.tool_command == "add" else parsers["tool"],
+    )
+    return True
+
+
+def _dispatch_llm_command(args, cli, parsers) -> bool:
+    if args.command != "llm":
+        return False
+    _dispatch_subcommand(
+        args.llm_command,
+        {
+            "add": lambda: cli.llm_add(
+                args.provider,
+                api_format=args.api_format,
+                base_url=args.base_url,
+                api_key=args.api_key,
+                api_key_env=args.api_key_env,
+                model=args.model,
+                timeout=args.timeout,
+                headers=_parse_llm_headers(args.header, args.headers_json),
+                set_current=args.set_current,
+            ),
+            "list": cli.llm_list,
+            "show": lambda: cli.llm_show(args.provider),
+            "switch": lambda: cli.llm_switch(args.provider),
+        },
+        parsers["llm"],
+    )
+    return True
+
+
+def _dispatch_paper_command(args, cli, parsers) -> bool:
+    if args.command != "paper":
+        return False
+    _dispatch_subcommand(
+        args.paper_command,
+        {
+            "import": lambda: cli.paper_import(
+                args.workspace,
+                args.path,
+                metadata=_paper_metadata_options(args),
+                enrich=args.enrich,
+                confirm_enrich=args.confirm_enrich,
+            ),
+            "list": lambda: cli.paper_list(args.workspace),
+            "show": lambda: cli.paper_show(args.workspace, args.paper_id),
+            "edit": lambda: cli.paper_edit(
+                args.workspace, args.paper_id, _paper_metadata_options(args)
+            ),
+            "enrich": lambda: cli.paper_enrich(
+                args.workspace, args.paper_id, args.confirm_enrich
+            ),
+        },
+        parsers["paper"],
+    )
+    return True
+
+
+def _dispatch_experience_command(args, cli, parsers) -> bool:
+    if args.command != "experience":
+        return False
+    _dispatch_subcommand(
+        args.experience_command,
+        {
+            "suggest": lambda: cli.experience_suggest(
+                args.workspace, args.summary, title=args.title, tags=args.tag
+            ),
+            "add": lambda: cli.experience_add(
+                args.workspace,
+                args.scope,
+                args.title,
+                args.summary,
+                tags=args.tag,
+                confirm=args.confirm,
+            ),
+            "list": lambda: cli.experience_list(
+                args.workspace, include_general=args.include_general
+            ),
+            "view": lambda: cli.experience_view(
+                args.record_id, args.workspace, scope=args.scope
+            ),
+            "edit": lambda: cli.experience_edit(
+                args.record_id,
+                args.workspace,
+                args.scope,
+                title=args.title,
+                summary=args.summary,
+                tags=args.tag,
+            ),
+            "delete": lambda: cli.experience_delete(
+                args.record_id, args.workspace, args.scope, args.confirm
+            ),
+            "export": lambda: cli.experience_export(
+                args.workspace,
+                args.format,
+                include_general=args.include_general,
+                output=args.output,
+            ),
+        },
+        parsers["experience"],
+    )
+    return True
+
+
+def _dispatch_command(args, cli, parser, parsers) -> None:
+    dispatchers = (
+        _dispatch_setup_command,
+        _dispatch_run_command,
+        _dispatch_multi_agent_command,
+        _dispatch_experiment_command,
+        _dispatch_log_command,
+        _dispatch_workspace_command,
+        _dispatch_tool_command,
+        _dispatch_llm_command,
+        _dispatch_paper_command,
+        _dispatch_experience_command,
+    )
+    if not any(dispatch(args, cli, parsers) for dispatch in dispatchers):
         parser.print_help()
+
+
+def main(argv: list[str] | None = None) -> None:
+    _configure_stdio_errors()
+    parser, command_parsers = _build_parser()
+    args = parser.parse_args(argv)
+    if args.command != "tui":
+        _configure_cli_logging()
+
+    from cli_entry import CLI
+
+    _dispatch_command(args, CLI(), parser, command_parsers)

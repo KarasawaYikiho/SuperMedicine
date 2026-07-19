@@ -9,8 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
-from core.redaction import redact_path_for_display, redact_sensitive
-from core.log_report import resolve_log_storage_locations
+from permission.redaction import redact_path_for_display, redact_sensitive
 
 
 logger = logging.getLogger(__name__)
@@ -33,7 +32,8 @@ class AuditLogger:
     def for_project(cls, project_dir: Path) -> "AuditLogger":
         """Create an audit logger using the shared storage resolver."""
 
-        return cls(resolve_log_storage_locations(project_dir).audit_file)
+        root = Path(project_dir).resolve()
+        return cls(root / ".supermedicine" / "policies" / "audit.jsonl")
 
     @property
     def storage_path(self) -> str:

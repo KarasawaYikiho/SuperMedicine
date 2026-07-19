@@ -17,6 +17,8 @@ import os
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from core.redaction import redact_sensitive
 
 
@@ -53,23 +55,40 @@ class PluginMeta:
     language: str = "python"
     entry: str = "main.py"
     permissions_required: list[str] = field(default_factory=list)
-    provides: list[str] = field(default_factory=list)
+    provides: list[dict[str, Any]] = field(default_factory=list)
     required: bool = False
     disable_supported: bool = True
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> PluginMeta:
+        tool_id = str(data.get("id") or data["name"])
+        raw_provides = data.get("provides") or [
+            {
+                "id": f"workspace.tool.{tool_id}",
+                "description": str(
+                    data.get("description") or data.get("name") or tool_id
+                ),
+            }
+        ]
         return cls(
-            name=data["name"],
+            name=tool_id if "entrypoint" in data else data["name"],
             version=data["version"],
-            type=data["type"],
+            type=data.get("type", "tool"),
             language=data.get("language", "python"),
-            entry=data.get("entry", "main.py"),
+            entry=data.get("entry", data.get("entrypoint", "main.py")),
             permissions_required=data.get("permissions_required", []),
-            provides=data.get("provides", []),
+            provides=raw_provides,
             required=bool(data.get("required", False)),
             disable_supported=bool(data.get("disable_supported", True)),
         )
+
+    @classmethod
+    def from_manifest(cls, path: Path) -> PluginMeta:
+        """Parse either plugin.yaml or tool.yaml through one canonical path."""
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict) or not (data.get("name") or data.get("id")):
+            raise ValueError(f"Invalid plugin manifest: {path}")
+        return cls.from_dict(data)
 
 
 class BasePlugin:

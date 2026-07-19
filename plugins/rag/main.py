@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import Any
 
 from plugins.base_plugin import plugin_result
-from plugins.rag.interface import RAGProviderConfig
-from plugins.rag.local_provider import LocalRAGProvider, MockExternalVectorStoreProvider
+from plugins.rag.providers import RAGProviderConfig
+from plugins.rag.providers import LocalRAGProvider, MockExternalVectorStoreProvider
 from plugins.rag.pubmed_provider import PubmedRAGProvider
 from plugins.tools._common import required_str
 
@@ -54,10 +54,8 @@ def execute(
     try:
         if action == "rag.query":
             output = _execute_query(params, context)
-        elif action == "rag.context.store":
-            output = _execute_context_store(params)
-        elif action == "rag.context.retrieve":
-            output = _execute_context_retrieve(params)
+        elif action in {"rag.context.store", "rag.context.retrieve"}:
+            output = _execute_context(action, params)
         else:
             return plugin_result(
                 status="plugin_error",
@@ -137,18 +135,14 @@ def _execute_query(
     )
 
 
-def _execute_context_store(params: dict[str, Any]) -> dict[str, Any]:
-    key = required_str(params, "key")
-    if "data" not in params:
-        raise ValueError("data is required")
-    provider = LocalRAGProvider(_storage_dir(params))
-    provider.store_context(key, params["data"])
-    return {"key": key, "stored": True, "provider": "local"}
-
-
-def _execute_context_retrieve(params: dict[str, Any]) -> dict[str, Any]:
+def _execute_context(action: str, params: dict[str, Any]) -> dict[str, Any]:
     key = required_str(params, "key")
     provider = LocalRAGProvider(_storage_dir(params))
+    if action == "rag.context.store":
+        if "data" not in params:
+            raise ValueError("data is required")
+        provider.store_context(key, params["data"])
+        return {"key": key, "stored": True, "provider": "local"}
     data = provider.retrieve_context(key)
     return {"key": key, "data": data, "found": data is not None, "provider": "local"}
 

@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
+from importlib import resources
 from pathlib import Path
 from typing import Any
-
-import yaml
 
 from plugins.base_plugin import BasePlugin, PluginMeta
 
@@ -18,8 +17,11 @@ class PluginRegistry:
     canonical PermissionEngine path cannot be bypassed accidentally by CLI code.
     """
 
-    def __init__(self, plugins_dir: Path):
+    def __init__(
+        self, plugins_dir: Path, *, allow_package_fallback: bool = True
+    ) -> None:
         self._plugins_dir = Path(plugins_dir)
+        self._allow_package_fallback = allow_package_fallback
         self._metas: dict[str, PluginMeta] = {}
         self._plugins: dict[str, BasePlugin] = {}
         self._diagnostics: list[dict[str, Any]] = []
@@ -29,15 +31,18 @@ class PluginRegistry:
         self._metas = {}
         self._plugins = {}
         self._diagnostics = []
-        if not self._plugins_dir.exists():
+        plugins_dir = self._discovery_root()
+        if plugins_dir is None:
             return []
-        for yml in self._plugins_dir.rglob("plugin.yaml"):
+        plugin_manifests = set(plugins_dir.rglob("plugin.yaml"))
+        tool_manifests = {
+            path
+            for path in plugins_dir.rglob("tool.yaml")
+            if path.with_name("plugin.yaml") not in plugin_manifests
+        }
+        for yml in sorted(plugin_manifests | tool_manifests):
             try:
-                with open(yml, encoding="utf-8") as f:
-                    data = yaml.safe_load(f)
-                if not data or "name" not in data:
-                    continue
-                meta = PluginMeta.from_dict(data)
+                meta = PluginMeta.from_manifest(yml)
             except Exception as exc:
                 self._diagnostics.append(
                     {"status": "skipped", "manifest": str(yml), "error": str(exc)}
@@ -57,6 +62,18 @@ class PluginRegistry:
             self._plugins[meta.name] = BasePlugin(meta, yml.parent)
             found.append(meta)
         return found
+
+    def _discovery_root(self) -> Path | None:
+        """Prefer an explicit source tree, then fall back to Wheel resources."""
+        if self._plugins_dir.is_dir():
+            return self._plugins_dir
+        if not self._allow_package_fallback:
+            return None
+        try:
+            package_root = Path(str(resources.files("plugins")))
+        except (ModuleNotFoundError, TypeError):
+            return None
+        return package_root if package_root.is_dir() else None
 
     def diagnostics(self) -> list[dict[str, Any]]:
         return list(self._diagnostics)

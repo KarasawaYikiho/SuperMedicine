@@ -5,12 +5,12 @@ from __future__ import annotations
 
 import logging
 import sys
-from dataclasses import replace
 from importlib import import_module
 from pathlib import Path
 from typing import Any
 
 from core.redaction import redact_sensitive
+from core.runtime_capabilities import required_runtime_snapshot
 
 logger = logging.getLogger(__name__)
 
@@ -52,15 +52,61 @@ def _load_release_exe_to_desktop():
 
 
 _FORWARDED_COMMAND_GROUPS = {
-    "cli.commands.workspace": ("workspace_init", "workspace_list", "workspace_show", "workspace_delete"),
-    "cli.commands.tool": ("tool_init", "tool_list", "tool_scan", "tool_add", "tool_show", "tool_run"),
+    "cli.commands.workspace": (
+        "workspace_init",
+        "workspace_list",
+        "workspace_show",
+        "workspace_delete",
+    ),
+    "cli.commands.tool": (
+        "tool_init",
+        "tool_list",
+        "tool_scan",
+        "tool_add",
+        "tool_show",
+        "tool_run",
+    ),
     "cli.commands.llm": ("llm_add", "llm_list", "llm_show", "llm_switch"),
-    "cli.commands.permission": ("permission_status", "permission_set_mode", "permission_authorize", "permission_revoke"),
+    "cli.commands.permission": (
+        "permission_status",
+        "permission_set_mode",
+        "permission_authorize",
+        "permission_revoke",
+        "multi_agent_status",
+        "multi_agent_set",
+    ),
     "cli.commands.self_evolve": ("self_evolve",),
-    "cli.commands.paper": ("paper_import", "paper_list", "paper_show", "paper_edit", "paper_enrich"),
-    "cli.commands.experience": ("experience_suggest", "experience_add", "experience_list", "experience_view", "experience_edit", "experience_delete", "experience_export"),
-    "cli.commands.experiment": ("experiment_start", "experiment_list", "experiment_context", "experiment_add_config", "experiment_show", "experiment_submit"),
-    "cli.commands.log": ("log_write", "log_list", "log_show", "log_location", "log_follow"),
+    "cli.commands.paper": (
+        "paper_import",
+        "paper_list",
+        "paper_show",
+        "paper_edit",
+        "paper_enrich",
+    ),
+    "cli.commands.experience": (
+        "experience_suggest",
+        "experience_add",
+        "experience_list",
+        "experience_view",
+        "experience_edit",
+        "experience_delete",
+        "experience_export",
+    ),
+    "cli.commands.experiment": (
+        "experiment_start",
+        "experiment_list",
+        "experiment_context",
+        "experiment_add_config",
+        "experiment_show",
+        "experiment_submit",
+    ),
+    "cli.commands.log": (
+        "log_write",
+        "log_list",
+        "log_show",
+        "log_location",
+        "log_follow",
+    ),
 }
 
 _FORWARDED_COMMANDS = {
@@ -68,33 +114,6 @@ _FORWARDED_COMMANDS = {
     for module, commands in _FORWARDED_COMMAND_GROUPS.items()
     for command in commands
 }
-
-
-def required_runtime_snapshot(project_dir: Path) -> dict[str, Any]:
-    """Build the entry-point-neutral mandatory runtime health snapshot."""
-    from core.config_center import ConfigCenter
-    from core.plugin_registry import PluginRegistry
-    from core.runtime_capabilities import RuntimeInvariantError, validate_required_plugins
-
-    config_path = project_dir / ".supermedicine" / "config.yaml"
-    config = ConfigCenter(config_path)
-    registry = PluginRegistry(Path(__file__).resolve().parent / "plugins")
-    registry.discover()
-    try:
-        capabilities = validate_required_plugins(registry, config_path)
-    except RuntimeInvariantError as exc:
-        return {
-            "harness": {"required": True, "healthy": False, "disable_supported": False},
-            "rag": {"required": True, "healthy": False, "disable_supported": False, "index": ""},
-            "agents": {"mode": "single", "multi_available": True},
-            "diagnostics": [exc.to_dict()],
-        }
-    capabilities = replace(
-        capabilities,
-        agent_mode=config.get_agents_config()["mode"],
-        rag_index=str(project_dir / ".supermedicine" / "rag" / "local"),
-    )
-    return capabilities.to_dict()
 
 
 class CLI:
@@ -288,45 +307,10 @@ class CLI:
 
     def diagnose(self) -> dict:
         """Print secret-safe diagnostics for config, LLM, install artifacts, and audit log."""
-        from core.config_center import ConfigCenter
-        from core.llm_manager import LLMConfigManager
-        from core.log_report import resolve_log_storage_locations
+        from core.services import PermissionLogSystemService
 
-        project_dir = Path.cwd()
-        config = ConfigCenter(project_dir / ".supermedicine" / "config.yaml")
-        manager = LLMConfigManager(config, restore_on_startup=False)
-        storage_locations = resolve_log_storage_locations(project_dir)
-        audit_log = storage_locations.audit_file
-        config_diag: dict[str, Any] = config.diagnostics()
-        llm_diag: dict[str, Any] = manager.diagnostics()
-        result: dict[str, Any] = {
-            "ok": True,
-            "stage": "diagnose",
-            "project_dir": str(project_dir),
-            "config": config_diag,
-            "llm": llm_diag,
-            "audit": {
-                "path": str(audit_log),
-                "exists": audit_log.exists(),
-                "writable_parent": audit_log.parent.exists(),
-            },
-            "log_storage": storage_locations.to_dict(),
-            "required_runtime": required_runtime_snapshot(project_dir),
-            "commands": {
-                "init": "set provider API key env var first, then run: supermedicine init --provider <name> --base-url <url> --model <model>",
-                "llm_list": "supermedicine llm list",
-                "llm_switch": "supermedicine llm switch <provider>",
-                "tui_dry_run": "supermedicine tui --dry-run",
-                "uninstall_dry_run": "python Uninstall.py --dry-run",
-            },
-        }
-        runtime = result["required_runtime"]
-        result["ok"] = (
-            bool(config_diag.get("exists"))
-            and bool(llm_diag.get("ok"))
-            and bool(runtime["harness"]["healthy"])
-            and bool(runtime["rag"]["healthy"])
-        )
+        service = PermissionLogSystemService(Path.cwd())
+        result = service.require_data(service.system_diagnostics())
         _log_json(result)
         return result
 

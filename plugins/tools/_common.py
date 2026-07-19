@@ -72,6 +72,35 @@ def normal_cdf(z: float) -> float:
     return 0.5 * (1 + math.erf(z / math.sqrt(2)))
 
 
+def validate_survival_sample(
+    times: list[float], events: list[int], *, label: str = "data"
+) -> None:
+    """Validate shared survival lengths, missing values, and event indicators."""
+    if len(times) != len(events):
+        raise ValueError(f"{label} times and events must have the same length")
+    if not times:
+        raise ValueError(f"{label} must not be empty")
+    if any(not math.isfinite(float(time)) for time in times):
+        raise ValueError(f"{label} times must contain finite numeric values")
+    if any(event not in (0, 1) for event in events):
+        raise ValueError(f"{label} events must contain only 0 or 1")
+
+
+def validate_survival_covariates(
+    covariates: list[list[float]], subject_count: int
+) -> None:
+    if not covariates:
+        raise ValueError("at least one covariate is required")
+    if any(len(covariate) != subject_count for covariate in covariates):
+        raise ValueError("each covariate must match the survival subject count")
+    if any(
+        not math.isfinite(float(value))
+        for covariate in covariates
+        for value in covariate
+    ):
+        raise ValueError("covariates must contain finite numeric values")
+
+
 def required_str(params: dict[str, Any], key: str) -> str:
     """Extract a required non-empty string parameter.
 

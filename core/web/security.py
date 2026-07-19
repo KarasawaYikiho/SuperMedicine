@@ -63,8 +63,8 @@ def verify_token(supplied_token: str, expected_token: str) -> bool:
     )
 
 
-def resolve_artifact_path(root: Path, artifact_id: str) -> Path:
-    """Return the JSON path for a safe artifact ID contained by *root*."""
+def validate_artifact_id(artifact_id: str) -> None:
+    """Reject artifact identifiers that cannot name one managed JSON record."""
     if (
         not _ARTIFACT_ID.fullmatch(artifact_id)
         or artifact_id in {".", ".."}
@@ -72,6 +72,11 @@ def resolve_artifact_path(root: Path, artifact_id: str) -> Path:
         or "\\" in artifact_id
     ):
         raise APIError(400, "invalid_artifact_id", "Invalid artifact ID")
+
+
+def resolve_artifact_path(root: Path, artifact_id: str) -> Path:
+    """Return the JSON path for a safe artifact ID contained by *root*."""
+    validate_artifact_id(artifact_id)
 
     resolved_root = root.resolve()
     candidate = (resolved_root / f"{artifact_id}.json").resolve()

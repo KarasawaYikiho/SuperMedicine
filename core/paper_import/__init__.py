@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
-from core.paper_import.errors import (
+import sys
+
+from core.paper_import import contracts as _contracts
+from core.paper_import.contracts import (
     MissingPaperSourceError,
     PaperImportError,
     PaperMetadataError,
+    SUPPORTED_PAPER_EXTENSIONS,
+    PaperImportResult,
+    PaperMetadata,
     UnsupportedPaperFormatError,
 )
+
 from core.paper_import.enrichment import (
     LocalMockMetadataProvider,
     PaperEnricher,
@@ -15,11 +22,9 @@ from core.paper_import.enrichment import (
     PaperMetadataProvider,
 )
 from core.paper_import.importer import PaperImporter
-from core.paper_import.models import (
-    SUPPORTED_PAPER_EXTENSIONS,
-    PaperImportResult,
-    PaperMetadata,
-)
+
+sys.modules.setdefault("core.paper_import.errors", _contracts)
+sys.modules.setdefault("core.paper_import.models", _contracts)
 
 __all__ = [
     "SUPPORTED_PAPER_EXTENSIONS",

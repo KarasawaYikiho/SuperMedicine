@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 from agents.checkpoint import CheckpointManager
-from plugins.harness.checkpoint_verifier import CheckpointVerifier
+from plugins.harness import CheckpointVerifier
 
 
 # ═══ Checkpoint Manager Tests ═══

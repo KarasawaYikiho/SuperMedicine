@@ -2,9 +2,18 @@
 
 from __future__ import annotations
 
-from core.llm_providers.base import AnthropicClient, ConfiguredLLMClient, OpenAIClient
+import sys
+
+from core.llm_providers import base as _base
+from core.llm_providers.base import (
+    AnthropicClient,
+    ConfiguredLLMClient,
+    OpenAIClient,
+    OpenRouterClient,
+)
 from core.llm_providers.config import LLMProviderConfig
-from core.llm_providers.openrouter import OpenRouterClient
+
+sys.modules.setdefault("core.llm_providers.openrouter", _base)
 
 __all__ = [
     "AnthropicClient",

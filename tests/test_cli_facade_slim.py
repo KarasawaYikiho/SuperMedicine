@@ -55,3 +55,26 @@ def test_cli_facade_forwards_llm_commands(monkeypatch):
 
     assert "llm_list" not in CLI.__dict__
     assert CLI().llm_list() == {"providers": []}
+
+
+def test_cli_facade_exposes_persisted_multi_agent_switch(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    cli = CLI()
+
+    assert cli.multi_agent_status() == {"enabled": False}
+    enabled = cli.multi_agent_set(True)
+
+    assert enabled["enabled"] is True
+    assert "四角色" in enabled["message"]
+    assert CLI().multi_agent_status() == {"enabled": True}
+
+
+def test_cli_parser_can_enable_and_disable_multi_agent(tmp_path, monkeypatch):
+    from cli.parser import main
+
+    monkeypatch.chdir(tmp_path)
+
+    main(["multi-agent", "enable"])
+    assert CLI().multi_agent_status()["enabled"] is True
+    main(["multi-agent", "disable"])
+    assert CLI().multi_agent_status()["enabled"] is False

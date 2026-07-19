@@ -19,8 +19,7 @@ from textual.containers import Horizontal, ScrollableContainer, Vertical
 from textual.widgets import Input, ListView, Static
 from textual.timer import Timer
 
-from core.config_center import ConfigCenter
-from core.llm_manager import LLMConfigManager
+from core.services import LLMService, PermissionLogSystemService
 from core.tui.i18n import LABELS, t
 from core.tui.opentui_runtime import (
     OpenTUIRuntimeError,
@@ -645,10 +644,10 @@ class SuperMedicineTUI(App[Any]):
 
     def _workspace_count(self) -> int:
         try:
-            from core.workspace import WorkspaceManager
+            from core.services import WorkspaceService
 
-            manager = WorkspaceManager(self.project_root)
-            return len(manager.list_workspaces())
+            service = WorkspaceService(self.project_root)
+            return len(service.require_data(service.list()))
         except Exception:
             return 0
 
@@ -895,16 +894,16 @@ class SuperMedicineTUI(App[Any]):
             "message": f"{header}\n{t('chat_result_output')}:\n{output}",
         }
 
-    def _llm_manager(self) -> LLMConfigManager:
-        config_path = self.project_root / ".supermedicine" / "config.yaml"
-        return LLMConfigManager(ConfigCenter(config_path))
+    def _llm_service(self) -> LLMService:
+        return LLMService(self.project_root, restore_on_startup=True)
 
     def _llm_status_label(self) -> str:
         try:
-            manager = self._llm_manager()
-            current = manager.get_current_provider(redacted=True)
+            service = self._llm_service()
+            current_result = service.show_provider()
+            current = current_result.data or {} if current_result.ok else {}
             provider = str(current.get("provider") or "")
-            if provider and manager.validate_provider(provider) is None:
+            if provider and service.validate_provider(provider).ok:
                 return f"🤖 {provider} {t('llm_ready')}"
             return f"🤖 {t('llm_not_ready')}"
         except Exception:
@@ -912,14 +911,17 @@ class SuperMedicineTUI(App[Any]):
 
     def _permission_status_label(self) -> str:
         try:
-            config = ConfigCenter(self.project_root / ".supermedicine" / "config.yaml")
-            return f"🛡️ 权限：{config.get_permission_mode_label()}"
+            service = PermissionLogSystemService(self.project_root)
+            config = service.require_data(service.permission_status())
+            label = "完全访问" if config.get("mode") == "full" else "保守"
+            return f"🛡️ 权限：{label}"
         except Exception:
             return "🛡️ 权限：保守"
 
     def _persist_current_view(self, view_id: str) -> None:
         try:
-            ConfigCenter(self._config_path).set_current_view(view_id, save=True)
+            service = PermissionLogSystemService(self.project_root)
+            service.require_data(service.set_current_view(view_id))
         except Exception:
             logger.warning(
                 "TUI runtime state sync failed: stage=current_view view=%s",
@@ -928,7 +930,7 @@ class SuperMedicineTUI(App[Any]):
 
     def _save_llm_exit_state(self) -> None:
         try:
-            self._llm_manager().save_exit_state()
+            self._llm_service().save_exit_state()
         except Exception:
             pass
 
@@ -979,11 +981,10 @@ def launch_tui(
     shortcut_hint = shell.shortcut_hint_text()
     status_message = t("dry_run_status") if dry_run else t("welcome")
     runtime = runtime_info()
-    config_load_error = (
-        ConfigCenter(root / ".supermedicine" / "config.yaml")
-        .diagnostics()
-        .get("load_error", "")
-    )
+    system_service = PermissionLogSystemService(root)
+    config_load_error = system_service.require_data(
+        system_service.config_diagnostics()
+    ).get("load_error", "")
     if dry_run:
         llm_text = (
             f"{t('llm_ready')}: {llm_provider}" if llm_ready else t("llm_not_ready")

@@ -108,125 +108,112 @@ class PermissionEngine:
             context: 运行时上下文（用于 hard_limits 检查；Kernel 插件执行也会记录
                 plugin/action/task 等上下文，确保 CLI 与运行时共用同一策略路径）
         """
-        if agent_id not in self._policies:
-            self._audit.log(
-                agent_id=agent_id,
-                action=action,
-                resource=resource,
-                result="DENIED",
-                reason="unknown_agent",
+        policy = self._policies.get(agent_id)
+        if policy is None:
+            return self._deny(agent_id, action, resource, "unknown_agent")
+
+        full_access_denial = self._full_access_denial_reason(context)
+        if full_access_denial:
+            return self._deny(
+                agent_id,
+                action,
+                resource,
+                full_access_denial,
+                context=self._full_access_audit_context(context),
             )
-            return PermissionResult.DENIED
 
-        policy = self._policies[agent_id]
+        hard_limit_denial = self._hard_limit_denial_reason(policy, context)
+        if hard_limit_denial:
+            return self._deny(agent_id, action, resource, hard_limit_denial)
 
-        if context and context.get("access_mode") == "full":
-            if context.get("high_risk_operation") and not context.get(
-                "explicit_authorization"
-            ):
-                self._audit.log(
-                    agent_id=agent_id,
-                    action=action,
-                    resource=resource,
-                    result="DENIED",
-                    reason="full_access_high_risk_requires_explicit_authorization",
-                    context={
-                        "access_mode": context.get("access_mode"),
-                        "high_risk_operation": context.get("high_risk_operation"),
-                        "explicit_authorization": context.get("explicit_authorization"),
-                        "risk_notice_acknowledged": context.get(
-                            "risk_notice_acknowledged"
-                        ),
-                    },
-                )
-                return PermissionResult.DENIED
-            if context.get("high_risk_operation") and not context.get(
-                "risk_notice_acknowledged"
-            ):
-                self._audit.log(
-                    agent_id=agent_id,
-                    action=action,
-                    resource=resource,
-                    result="DENIED",
-                    reason="full_access_high_risk_requires_risk_notice_acknowledgement",
-                    context={
-                        "access_mode": context.get("access_mode"),
-                        "high_risk_operation": context.get("high_risk_operation"),
-                        "explicit_authorization": context.get("explicit_authorization"),
-                        "risk_notice_acknowledged": context.get(
-                            "risk_notice_acknowledged"
-                        ),
-                    },
-                )
-                return PermissionResult.DENIED
-
-        # 先检查 hard_limits
-        if context and policy.hard_limits:
-            if (
-                context.get("requires_network")
-                and policy.hard_limits.network_access is False
-            ):
-                self._audit.log(
-                    agent_id=agent_id,
-                    action=action,
-                    resource=resource,
-                    result="DENIED",
-                    reason="hard_limit_exceeded:network_access:false",
-                )
-                return PermissionResult.DENIED
-            if (
-                context.get("requires_external_api")
-                and policy.hard_limits.external_api is False
-            ):
-                self._audit.log(
-                    agent_id=agent_id,
-                    action=action,
-                    resource=resource,
-                    result="DENIED",
-                    reason="hard_limit_exceeded:external_api:false",
-                )
-                return PermissionResult.DENIED
-            for limit_name, limit_value in policy.hard_limits.items():
-                ctx_value = context.get(limit_name)
-                if ctx_value is not None and ctx_value > limit_value:
-                    reason = (
-                        f"hard_limit_exceeded:{limit_name}:{ctx_value}>{limit_value}"
-                    )
-                    self._audit.log(
-                        agent_id=agent_id,
-                        action=action,
-                        resource=resource,
-                        result="DENIED",
-                        reason=reason,
-                    )
-                    return PermissionResult.DENIED
-
-        # 检查 Allowed/Denied 规则
         result = policy.check(action, resource)
-        reason = (
-            "whitelist_match"
-            if result == PermissionResult.ALLOWED
-            else "blacklist_match_or_default_deny"
-        )
-        if (
-            result == PermissionResult.ALLOWED
-            and context
-            and context.get("access_mode") == "full"
-        ):
-            reason = "full_access_explicit_authorization_preserved:risk_notice_required_for_high_risk"
+        reason = self._policy_result_reason(result, context)
         self._audit.log(
             agent_id=agent_id,
             action=action,
             resource=resource,
             result=result.value,
             reason=reason,
-            context={
-                "access_mode": context.get("access_mode"),
-                "explicit_authorization": context.get("explicit_authorization"),
-                "risk_notice_acknowledged": context.get("risk_notice_acknowledged"),
-                "high_risk_operation": context.get("high_risk_operation"),
-            }
-            if context and context.get("access_mode") == "full"
-            else None,
+            context=self._full_access_audit_context(context),
         )
         return result
+
+    def _deny(
+        self,
+        agent_id: str,
+        action: str,
+        resource: str,
+        reason: str,
+        *,
+        context: dict[str, Any] | None = None,
+    ) -> PermissionResult:
+        self._audit.log(
+            agent_id=agent_id,
+            action=action,
+            resource=resource,
+            result="DENIED",
+            reason=reason,
+            context=context,
+        )
+        return PermissionResult.DENIED
+
+    @staticmethod
+    def _full_access_denial_reason(context: dict[str, Any] | None) -> str | None:
+        if not context or context.get("access_mode") != "full":
+            return None
+        if context.get("high_risk_operation") and not context.get(
+            "explicit_authorization"
+        ):
+            return "full_access_high_risk_requires_explicit_authorization"
+        if context.get("high_risk_operation") and not context.get(
+            "risk_notice_acknowledged"
+        ):
+            return "full_access_high_risk_requires_risk_notice_acknowledgement"
+        return None
+
+    @staticmethod
+    def _hard_limit_denial_reason(
+        policy: PermissionPolicy, context: dict[str, Any] | None
+    ) -> str | None:
+        if not context or not policy.hard_limits:
+            return None
+        if context.get("requires_network") and policy.hard_limits.network_access is False:
+            return "hard_limit_exceeded:network_access:false"
+        if (
+            context.get("requires_external_api")
+            and policy.hard_limits.external_api is False
+        ):
+            return "hard_limit_exceeded:external_api:false"
+        for limit_name, limit_value in policy.hard_limits.items():
+            context_value = context.get(limit_name)
+            if context_value is not None and context_value > limit_value:
+                return f"hard_limit_exceeded:{limit_name}:{context_value}>{limit_value}"
+        return None
+
+    @staticmethod
+    def _full_access_audit_context(
+        context: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        if not context or context.get("access_mode") != "full":
+            return None
+        keys = (
+            "access_mode",
+            "explicit_authorization",
+            "risk_notice_acknowledged",
+            "high_risk_operation",
+        )
+        return {key: context.get(key) for key in keys}
+
+    @staticmethod
+    def _policy_result_reason(
+        result: PermissionResult, context: dict[str, Any] | None
+    ) -> str:
+        if (
+            result == PermissionResult.ALLOWED
+            and context
+            and context.get("access_mode") == "full"
+        ):
+            return "full_access_explicit_authorization_preserved:risk_notice_required_for_high_risk"
+        if result == PermissionResult.ALLOWED:
+            return "whitelist_match"
+        return "blacklist_match_or_default_deny"

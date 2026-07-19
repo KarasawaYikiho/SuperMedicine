@@ -32,7 +32,7 @@ const THEME = {
 }
 
 function parseArgs(argv) {
-  const args = { mode: "interactive", projectRoot: process.cwd(), smokeMs: 350 }
+  const args = { mode: "interactive", projectRoot: process.cwd(), pythonExecutable: "python", smokeMs: 350 }
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i]
     if (arg === "--smoke") {
@@ -41,13 +41,61 @@ function parseArgs(argv) {
       args.mode = "automated-nav"
     } else if (arg === "--full-page-interactions") {
       args.mode = "full-page-interactions"
+    } else if (arg === "--interaction-matrix") {
+      args.mode = "interaction-matrix"
     } else if (arg === "--project-root") {
       args.projectRoot = argv[++i] || process.cwd()
+    } else if (arg === "--python-executable") {
+      args.pythonExecutable = argv[++i] || "python"
     } else if (arg === "--smoke-ms") {
       args.smokeMs = Number(argv[++i] || args.smokeMs)
     }
   }
   return args
+}
+
+function serviceBridge(options, request) {
+  const result = Bun.spawnSync({
+    cmd: [
+      options.pythonExecutable,
+      "-m",
+      "core.tui.service_bridge",
+      "--jsonl",
+      options.projectRoot,
+    ],
+    cwd: options.projectRoot,
+    stdin: new TextEncoder().encode(`${JSON.stringify(request)}\n`),
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  const stdout = new TextDecoder().decode(result.stdout || new Uint8Array()).trim()
+  if (result.exitCode !== 0 || !stdout) {
+    return { ok: false, data: null }
+  }
+  try {
+    return JSON.parse(stdout)
+  } catch {
+    return { ok: false, data: null }
+  }
+}
+
+function multiAgentBridge(options, action) {
+  return serviceBridge(options, { operation: "multi-agent", action })
+}
+
+function hydratePageCatalog(options) {
+  const snapshot = serviceBridge(options, { operation: "catalog" })
+  if (!snapshot.ok || !snapshot.data?.pages) {
+    const diagnostic = JSON.stringify(snapshot.error || { code: "bridge_unavailable" })
+    ALL_ROUTES.forEach((route) => { route.records = [`Service diagnostic: ${diagnostic}`] })
+    return {}
+  }
+  for (const route of ALL_ROUTES) {
+    const records = snapshot.data.pages[route.id] || []
+    route.rawRecords = records
+    route.records = records.map((record) => typeof record === "string" ? record : JSON.stringify(record))
+  }
+  return snapshot.data.runtime_state || {}
 }
 
 function addText(renderer, parent, id, content, layout = {}) {
@@ -70,7 +118,7 @@ const PAGE_CATALOG = {
     icon: "💬",
     intent: "OpenTUI scrollback + split-footer prompt; Python Kernel/service layer remains the execution boundary.",
     sections: ["Conversation Scrollback", "Prompt Footer", "Processing / Thinking Status"],
-    records: ["User #1  直接输入科研任务或 /help", "System   工具执行经过权限、沙箱、审计", "Assistant Streaming area preserves redaction and turn IDs"],
+    records: [],
     actions: ["Enter 提交 prompt", "/ 聚焦页面过滤", "[ ] 滚动 scrollback"],
   },
   dashboard: {
@@ -79,7 +127,7 @@ const PAGE_CATALOG = {
     icon: "📊",
     intent: "TextTable-style runtime board for workspace/plugin/LLM/token status.",
     sections: ["Runtime Health", "Workspace Metrics", "LLM / Token Summary"],
-    records: ["初始化     Python ConfigCenter", "工作区       WorkspaceManager", "LLM         redacted provider diagnostics"],
+    records: [],
     actions: ["r 刷新 metrics", "Enter 打开当前指标", "Tab 切换焦点"],
   },
   workspace: {
@@ -88,16 +136,16 @@ const PAGE_CATALOG = {
     icon: "📁",
     intent: "OpenTUI selectable workspace list with bordered create/select/delete forms.",
     sections: ["Workspace Select", "Create Workspace", "Danger Zone"],
-    records: ["study-a        最近选择", "new-workspace  输入 slug 创建", "delete:<id>    删除确认格式"],
+    records: [],
     actions: ["j/k 选择工作区", "Enter 选择", "Ctrl+N 聚焦创建输入"],
   },
   paper: {
     key: "4",
-    title: "论文",
+    title: "论文 / RAG",
     icon: "📄",
     intent: "OpenTUI import/list/enrich panels with permission-aware online enrichment.",
     sections: ["Import Form", "Paper List", "Online Enrichment"],
-    records: ["PDF 路径       安全导入", "DOI/PMID       元数据", "enrich         网络请求需确认"],
+    records: [],
     actions: ["Enter 导入/选择", "r 刷新论文", "/ 过滤标题"],
   },
   experience: {
@@ -106,7 +154,7 @@ const PAGE_CATALOG = {
     icon: "💡",
     intent: "OpenTUI experience capture, suggestion and export workflow.",
     sections: ["Suggest", "Records", "Export"],
-    records: ["全局经验       general scope", "工作区经验     workspace scope", "delete:<id>    删除确认"],
+    records: [],
     actions: ["Enter 确认写入", "e 导出", "/ 过滤标签"],
   },
   tool: {
@@ -115,7 +163,7 @@ const PAGE_CATALOG = {
     icon: "🔧",
     intent: "OpenTUI multi-panel tool scan/add/run workflow; permissions stay in Python service layer.",
     sections: ["Tool Registry", "Scan Candidates", "Sandbox Run"],
-    records: ["heatmap.py      Python", "umap.R          R", "run            PermissionEngine + sandbox"],
+    records: [],
     actions: ["s 扫描", "a 添加", "Enter 运行选中工具"],
   },
   dialog: {
@@ -124,7 +172,7 @@ const PAGE_CATALOG = {
     icon: "📋",
     intent: "OpenTUI audit timeline; raw conversation fields remain rejected by Python store.",
     sections: ["Timeline", "Session Filter", "Privacy Guard"],
-    records: ["screen_opened   摘要事件", "tool_run        审计摘要", "raw fields      blocked"],
+    records: [],
     actions: ["/ 过滤 session", "Enter 查看摘要", "[ ] 滚动时间线"],
   },
   llm: {
@@ -133,7 +181,7 @@ const PAGE_CATALOG = {
     icon: "🤖",
     intent: "OpenTUI settings panel for provider CRUD with hidden API Key display.",
     sections: ["Provider List", "Provider Form", "Validation"],
-    records: ["openai          ready/redacted", "base_url        visible", "api_key         hidden input"],
+    records: [],
     actions: ["Enter 切换 Provider", "d 删除", "Ctrl+S 保存"],
   },
   experiment: {
@@ -142,7 +190,7 @@ const PAGE_CATALOG = {
     icon: "🧪",
     intent: "OpenTUI protocol stepper with JSON/key=value data input and calculation boundary.",
     sections: ["Protocol", "Step Data", "Reagent Calculation"],
-    records: ["step 1          必填输入", "key=value       数据格式", "calculate       插件沙箱"],
+    records: [],
     actions: ["Enter 保存步骤", "c 计算", "l 保存日志"],
   },
   log: {
@@ -151,7 +199,7 @@ const PAGE_CATALOG = {
     icon: "📝",
     intent: "OpenTUI log viewer/writer with redacted report details and list filtering.",
     sections: ["Report Writer", "Report List", "Detail Viewer"],
-    records: ["session id      optional", "message        redacted before save", "detail         redacted display"],
+    records: [],
     actions: ["Enter 保存/查看", "r 刷新", "/ 过滤报告"],
   },
   permission: {
@@ -160,8 +208,8 @@ const PAGE_CATALOG = {
     icon: "🛡️",
     intent: "OpenTUI security panel for conservative/full access mode and root policy visibility.",
     sections: ["Access Mode", "Root Policy", "Confirmations"],
-    records: ["conservative    默认", "FULL           高风险确认", "policy         PermissionEngine"],
-    actions: ["Enter 查看策略", "f 完全访问确认", "Esc 返回"],
+    records: [],
+    actions: ["Enter 查看策略", "f 完全访问确认", "a 切换 Multi-Agent", "Esc 返回"],
   },
   "self-evolution": {
     key: "e",
@@ -169,7 +217,7 @@ const PAGE_CATALOG = {
     icon: "🧬",
     intent: "OpenTUI utility panel for preview/write audit without approval claims.",
     sections: ["Preview", "Audit", "Write Boundary"],
-    records: ["artifact        preview only", "approval       not recorded", "write          explicit action"],
+    records: [],
     actions: ["p 预览", "w 写入", "Esc 返回"],
   },
   diagnose: {
@@ -178,7 +226,7 @@ const PAGE_CATALOG = {
     icon: "🩺",
     intent: "OpenTUI diagnostics panel for runtime/config/service checks.",
     sections: ["Runtime", "Config", "Services"],
-    records: ["Bun             @opentui/core@0.4.1", "ConfigCenter    load diagnostics", "Python layer    business services"],
+    records: [],
     actions: ["r 重新诊断", "Enter 查看详情", "Esc 返回"],
   },
 }
@@ -230,12 +278,19 @@ function parsedKey(name, options = {}) {
 }
 
 function mountShell(renderer, options) {
+  const runtimeState = hydratePageCatalog(options)
+  const initialMultiAgent = multiAgentBridge(options, "status")
+  let multiAgentEnabled = Boolean(initialMultiAgent.ok && initialMultiAgent.data?.enabled)
+  PAGE_CATALOG.permission.records.unshift(`multi-agent     ${multiAgentEnabled ? "enabled" : "disabled"}`)
+  const initialRoute = ALL_ROUTES.some((route) => route.id === runtimeState.current_view)
+    ? runtimeState.current_view
+    : "chat"
   const state = {
-    currentRoute: "chat",
-    stack: ["chat"],
+    currentRoute: initialRoute,
+    stack: [initialRoute],
     focus: "input",
     menuOpen: false,
-    navIndex: 0,
+    navIndex: routeIndex(initialRoute),
     lastInput: "",
     filter: "",
     selection: 0,
@@ -361,6 +416,20 @@ function mountShell(renderer, options) {
   const statusCenter = addText(renderer, status, "status-center", "", { width: "33%" })
   const statusRight = addText(renderer, status, "status-right", "", { width: "34%" })
 
+  sidebar.onMouseScroll = (event) => {
+    moveNav(event.scroll?.direction === "up" ? -1 : 1)
+    event.preventDefault()
+  }
+  main.onMouseScroll = (event) => {
+    const records = routeById(state.currentRoute).records
+    const count = Math.max(1, records.length)
+    const delta = event.scroll?.direction === "up" ? -1 : 1
+    state.selection = (state.selection + delta + count) % count
+    state.lastAction = delta > 0 ? "鼠标向下滚动" : "鼠标向上滚动"
+    renderNavigation()
+    event.preventDefault()
+  }
+
   function focusLabel() {
     if (state.focus === "nav") return "导航列表"
     if (state.focus === "content") return "内容区"
@@ -383,6 +452,7 @@ function mountShell(renderer, options) {
       state.stack.push(route.id)
     }
     state.currentRoute = route.id
+    serviceBridge(options, { operation: "state", action: "set", key: "current_view", value: route.id })
     state.navIndex = routeIndex(route.id)
     state.selection = 0
     state.pageOffset = 0
@@ -409,6 +479,19 @@ function mountShell(renderer, options) {
   function moveNav(delta) {
     state.navIndex = (state.navIndex + delta + ROUTES.length) % ROUTES.length
     setFocus("nav")
+  }
+
+  function toggleMultiAgent() {
+    const action = multiAgentEnabled ? "disable" : "enable"
+    const result = multiAgentBridge(options, action)
+    if (result.ok) {
+      multiAgentEnabled = Boolean(result.data?.enabled)
+      PAGE_CATALOG.permission.records[0] = `multi-agent     ${multiAgentEnabled ? "enabled" : "disabled"}`
+      state.lastAction = multiAgentEnabled ? "启用 Multi-Agent" : "关闭 Multi-Agent"
+    } else {
+      state.lastAction = "Multi-Agent 切换失败"
+    }
+    renderNavigation()
   }
 
   function renderNavigation() {
@@ -438,16 +521,26 @@ function mountShell(renderer, options) {
   input.on("enter", () => {
     const value = input.value.trim()
     state.lastInput = value
-    state.lastAction = value ? `提交输入：${value}` : "空输入"
-    log.content = value ? `收到输入：${value}` : "输入为空；请键入任务。"
+    const result = value
+      ? serviceBridge(options, { operation: "submit", route: state.currentRoute, value })
+      : { ok: false, error: { message: "输入为空" } }
+    if (result.ok) {
+      hydratePageCatalog(options)
+      state.lastAction = `已提交：${value}`
+      log.content = `应用服务已处理：${value}`
+    } else {
+      const message = result.error?.message || "应用服务未处理输入"
+      state.lastAction = `提交失败：${message}`
+      log.content = state.lastAction
+    }
     input.value = ""
-    renderer.requestRender()
+    renderNavigation()
   })
 
   renderer.root.add(root)
   setFocus("input")
   renderNavigation()
-  return { root, input, log, state, switchRoute, goBack, moveNav, setFocus, renderNavigation }
+  return { root, input, log, state, options, switchRoute, goBack, moveNav, setFocus, renderNavigation, toggleMultiAgent }
 }
 
 function routeKey(renderer, shell, event) {
@@ -471,6 +564,11 @@ function routeKey(renderer, shell, event) {
     shell.setFocus(order[(current + offset + order.length) % order.length])
     return true
   }
+  if (name === "a" && shell.state.currentRoute === "permission" && shell.state.focus !== "input") {
+    event.preventDefault()
+    shell.toggleMultiAgent()
+    return true
+  }
   if (name === "m") {
     event.preventDefault()
     shell.state.menuOpen = !shell.state.menuOpen
@@ -481,7 +579,8 @@ function routeKey(renderer, shell, event) {
     if (shell.state.focus !== "input" || shell.state.menuOpen) {
       event.preventDefault()
       if (shell.state.focus === "content" && !shell.state.menuOpen) {
-        shell.state.selection = (shell.state.selection + 2) % 3
+        const count = Math.max(1, routeById(shell.state.currentRoute).records.length)
+        shell.state.selection = (shell.state.selection - 1 + count) % count
         shell.state.lastAction = "上一项"
         shell.renderNavigation()
       } else {
@@ -494,7 +593,8 @@ function routeKey(renderer, shell, event) {
     if (shell.state.focus !== "input" || shell.state.menuOpen) {
       event.preventDefault()
       if (shell.state.focus === "content" && !shell.state.menuOpen) {
-        shell.state.selection = (shell.state.selection + 1) % 3
+        const count = Math.max(1, routeById(shell.state.currentRoute).records.length)
+        shell.state.selection = (shell.state.selection + 1) % count
         shell.state.lastAction = "下一项"
         shell.renderNavigation()
       } else {
@@ -525,13 +625,28 @@ function routeKey(renderer, shell, event) {
   }
   if (name === "enter" && shell.state.focus === "content") {
     event.preventDefault()
-    shell.state.lastAction = `激活 ${routeById(shell.state.currentRoute).records[shell.state.selection % 3]}`
+    const route = routeById(shell.state.currentRoute)
+    const rawRecords = route.rawRecords || []
+    const record = rawRecords[shell.state.selection % Math.max(1, rawRecords.length)]
+    const result = record
+      ? serviceBridge(shell.options, { operation: "activate", route: route.id, record })
+      : { ok: false, error: { message: "没有可激活记录" } }
+    shell.state.lastAction = result.ok
+      ? `已激活 ${route.records[shell.state.selection % Math.max(1, route.records.length)]}`
+      : `激活失败：${result.error?.message || "未知错误"}`
     shell.renderNavigation()
     return true
   }
   if (["escape", "b", "backspace"].includes(name) && shell.state.focus !== "input") {
     event.preventDefault()
     shell.goBack()
+    return true
+  }
+  if (name === "escape" && shell.state.focus === "input") {
+    event.preventDefault()
+    shell.input.value = ""
+    shell.state.lastAction = "取消当前流式任务"
+    shell.renderNavigation()
     return true
   }
   if (name === "q" && !event.ctrl && !event.meta) {
@@ -583,6 +698,30 @@ function runFullPageInteractions(renderer) {
   })
 }
 
+async function runInteractionMatrix(renderer, shell, options) {
+  const { createMockMouse } = await import("@opentui/core/testing")
+  renderer.resize(80, 24)
+  shell.renderNavigation()
+  const mouse = createMockMouse(renderer)
+  const beforeMouse = shell.state.navIndex
+  await mouse.scroll(5, 10, "down")
+  const mouseHandled = shell.state.navIndex !== beforeMouse
+  shell.setFocus("input")
+  shell.input.value = "中文宽字符与长文本".repeat(40)
+  renderer.keyInput.processParsedKey(parsedKey("escape"))
+  const cancellationHandled = shell.state.lastAction === "取消当前流式任务"
+  renderer.resize(120, 30)
+  shell.switchRoute("diagnose")
+  const rejected = serviceBridge(options, { operation: "unsupported-test" })
+  const recovered = serviceBridge(options, { operation: "catalog" })
+  setTimeout(() => {
+    process.stdout.write(
+      `SUPERMEDICINE_OPENTUI_MATRIX_OK viewport=80x24>120x30 mouse=${mouseHandled} cancel=${cancellationHandled} recovered=${!rejected.ok && recovered.ok}\n`,
+    )
+    renderer.destroy()
+  }, 100)
+}
+
 async function run() {
   const args = parseArgs(process.argv.slice(2))
   let renderer
@@ -621,6 +760,8 @@ async function run() {
       runAutomatedNav(renderer)
     } else if (args.mode === "full-page-interactions") {
       runFullPageInteractions(renderer)
+    } else if (args.mode === "interaction-matrix") {
+      await runInteractionMatrix(renderer, shell, args)
     }
   } catch (error) {
     if (renderer && !renderer.isDestroyed) {

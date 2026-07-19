@@ -159,13 +159,11 @@ def _correlation_matrix(df: pd.DataFrame, cont_cols: list[str]) -> dict | None:
     pairs: list[dict] = []
     cols = corr.columns.tolist()
     for i, a in enumerate(cols):
-        for b in cols[i + 1:]:
+        for b in cols[i + 1 :]:
             r = float(corr.loc[a, b])
-            pairs.append({"a": a, "b": b, "r": r,
-                          "magnitude": _label_r(r)})
+            pairs.append({"a": a, "b": b, "r": r, "magnitude": _label_r(r)})
     pairs.sort(key=lambda x: -abs(x["r"]))
-    return {"columns": cols, "matrix": corr.round(3).to_dict(),
-            "pairs_sorted": pairs}
+    return {"columns": cols, "matrix": corr.round(3).to_dict(), "pairs_sorted": pairs}
 
 
 def _label_r(r: float) -> str:
@@ -202,8 +200,11 @@ def _suggest_charts(info: dict) -> list[str]:
     """Translate data features into chart-type suggestions."""
     cols = info["columns"]
     cont = [c for c, m in cols.items() if m["type"] == TYPE_CONTINUOUS]
-    cats = [c for c, m in cols.items()
-            if m["type"] in (TYPE_CATEGORICAL, TYPE_BOOLEAN, TYPE_ORDINAL)]
+    cats = [
+        c
+        for c, m in cols.items()
+        if m["type"] in (TYPE_CATEGORICAL, TYPE_BOOLEAN, TYPE_ORDINAL)
+    ]
     dt = [c for c, m in cols.items() if m["type"] == TYPE_DATETIME]
     group = info.get("group_summary")
     suggestions: list[str] = []
@@ -211,30 +212,36 @@ def _suggest_charts(info: dict) -> list[str]:
     if dt and cont:
         suggestions.append(
             f"Time series detected: line chart ({dt[0]} as x-axis, "
-            f"{cont[0]}{'/' + cont[1] if len(cont) > 1 else ''} as y-axis) + error band")
+            f"{cont[0]}{'/' + cont[1] if len(cont) > 1 else ''} as y-axis) + error band"
+        )
 
     if cats and cont:
         if group and group.get("small_groups_flag"):
             suggestions.append(
                 "Categorical vs continuous, small sample (n<10 per group) -> "
                 "**box/violin + stripplot overlay raw points**; "
-                "**avoid** mean-only bar chart (hides distribution).")
+                "**avoid** mean-only bar chart (hides distribution)."
+            )
         else:
             suggestions.append(
                 "Categorical vs continuous, adequate sample -> box / violin, "
-                "or bar chart with error bars (annotate SD/SEM/CI)")
+                "or bar chart with error bars (annotate SD/SEM/CI)"
+            )
 
     if len(cont) >= 2:
         if len(cont) == 2:
             suggestions.append(
-                f"Two continuous variables {cont[0]} vs {cont[1]} -> scatter (with regression fit + r value)")
+                f"Two continuous variables {cont[0]} vs {cont[1]} -> scatter (with regression fit + r value)"
+            )
         else:
             suggestions.append(
-                f">=3 continuous variables -> correlation heatmap ({cont[:5]}) or pairplot")
+                f">=3 continuous variables -> correlation heatmap ({cont[:5]}) or pairplot"
+            )
 
     if len(cont) >= 1 and not cats and not dt:
         suggestions.append(
-            f"Single continuous variable {cont[0]} -> histogram / KDE / boxplot for distribution")
+            f"Single continuous variable {cont[0]} -> histogram / KDE / boxplot for distribution"
+        )
 
     if len(cats) >= 2 and len(cont) >= 1:
         n_combo = 1
@@ -243,20 +250,25 @@ def _suggest_charts(info: dict) -> list[str]:
         if n_combo > 12:
             suggestions.append(
                 f"Categorical dimension combinations = {n_combo} ({', '.join(cats)} full cross), "
-                "**one figure cannot fit** -- consider splitting by one dimension into multi-panels, or select subset.")
+                "**one figure cannot fit** -- consider splitting by one dimension into multi-panels, or select subset."
+            )
 
     for c in cont:
         m = cols[c]
         if m.get("needs_log_axis"):
             suggestions.append(
-                f"{c} spans multiple orders of magnitude ({m['min']:.3g} ~ {m['max']:.3g}) -> use log y-axis")
+                f"{c} spans multiple orders of magnitude ({m['min']:.3g} ~ {m['max']:.3g}) -> use log y-axis"
+            )
         elif m.get("skew_label") == "highly skewed":
             suggestions.append(
                 f"{c} highly skewed (skew={m['skewness']:.2f}) -> "
-                "consider log transform or violin instead of mean bar")
+                "consider log transform or violin instead of mean bar"
+            )
 
     if not suggestions:
-        suggestions.append("Insufficient data features for specific suggestions; see chart_selection.md decision framework.")
+        suggestions.append(
+            "Insufficient data features for specific suggestions; see chart_selection.md decision framework."
+        )
     return suggestions
 
 
@@ -289,8 +301,9 @@ def profile_data(source, group_cols: list[str] | None = None) -> dict:
     group_cols = group_cols or []
     for g in group_cols:
         if g not in df.columns:
-            raise ValueError(f"group column {g!r} not in data; "
-                             f"available: {df.columns.tolist()}")
+            raise ValueError(
+                f"group column {g!r} not in data; available: {df.columns.tolist()}"
+            )
 
     cols_info: dict[str, dict] = {}
     warn_list: list[str] = []
@@ -309,7 +322,8 @@ def profile_data(source, group_cols: list[str] | None = None) -> dict:
         if missing_rate > 0.20:
             warn_list.append(
                 f"Column {c!r} missing rate {entry['missing_rate']:.0%} -- consider imputation, removal, "
-                "or reporting in figure legend before plotting.")
+                "or reporting in figure legend before plotting."
+            )
         if ctype == TYPE_CONTINUOUS:
             entry.update(_profile_continuous(s))
         elif ctype in (TYPE_CATEGORICAL, TYPE_BOOLEAN, TYPE_ORDINAL):
@@ -317,7 +331,8 @@ def profile_data(source, group_cols: list[str] | None = None) -> dict:
             if entry.get("small_groups_flag"):
                 warn_list.append(
                     f"Column {c!r} has at least one category with n<10 -- small samples must show raw data points, "
-                    "do not use mean-only bar chart.")
+                    "do not use mean-only bar chart."
+                )
         elif ctype == TYPE_DATETIME:
             non_null = pd.to_datetime(s, errors="coerce").dropna()
             if len(non_null) > 0:
@@ -356,9 +371,11 @@ def render_report(info: dict) -> str:
     for c, m in info["columns"].items():
         summary = ""
         if m["type"] == TYPE_CONTINUOUS:
-            summary = (f"mean={m.get('mean', 0):.3g}, sd={m.get('sd', 0):.3g}, "
-                       f"range=[{m.get('min', 0):.3g}, {m.get('max', 0):.3g}], "
-                       f"skew={m.get('skewness', 0):.2f} ({m.get('skew_label')})")
+            summary = (
+                f"mean={m.get('mean', 0):.3g}, sd={m.get('sd', 0):.3g}, "
+                f"range=[{m.get('min', 0):.3g}, {m.get('max', 0):.3g}], "
+                f"skew={m.get('skewness', 0):.2f} ({m.get('skew_label')})"
+            )
             if m.get("n_outliers_iqr", 0):
                 summary += f"; outliers={m['n_outliers_iqr']} (IQR)"
             if m.get("needs_log_axis"):
@@ -366,12 +383,20 @@ def render_report(info: dict) -> str:
         elif m["type"] in (TYPE_CATEGORICAL, TYPE_BOOLEAN, TYPE_ORDINAL):
             cats_list = m.get("categories", [])[:5]
             cats_str = ", ".join(f"{k}({v})" for k, v in cats_list)
-            more = f" +{m['n_unique']-len(cats_list)} more" if m["n_unique"] > len(cats_list) else ""
+            more = (
+                f" +{m['n_unique'] - len(cats_list)} more"
+                if m["n_unique"] > len(cats_list)
+                else ""
+            )
             summary = f"{m['n_unique']} levels: {cats_str}{more}; min_group_n={m['min_group_n']}"
         elif m["type"] == TYPE_DATETIME:
             summary = f"{m.get('min', '?')} -> {m.get('max', '?')}"
-        miss = f"{m['n_null']} ({m['missing_rate']:.0%})" if m["missing_rate"] > 0 else "0"
-        lines.append(f"| `{c}` | {m['type']} | {m['n_total']-m['n_null']} | {miss} | {summary} |")
+        miss = (
+            f"{m['n_null']} ({m['missing_rate']:.0%})" if m["missing_rate"] > 0 else "0"
+        )
+        lines.append(
+            f"| `{c}` | {m['type']} | {m['n_total'] - m['n_null']} | {miss} | {summary} |"
+        )
     lines.append("")
 
     if info.get("group_summary"):
@@ -379,21 +404,29 @@ def render_report(info: dict) -> str:
         lines.append("## Group structure")
         lines.append(f"- Grouped by: `{'`, `'.join(gs['by'])}`")
         lines.append(f"- Number of groups: {gs['n_groups']}")
-        lines.append(f"- Group size: min={gs['min_n_per_group']}, "
-                     f"median={gs['median_n_per_group']}, max={gs['max_n_per_group']}")
+        lines.append(
+            f"- Group size: min={gs['min_n_per_group']}, "
+            f"median={gs['median_n_per_group']}, max={gs['max_n_per_group']}"
+        )
         if gs["tiny_groups_flag"]:
-            lines.append("- **WARN**: at least one group has n<3 -- statistics unreliable; "
-                         "must show all raw points.")
+            lines.append(
+                "- **WARN**: at least one group has n<3 -- statistics unreliable; "
+                "must show all raw points."
+            )
         elif gs["small_groups_flag"]:
-            lines.append("- **WARN**: at least one group has n<10 -- use box/violin + stripplot "
-                         "rather than mean-only bar chart.")
+            lines.append(
+                "- **WARN**: at least one group has n<10 -- use box/violin + stripplot "
+                "rather than mean-only bar chart."
+            )
         lines.append("")
 
     if info.get("correlation"):
         corr = info["correlation"]
         lines.append("## Correlations (Pearson, sorted by |r|)")
         for p in corr["pairs_sorted"][:10]:
-            lines.append(f"- `{p['a']}` <-> `{p['b']}` : r = {p['r']:.3f} ({p['magnitude']})")
+            lines.append(
+                f"- `{p['a']}` <-> `{p['b']}` : r = {p['r']:.3f} ({p['magnitude']})"
+            )
         if len(corr["pairs_sorted"]) > 10:
             lines.append(f"- ... +{len(corr['pairs_sorted']) - 10} more pairs")
         lines.append("")
@@ -408,8 +441,10 @@ def render_report(info: dict) -> str:
     for s in info["suggestions"]:
         lines.append(f"- {s}")
     lines.append("")
-    lines.append("> These are **preliminary suggestions** based on data shape. Final chart type must combine "
-                 "**argumentative intent** (what you want to say) -- see `references/chart_selection.md`.")
+    lines.append(
+        "> These are **preliminary suggestions** based on data shape. Final chart type must combine "
+        "**argumentative intent** (what you want to say) -- see `references/chart_selection.md`."
+    )
     return "\n".join(lines)
 
 

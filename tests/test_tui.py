@@ -1783,17 +1783,10 @@ def test_tui_stylesheet_selectors_match_declared_widgets_and_classes():
         path.read_text(encoding="utf-8")
         for path in [
             root.joinpath("core", "tui", "app.py"),
-            root.joinpath("core", "tui", "menu_screens.py"),
-            *root.joinpath("core", "tui", "screens").glob("*_screen.py"),
+                root.joinpath("core", "tui", "support.py"),
+                *root.joinpath("core", "tui", "screens").glob("*_views.py"),
         ]
     )
-    tui_sources += root.joinpath("core", "tui", "screens", "chat_view.py").read_text(
-        encoding="utf-8"
-    )
-    tui_sources += root.joinpath("core", "tui", "screens", "dashboard.py").read_text(
-        encoding="utf-8"
-    )
-
     declared_ids = set(re.findall(r'id="([a-zA-Z0-9_-]+)"', tui_sources))
     declared_classes = {
         class_name
@@ -2627,7 +2620,7 @@ def test_tui_controller_readiness_message_redacts_api_key(tmp_path):
         model="",
         set_current=False,
     )
-    switch_result = controller.manager.switch_provider("needs-model", save=False)
+    switch_result = controller.validate_provider("needs-model")
     readiness = controller.readiness()
 
     assert result["ok"] is True
@@ -3255,14 +3248,14 @@ class TestLogScreenRefreshAndAggregation:
         assert "set_interval" not in source
         assert "Timer" not in source
 
-    def test_log_screen_store_property_creates_fresh_store(self, tmp_path):
+    def test_log_screen_service_property_creates_fresh_service(self, tmp_path):
         view = LogReportView(project_root=tmp_path)
 
-        store1 = view.store
-        store2 = view.store
+        store1 = view.service
+        store2 = view.service
 
         assert store1 is not store2
-        assert store1.project_dir == store2.project_dir
+        assert store1.project_root == store2.project_root
 
 
 # ═══ test_tui_paper_screens ═══

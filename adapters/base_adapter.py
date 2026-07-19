@@ -5,49 +5,143 @@ from __future__ import annotations
 import re
 import shlex
 import subprocess
-from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol, cast, runtime_checkable
 
 from core.redaction import redact_sensitive
-from permission.engine import PermissionEngine
-from permission.policy import DEFAULT_POLICY_RELATIVE_PATH, PermissionResult
+from core.services.adapter import AdapterService, PermissionChecker
 
 
-class BaseAdapter(ABC):
+@runtime_checkable
+class AdapterProtocol(Protocol):
+    """Small, host-neutral contract retained by every platform adapter."""
+
+    @property
+    def platform_name(self) -> str: ...
+
+    def tool_call(self, tool_id: str, params: dict[str, Any]) -> dict[str, Any]: ...
+
+    def skill_load(self, skill_name: str) -> str: ...
+
+    def subagent_dispatch(
+        self, agent_id: str, task: dict[str, Any]
+    ) -> dict[str, Any]: ...
+
+
+@dataclass(frozen=True, slots=True)
+class AdapterHostConfig:
+    platform: str
+    adapter_class: str
+    status: str
+    optional: bool
+    core: bool
+    default: bool
+    module: str
+    requires_core_runtime: bool
+    capability_tool: str | None
+    limitations: tuple[str, ...]
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "platform": self.platform,
+            "adapter_class": self.adapter_class,
+            "module": self.module,
+            "status": self.status,
+            "optional": self.optional,
+            "core": self.core,
+            "default": self.default,
+            "requires_core_runtime": self.requires_core_runtime,
+            "capability_tool": self.capability_tool,
+            "limitations": list(self.limitations),
+        }
+
+
+ADAPTER_HOST_CONFIGS = {
+    "standalone": AdapterHostConfig(
+        "standalone",
+        "StandaloneAdapter",
+        "core_default",
+        False,
+        True,
+        True,
+        "adapters.standalone.adapter",
+        True,
+        None,
+        (
+            "Self-contained core adapter; does not load OpenCode or Claude Code platform resources.",
+            "Skill loading returns core-neutral metadata instead of platform skill files.",
+        ),
+    ),
+    "opencode": AdapterHostConfig(
+        "opencode",
+        "OpenCodeAdapter",
+        "optional_add_on",
+        True,
+        False,
+        False,
+        "adapters.opencode.adapter",
+        False,
+        "opencode.capabilities",
+        (
+            "Optional add-on; not imported, initialized, or probed by default.",
+            "Native OpenCode dispatch requires an explicit orchestrator/runtime bridge.",
+            "Only SuperMedicine is exposed as a user-facing platform agent; alpha/beta/gamma/delta files are internal role context only.",
+        ),
+    ),
+    "claude-code": AdapterHostConfig(
+        "claude-code",
+        "ClaudeCodeAdapter",
+        "optional_minimal",
+        True,
+        False,
+        False,
+        "adapters.claude_code.adapter",
+        False,
+        "claude.capabilities",
+        (
+            "Optional minimal add-on; not imported, initialized, or probed by default.",
+            "Invocation requires an explicitly selected adapter and local Claude Code CLI runtime.",
+            "Only SuperMedicine is exposed as a user-facing platform agent; alpha/beta/gamma/delta are internal role contexts only.",
+            "OpenAI/Anthropic provider config is injected by installer/runtime/project config; manifests and docs must not contain plaintext API keys.",
+        ),
+    ),
+}
+
+
+class BaseAdapter:
     """平台适配器基类 — 提供共享工具方法实现"""
 
     DEFAULT_TIMEOUT_SECONDS = 30
     MAX_TIMEOUT_SECONDS = 120
     PERMISSION_GATED_TOOLS = {"bash", "write", "edit"}
     FILESYSTEM_TOOLS = {"read", "write", "edit", "glob", "grep"}
+    HOST_CONFIG: AdapterHostConfig
+    REGISTRATION_EXTRAS: dict[str, Any] = {}
+    DEFAULT_AGENT_ID = "alpha"
 
     def __init__(
         self,
-        permission_engine: PermissionEngine | None = None,
+        permission_engine: PermissionChecker | None = None,
         project_dir: Path | None = None,
-        default_agent_id: str = "alpha",
+        default_agent_id: str | None = None,
+        adapter_service: AdapterService | None = None,
     ):
-        self._permission_engine = permission_engine
         self._project_dir = (
             Path.cwd() if project_dir is None else Path(project_dir)
         ).resolve()
-        self._default_agent_id = default_agent_id
+        self._default_agent_id = default_agent_id or self.DEFAULT_AGENT_ID
+        self._adapter_service = adapter_service or AdapterService(
+            self._project_dir, permission_engine
+        )
 
     @property
-    @abstractmethod
-    def platform_name(self) -> str: ...
+    def platform_name(self) -> str:
+        return self.HOST_CONFIG.platform
 
-    @abstractmethod
-    def tool_call(self, tool_id: str, params: dict[str, Any]) -> dict[str, Any]: ...
-
-    @abstractmethod
-    def skill_load(self, skill_name: str) -> str: ...
-
-    @abstractmethod
-    def subagent_dispatch(
-        self, agent_id: str, task: dict[str, Any]
-    ) -> dict[str, Any]: ...
+    @property
+    def registration(self) -> dict[str, Any]:
+        return {**self.HOST_CONFIG.as_dict(), **self.REGISTRATION_EXTRAS}
 
     # ── 共享工具方法 ──────────────────────────────────────────
 
@@ -132,6 +226,20 @@ class BaseAdapter(ABC):
         except Exception as e:
             return {"status": "error", "tool": tool_id, "result": str(e)}
 
+    def _delegate_tool(
+        self, params: dict[str, Any], kind: str, default_agent: str
+    ) -> str | dict[str, Any]:
+        adapter = cast(AdapterProtocol, self)
+        if kind == "skill":
+            return adapter.skill_load(str(params.get("name", "")))
+        agent_id = str(
+            params.get("agent_id", params.get("subagent_type", default_agent))
+        )
+        task = params.get("task", params.get("prompt", ""))
+        return adapter.subagent_dispatch(
+            agent_id, task if isinstance(task, dict) else {"description": task}
+        )
+
     def _filesystem_tool_sandbox_denied(
         self, tool_id: str, params: dict[str, Any]
     ) -> dict[str, Any] | None:
@@ -153,14 +261,13 @@ class BaseAdapter(ABC):
         if tool_id not in self.PERMISSION_GATED_TOOLS:
             return None
 
-        engine = self._get_permission_engine()
         agent_id = str(params.get("agent_id") or self._default_agent_id)
         resource = self._tool_permission_resource(tool_id, params)
         context: dict[str, Any] = {
             "adapter": self.platform_name,
             "tool": tool_id,
             "resource": resource,
-            "policy_path": str(self._project_dir / DEFAULT_POLICY_RELATIVE_PATH),
+            "policy_path": str(self._adapter_service.policy_path),
             "project_dir": str(self._project_dir),
             "permission_scope": "adapter_tool_call",
         }
@@ -173,38 +280,22 @@ class BaseAdapter(ABC):
             context["mutates_file"] = True
             context["risk"] = "high"
 
-        if engine is None:
-            if tool_id == "bash" and self._allows_minimal_echo_without_engine(params):
-                return None
-            return self._permission_denied_result(
-                tool_id,
-                agent_id,
-                "tool_call",
-                resource,
-                reason="permission_engine_unavailable",
-            )
-
-        result = engine.check(agent_id, "tool_call", resource, context=context)
-        if result == PermissionResult.ALLOWED:
+        denied = self._permission_denied_result(
+            tool_id, agent_id, "tool_call", resource, context=context
+        )
+        if (
+            denied is not None
+            and denied.get("error_code") == "permission_engine_unavailable"
+            and tool_id == "bash"
+            and self._allows_minimal_echo_without_engine(params)
+        ):
             return None
-        return self._permission_denied_result(tool_id, agent_id, "tool_call", resource)
+        return denied
 
     def _allows_minimal_echo_without_engine(self, params: dict[str, Any]) -> bool:
         command = params.get("command", "")
         argv = self._normalize_command(command)
         return isinstance(argv, list) and bool(argv) and argv[0].lower() == "echo"
-
-    def _get_permission_engine(self) -> PermissionEngine | None:
-        if self._permission_engine is not None:
-            return self._permission_engine
-        policy_dir = self._project_dir / DEFAULT_POLICY_RELATIVE_PATH.parent
-        try:
-            self._permission_engine = PermissionEngine(
-                policy_dir, policy_dir / "audit.jsonl"
-            )
-        except Exception:
-            return None
-        return self._permission_engine
 
     def _tool_permission_resource(self, tool_id: str, params: dict[str, Any]) -> str:
         if tool_id == "bash":
@@ -227,11 +318,24 @@ class BaseAdapter(ABC):
         action: str,
         resource: str,
         *,
-        reason: str = "permission_denied",
-    ) -> dict[str, Any]:
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
+        authorization = self._adapter_service.authorize(
+            adapter=self.platform_name,
+            agent_id=agent_id,
+            action=action,
+            resource=resource,
+            context=context,
+        )
+        if authorization.ok and authorization.data and authorization.data["allowed"]:
+            return None
+        reason = (
+            authorization.error.code if authorization.error else "permission_denied"
+        )
         return {
             "status": "denied",
             "tool": tool_id,
+            "platform": self.platform_name,
             "agent": agent_id,
             "action": action,
             "resource": resource,
@@ -239,7 +343,7 @@ class BaseAdapter(ABC):
             "error": "Permission denied by canonical policy chain.",
             "error_code": reason,
             "metadata": {
-                "policy_path": str(self._project_dir / DEFAULT_POLICY_RELATIVE_PATH),
+                "policy_path": str(self._adapter_service.policy_path),
                 "security": {"permission": "denied", "permission_checked": True},
             },
         }

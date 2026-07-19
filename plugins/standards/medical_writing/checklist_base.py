@@ -265,3 +265,14 @@ class ChecklistBase:
         }
         result.update(enforce_medical_accuracy(claims, sources, text=text))
         return result
+
+
+class DeclarativeChecklist(ChecklistBase):
+    """Checklist whose identity and items are supplied entirely as class data."""
+
+    NAME = ""
+    VERSION = ""
+    ITEMS: tuple[ChecklistItemBase, ...] = ()
+
+    def __init__(self) -> None:
+        super().__init__(self.NAME, self.VERSION, list(self.ITEMS))

@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from plugins.harness.monitor import AgentMonitor, AgentPerformanceMonitor
-from plugins.harness.checkpoint_verifier import CheckpointVerifier
+from plugins.harness.monitor import (
+    AgentMonitor,
+    AgentPerformanceMonitor,
+    CheckpointVerifier,
+)
 
 __all__ = ["AgentMonitor", "AgentPerformanceMonitor", "CheckpointVerifier"]

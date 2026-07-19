@@ -6,15 +6,9 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
-
-import yaml
+from typing import Any, cast
 
 from core.redaction import redact_sensitive
-from core.serialization import json_ready
-
-if TYPE_CHECKING:
-    from core.experience import ExperienceScope, ExportFormat
 
 logger = logging.getLogger(__name__)
 
@@ -23,55 +17,6 @@ PERMISSION_RISK_NOTICE = (
     "已经拥有的系统权限，不会静默提权、不会绕过系统权限。若系统权限不足，请通过"
     "管理员身份运行或操作系统 UAC/安全提示进行显式授权。"
 )
-
-_EXPERIENCE_SCOPE_CHOICES = frozenset({"general", "workspace"})
-_EXPORT_FORMAT_CHOICES = frozenset({"json", "md"})
-
-
-def _workspace_info_to_dict(info, name: str | None = None) -> dict:
-    """Return a JSON-serializable workspace representation."""
-    metadata = info.metadata.to_dict()
-    metadata_path = info.path / "workspace.yaml"
-    if metadata_path.is_file():
-        raw_metadata = yaml.safe_load(metadata_path.read_text(encoding="utf-8")) or {}
-        if (
-            isinstance(raw_metadata, dict)
-            and raw_metadata.get("display_name") is not None
-        ):
-            metadata["display_name"] = str(raw_metadata["display_name"])
-    data = {
-        "id": info.id,
-        "path": str(info.path),
-        "metadata": metadata,
-    }
-    if name is not None:
-        data["name"] = name
-    elif metadata.get("display_name") is not None:
-        data["name"] = metadata["display_name"]
-    return data
-
-
-def _as_experience_scope(scope: str) -> ExperienceScope:
-    if scope not in _EXPERIENCE_SCOPE_CHOICES:
-        raise ValueError("experience scope must be one of: general, workspace")
-    return cast("ExperienceScope", scope)
-
-
-def _as_optional_experience_scope(scope: str | None) -> ExperienceScope | None:
-    if scope is None:
-        return None
-    return _as_experience_scope(scope)
-
-
-def _as_export_format(format: str) -> ExportFormat:
-    if format not in _EXPORT_FORMAT_CHOICES:
-        raise ValueError("export format must be one of: json, md")
-    return cast("ExportFormat", format)
-
-
-def _paper_metadata_to_dict(metadata) -> dict:
-    return json_ready(metadata)
-
 
 def _self_evolution_cli_result(
     result: dict[str, Any],
@@ -160,21 +105,6 @@ def _self_evolution_cli_result(
     )
 
 
-def _paper_import_result_to_dict(
-    import_result, warnings: list[str] | None = None
-) -> dict:
-    return {
-        "status": import_result.status,
-        "metadata": _paper_metadata_to_dict(import_result.metadata),
-        "source_path": str(import_result.source_path)
-        if import_result.source_path
-        else None,
-        "warnings": warnings if warnings is not None else list(import_result.warnings),
-        "duplicate": import_result.duplicate,
-        "duplicate_reason": import_result.duplicate_reason,
-    }
-
-
 def _paper_metadata_options(args) -> dict:
     metadata: dict = {}
     for field in ("title", "doi", "pmid", "notes"):
@@ -197,72 +127,6 @@ def _load_params_json(raw_json: str) -> dict:
     if not isinstance(params, dict):
         raise ValueError("plugin params must be a JSON object")
     return params
-
-
-def _load_input_json(raw_json: str) -> dict:
-    """Parse experiment step input from a JSON object string."""
-    try:
-        payload = json.loads(raw_json)
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"--input-json must be valid JSON: {exc.msg}") from exc
-    if not isinstance(payload, dict):
-        raise ValueError("--input-json must be a JSON object")
-    return payload
-
-
-def _dict_payload(value: object, name: str) -> dict:
-    if value is None:
-        return {}
-    if not isinstance(value, dict):
-        raise ValueError(f"{name} must be a JSON object")
-    return value
-
-
-def _load_experiment_session(path: Path) -> dict:
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except FileNotFoundError as exc:
-        raise ValueError(f"experiment session file not found: {path}") from exc
-    except (OSError, json.JSONDecodeError) as exc:
-        raise ValueError(
-            f"could not read experiment session file {path}: {exc}"
-        ) from exc
-    if not isinstance(data, dict):
-        raise ValueError("experiment session file must contain a JSON object")
-    return data
-
-
-def _save_experiment_session(path: Path, data: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(json_ready(redact_sensitive(data)), ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
-
-
-def _experiment_response(
-    session,
-    *,
-    session_file: Path,
-    medical_boundary: str,
-    record: dict | None = None,
-    plugin_request: dict | None = None,
-    kernel_result: dict | None = None,
-) -> dict:
-    next_step = session.current_step
-    return {
-        "status": session.status.value
-        if hasattr(session.status, "value")
-        else str(session.status),
-        "session_file": str(session_file),
-        "session": session.to_dict(),
-        "current_step": next_step.to_dict() if next_step else None,
-        "record": record,
-        "plugin_request": plugin_request,
-        "kernel_result": kernel_result,
-        "progress": session.progress,
-        "medical_boundary": medical_boundary,
-    }
 
 
 def _load_params_file(path: str) -> dict:
@@ -352,30 +216,3 @@ def _parse_llm_headers(
             raise ValueError("--header key cannot be empty")
         headers[key] = value
     return headers
-
-
-def _llm_provider_values(
-    *,
-    api_format: str | None = None,
-    base_url: str | None = None,
-    api_key: str | None = None,
-    api_key_env: str | None = None,
-    model: str | None = None,
-    timeout: float | None = None,
-    headers: dict | None = None,
-) -> dict:
-    """Build provider values for LLMConfigManager without duplicating persistence logic."""
-    values: dict = {}
-    for key, value in {
-        "api_format": api_format,
-        "base_url": base_url,
-        "api_key": api_key,
-        "api_key_env": api_key_env,
-        "model": model,
-        "timeout": timeout,
-    }.items():
-        if value is not None:
-            values[key] = value
-    if headers:
-        values["headers"] = headers
-    return values

@@ -19,11 +19,11 @@ from typing import Any
 # Sub-module imports
 # ---------------------------------------------------------------------------
 from . import profile as profile_mod
-from . import style as style_mod
 from . import export as export_mod
-from . import check as check_mod
-from . import layout as layout_mod
-from . import qa as qa_mod
+from . import audit as check_mod
+from . import audit as qa_mod
+from . import presentation as layout_mod
+from . import presentation as style_mod
 
 # ---------------------------------------------------------------------------
 # Path to reference documents bundled with the plugin
@@ -47,14 +47,42 @@ def _read_reference(filename: str) -> str:
 # workflow to decide which steps need emphasis.
 _INTENT_KEYWORDS: dict[str, list[str]] = {
     "profile": ["profile", "eda", "explore", "profiling", "数据探索", "数据概况"],
-    "style": ["style", "journal", "nature", "science", "ieee", "字体", "font", "样式", "cjk"],
+    "style": [
+        "style",
+        "journal",
+        "nature",
+        "science",
+        "ieee",
+        "字体",
+        "font",
+        "样式",
+        "cjk",
+    ],
     "export": ["export", "save", "pdf", "svg", "png", "导出", "保存"],
     "check": ["check", "audit", "compliance", "合规", "检查"],
     "layout": ["layout", "label", "panel", "align", "标签", "对齐", "子图"],
     "qa": ["qa", "preview", "visual", "review", "预览", "自检", "视觉"],
-    "plot": ["plot", "chart", "figure", "画图", "图表", "柱状图", "散点图",
-             "折线图", "箱线图", "热力图", "直方图", "bar", "scatter",
-             "line", "box", "heatmap", "histogram", "violin", "可视化"],
+    "plot": [
+        "plot",
+        "chart",
+        "figure",
+        "画图",
+        "图表",
+        "柱状图",
+        "散点图",
+        "折线图",
+        "箱线图",
+        "热力图",
+        "直方图",
+        "bar",
+        "scatter",
+        "line",
+        "box",
+        "heatmap",
+        "histogram",
+        "violin",
+        "可视化",
+    ],
 }
 
 
@@ -75,6 +103,7 @@ def _extract_intent(task: str) -> set[str]:
 # Chart-type recommendation (Step 2)
 # ---------------------------------------------------------------------------
 
+
 def _recommend_chart(profile_info: dict) -> list[str]:
     """Translate data profile into concrete chart-type recommendations.
 
@@ -85,8 +114,11 @@ def _recommend_chart(profile_info: dict) -> list[str]:
 
     columns = profile_info.get("columns", {})
     cont_cols = [c for c, m in columns.items() if m.get("type") == "continuous"]
-    cat_cols = [c for c, m in columns.items()
-                if m.get("type") in ("categorical", "boolean", "ordinal")]
+    cat_cols = [
+        c
+        for c, m in columns.items()
+        if m.get("type") in ("categorical", "boolean", "ordinal")
+    ]
     dt_cols = [c for c, m in columns.items() if m.get("type") == "datetime"]
 
     # Time-series
@@ -111,9 +143,7 @@ def _recommend_chart(profile_info: dict) -> list[str]:
 
     # Two continuous → scatter
     if len(cont_cols) >= 2:
-        suggestions.append(
-            f"Scatter + regression (x={cont_cols[0]}, y={cont_cols[1]})"
-        )
+        suggestions.append(f"Scatter + regression (x={cont_cols[0]}, y={cont_cols[1]})")
 
     # Many continuous → heatmap / pairplot
     if len(cont_cols) >= 3:
@@ -127,9 +157,9 @@ def _recommend_chart(profile_info: dict) -> list[str]:
 
     # Fall back to profiler suggestions
     if not suggestions:
-        suggestions = profile_info.get("suggestions", [
-            "See references/chart_selection.md for decision framework"
-        ])
+        suggestions = profile_info.get(
+            "suggestions", ["See references/chart_selection.md for decision framework"]
+        )
 
     return suggestions
 
@@ -183,6 +213,139 @@ def _journal_spec_summary(journal: str) -> dict[str, str]:
 # Full 8-step workflow
 # ---------------------------------------------------------------------------
 
+
+class _FigureWorkflow:
+    """Stateful orchestration of the documented eight figure workflow steps."""
+
+    def __init__(self, task: str, data_path: str | None, params: dict[str, Any]):
+        self.task = task
+        self.data_path = data_path
+        self.params = params
+        self.journal: str = params.get("journal", "general")
+        self.lang: str = params.get("lang", "en")
+        self.fig = params.get("fig")
+        self.result: dict[str, Any] = {"task": task, "steps": {}}
+
+    @property
+    def steps(self) -> dict[str, Any]:
+        return self.result["steps"]
+
+    def run(self) -> dict[str, Any]:
+        intents = sorted(_extract_intent(self.task))
+        self.result["intents"] = intents
+        self.steps["step_0_intent"] = {
+            "intents": intents,
+            "description": "Parsed task intent to decide workflow emphasis",
+        }
+        profile_info = self._profile_data()
+        self._add_guidance(profile_info)
+        self._audit_layout()
+        self._export_figure()
+        self.result["status"] = "success"
+        self.result["output"] = (
+            "Workflow complete. Review each step's output above. "
+            "If step 6 QA reported FAIL issues, fix them before exporting. "
+            "See references/visual_review.md for the AI visual review loop."
+        )
+        return self.result
+
+    def _profile_data(self) -> dict[str, Any] | None:
+        if not self.data_path:
+            self.steps["step_1_profile"] = {
+                "status": "skipped",
+                "reason": "No data_path provided",
+            }
+            return None
+        try:
+            profile_info = profile_mod.profile_data(
+                self.data_path, group_cols=self.params.get("group_cols")
+            )
+            self.steps["step_1_profile"] = {
+                "status": "success",
+                "source": profile_info.get("source"),
+                "shape": f"{profile_info['n_rows']} x {profile_info['n_cols']}",
+                "n_warnings": len(profile_info.get("warnings", [])),
+                "report": profile_mod.render_report(profile_info),
+            }
+            return profile_info
+        except Exception as exc:
+            self.steps["step_1_profile"] = {"status": "error", "error": str(exc)}
+            return None
+
+    def _add_guidance(self, profile_info: dict[str, Any] | None) -> None:
+        self.steps["step_2_chart_select"] = (
+            {
+                "recommendations": _recommend_chart(profile_info),
+                "full_reference": "See references/chart_selection.md",
+            }
+            if profile_info
+            else {"status": "skipped", "reason": "No profile data available"}
+        )
+        self.steps["step_3_journal_spec"] = {
+            "journal": self.journal,
+            "constraints": _journal_spec_summary(self.journal),
+            "full_reference": _read_reference("journal_specs.md"),
+        }
+        try:
+            self.steps["step_4_style"] = {
+                "status": "success",
+                "info": style_mod.setup_style(journal=self.journal, lang=self.lang),
+            }
+        except Exception as exc:
+            self.steps["step_4_style"] = {"status": "error", "error": str(exc)}
+        self.steps["step_5_plot_recipe"] = {
+            "description": "Plot recipe guidance from references",
+            "recipes": _read_reference("plot_recipes.md"),
+            "pitfalls": _read_reference("viz_pitfalls.md"),
+        }
+
+    def _audit_layout(self) -> None:
+        if self.fig is None:
+            self.steps["step_6_qa"] = {
+                "status": "skipped",
+                "reason": "No figure object provided",
+            }
+            return
+        try:
+            issues = qa_mod.audit_layout(self.fig)
+            self.steps["step_6_qa"] = {
+                "status": "success",
+                "report": qa_mod.format_audit_report(issues),
+            }
+        except Exception as exc:
+            self.steps["step_6_qa"] = {"status": "error", "error": str(exc)}
+        try:
+            placed = layout_mod.add_panel_labels(self.fig, style=self.journal)
+            self.steps["step_6_layout_labels"] = {
+                "labels_placed": [label.get_text() for label in placed],
+                "count": len(placed),
+            }
+        except Exception as exc:
+            self.steps["step_6_layout_labels"] = {
+                "status": "error",
+                "error": str(exc),
+            }
+
+    def _export_figure(self) -> None:
+        basename = self.params.get("basename")
+        if self.fig is None or not basename:
+            self.steps["step_7_export"] = {
+                "status": "skipped",
+                "reason": "No figure object or basename provided",
+            }
+            return
+        try:
+            paths = export_mod.export_figure(
+                self.fig,
+                basename=basename,
+                formats=self.params.get("formats"),
+                dpi=self.params.get("dpi", 300),
+            )
+            self.steps["step_7_export"] = {"status": "success", "paths": paths}
+        except Exception as exc:
+            self.steps["step_7_export"] = {"status": "error", "error": str(exc)}
+
+
 def execute_figure_workflow(
     task: str,
     data_path: str | None = None,
@@ -207,175 +370,7 @@ def execute_figure_workflow(
         - ``formats``: list of export format extensions.
         - ``dpi``: raster DPI (default 300).
     """
-    params = params or {}
-    journal: str = params.get("journal", "general")
-    lang: str = params.get("lang", "en")
-    group_cols: list[str] | None = params.get("group_cols")
-    fig = params.get("fig")
-    basename: str | None = params.get("basename")
-    formats: list[str] | None = params.get("formats")
-    dpi: int = params.get("dpi", 300)
-
-    result: dict[str, Any] = {"task": task, "steps": {}}
-
-    # ------------------------------------------------------------------
-    # Step 0 — Extract intent
-    # ------------------------------------------------------------------
-    intents = _extract_intent(task)
-    result["intents"] = sorted(intents)
-    result["steps"]["step_0_intent"] = {
-        "intents": sorted(intents),
-        "description": "Parsed task intent to decide workflow emphasis",
-    }
-
-    # ------------------------------------------------------------------
-    # Step 1 — Data profiling (EDA)
-    # ------------------------------------------------------------------
-    profile_info: dict | None = None
-    if data_path:
-        try:
-            profile_info = profile_mod.profile_data(
-                data_path, group_cols=group_cols
-            )
-            report_text = profile_mod.render_report(profile_info)
-            result["steps"]["step_1_profile"] = {
-                "status": "success",
-                "source": profile_info.get("source"),
-                "shape": f"{profile_info['n_rows']} x {profile_info['n_cols']}",
-                "n_warnings": len(profile_info.get("warnings", [])),
-                "report": report_text,
-            }
-        except Exception as exc:
-            result["steps"]["step_1_profile"] = {
-                "status": "error",
-                "error": str(exc),
-            }
-    else:
-        result["steps"]["step_1_profile"] = {
-            "status": "skipped",
-            "reason": "No data_path provided",
-        }
-
-    # ------------------------------------------------------------------
-    # Step 2 — Chart type recommendation
-    # ------------------------------------------------------------------
-    if profile_info:
-        chart_suggestions = _recommend_chart(profile_info)
-        result["steps"]["step_2_chart_select"] = {
-            "recommendations": chart_suggestions,
-            "full_reference": "See references/chart_selection.md",
-        }
-    else:
-        result["steps"]["step_2_chart_select"] = {
-            "status": "skipped",
-            "reason": "No profile data available",
-        }
-
-    # ------------------------------------------------------------------
-    # Step 3 — Journal specification constraints
-    # ------------------------------------------------------------------
-    spec = _journal_spec_summary(journal)
-    result["steps"]["step_3_journal_spec"] = {
-        "journal": journal,
-        "constraints": spec,
-        "full_reference": _read_reference("journal_specs.md"),
-    }
-
-    # ------------------------------------------------------------------
-    # Step 4 — Style setup
-    # ------------------------------------------------------------------
-    try:
-        style_info = style_mod.setup_style(journal=journal, lang=lang)
-        result["steps"]["step_4_style"] = {
-            "status": "success",
-            "info": style_info,
-        }
-    except Exception as exc:
-        result["steps"]["step_4_style"] = {
-            "status": "error",
-            "error": str(exc),
-        }
-
-    # ------------------------------------------------------------------
-    # Step 5 — Plot recipe guidance
-    # ------------------------------------------------------------------
-    result["steps"]["step_5_plot_recipe"] = {
-        "description": "Plot recipe guidance from references",
-        "recipes": _read_reference("plot_recipes.md"),
-        "pitfalls": _read_reference("viz_pitfalls.md"),
-    }
-
-    # ------------------------------------------------------------------
-    # Step 6 — Layout QA (if a figure object is available)
-    # ------------------------------------------------------------------
-    if fig is not None:
-        try:
-            qa_issues = qa_mod.audit_layout(fig)
-            qa_report = qa_mod.format_audit_report(qa_issues)
-            result["steps"]["step_6_qa"] = {
-                "status": "success",
-                "report": qa_report,
-            }
-        except Exception as exc:
-            result["steps"]["step_6_qa"] = {
-                "status": "error",
-                "error": str(exc),
-            }
-
-        # Also add panel labels if multi-panel
-        try:
-            placed = layout_mod.add_panel_labels(fig, style=journal)
-            result["steps"]["step_6_layout_labels"] = {
-                "labels_placed": [t.get_text() for t in placed],
-                "count": len(placed),
-            }
-        except Exception as exc:
-            result["steps"]["step_6_layout_labels"] = {
-                "status": "error",
-                "error": str(exc),
-            }
-    else:
-        result["steps"]["step_6_qa"] = {
-            "status": "skipped",
-            "reason": "No figure object provided",
-        }
-
-    # ------------------------------------------------------------------
-    # Step 7 — Export (if a figure object is available)
-    # ------------------------------------------------------------------
-    if fig is not None and basename:
-        try:
-            saved_paths = export_mod.export_figure(
-                fig,
-                basename=basename,
-                formats=formats,
-                dpi=dpi,
-            )
-            result["steps"]["step_7_export"] = {
-                "status": "success",
-                "paths": saved_paths,
-            }
-        except Exception as exc:
-            result["steps"]["step_7_export"] = {
-                "status": "error",
-                "error": str(exc),
-            }
-    else:
-        result["steps"]["step_7_export"] = {
-            "status": "skipped",
-            "reason": "No figure object or basename provided",
-        }
-
-    # ------------------------------------------------------------------
-    # Final summary
-    # ------------------------------------------------------------------
-    result["status"] = "success"
-    result["output"] = (
-        "Workflow complete. Review each step's output above. "
-        "If step 6 QA reported FAIL issues, fix them before exporting. "
-        "See references/visual_review.md for the AI visual review loop."
-    )
-    return result
+    return _FigureWorkflow(task, data_path, params or {}).run()
 
 
 # ---------------------------------------------------------------------------
@@ -384,15 +379,15 @@ def execute_figure_workflow(
 
 # Mapping from action id to (submodule, function name)
 _ACTION_MAP: dict[str, tuple[Any, str]] = {
-    "figure-profile.profile":     (profile_mod, "execute"),
-    "figure-style.setup":         (style_mod,   "execute"),
-    "figure-style.list-fonts":    (style_mod,   "execute"),
-    "figure-export.export":       (export_mod,  "execute"),
-    "figure-check.audit":         (check_mod,   "execute"),
-    "figure-layout.labels":       (layout_mod,  "execute"),
-    "figure-layout.finalize":     (layout_mod,  "execute"),
-    "figure-qa.audit":            (qa_mod,      "execute"),
-    "figure-qa.preview":          (qa_mod,      "execute"),
+    "figure-profile.profile": (profile_mod, "execute"),
+    "figure-style.setup": (style_mod, "execute_style"),
+    "figure-style.list-fonts": (style_mod, "execute_style"),
+    "figure-export.export": (export_mod, "execute"),
+    "figure-check.audit": (check_mod, "execute_check"),
+    "figure-layout.labels": (layout_mod, "execute_layout"),
+    "figure-layout.finalize": (layout_mod, "execute_layout"),
+    "figure-qa.audit": (qa_mod, "execute_qa"),
+    "figure-qa.preview": (qa_mod, "execute_qa"),
 }
 
 

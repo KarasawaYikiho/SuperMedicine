@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -161,3 +161,40 @@ def validate_required_plugins(
                         }
                     )
     return RuntimeCapabilities(diagnostics=tuple(diagnostics))
+
+
+def required_runtime_snapshot(project_dir: Path) -> dict[str, Any]:
+    """Build the shared mandatory runtime health snapshot for every interface."""
+    from core.config_center import ConfigCenter
+
+    root = Path(project_dir).resolve()
+    config_path = root / ".supermedicine" / "config.yaml"
+    config = ConfigCenter(config_path)
+    registry = PluginRegistry(root / "plugins", allow_package_fallback=True)
+    registry.discover()
+    try:
+        capabilities = validate_required_plugins(registry, config_path)
+    except RuntimeInvariantError as exc:
+        return {
+            "harness": {
+                "required": True,
+                "healthy": False,
+                "disable_supported": False,
+            },
+            "rag": {
+                "required": True,
+                "healthy": False,
+                "disable_supported": False,
+                "index": "",
+            },
+            "agents": {"mode": "single", "multi_available": True},
+            "diagnostics": [exc.to_dict()],
+        }
+    capabilities = replace(
+        capabilities,
+        agent_mode=(
+            "multi" if config.get_multi_agent_config()["enabled"] else "single"
+        ),
+        rag_index=str(root / ".supermedicine" / "rag" / "local"),
+    )
+    return capabilities.to_dict()

@@ -19,8 +19,8 @@ from installer.entrypoint import (
 )
 from core.kernel import Kernel
 from agents.orchestrator import Orchestrator
-from agents.base_agent import BaseAgent
-from agents.state_machine import StateMachine, TaskState
+from agents.roles import BaseAgent
+from agents.orchestrator import StateMachine, TaskState
 from agents.checkpoint import CheckpointManager
 from permission.engine import PermissionEngine
 from permission.policy import PermissionResult, default_policy_path

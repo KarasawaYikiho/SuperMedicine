@@ -9,10 +9,10 @@ from typing import Any, Callable, cast
 
 from agents.checkpoint import CheckpointManager
 from agents.orchestrator import Orchestrator
-from agents.alpha_agent import AlphaAgent
-from agents.beta_agent import BetaAgent
-from agents.gamma_agent import GammaAgent
-from agents.delta_agent import DeltaAgent
+from agents.roles import AlphaAgent
+from agents.roles import BetaAgent
+from agents.roles import GammaAgent
+from agents.roles import DeltaAgent
 from core.config_center import ConfigCenter
 from core.database.database import Database
 from core.database.migrations import MigrationManager
@@ -72,7 +72,9 @@ class Kernel:
         self._config = ConfigCenter(self._config_path)
         self._llm_manager = LLMConfigManager(self._config)
         self._event_bus = EventBus()
-        self._plugin_registry = PluginRegistry(self._plugins_dir)
+        self._plugin_registry = PluginRegistry(
+            self._plugins_dir, allow_package_fallback=plugins_dir is None
+        )
         self._plugin_registry.discover()
         self._runtime_capabilities = validate_required_plugins(
             self._plugin_registry, self._config_path
@@ -146,7 +148,11 @@ class Kernel:
 
     def _refresh_runtime_capabilities(self) -> None:
         """Attach config-derived state to the validated shared health snapshot."""
-        agent_mode = self._config.get_agents_config()["mode"]
+        agent_mode = (
+            "multi"
+            if self._config.get_multi_agent_config()["enabled"]
+            else "single"
+        )
         project_root = (
             self._config_path.parent.parent
             if self._config_path.parent.name == ".supermedicine"
@@ -217,7 +223,9 @@ class Kernel:
         # Step 2: Alpha analysis
         emit("status", "Alpha agent analysing task…")
         alpha_input = {**task_dict, "context": context}
-        alpha_result = orch.dispatch(target if target == "alpha" else "alpha", alpha_input)
+        alpha_result = orch.dispatch(
+            target if target == "alpha" else "alpha", alpha_input
+        )
 
         # Step 3: Beta review
         emit("status", "Beta agent reviewing analysis…")
@@ -407,9 +415,9 @@ class Kernel:
     ) -> dict[str, Any]:
         """Execute every task inside the mandatory Harness lifecycle."""
         self._config.reload()
-        configured_mode = self._config.get_agents_config()["mode"]
+        configured_multi_agent = self._config.get_multi_agent_config()["enabled"]
         resolved_agent_mode = (
-            configured_mode == "multi"
+            configured_multi_agent
             if use_agent_chain is None
             else bool(use_agent_chain)
         )
@@ -682,8 +690,13 @@ class Kernel:
         )
         if permission == PermissionResult.DENIED:
             return self._handle_permission_denied(
-                task, agent_id, selected_plugin, selected_action,
-                task_id, emit, execution_context,
+                task,
+                agent_id,
+                selected_plugin,
+                selected_action,
+                task_id,
+                emit,
+                execution_context,
             )
         emit("status", "权限检查通过，插件正在执行。")
 
@@ -691,13 +704,24 @@ class Kernel:
         plugin = self._plugin_registry.get(selected_plugin)
         if plugin is None:
             return self._handle_missing_plugin(
-                task, agent_id, selected_plugin, selected_action, task_id,
+                task,
+                agent_id,
+                selected_plugin,
+                selected_action,
+                task_id,
             )
 
         # --- execute plugin and shape result ---
         result = self._execute_plugin(
-            plugin, selected_action, params, execution_context,
-            task, agent_id, selected_plugin, task_id, emit,
+            plugin,
+            selected_action,
+            params,
+            execution_context,
+            task,
+            agent_id,
+            selected_plugin,
+            task_id,
+            emit,
         )
         if plugin_rag_context is not None:
             metadata = result.setdefault("metadata", {})
@@ -993,5 +1017,3 @@ class Kernel:
     def _workspace_tool_runtime_context(self, workspace_id: str) -> dict[str, Any]:
         """Return currently imported workspace tools for LLM context when available."""
         return _workspace_tool_runtime_context_fn(workspace_id, self._config_path)
-
-

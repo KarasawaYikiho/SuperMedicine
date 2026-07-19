@@ -14,6 +14,7 @@ from installer.entrypoint import (
 )
 
 from installer.component_installer import (
+    InstallService,
     load_components,
     install_components,
     validate_selection,
@@ -30,6 +31,7 @@ __all__ = [
     "_normalize_provider",
     "_resolve_api_key",
     "_resolve_install_value",
+    "InstallService",
     "load_components",
     "install_components",
     "validate_selection",

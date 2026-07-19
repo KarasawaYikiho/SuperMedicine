@@ -12,6 +12,7 @@ import yaml
 
 from core.redaction import redact_sensitive
 from core.llm_providers.config import LLMProviderConfig, sanitized_headers
+from core.secure_files import secure_config_permissions
 from permission.access_mode import AccessMode, AccessModePolicy, normalize_access_mode
 
 
@@ -70,6 +71,9 @@ DEFAULT_AGENTS_CONFIG: dict[str, Any] = {
     "max_steps": 4,
     "max_retries": 1,
 }
+
+
+DEFAULT_MULTI_AGENT_CONFIG: dict[str, Any] = {"enabled": False}
 
 
 DEFAULT_RUNTIME_STATE_CONFIG: dict[str, Any] = {
@@ -139,6 +143,7 @@ class ConfigCenter:
         with open(self._config_path, "w", encoding="utf-8") as f:
             yaml.dump(self._config, f, allow_unicode=True, default_flow_style=False)
             f.flush()
+        secure_config_permissions(self._config_path)
 
     def reload(self) -> None:
         """从磁盘重新读取配置文件，刷新内存中的配置。
@@ -154,14 +159,18 @@ class ConfigCenter:
                 if isinstance(loaded, dict):
                     self._config = loaded
                 else:
-                    self._load_error = f"config root must be a mapping: {self._config_path}"
+                    self._load_error = (
+                        f"config root must be a mapping: {self._config_path}"
+                    )
                     logger.error(
                         "Config reload failed: stage=parse path=%s error=%s",
                         self._config_path,
                         self._load_error,
                     )
             except yaml.YAMLError as exc:
-                self._load_error = f"invalid YAML in config file {self._config_path}: {exc}"
+                self._load_error = (
+                    f"invalid YAML in config file {self._config_path}: {exc}"
+                )
                 logger.error(
                     "Config reload failed: stage=parse path=%s error=%s",
                     self._config_path,
@@ -290,6 +299,26 @@ class ConfigCenter:
         if config["mode"] != AccessMode.FULL.value:
             config["full_mode_confirmed"] = False
         return config
+
+    def get_multi_agent_config(self) -> dict[str, bool]:
+        """Return the optional multi-agent pipeline configuration."""
+        config = self._config.get("multi_agent")
+        if isinstance(config, dict) and "enabled" in config:
+            return {"enabled": bool(config.get("enabled"))}
+        return {"enabled": self.get_agents_config()["mode"] == "multi"}
+
+    def set_multi_agent_enabled(
+        self, enabled: bool, *, save: bool = True
+    ) -> dict[str, bool]:
+        """Enable or disable the full role pipeline with explicit persisted state."""
+        config = self._config.setdefault("multi_agent", {})
+        if not isinstance(config, dict):
+            config = {}
+            self._config["multi_agent"] = config
+        config["enabled"] = bool(enabled)
+        if save:
+            self.save()
+        return self.get_multi_agent_config()
 
     def get_file_access_policy(self, project_root: str | Path) -> AccessModePolicy:
         """Return the unified runtime file-access policy from current config.

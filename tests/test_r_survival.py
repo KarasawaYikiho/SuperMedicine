@@ -133,6 +133,13 @@ class TestRSurvivalContract:
             result["metadata"]["contract"]["stage"] == "prototype-interface-tests-only"
         )
 
+    def test_missing_numeric_value_returns_shared_structured_error(self):
+        result = execute(
+            "r.survival.km", {"times": [1, float("nan"), 3], "events": [1, 0, 1]}
+        )
+        assert result["status"] == "plugin_error"
+        assert "finite numeric values" in result["error"]
+
     def test_unsupported_action_returns_structured_error_with_boundary(self):
         result = execute("r.survival.missing", {})
         assert result["status"] == "plugin_error"

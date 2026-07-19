@@ -257,6 +257,7 @@
                 break;
             case "permissions":
                 loadPermissions();
+                loadMultiAgent();
                 break;
             case "logs":
                 loadLogs();
@@ -736,7 +737,8 @@
             try {
                 var body = { protocol: protocol };
                 if (sessionId) body.session_id = sessionId;
-                await apiCall("POST", "/api/v1/experiments", body);
+                var started = await apiCall("POST", "/api/v1/experiments", body);
+                showExperimentDetails(started);
                 showToast("实验已启动", "success");
                 form.classList.add("hidden");
                 document.getElementById("exp-protocol").value = "";
@@ -775,9 +777,21 @@
         }).join("");
     }
 
+    function showExperimentDetails(data) {
+        alert(JSON.stringify(data, null, 2));
+    }
+
     window.viewExperiment = async function (sessionFile) {
-        // 可扩展为展示实验详情
-        showToast("查看实验: " + sessionFile, "info");
+        if (!sessionFile) return;
+        try {
+            var data = await apiCall(
+                "GET",
+                "/api/v1/experiments?session_file=" + encodeURIComponent(sessionFile)
+            );
+            showExperimentDetails(data);
+        } catch (err) {
+            showToast("加载实验详情失败: " + err.message, "error");
+        }
     };
 
     // ---- 对话历史 ---------------------------------------------------------
@@ -939,6 +953,18 @@
         }
     }
 
+    async function loadMultiAgent() {
+        try {
+            const data = await apiCall("GET", "/api/v1/multi-agent");
+            document.getElementById("multi-agent-enabled").value = String(Boolean(data.enabled));
+            document.getElementById("multi-agent-info").textContent = data.enabled
+                ? "已启用：任务自动经过完整四角色流程。"
+                : "已关闭：任务使用轻量单流程。";
+        } catch (err) {
+            showToast("加载 Multi-Agent 设置失败: " + err.message, "error");
+        }
+    }
+
     function renderPermissions(data) {
         var modeInfo = document.getElementById("permission-mode-info");
         modeInfo.innerHTML =
@@ -961,6 +987,16 @@
     }
 
     function setupPermissionForm() {
+        document.getElementById("btn-set-multi-agent").addEventListener("click", async function () {
+            var enabled = document.getElementById("multi-agent-enabled").value === "true";
+            try {
+                await apiCall("POST", "/api/v1/multi-agent", { enabled: enabled });
+                showToast(enabled ? "完整四角色流程已启用" : "已切换为轻量单流程", "success");
+                loadMultiAgent();
+            } catch (err) {
+                showToast("设置 Multi-Agent 失败: " + err.message, "error");
+            }
+        });
         document.getElementById("btn-set-permission").addEventListener("click", async function () {
             var mode = document.getElementById("permission-mode-select").value;
             var confirmFull = document.getElementById("permission-confirm-full").checked;

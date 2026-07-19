@@ -226,12 +226,10 @@ def test_unexpected_api_failure_is_redacted(monkeypatch):
     from core.web.server import create_app
 
     secret = "must-not-leak-in-http-response"
-
-    class FailingCLI:
-        def workspace_list(self):
-            raise RuntimeError(secret)
-
-    monkeypatch.setattr("cli_entry.CLI", FailingCLI)
+    monkeypatch.setattr(
+        "core.services.workspace.WorkspaceManager.list_workspaces",
+        lambda self: (_ for _ in ()).throw(RuntimeError(secret)),
+    )
 
     response = TestClient(create_app()).get("/api/v1/workspaces")
 

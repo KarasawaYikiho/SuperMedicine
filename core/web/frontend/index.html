@@ -11,9 +11,6 @@
     <meta name="format-detection" content="telephone=no">
     <meta name="msapplication-tap-highlight" content="no">
     <title>SuperMedicine — 桌面版</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -414,6 +411,19 @@
             <div id="permission-status" class="info-card">
                 <h3>当前模式</h3>
                 <div id="permission-mode-info">加载中...</div>
+            </div>
+            <div class="form-container">
+                <h3>Multi-Agent 流程</h3>
+                <div id="multi-agent-info" class="text-muted">加载中...</div>
+                <div class="form-group">
+                    <select id="multi-agent-enabled" class="select-input">
+                        <option value="false">关闭 — 轻量单流程</option>
+                        <option value="true">启用 — Alpha/Beta/Gamma/Delta</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button id="btn-set-multi-agent" class="btn btn-primary">应用</button>
+                </div>
             </div>
             <div class="form-container">
                 <h3>更改权限模式</h3>

@@ -27,7 +27,7 @@ FRONTEND_STREAMING_HINT_SCAN_PATHS = (
     "core/web/frontend/app.js",
     "core/web/frontend/index.html",
     "core/web/frontend/style.css",
-    "core/tui/screens/chat_view.py",
+    "core/tui/screens/core_views.py",
     "core/tui/i18n.py",
     "core/tui/app.py",
     "core/kernel_llm_chat.py",
@@ -707,30 +707,27 @@ def test_release_zip_layout_includes_installer_package_for_install_entrypoint():
     assert "installer/exe_release.py" in _tracked_files()
 
 
-def test_release_asset_cleanup_does_not_delete_graphql_node_ids_with_rest_endpoint():
+def test_release_publish_refuses_to_overwrite_an_existing_version():
     workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
         encoding="utf-8"
     )
+    assert "gh release edit" not in workflow
+    assert "gh release delete-asset" not in workflow
+    assert "--clobber" not in workflow
+    assert 'Release already exists for ${RELEASE_TAG}; refusing to overwrite it.' in workflow
+    assert 'Tag ${RELEASE_TAG} already exists; refusing to overwrite this version.' in workflow
 
-    extracts_release_asset_node_ids = re.search(
-        r"gh\s+release\s+view\b(?:(?!\n\s*(?:if|else|fi|while|done)\b).)*"
-        r"--json\s+assets\b(?:(?!\n\s*(?:if|else|fi|while|done)\b).)*"
-        r"--jq\s+[\"'][^\"']*\.id\b",
-        workflow,
-        re.DOTALL,
-    )
-    deletes_release_asset_with_rest_endpoint = re.search(
-        r"gh\s+api\s+--method\s+DELETE\s+repos/[^\s\"']+/releases/assets/\$\{?asset_id\}?\b",
-        workflow,
-    )
 
-    assert not (
-        extracts_release_asset_node_ids and deletes_release_asset_with_rest_endpoint
-    ), (
-        "Release asset cleanup must not pass GraphQL asset node IDs from "
-        "`gh release view --json assets --jq ... .id` to the REST release asset delete endpoint."
+def test_packaging_ci_runs_real_artifact_self_tests_and_clean_wheel_install():
+    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
+        encoding="utf-8"
     )
-    assert "gh release delete-asset" in workflow
+    assert "SuperMedicineGUI.exe --self-test" in workflow
+    assert "SuperMedicineInstaller.exe --self-test" in workflow
+    assert "SuperMedicine.exe tui --dry-run" in workflow
+    assert "python -m build --wheel" in workflow
+    assert "--target wheel-smoke" in workflow
+    assert "scripts/ci/smoke_wheel_install.py" in workflow
 
 
 def test_opencode_plugin_declared_entry_skills_and_agents_exist():
@@ -956,22 +953,30 @@ def test_distribution_build_forces_exact_lowercase_install_entry():
 
     pyproject = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
     setup_py = (REPO_ROOT / "setup.py").read_text(encoding="utf-8")
+    hooks_py = (REPO_ROOT / "scripts" / "packaging_hooks.py").read_text(
+        encoding="utf-8"
+    )
+    manifest_in = (REPO_ROOT / "MANIFEST.in").read_text(encoding="utf-8")
 
     py_modules = _setuptools_py_modules(pyproject)
     assert "cli_entry" in py_modules
     assert "uninstall_entry" in py_modules
     assert "install" not in py_modules
     assert "Install" not in py_modules
-    assert '["git", "show", ":install.py"]' in setup_py
-    assert '["git", "show", ":install_entry.py"]' in setup_py
-    assert 'LOWERCASE_INSTALL_NAME = "install.py"' in setup_py
-    assert 'UPPERCASE_INSTALL_NAME = "install_entry.py"' in setup_py
-    assert "class build_py" in setup_py
-    assert "class sdist" in setup_py
-    assert "class bdist_wheel" in setup_py
-    assert 'Path(self.dist_dir).glob("*.whl")' in setup_py
-    assert "get_outputs()" not in setup_py
-    assert "archive.writestr(name, data)" in setup_py
+    assert len(setup_py.splitlines()) <= 10
+    assert 'run_path(str(Path(__file__).parent / "scripts" / "packaging_hooks.py"))' in setup_py
+    assert "setup(cmdclass=cmdclass)" in setup_py
+    assert '["git", "show", ":install.py"]' in hooks_py
+    assert '["git", "show", ":install_entry.py"]' in hooks_py
+    assert 'LOWERCASE_INSTALL_NAME = "install.py"' in hooks_py
+    assert 'UPPERCASE_INSTALL_NAME = "install_entry.py"' in hooks_py
+    assert "class build_py" in hooks_py
+    assert "class sdist" in hooks_py
+    assert "class bdist_wheel" in hooks_py
+    assert 'Path(self.dist_dir).glob("*.whl")' in hooks_py
+    assert "get_outputs()" not in hooks_py
+    assert "archive.writestr(name, data)" in hooks_py
+    assert "include scripts/packaging_hooks.py" in manifest_in
 
 
 def test_install_manifest_declares_safe_uninstall_entry():
@@ -1070,3 +1075,13 @@ def test_ci_workflow_runs_full_quality_gates_without_hardcoded_secrets():
         combined,
         re.IGNORECASE,
     )
+
+
+def test_feature_manifest_keeps_all_baseline_feature_ids():
+    """Later refactors may add IDs, but must not silently remove any baseline ID."""
+    manifest_path = REPO_ROOT / "feature_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    baseline_ids = set(manifest["baseline_feature_ids"])
+    current_ids = {record["feature_id"] for record in manifest["features"]}
+    assert baseline_ids <= current_ids
+    assert len(current_ids) >= manifest["metrics"]["feature_id_count"]

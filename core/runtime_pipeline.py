@@ -8,8 +8,7 @@ from typing import Any
 from uuid import uuid4
 
 from agents.checkpoint import CheckpointManager
-from plugins.harness.checkpoint_verifier import CheckpointVerifier
-from plugins.harness.monitor import AgentPerformanceMonitor
+from plugins.harness.monitor import AgentPerformanceMonitor, CheckpointVerifier
 
 
 @dataclass

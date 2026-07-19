@@ -1,4 +1,5 @@
 """Tests for Self Evolution API endpoints."""
+
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 def client():
     """Create test client."""
     from core.web.server import create_app
+
     app = create_app()
     return TestClient(app)
 
@@ -35,11 +37,14 @@ def test_self_evolution_generate_missing_params(client):
 
 def test_self_evolution_generate_with_params(client):
     """Test POST /api/v1/self-evolution/generate with valid params."""
-    response = client.post("/api/v1/self-evolution/generate", json={
-        "instruction": "test instruction",
-        "type": "code",
-        "output": "/tmp/test_output.py",
-    })
+    response = client.post(
+        "/api/v1/self-evolution/generate",
+        json={
+            "instruction": "test instruction",
+            "type": "code",
+            "output": "/tmp/test_output.py",
+        },
+    )
     assert response.status_code == 200
     # Should return a result (may be error if self_evolve not fully implemented)
 
@@ -100,6 +105,27 @@ def test_self_evolution_delete_rejects_windows_traversal_without_deleting(
     assert outside.exists()
 
 
+def test_multi_agent_api_views_and_toggles_persisted_state(
+    client, tmp_path, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+
+    assert client.get("/api/v1/multi-agent").json() == {"enabled": False}
+    response = client.post("/api/v1/multi-agent", json={"enabled": True})
+
+    assert response.status_code == 200
+    assert response.json() == {"enabled": True}
+    assert client.get("/api/v1/multi-agent").json() == {"enabled": True}
+
+    frontend = Path(__file__).resolve().parents[1] / "core" / "web" / "frontend"
+    assert 'id="multi-agent-enabled"' in (frontend / "index.html").read_text(
+        encoding="utf-8"
+    )
+    app_js = (frontend / "app.js").read_text(encoding="utf-8")
+    assert '"/api/v1/multi-agent"' in app_js
+    assert "btn-set-multi-agent" in app_js
+
+
 def test_diagnose_all(client):
     """Test GET /api/v1/diagnose returns all diagnostics."""
     response = client.get("/api/v1/diagnose")
@@ -144,20 +170,214 @@ def test_diagnose_install(client):
     assert "audit" in data or "error" in data
 
 
-def test_paper_enrich_requires_explicit_confirmation(monkeypatch):
-    """Web paper enrichment should preserve the CLI explicit-confirm boundary."""
+def test_web_routes_delegate_status_and_diagnostics_to_application_services():
+    routes_source = (
+        Path(__file__)
+        .resolve()
+        .parents[1]
+        .joinpath("core", "web", "routes.py")
+        .read_text(encoding="utf-8")
+    )
+    assert "runtime.get_cli()" not in routes_source
+    assert "Path.cwd()" not in routes_source
+    assert '.system_diagnostics()' in routes_source
+    assert '.application_status()' in routes_source
 
-    captured: dict[str, object] = {}
 
+def test_chat_missing_message_returns_http_client_error(client):
+    response = client.post("/api/v1/chat", json={})
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "message_required"
+
+
+def test_websocket_chat_accepts_real_connection_and_validates_empty_message(client):
+    with client.websocket_connect("/ws/chat") as websocket:
+        websocket.send_json({})
+        assert websocket.receive_json() == {
+            "type": "error",
+            "content": "No message provided",
+        }
+
+
+def test_unexpected_api_failure_returns_http_server_error(monkeypatch):
+    monkeypatch.setattr(
+        "core.services.workspace.WorkspaceManager.list_workspaces",
+        lambda self: (_ for _ in ()).throw(RuntimeError("workspace backend failed")),
+    )
+    from core.web.server import create_app
+
+    response = TestClient(create_app()).get("/api/v1/workspaces")
+
+    assert response.status_code == 500
+    assert response.json()["error"]["code"] == "internal_error"
+    assert "workspace backend failed" not in response.text
+
+
+def test_llm_provider_list_uses_frontend_provider_schema(monkeypatch):
+    from core.services import ServiceResult
+
+    class FakeLLMService:
+        def __init__(self, project_root):
+            pass
+
+        def list_providers(self):
+            return ServiceResult.success(
+                {
+                    "current_provider": "openai",
+                    "last_provider": "anthropic",
+                    "providers": {
+                        "openai": {
+                            "api_format": "openai",
+                            "base_url": "https://api.openai.com/v1",
+                            "api_key": "<redacted>",
+                            "model": "gpt-test",
+                            "timeout": 60.0,
+                            "headers": {},
+                        },
+                        "anthropic": {
+                            "provider": "anthropic",
+                            "api_format": "anthropic",
+                            "base_url": "https://api.anthropic.com",
+                            "api_key": "<redacted>",
+                            "model": "claude-test",
+                            "timeout": 30.0,
+                            "headers": {},
+                        },
+                    },
+                }
+            )
+
+    from core.web.server import create_app
+
+    monkeypatch.setattr("core.web.server.LLMService", FakeLLMService)
+
+    response = TestClient(create_app()).get("/api/v1/llm/providers")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "current_provider": "openai",
+        "last_provider": "anthropic",
+        "providers": [
+            {
+                "provider": "openai",
+                "api_format": "openai",
+                "base_url": "https://api.openai.com/v1",
+                "api_key": "<redacted>",
+                "model": "gpt-test",
+                "timeout": 60.0,
+                "headers": {},
+                "current": True,
+            },
+            {
+                "provider": "anthropic",
+                "api_format": "anthropic",
+                "base_url": "https://api.anthropic.com",
+                "api_key": "<redacted>",
+                "model": "claude-test",
+                "timeout": 30.0,
+                "headers": {},
+                "current": False,
+            },
+        ],
+    }
+
+
+def test_experiment_detail_endpoint_returns_persisted_session_details(monkeypatch):
+    from core.services import ServiceResult
+
+    class FakeExperimentToolService:
+        def __init__(self, project_root):
+            pass
+
+        def show_experiment(self, session_file):
+            return ServiceResult.success(
+                {
+                    "session_file": session_file,
+                    "status": "in_progress",
+                    "current_step": {"step_id": "sample_preparation"},
+                    "session": {
+                        "records": {
+                            "sample_preparation": {
+                                "user_input": {"sample_id": "S1"},
+                                "outputs": {"sample_record": "ready"},
+                                "calculation_results": [],
+                            }
+                        }
+                    },
+                }
+            )
+
+    from core.web.server import create_app
+
+    monkeypatch.setattr(
+        "core.web.server.ExperimentToolService", FakeExperimentToolService
+    )
+
+    response = TestClient(create_app()).get(
+        "/api/v1/experiments",
+        params={"session_file": ".supermedicine/experiments/wb-session.json"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["current_step"]["step_id"] == "sample_preparation"
+    record = data["session"]["records"]["sample_preparation"]
+    assert record["user_input"] == {"sample_id": "S1"}
+    assert record["outputs"] == {"sample_record": "ready"}
+
+
+def test_experiment_detail_rejects_files_outside_session_storage(monkeypatch):
     class FakeCLI:
-        def paper_enrich(self, workspace_id, paper_id, *, confirm_enrich):
-            captured["workspace_id"] = workspace_id
-            captured["paper_id"] = paper_id
-            captured["confirm_enrich"] = confirm_enrich
-            return {"status": "ok"}
+        def experiment_show(self, session_file):
+            raise AssertionError("out-of-root session must not reach the CLI")
 
     monkeypatch.setattr("cli_entry.CLI", FakeCLI)
     from core.web.server import create_app
+
+    response = TestClient(create_app()).get(
+        "/api/v1/experiments",
+        params={"session_file": "../private-config.json"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "request_error"
+
+
+def test_frontend_experiment_detail_button_fetches_real_session():
+    app_js = (
+        Path(__file__)
+        .resolve()
+        .parents[1]
+        .joinpath("core", "web", "frontend", "app.js")
+        .read_text(encoding="utf-8")
+    )
+
+    assert '"/api/v1/experiments?session_file="' in app_js
+    assert "showExperimentDetails" in app_js
+    assert "可扩展为展示实验详情" not in app_js
+
+
+def test_paper_enrich_requires_explicit_confirmation(monkeypatch):
+    """Web paper enrichment should preserve the explicit-confirm boundary."""
+
+    from core.services import ServiceResult
+
+    captured: dict[str, object] = {}
+
+    class FakePaperRAGService:
+        def __init__(self, project_root):
+            pass
+
+        def enrich_metadata(self, workspace_id, paper_id, *, confirm):
+            captured["workspace_id"] = workspace_id
+            captured["paper_id"] = paper_id
+            captured["confirm_enrich"] = confirm
+            return ServiceResult.success({"status": "ok"})
+
+    from core.web.server import create_app
+
+    monkeypatch.setattr("core.web.server.PaperRAGService", FakePaperRAGService)
 
     test_client = TestClient(create_app())
 
@@ -174,12 +394,16 @@ def test_paper_enrich_requires_explicit_confirmation(monkeypatch):
 def test_frontend_inline_handlers_escape_javascript_string_arguments():
     """Inline onclick handlers must not be broken by IDs containing quotes."""
 
-    app_js = Path(__file__).resolve().parents[1].joinpath(
-        "core", "web", "frontend", "app.js"
-    ).read_text(encoding="utf-8")
+    app_js = (
+        Path(__file__)
+        .resolve()
+        .parents[1]
+        .joinpath("core", "web", "frontend", "app.js")
+        .read_text(encoding="utf-8")
+    )
 
     assert "function escapeJsString" in app_js
-    assert "onclick=\\\"deleteWorkspace('\" + escapeHtml" not in app_js
-    assert "onclick=\\\"showLLM('\" + escapeHtml" not in app_js
-    assert "onclick=\\\"viewArtifact('\" + escapeHtml" not in app_js
-    assert "onclick=\\\"deleteArtifact('\" + escapeHtml" not in app_js
+    assert 'onclick=\\"deleteWorkspace(\'" + escapeHtml' not in app_js
+    assert 'onclick=\\"showLLM(\'" + escapeHtml' not in app_js
+    assert 'onclick=\\"viewArtifact(\'" + escapeHtml' not in app_js
+    assert 'onclick=\\"deleteArtifact(\'" + escapeHtml' not in app_js

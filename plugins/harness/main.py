@@ -6,8 +6,11 @@ from pathlib import Path
 from typing import Any
 
 from plugins.base_plugin import plugin_result
-from plugins.harness.checkpoint_verifier import CheckpointVerifier
-from plugins.harness.monitor import AgentMonitor, AgentPerformanceMonitor
+from plugins.harness.monitor import (
+    AgentMonitor,
+    AgentPerformanceMonitor,
+    CheckpointVerifier,
+)
 from plugins.tools._common import required_str
 
 

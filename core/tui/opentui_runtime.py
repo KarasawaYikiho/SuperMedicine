@@ -25,6 +25,14 @@ class OpenTUIRuntimeError(RuntimeError):
     """Raised when the OpenTUI runtime bridge cannot be launched."""
 
 
+def _configure_output_errors() -> None:
+    """Keep Unicode bridge output printable on legacy Windows consoles."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            reconfigure(errors="replace")
+
+
 def runtime_info() -> OpenTUIRuntimeInfo:
     """Return the approved OpenTUI runtime package metadata."""
 
@@ -83,18 +91,22 @@ def opentui_command(
     smoke: bool = False,
     automated_nav: bool = False,
     full_page_interactions: bool = False,
+    interaction_matrix: bool = False,
 ) -> list[str]:
     """Build the command that starts the OpenTUI bridge."""
 
     root = Path(project_root) if project_root is not None else Path.cwd()
     bridge = _bridge_path(root)
     command = [_preferred_js_runtime(), str(bridge), "--project-root", str(root)]
+    command.extend(["--python-executable", sys.executable])
     if smoke:
         command.append("--smoke")
     if automated_nav:
         command.append("--automated-nav")
     if full_page_interactions:
         command.append("--full-page-interactions")
+    if interaction_matrix:
+        command.append("--interaction-matrix")
     return command
 
 
@@ -112,7 +124,9 @@ def launch_opentui_runtime(*, project_root: Path | str | None = None) -> int:
     return int(completed.returncode or 0)
 
 
-def smoke_opentui_runtime(*, project_root: Path | str | None = None) -> subprocess.CompletedProcess[str]:
+def smoke_opentui_runtime(
+    *, project_root: Path | str | None = None
+) -> subprocess.CompletedProcess[str]:
     """Start the OpenTUI bridge in smoke mode for external verification."""
 
     command = opentui_command(project_root=project_root, smoke=True)
@@ -121,6 +135,8 @@ def smoke_opentui_runtime(*, project_root: Path | str | None = None) -> subproce
             command,
             cwd=Path(project_root or Path.cwd()),
             text=True,
+            encoding="utf-8",
+            errors="replace",
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             timeout=10,
@@ -143,6 +159,8 @@ def automated_nav_opentui_runtime(
             command,
             cwd=Path(project_root or Path.cwd()),
             text=True,
+            encoding="utf-8",
+            errors="replace",
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             timeout=10,
@@ -165,6 +183,8 @@ def full_page_interactions_opentui_runtime(
             command,
             cwd=Path(project_root or Path.cwd()),
             text=True,
+            encoding="utf-8",
+            errors="replace",
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             timeout=15,
@@ -176,13 +196,43 @@ def full_page_interactions_opentui_runtime(
         ) from exc
 
 
+def interaction_matrix_opentui_runtime(
+    *, project_root: Path | str | None = None
+) -> subprocess.CompletedProcess[str]:
+    """Exercise real mouse, resize, Unicode, cancellation, and recovery paths."""
+
+    command = opentui_command(project_root=project_root, interaction_matrix=True)
+    try:
+        return subprocess.run(
+            command,
+            cwd=Path(project_root or Path.cwd()),
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=15,
+        )
+    except FileNotFoundError as exc:
+        raise OpenTUIRuntimeError(
+            "OpenTUI runtime requires Bun for the interaction matrix."
+        ) from exc
+
+
 def main(argv: list[str] | None = None) -> int:
     """Standalone smoke/launch helper for packaging diagnostics."""
 
+    _configure_output_errors()
     argv = list(sys.argv[1:] if argv is None else argv)
     smoke = "--smoke" in argv
     automated_nav = "--automated-nav" in argv
     full_page_interactions = "--full-page-interactions" in argv
+    interaction_matrix = "--interaction-matrix" in argv
+    if interaction_matrix:
+        result = interaction_matrix_opentui_runtime()
+        sys.stdout.write(result.stdout)
+        sys.stderr.write(result.stderr)
+        return int(result.returncode or 0)
     if full_page_interactions:
         result = full_page_interactions_opentui_runtime()
         sys.stdout.write(result.stdout)

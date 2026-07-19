@@ -65,6 +65,26 @@ class TestVancouverFormatter:
 
 
 class TestCitationAccuracy:
+    def test_ama_and_vancouver_snapshots_keep_only_declared_doi_difference(self):
+        article = JournalArticle(
+            authors=["John Smith", "Jane Doe"],
+            title="Cardiovascular Risk Factors",
+            journal="JAMA",
+            year=2024,
+            volume="331",
+            issue="5",
+            pages="401-410",
+            doi="10.1001/jama.2024.1234",
+        )
+
+        assert VancouverFormatter().format_journal(article) == (
+            "Smith J, Doe J. Cardiovascular Risk Factors. JAMA. 2024;331(5):401-410."
+        )
+        assert AMAFormatter().format_journal(article) == (
+            "Smith J, Doe J. Cardiovascular Risk Factors. JAMA. 2024;331(5):401-410. "
+            "doi:10.1001/jama.2024.1234"
+        )
+
     def test_formatter_models_are_shared(self):
         article = JournalArticle(
             authors=["John Smith"],
