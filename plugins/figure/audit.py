@@ -121,7 +121,7 @@ def _check_pdf_fonts(path: str) -> list[tuple[str, str]]:
         from pypdf import PdfReader
     except ImportError:
         try:
-            from PyPDF2 import PdfReader  # type: ignore[assignment]  # noqa: F401
+            from PyPDF2 import PdfReader  # type: ignore[no-redef,assignment]  # noqa: F401
         except ImportError:
             issues.append(
                 (

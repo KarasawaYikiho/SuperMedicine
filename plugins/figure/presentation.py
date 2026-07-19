@@ -266,7 +266,12 @@ def setup_style(
     if use_sciplots:
         sciplots_used = _try_sciencplots(journal)
 
-    plt.rcParams.update(JOURNAL_PRESETS[journal])
+    # Matplotlib's stubs enumerate every supported rcParam key as literals,
+    # while journal presets are deliberately selected dynamically at runtime.
+    # Keep type checking for the preset values, but mark this library boundary
+    # as dynamic instead of coupling the preset declaration to stub internals.
+    rc_params: Any = plt.rcParams
+    rc_params.update(JOURNAL_PRESETS[journal])
     plt.rcParams["figure.constrained_layout.use"] = constrained_layout
     plt.rcParams["axes.unicode_minus"] = False
 
