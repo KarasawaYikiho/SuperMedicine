@@ -943,4 +943,3 @@ class ToolView(Vertical):
 
 # Backward-compatible alias
 ToolScreen = ToolView
-

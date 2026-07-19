@@ -771,4 +771,3 @@ class SelfEvolutionView(Vertical):
 
 
 SelfEvolutionScreen = SelfEvolutionView
-
