@@ -369,13 +369,24 @@ def install_components(
 
     # Perform actual copy
     copied = 0
+    created: list[Path] = []
+    overwritten: dict[Path, bytes] = {}
     try:
         for source, relative in files:
             target = target_dir / relative
+            if target.is_file():
+                overwritten[target] = target.read_bytes()
+            else:
+                created.append(target)
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
             copied += 1
     except Exception as exc:
+        for target in reversed(created):
+            target.unlink(missing_ok=True)
+        for target, payload in overwritten.items():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(payload)
         logger.error(
             "组件安装失败: target=%s copied=%d/%d error=%s",
             target_dir,
@@ -393,3 +404,73 @@ def install_components(
         sorted(selected),
     )
     return result
+
+
+def load_install_manifest(path: str | os.PathLike[str]) -> dict[str, Any]:
+    """Read an installation manifest, returning an empty mapping if unavailable."""
+
+    manifest_path = Path(path)
+    if not manifest_path.is_file():
+        return {}
+    try:
+        value = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+@dataclass(frozen=True)
+class InstallService:
+    """Resolve and install manifest components without presentation logic."""
+
+    manifest_path: Path
+    source_root: Path
+    components: dict[str, ComponentDef]
+
+    @classmethod
+    def from_manifest(
+        cls,
+        manifest_path: str | os.PathLike[str],
+        *,
+        source_root: str | os.PathLike[str] | None = None,
+    ) -> InstallService:
+        path = Path(manifest_path).expanduser().resolve()
+        return cls(
+            manifest_path=path,
+            source_root=(Path(source_root) if source_root else path.parent).resolve(),
+            components=load_components(path),
+        )
+
+    def default_selection(self) -> list[str]:
+        return get_default_selection(self.components)
+
+    def validate(self, selected: list[str]) -> None:
+        validate_selection(self.components, selected)
+
+    def diagnostics(self, selected: list[str]) -> dict[str, Any]:
+        self.validate(selected)
+        files = get_component_files(self.components, selected, self.source_root)
+        return {
+            "manifest": str(self.manifest_path),
+            "source_root": str(self.source_root),
+            "components": sorted(selected),
+            "file_count": len(files),
+            "missing_components": sorted(set(selected) - self.components.keys()),
+        }
+
+    def install(
+        self,
+        selected: list[str],
+        install_path: str | os.PathLike[str],
+        *,
+        overwrite: bool = False,
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        return install_components(
+            self.components,
+            selected,
+            install_path,
+            self.source_root,
+            overwrite=overwrite,
+            dry_run=dry_run,
+        )

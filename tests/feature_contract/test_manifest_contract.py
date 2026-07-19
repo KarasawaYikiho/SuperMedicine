@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
+from typing import Any
 
 from tests.feature_contract.inventory import collect_metrics, discovered_surface
 
-def test_manifest_has_unique_ids_and_required_contract_fields(manifest: dict[str, object]) -> None:
+def test_manifest_has_unique_ids_and_required_contract_fields(manifest: dict[str, Any]) -> None:
     records = manifest["features"]
     assert isinstance(records, list)
     assert records
@@ -22,7 +23,7 @@ def test_manifest_has_unique_ids_and_required_contract_fields(manifest: dict[str
         assert required_fields <= set(record)
 
 
-def test_manifest_covers_declared_web_and_plugin_entries(manifest: dict[str, object]) -> None:
+def test_manifest_covers_declared_web_and_plugin_entries(manifest: dict[str, Any]) -> None:
     entries = {record["entrypoint"] for record in manifest["features"]}
     assert {
         "web:GET /api/v1/status",
@@ -33,7 +34,7 @@ def test_manifest_covers_declared_web_and_plugin_entries(manifest: dict[str, obj
 
 
 def test_manifest_matches_static_inventory(
-    repository_root: Path, manifest: dict[str, object]
+    repository_root: Path, manifest: dict[str, Any]
 ) -> None:
     manifest_entries = {record["entrypoint"] for record in manifest["features"]}
     discovered_entries = {
@@ -44,7 +45,7 @@ def test_manifest_matches_static_inventory(
     assert discovered_entries <= manifest_entries
 
 
-def test_manifest_covers_tui_actions_and_configuration_keys(manifest: dict[str, object]) -> None:
+def test_manifest_covers_tui_actions_and_configuration_keys(manifest: dict[str, Any]) -> None:
     entries = {record["entrypoint"] for record in manifest["features"]}
     assert {
         "tui_action:show_help",
@@ -54,7 +55,7 @@ def test_manifest_covers_tui_actions_and_configuration_keys(manifest: dict[str, 
 
 
 def test_each_manifest_contract_node_exists(
-    repository_root: Path, manifest: dict[str, object]
+    repository_root: Path, manifest: dict[str, Any]
 ) -> None:
     for record in manifest["features"]:
         path_text, function_name = record["contract_test"].split("::", maxsplit=1)
@@ -68,14 +69,14 @@ def test_each_manifest_contract_node_exists(
         assert function_name in functions, record["feature_id"]
 
 
-def test_feature_id_baseline_never_regresses(manifest: dict[str, object]) -> None:
+def test_feature_id_baseline_never_regresses(manifest: dict[str, Any]) -> None:
     current_ids = {record["feature_id"] for record in manifest["features"]}
     baseline_ids = set(manifest["baseline_feature_ids"])
     assert baseline_ids <= current_ids
     assert len(current_ids) >= manifest["metrics"]["feature_id_count"]
 
 
-def test_manifest_covers_release_entrypoints(manifest: dict[str, object]) -> None:
+def test_manifest_covers_release_entrypoints(manifest: dict[str, Any]) -> None:
     entries = {record["entrypoint"] for record in manifest["features"]}
     assert {
         "entrypoint:cli_entry.py",
@@ -88,13 +89,13 @@ def test_manifest_covers_release_entrypoints(manifest: dict[str, object]) -> Non
     } <= entries
 
 
-def test_manifest_covers_database_schema(manifest: dict[str, object]) -> None:
+def test_manifest_covers_database_schema(manifest: dict[str, Any]) -> None:
     entries = {record["entrypoint"] for record in manifest["features"]}
     assert "database_table:agents" in entries
 
 
 def test_manifest_records_reproducible_structural_metrics(
-    repository_root: Path, manifest: dict[str, object]
+    repository_root: Path, manifest: dict[str, Any]
 ) -> None:
     metrics = manifest["metrics"]
     required = {

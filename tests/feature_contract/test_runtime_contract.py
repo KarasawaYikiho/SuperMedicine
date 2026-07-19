@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from agents.roles import ROLE_SPECS, AlphaAgent, BetaAgent, DeltaAgent, GammaAgent
 from core.plugin_registry import PluginRegistry
 
 
 def test_required_plugins_name_their_runtime_contract(
-    manifest: dict[str, object],
+    manifest: dict[str, Any],
 ) -> None:
     required_plugins = [
         record

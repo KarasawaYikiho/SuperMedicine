@@ -25,6 +25,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
+from installer.component_installer import load_install_manifest
+
 from core.redaction import redact_sensitive
 
 
@@ -147,17 +149,13 @@ def _load_install_record(project_dir: Path) -> dict[str, Any]:
 
 def _load_install_manifest(project_dir: Path) -> dict[str, Any]:
     manifest_path = project_dir / INSTALL_MANIFEST
-    if not manifest_path.is_file():
-        return {}
-    try:
-        loaded = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
+    loaded = load_install_manifest(project_dir / INSTALL_MANIFEST)
+    if manifest_path.is_file() and not loaded:
         logger.warning(
             "Ignoring invalid install manifest: %s",
             _safe_display(manifest_path, project_dir),
         )
-        return {}
-    return loaded if isinstance(loaded, dict) else {}
+    return loaded
 
 
 def _load_component_definitions(project_dir: Path) -> dict[str, dict[str, Any]]:

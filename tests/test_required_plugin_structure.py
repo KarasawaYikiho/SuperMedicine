@@ -64,10 +64,12 @@ def test_figure_keeps_all_entrypoints_in_six_maintainer_owned_modules():
         "figure-qa.preview",
     }
 
-    from plugins.figure.check import check_figure
-    from plugins.figure.layout import finalize_figure
-    from plugins.figure.qa import audit_layout
-    from plugins.figure.style import setup_style
+    import importlib
+
+    check_figure = importlib.import_module("plugins.figure.check").check_figure
+    finalize_figure = importlib.import_module("plugins.figure.layout").finalize_figure
+    audit_layout = importlib.import_module("plugins.figure.qa").audit_layout
+    setup_style = importlib.import_module("plugins.figure.style").setup_style
 
     assert all(
         callable(item)

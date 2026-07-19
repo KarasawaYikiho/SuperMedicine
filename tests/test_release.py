@@ -385,6 +385,29 @@ def test_cur_dbg_010_release_icon_contract_is_packaged_and_documented():
     assert "target_filename" in exe_release
 
 
+def test_desktop_and_installer_exe_builders_share_one_parameterized_engine():
+    """The two preserved EXE targets must not maintain duplicate build workflows."""
+
+    ci_dir = REPO_ROOT / "scripts" / "ci"
+    gui_builder = (ci_dir / "build_gui_exe.py").read_text(encoding="utf-8")
+    installer_builder = (ci_dir / "build_installer_exe.py").read_text(
+        encoding="utf-8"
+    )
+    shared_builder = ci_dir / "_pyinstaller_builder.py"
+
+    assert shared_builder.is_file()
+    shared_source = shared_builder.read_text(encoding="utf-8")
+    assert "class PyInstallerTarget" in shared_source
+    assert "def build_executable" in shared_source
+    assert '"PyInstaller"' in shared_source
+    assert '"PyInstaller"' not in gui_builder
+    assert '"PyInstaller"' not in installer_builder
+    assert "build_executable" in gui_builder
+    assert "build_executable" in installer_builder
+    assert len(gui_builder.splitlines()) <= 80
+    assert len(installer_builder.splitlines()) <= 80
+
+
 def test_ci_standalone_installer_pyinstaller_payload_path_matches_specpath_contract():
     """Regression: --specpath must not make PyInstaller look for a missing release_payload."""
 

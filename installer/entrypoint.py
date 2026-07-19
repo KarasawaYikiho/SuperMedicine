@@ -34,10 +34,9 @@ from permission.policy import ensure_default_policy
 from installer.component_installer import (
     ComponentDef,
     ComponentError,
-    load_components,
+    InstallService,
     get_default_selection,
     validate_selection,
-    install_components,
 )
 
 logger = logging.getLogger("Install")
@@ -666,9 +665,13 @@ def _run_interactive_installer(args: argparse.Namespace) -> None:
 
     source_root = _release_entrypoint_dir()
     install_json_path = source_root / "install.json"
+    install_service: InstallService | None = None
     components: dict[str, ComponentDef] | None = None
     try:
-        components = load_components(install_json_path)
+        install_service = InstallService.from_manifest(
+            install_json_path, source_root=source_root
+        )
+        components = install_service.components
     except (FileNotFoundError, KeyError, ComponentError):
         components = None
     has_components = components is not None and bool(components)
@@ -808,12 +811,10 @@ def _run_interactive_installer(args: argparse.Namespace) -> None:
             if extract_release:
                 args.extract_release_to = install_path
                 payload_result = _extract_release_from_args(args)
-            if selected_components and components is not None:
-                component_result = install_components(
-                    components,
+            if selected_components and install_service is not None:
+                component_result = install_service.install(
                     selected_components,
                     install_path,
-                    source_root,
                     overwrite=existing_action == "update",
                 )
                 logger.info(

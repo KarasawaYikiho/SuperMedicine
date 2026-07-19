@@ -23,6 +23,7 @@ Or from the command line::
 
 from __future__ import annotations
 
+import json
 import logging
 import sys
 import threading
@@ -48,9 +49,7 @@ except ImportError:
 from installer.component_installer import (  # noqa: E402
     ComponentDef,
     ComponentError,
-    install_components,
-    load_components,
-    validate_selection,
+    InstallService,
 )
 
 
@@ -76,7 +75,9 @@ _INSTALL_JSON_CANDIDATES = (
 
 def _find_install_json() -> Path | None:
     """Return the first existing *install.json* path or ``None``."""
-    for candidate in _INSTALL_JSON_CANDIDATES:
+    bundle_root = getattr(sys, "_MEIPASS", None)
+    bundle_candidates = (Path(bundle_root) / "install.json",) if bundle_root else ()
+    for candidate in (*bundle_candidates, *_INSTALL_JSON_CANDIDATES):
         if candidate.is_file():
             return candidate
     return None
@@ -105,6 +106,7 @@ class _InstallerGUI:
 
         # State
         self._components: dict[str, ComponentDef] = {}
+        self._install_service: InstallService | None = None
         self._check_vars: dict[str, tk.BooleanVar] = {}
         self._installing = False
 
@@ -122,7 +124,10 @@ class _InstallerGUI:
             logger.warning("install.json 未找到，组件选择不可用")
             return
         try:
-            self._components = load_components(config_path)
+            self._install_service = InstallService.from_manifest(
+                config_path, source_root=config_path.parent
+            )
+            self._components = self._install_service.components
         except (FileNotFoundError, KeyError, ComponentError) as exc:
             logger.warning("加载组件定义失败: %s", exc)
 
@@ -262,9 +267,9 @@ class _InstallerGUI:
             return
 
         # Validate selection
-        if self._components:
+        if self._install_service:
             try:
-                validate_selection(self._components, selected)
+                self._install_service.validate(selected)
             except ComponentError as exc:
                 messagebox.showerror("组件选择无效", str(exc), parent=self._root)
                 return
@@ -296,23 +301,18 @@ class _InstallerGUI:
     ) -> None:
         """Execute the actual installation (runs in a worker thread)."""
         try:
-            # Determine source root
-            source_root = Path(__file__).resolve().parents[1]
-
             # Simulate progress stages
             self._update_progress(10, "正在验证组件...")
-            if self._components:
-                validate_selection(self._components, selected)
+            if self._install_service:
+                self._install_service.validate(selected)
 
             self._update_progress(30, "正在复制文件...")
 
             result: dict[str, Any] = {}
-            if self._components:
-                result = install_components(
-                    self._components,
+            if self._install_service:
+                result = self._install_service.install(
                     selected,
                     install_path,
-                    source_root,
                     overwrite=False,
                 )
             else:
@@ -427,9 +427,51 @@ def launch_gui_installer() -> None:
 # ---------------------------------------------------------------------------
 
 
-def main() -> None:
+def installer_self_test() -> dict[str, Any]:
+    """Validate frozen resources and storage without opening a window."""
+
+    manifest = _find_install_json()
+    service: InstallService | None = None
+    if manifest is not None:
+        try:
+            service = InstallService.from_manifest(
+                manifest, source_root=manifest.parent
+            )
+        except (FileNotFoundError, KeyError, ComponentError):
+            service = None
+    persistent_path = Path(_default_install_path()).expanduser().resolve()
+    raw_bundle_root = getattr(sys, "_MEIPASS", None)
+    bundle_root = Path(raw_bundle_root).resolve() if raw_bundle_root else None
+    checks = {
+        "tkinter": _tkinter_available,
+        "manifest": manifest is not None and manifest.is_file(),
+        "install_service": service is not None,
+        "components": service is not None and bool(service.components),
+        "persistent_path_outside_bundle": (
+            bundle_root is None or not persistent_path.is_relative_to(bundle_root)
+        ),
+    }
+    return {
+        "ok": all(checks.values()),
+        "checks": checks,
+        "manifest": str(manifest) if manifest else None,
+        "persistent_path": str(persistent_path),
+        "bundle_root": str(bundle_root) if bundle_root else None,
+    }
+
+
+def main(argv: list[str] | None = None) -> int:
     """CLI entry-point for ``python -m installer.gui_installer``."""
     logging.basicConfig(level=logging.INFO, format="%(message)s")
+    args = list(sys.argv[1:] if argv is None else argv)
+
+    if args == ["--self-test"]:
+        report = installer_self_test()
+        print(json.dumps(report, ensure_ascii=False))
+        return 0 if report["ok"] else 1
+    if args:
+        print("usage: gui_installer.py [--self-test]", file=sys.stderr)
+        return 2
 
     if not _tkinter_available:
         print(
@@ -437,10 +479,11 @@ def main() -> None:
             "请使用命令行安装模式: python install_entry.py --init --interactive",
             file=sys.stderr,
         )
-        sys.exit(1)
+        return 1
 
     launch_gui_installer()
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

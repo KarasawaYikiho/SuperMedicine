@@ -1,6 +1,7 @@
 exclude .gitignore
 include permission/default_policy.yaml
 include THIRD_PARTY_NOTICES.md
+include scripts/packaging_hooks.py
 prune .github
 prune .supermedicine/checkpoints
 prune .supermedicine/experiments

@@ -956,22 +956,30 @@ def test_distribution_build_forces_exact_lowercase_install_entry():
 
     pyproject = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
     setup_py = (REPO_ROOT / "setup.py").read_text(encoding="utf-8")
+    hooks_py = (REPO_ROOT / "scripts" / "packaging_hooks.py").read_text(
+        encoding="utf-8"
+    )
+    manifest_in = (REPO_ROOT / "MANIFEST.in").read_text(encoding="utf-8")
 
     py_modules = _setuptools_py_modules(pyproject)
     assert "cli_entry" in py_modules
     assert "uninstall_entry" in py_modules
     assert "install" not in py_modules
     assert "Install" not in py_modules
-    assert '["git", "show", ":install.py"]' in setup_py
-    assert '["git", "show", ":install_entry.py"]' in setup_py
-    assert 'LOWERCASE_INSTALL_NAME = "install.py"' in setup_py
-    assert 'UPPERCASE_INSTALL_NAME = "install_entry.py"' in setup_py
-    assert "class build_py" in setup_py
-    assert "class sdist" in setup_py
-    assert "class bdist_wheel" in setup_py
-    assert 'Path(self.dist_dir).glob("*.whl")' in setup_py
-    assert "get_outputs()" not in setup_py
-    assert "archive.writestr(name, data)" in setup_py
+    assert len(setup_py.splitlines()) <= 10
+    assert 'run_path(str(Path(__file__).parent / "scripts" / "packaging_hooks.py"))' in setup_py
+    assert "setup(cmdclass=cmdclass)" in setup_py
+    assert '["git", "show", ":install.py"]' in hooks_py
+    assert '["git", "show", ":install_entry.py"]' in hooks_py
+    assert 'LOWERCASE_INSTALL_NAME = "install.py"' in hooks_py
+    assert 'UPPERCASE_INSTALL_NAME = "install_entry.py"' in hooks_py
+    assert "class build_py" in hooks_py
+    assert "class sdist" in hooks_py
+    assert "class bdist_wheel" in hooks_py
+    assert 'Path(self.dist_dir).glob("*.whl")' in hooks_py
+    assert "get_outputs()" not in hooks_py
+    assert "archive.writestr(name, data)" in hooks_py
+    assert "include scripts/packaging_hooks.py" in manifest_in
 
 
 def test_install_manifest_declares_safe_uninstall_entry():
