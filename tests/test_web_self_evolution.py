@@ -25,9 +25,12 @@ def test_self_evolution_list(client):
 def test_self_evolution_generate_missing_params(client):
     """Test POST /api/v1/self-evolution/generate with missing params returns error."""
     response = client.post("/api/v1/self-evolution/generate", json={})
-    assert response.status_code == 200
+    assert response.status_code == 400
     data = response.json()
-    assert data.get("status") == "error"
+    assert data["ok"] is False
+    assert data["data"] is None
+    assert data["error"]["code"] == "invalid_self_evolution_request"
+    assert data["request_id"]
 
 
 def test_self_evolution_generate_with_params(client):
@@ -44,17 +47,57 @@ def test_self_evolution_generate_with_params(client):
 def test_self_evolution_get_not_found(client):
     """Test GET /api/v1/self-evolution/{id} with invalid ID returns error."""
     response = client.get("/api/v1/self-evolution/nonexistent")
-    assert response.status_code == 200
+    assert response.status_code == 404
     data = response.json()
-    assert data.get("status") == "error"
+    assert data["ok"] is False
+    assert data["error"]["code"] == "artifact_not_found"
 
 
 def test_self_evolution_delete_not_found(client):
     """Test DELETE /api/v1/self-evolution/{id} with invalid ID returns error."""
     response = client.delete("/api/v1/self-evolution/nonexistent")
-    assert response.status_code == 200
+    assert response.status_code == 404
     data = response.json()
-    assert data.get("status") == "error"
+    assert data["ok"] is False
+    assert data["error"]["code"] == "artifact_not_found"
+
+
+@pytest.mark.parametrize(
+    "encoded_id",
+    [
+        "%2E%2E%5Coutside",
+        "%2E%2E",
+        "C%3Aoutside",
+    ],
+)
+def test_self_evolution_get_rejects_unsafe_artifact_id(
+    client, tmp_path, monkeypatch, encoded_id
+):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "self_evolution").mkdir()
+    outside = tmp_path / "outside.json"
+    outside.write_text('{"secret": true}', encoding="utf-8")
+
+    response = client.get(f"/api/v1/self-evolution/{encoded_id}")
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "invalid_artifact_id"
+    assert outside.read_text(encoding="utf-8") == '{"secret": true}'
+
+
+def test_self_evolution_delete_rejects_windows_traversal_without_deleting(
+    client, tmp_path, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "self_evolution").mkdir()
+    outside = tmp_path / "outside.json"
+    outside.write_text('{"keep": true}', encoding="utf-8")
+
+    response = client.delete("/api/v1/self-evolution/%2E%2E%5Coutside")
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "invalid_artifact_id"
+    assert outside.exists()
 
 
 def test_diagnose_all(client):

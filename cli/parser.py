@@ -161,6 +161,12 @@ def main(argv: list[str] | None = None) -> None:
         description="启动基于 FastAPI 的 Web 界面；需要安装可选依赖：pip install supermedicine[web]",
     )
     web_parser.add_argument(
+        "--auth-token-file",
+        type=Path,
+        default=None,
+        help="Remote Web binding Bearer token file (minimum 32 bytes)",
+    )
+    web_parser.add_argument(
         "--host",
         type=str,
         default="127.0.0.1",
@@ -805,8 +811,13 @@ def main(argv: list[str] | None = None) -> None:
         cli.tui(dry_run=args.dry_run)
     elif args.command == "web":
         try:
-            cli.web(host=args.host, port=args.port, reload=args.reload)
-        except ImportError as exc:
+            cli.web(
+                host=args.host,
+                port=args.port,
+                reload=args.reload,
+                auth_token_file=args.auth_token_file,
+            )
+        except (ImportError, ValueError) as exc:
             web_parser.error(str(exc))
     elif args.command == "run":
         verbose = getattr(args, "verbose", False)

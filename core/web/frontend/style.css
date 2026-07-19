@@ -64,6 +64,37 @@ header h1 {
     letter-spacing: -0.02em;
 }
 
+#web-auth-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: auto;
+    margin-right: 1rem;
+}
+
+#web-auth-controls label {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+}
+
+#web-auth-token {
+    width: min(18rem, 28vw);
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-bg);
+    color: var(--color-text);
+}
+
+#web-auth-save {
+    padding: 0.4rem 0.75rem;
+    border: 1px solid var(--color-primary);
+    border-radius: var(--radius);
+    background: var(--color-primary);
+    color: #ffffff;
+    cursor: pointer;
+}
+
 #status-bar {
     display: flex;
     align-items: center;
@@ -971,9 +1002,22 @@ body {
 @media (max-width: 768px) {
     header {
         flex-direction: row;
+        flex-wrap: wrap;
         gap: 0.75rem;
         text-align: left;
         padding: 1rem;
+    }
+
+    #web-auth-controls {
+        order: 3;
+        width: 100%;
+        margin: 0;
+    }
+
+    #web-auth-token {
+        width: auto;
+        min-width: 0;
+        flex: 1;
     }
 
     .drawer-menu {

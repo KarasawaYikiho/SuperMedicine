@@ -21,6 +21,8 @@
     const drawerOverlay = document.getElementById("drawer-overlay");
     const drawerCloseBtn = document.getElementById("drawer-close-btn");
     const chatWsSelect = document.getElementById("chat-ws-select");
+    const webAuthTokenInput = document.getElementById("web-auth-token");
+    const webAuthSave = document.getElementById("web-auth-save");
 
     // ---- 状态 -------------------------------------------------------------
 
@@ -29,6 +31,7 @@
     const RECONNECT_DELAY = 3000;
     let currentWorkspaceId = null;
     let chatProcessing = false;
+    let webAuthToken = sessionStorage.getItem("supermedicine.webAuthToken") || "";
 
     // ---- 辅助函数 ---------------------------------------------------------
 
@@ -172,6 +175,13 @@
 
     // ---- API 辅助 ---------------------------------------------------------
 
+    function authorizedFetch(url, opts) {
+        opts = opts || {};
+        opts.headers = Object.assign({}, opts.headers || {});
+        if (webAuthToken) opts.headers.Authorization = "Bearer " + webAuthToken;
+        return fetch(url, opts);
+    }
+
     async function apiCall(method, url, body) {
         const opts = {
             method: method,
@@ -179,7 +189,7 @@
         };
         if (body) opts.body = JSON.stringify(body);
 
-        const resp = await fetch(url, opts);
+        const resp = await authorizedFetch(url, opts);
         if (!resp.ok) throw new Error("HTTP " + resp.status);
         return resp.json();
     }
@@ -1162,7 +1172,7 @@
     // ---- 诊断 -------------------------------------------------------------
 
     function loadDiagnostics() {
-        fetch('/api/v1/diagnose')
+        authorizedFetch('/api/v1/diagnose')
             .then(function (response) { return response.json(); })
             .then(function (data) {
                 renderDiagnostics(data);
@@ -1201,7 +1211,7 @@
     }
 
     function runConfigDiagnostics() {
-        fetch('/api/v1/diagnose/config')
+        authorizedFetch('/api/v1/diagnose/config')
             .then(function (response) { return response.json(); })
             .then(function (data) {
                 document.getElementById('diagnose-content').textContent = JSON.stringify(data, null, 2);
@@ -1214,7 +1224,7 @@
     }
 
     function runLLMDiagnostics() {
-        fetch('/api/v1/diagnose/llm')
+        authorizedFetch('/api/v1/diagnose/llm')
             .then(function (response) { return response.json(); })
             .then(function (data) {
                 document.getElementById('diagnose-content').textContent = JSON.stringify(data, null, 2);
@@ -1227,7 +1237,7 @@
     }
 
     function runInstallDiagnostics() {
-        fetch('/api/v1/diagnose/install')
+        authorizedFetch('/api/v1/diagnose/install')
             .then(function (response) { return response.json(); })
             .then(function (data) {
                 document.getElementById('diagnose-content').textContent = JSON.stringify(data, null, 2);
@@ -1240,7 +1250,7 @@
     }
 
     function runAllDiagnostics() {
-        fetch('/api/v1/diagnose')
+        authorizedFetch('/api/v1/diagnose')
             .then(function (response) { return response.json(); })
             .then(function (data) {
                 document.getElementById('diagnose-content').textContent = JSON.stringify(data, null, 2);
@@ -1278,7 +1288,11 @@
         ws = new WebSocket(url);
 
         ws.onopen = function () {
-            setConnected(true);
+            if (webAuthToken) {
+                ws.send(JSON.stringify({ type: "auth", token: webAuthToken }));
+            } else {
+                setConnected(true);
+            }
             if (reconnectTimer) {
                 clearTimeout(reconnectTimer);
                 reconnectTimer = null;
@@ -1306,6 +1320,10 @@
             }
 
             switch (data.type) {
+                case "auth_ok":
+                    setConnected(true);
+                    break;
+
                 case "progress":
                     addMessage("progress", data.data.message || JSON.stringify(data.data), "progress");
                     break;
@@ -1366,7 +1384,7 @@
         if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify(payload));
         } else {
-            fetch("/api/v1/chat", {
+            authorizedFetch("/api/v1/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
@@ -1405,6 +1423,21 @@
     if (chatWsSelect) {
         chatWsSelect.addEventListener("change", function () {
             handleWorkspaceSelection(this.value);
+        });
+    }
+
+    if (webAuthTokenInput) webAuthTokenInput.value = webAuthToken;
+    if (webAuthSave) {
+        webAuthSave.addEventListener("click", function () {
+            webAuthToken = webAuthTokenInput.value.trim();
+            if (webAuthToken) {
+                sessionStorage.setItem("supermedicine.webAuthToken", webAuthToken);
+            } else {
+                sessionStorage.removeItem("supermedicine.webAuthToken");
+            }
+            if (ws) ws.close();
+            fetchStatus();
+            connect();
         });
     }
 

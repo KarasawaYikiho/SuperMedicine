@@ -341,14 +341,25 @@ class CLI:
             return launch_tui(dry_run=dry_run)
         return launch_tui(dry_run=dry_run, project_root=Path.cwd())
 
-    def web(self, host: str = "127.0.0.1", port: int = 8000, reload: bool = False):
+    def web(
+        self,
+        host: str = "127.0.0.1",
+        port: int = 8000,
+        reload: bool = False,
+        auth_token_file: str | Path | None = None,
+    ):
         """Start web interface.
 
         Requires optional web dependencies: ``pip install supermedicine[web]``
         """
         from core.web.server import start_server
 
-        start_server(host, port, reload=reload)
+        start_server(
+            host,
+            port,
+            reload=reload,
+            auth_token_file=auth_token_file,
+        )
 
 
 from cli.parser import main  # noqa: E402

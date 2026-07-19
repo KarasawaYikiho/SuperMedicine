@@ -276,10 +276,9 @@ def _exe_search_candidates(requested: Path) -> list[Path]:
     else:
         for root in roots:
             _append_unique_path(candidates, root / requested)
-
-    for relative in DEFAULT_EXE_SEARCH_RELATIVE_PATHS:
-        for root in roots:
-            _append_unique_path(candidates, root / relative)
+        for relative in DEFAULT_EXE_SEARCH_RELATIVE_PATHS:
+            for root in roots:
+                _append_unique_path(candidates, root / relative)
 
     return candidates
 

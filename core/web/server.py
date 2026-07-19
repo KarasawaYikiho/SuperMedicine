@@ -14,6 +14,7 @@ import json
 import logging
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 logger = logging.getLogger(__name__)
 
@@ -35,11 +36,11 @@ def _ensure_fastapi() -> None:
         ) from exc
 
 
-def create_app() -> Any:
+def create_app(*, auth_token: str | None = None) -> Any:
     """Create and return the FastAPI application."""
     _ensure_fastapi()
 
-    from fastapi import FastAPI
+    from fastapi import FastAPI, WebSocket
     from fastapi.responses import HTMLResponse
     from fastapi.staticfiles import StaticFiles
 
@@ -48,6 +49,44 @@ def create_app() -> Any:
         version="0.4.2",
         description="SuperMedicine 医学研究智能体的浏览器/桌面 GUI 接口",
     )
+
+    from core.web.errors import APIError, api_error_response, install_api_error_handlers
+
+    install_api_error_handlers(app)
+
+    @app.middleware("http")
+    async def authenticate_remote_api(request: Any, call_next: Any) -> Any:
+        request_id = str(uuid4())
+        request.state.request_id = request_id
+        api_path = request.url.path == "/api/v1" or request.url.path.startswith(
+            "/api/v1/"
+        )
+        if auth_token is not None and api_path:
+            from core.web.security import verify_bearer_header
+
+            authorization = request.headers.get("authorization")
+            if not authorization:
+                return api_error_response(
+                    APIError(
+                        401,
+                        "authentication_required",
+                        "Bearer authentication is required",
+                        headers={"WWW-Authenticate": "Bearer"},
+                    ),
+                    request_id=request_id,
+                )
+            if not verify_bearer_header(authorization, auth_token):
+                return api_error_response(
+                    APIError(
+                        403,
+                        "invalid_authentication",
+                        "Bearer authentication failed",
+                    ),
+                    request_id=request_id,
+                )
+        response = await call_next(request)
+        response.headers.setdefault("X-Request-ID", request_id)
+        return response
 
     # ---- state -----------------------------------------------------------
     _kernel_holder: dict[str, Any] = {}
@@ -165,12 +204,13 @@ def create_app() -> Any:
         workspace_id = request.get("workspace_id") or None
         agent_mode = request.get("agent_mode") or None
         if not message:
-            return {"error": "No message provided", "status": "error"}
+            raise APIError(400, "message_required", "No message provided")
         if agent_mode not in {None, "single", "multi"}:
-            return {
-                "error": "agent_mode must be 'single' or 'multi'",
-                "status": "error",
-            }
+            raise APIError(
+                400,
+                "invalid_agent_mode",
+                "agent_mode must be 'single' or 'multi'",
+            )
 
         try:
             result = _execute_chat_message(
@@ -179,7 +219,7 @@ def create_app() -> Any:
             return result
         except Exception as exc:
             logger.exception("Chat error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     # ---- CLI helper (lazy) ------------------------------------------------
 
@@ -199,19 +239,21 @@ def create_app() -> Any:
             return _get_cli().workspace_list()
         except Exception as exc:
             logger.exception("workspace_list error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     @app.post("/api/v1/workspaces")
     async def workspace_create(request: dict[str, Any]) -> dict[str, Any]:
         """Initialize a new workspace."""
         workspace_id = request.get("id", "")
         if not workspace_id:
-            return {"error": "No workspace id provided", "status": "error"}
+            raise APIError(
+                400, "workspace_id_required", "No workspace id provided"
+            )
         try:
             return _get_cli().workspace_init(workspace_id, name=request.get("name"))
         except Exception as exc:
             logger.exception("workspace_create error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     @app.get("/api/v1/workspaces/{workspace_id}")
     async def workspace_get(workspace_id: str) -> dict[str, Any]:
@@ -220,7 +262,7 @@ def create_app() -> Any:
             return _get_cli().workspace_show(workspace_id)
         except Exception as exc:
             logger.exception("workspace_get error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     @app.delete("/api/v1/workspaces/{workspace_id}")
     async def workspace_remove(workspace_id: str) -> dict[str, Any]:
@@ -229,7 +271,7 @@ def create_app() -> Any:
             return _get_cli().workspace_delete(workspace_id, confirm=workspace_id)
         except Exception as exc:
             logger.exception("workspace_remove error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     # ---- Paper endpoints --------------------------------------------------
 
@@ -240,14 +282,14 @@ def create_app() -> Any:
             return _get_cli().paper_list(workspace_id)
         except Exception as exc:
             logger.exception("paper_list error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     @app.post("/api/v1/workspaces/{workspace_id}/papers")
     async def paper_create(workspace_id: str, request: dict[str, Any]) -> dict[str, Any]:
         """Import a paper into a workspace."""
         source_path = request.get("source_path", "")
         if not source_path:
-            return {"error": "No source_path provided", "status": "error"}
+            raise APIError(400, "source_path_required", "No source_path provided")
         try:
             return _get_cli().paper_import(
                 workspace_id,
@@ -258,7 +300,7 @@ def create_app() -> Any:
             )
         except Exception as exc:
             logger.exception("paper_create error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     @app.get("/api/v1/workspaces/{workspace_id}/papers/{paper_id}")
     async def paper_get(workspace_id: str, paper_id: str) -> dict[str, Any]:
@@ -267,7 +309,7 @@ def create_app() -> Any:
             return _get_cli().paper_show(workspace_id, paper_id)
         except Exception as exc:
             logger.exception("paper_get error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     @app.patch("/api/v1/workspaces/{workspace_id}/papers/{paper_id}")
     async def paper_update(workspace_id: str, paper_id: str, request: dict[str, Any]) -> dict[str, Any]:
@@ -277,7 +319,7 @@ def create_app() -> Any:
             return _get_cli().paper_edit(workspace_id, paper_id, metadata)
         except Exception as exc:
             logger.exception("paper_update error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     @app.post("/api/v1/workspaces/{workspace_id}/papers/{paper_id}/enrich")
     async def paper_enrich(workspace_id: str, paper_id: str, request: dict[str, Any]) -> dict[str, Any]:
@@ -288,7 +330,7 @@ def create_app() -> Any:
             )
         except Exception as exc:
             logger.exception("paper_enrich error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     # ---- Experience endpoints ---------------------------------------------
 
@@ -299,7 +341,7 @@ def create_app() -> Any:
             return _get_cli().experience_list(workspace_id)
         except Exception as exc:
             logger.exception("experience_list error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     @app.post("/api/v1/workspaces/{workspace_id}/experiences")
     async def experience_create(workspace_id: str, request: dict[str, Any]) -> dict[str, Any]:
@@ -308,7 +350,11 @@ def create_app() -> Any:
         title = request.get("title", "")
         summary = request.get("summary", "")
         if not all([scope, title, summary]):
-            return {"error": "scope, title, and summary are required", "status": "error"}
+            raise APIError(
+                400,
+                "experience_fields_required",
+                "scope, title, and summary are required",
+            )
         try:
             return _get_cli().experience_add(
                 workspace_id,
@@ -320,7 +366,7 @@ def create_app() -> Any:
             )
         except Exception as exc:
             logger.exception("experience_create error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     @app.get("/api/v1/workspaces/{workspace_id}/experiences/{experience_id}")
     async def experience_get(workspace_id: str, experience_id: str) -> dict[str, Any]:
@@ -329,21 +375,23 @@ def create_app() -> Any:
             return _get_cli().experience_view(experience_id, workspace_id)
         except Exception as exc:
             logger.exception("experience_get error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     @app.delete("/api/v1/workspaces/{workspace_id}/experiences/{experience_id}")
     async def experience_remove(workspace_id: str, experience_id: str, request: dict[str, Any]) -> dict[str, Any]:
         """Delete one experience after confirmation."""
         scope = request.get("scope", "")
         if not scope:
-            return {"error": "scope is required", "status": "error"}
+            raise APIError(
+                400, "experience_scope_required", "scope is required"
+            )
         try:
             return _get_cli().experience_delete(
                 experience_id, workspace_id, scope, confirm=experience_id
             )
         except Exception as exc:
             logger.exception("experience_remove error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     # ---- Tool endpoints ---------------------------------------------------
 
@@ -354,7 +402,7 @@ def create_app() -> Any:
             return _get_cli().tool_list(workspace_id, language=language)
         except Exception as exc:
             logger.exception("tool_list error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     @app.post("/api/v1/workspaces/{workspace_id}/tools")
     async def tool_create(workspace_id: str, request: dict[str, Any]) -> dict[str, Any]:
@@ -368,7 +416,7 @@ def create_app() -> Any:
             )
         except Exception as exc:
             logger.exception("tool_create error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     @app.get("/api/v1/tools/scan")
     async def tool_scan(language: str | None = None) -> Any:
@@ -377,7 +425,7 @@ def create_app() -> Any:
             return _get_cli().tool_scan(language=language)
         except Exception as exc:
             logger.exception("tool_scan error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     # ---- LLM endpoints ---------------------------------------------------
 
@@ -388,14 +436,14 @@ def create_app() -> Any:
             return _get_cli().llm_list()
         except Exception as exc:
             logger.exception("llm_providers error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     @app.post("/api/v1/llm/providers")
     async def llm_provider_create(request: dict[str, Any]) -> dict[str, Any]:
         """Add or update one LLM provider."""
         provider = request.get("provider") or request.get("name") or ""
         if not provider:
-            return {"error": "No provider specified", "status": "error"}
+            raise APIError(400, "provider_required", "No provider specified")
         try:
             return _get_cli().llm_add(
                 provider,
@@ -410,7 +458,7 @@ def create_app() -> Any:
             )
         except Exception as exc:
             logger.exception("llm_provider_create error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     @app.get("/api/v1/llm/providers/{name}")
     async def llm_provider_get(name: str) -> dict[str, Any]:
@@ -419,19 +467,19 @@ def create_app() -> Any:
             return _get_cli().llm_show(name)
         except Exception as exc:
             logger.exception("llm_provider_get error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     @app.post("/api/v1/llm/switch")
     async def llm_switch(request: dict[str, Any]) -> dict[str, Any]:
         """Switch the active LLM provider."""
         provider = request.get("provider", "")
         if not provider:
-            return {"error": "No provider specified", "status": "error"}
+            raise APIError(400, "provider_required", "No provider specified")
         try:
             return _get_cli().llm_switch(provider)
         except Exception as exc:
             logger.exception("llm_switch error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     # ---- Permission endpoints ---------------------------------------------
 
@@ -442,14 +490,16 @@ def create_app() -> Any:
             return _get_cli().permission_status()
         except Exception as exc:
             logger.exception("permission_status error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     @app.post("/api/v1/permissions/mode")
     async def permission_set_mode(request: dict[str, Any]) -> dict[str, Any]:
         """Set the permission mode."""
         mode = request.get("mode", "")
         if not mode:
-            return {"error": "No mode specified", "status": "error"}
+            raise APIError(
+                400, "permission_mode_required", "No mode specified"
+            )
         try:
             return _get_cli().permission_set_mode(
                 mode,
@@ -458,31 +508,31 @@ def create_app() -> Any:
             )
         except Exception as exc:
             logger.exception("permission_set_mode error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     @app.post("/api/v1/permissions/authorize")
     async def permission_authorize(request: dict[str, Any]) -> dict[str, Any]:
         """Authorize an external path."""
         path = request.get("path", "")
         if not path:
-            return {"error": "No path specified", "status": "error"}
+            raise APIError(400, "path_required", "No path specified")
         try:
             return _get_cli().permission_authorize(path)
         except Exception as exc:
             logger.exception("permission_authorize error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     @app.post("/api/v1/permissions/revoke")
     async def permission_revoke(request: dict[str, Any]) -> dict[str, Any]:
         """Revoke an authorized external path."""
         path = request.get("path", "")
         if not path:
-            return {"error": "No path specified", "status": "error"}
+            raise APIError(400, "path_required", "No path specified")
         try:
             return _get_cli().permission_revoke(path)
         except Exception as exc:
             logger.exception("permission_revoke error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     # ---- Log endpoints ----------------------------------------------------
 
@@ -493,7 +543,7 @@ def create_app() -> Any:
             return _get_cli().log_list()
         except Exception as exc:
             logger.exception("log_list error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     @app.get("/api/v1/logs/{name}")
     async def log_get(name: str) -> dict[str, Any]:
@@ -502,19 +552,19 @@ def create_app() -> Any:
             return _get_cli().log_show(name)
         except Exception as exc:
             logger.exception("log_get error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     @app.post("/api/v1/logs")
     async def log_create(request: dict[str, Any]) -> dict[str, Any]:
         """Write a log entry."""
         message = request.get("message", "")
         if not message:
-            return {"error": "No message provided", "status": "error"}
+            raise APIError(400, "message_required", "No message provided")
         try:
             return _get_cli().log_write(message, session_id=request.get("session_id"))
         except Exception as exc:
             logger.exception("log_create error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     # ---- Experiment endpoints ---------------------------------------------
 
@@ -525,19 +575,19 @@ def create_app() -> Any:
             return _get_cli().experiment_list()
         except Exception as exc:
             logger.exception("experiment_list error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     @app.post("/api/v1/experiments")
     async def experiment_create(request: dict[str, Any]) -> dict[str, Any]:
         """Start a new experiment."""
         protocol = request.get("protocol", "")
         if not protocol:
-            return {"error": "No protocol specified", "status": "error"}
+            raise APIError(400, "protocol_required", "No protocol specified")
         try:
             return _get_cli().experiment_start(protocol, session_id=request.get("session_id"))
         except Exception as exc:
             logger.exception("experiment_create error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     @app.post("/api/v1/experiments/{session_file}/submit")
     async def experiment_submit(session_file: str, request: dict[str, Any]) -> dict[str, Any]:
@@ -545,14 +595,18 @@ def create_app() -> Any:
         step_id = request.get("step_id", "")
         input_json = request.get("input_json", "")
         if not all([step_id, input_json]):
-            return {"error": "step_id and input_json are required", "status": "error"}
+            raise APIError(
+                400,
+                "experiment_step_input_required",
+                "step_id and input_json are required",
+            )
         try:
             return _get_cli().experiment_submit(
                 session_file, step_id, input_json, calculate=request.get("calculate", False)
             )
         except Exception as exc:
             logger.exception("experiment_submit error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     # ---- Dialog history endpoints ----------------------------------------
 
@@ -566,7 +620,7 @@ def create_app() -> Any:
             return [event.to_dict() for event in events]
         except Exception as exc:
             logger.exception("dialog_history_list error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     # ---- Self Evolution endpoints ----------------------------------------
 
@@ -596,7 +650,7 @@ def create_app() -> Any:
             return artifacts
         except Exception as exc:
             logger.exception("self_evolution_list error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     @app.post("/api/v1/self-evolution/generate")
     async def self_evolution_generate(request: dict[str, Any]) -> dict[str, Any]:
@@ -605,7 +659,11 @@ def create_app() -> Any:
         artifact_type = request.get("type", "code")
         output = request.get("output", "")
         if not all([instruction, output]):
-            return {"error": "instruction and output are required", "status": "error"}
+            raise APIError(
+                400,
+                "invalid_self_evolution_request",
+                "instruction and output are required",
+            )
         try:
             return _get_cli().self_evolve(
                 instruction=instruction,
@@ -615,7 +673,7 @@ def create_app() -> Any:
             )
         except Exception as exc:
             logger.exception("self_evolution_generate error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     @app.get("/api/v1/self-evolution/{artifact_id}")
     async def self_evolution_get(artifact_id: str) -> dict[str, Any]:
@@ -623,14 +681,22 @@ def create_app() -> Any:
         try:
             from pathlib import Path as _P
             project_dir = _P.cwd()
-            artifact_path = project_dir / "self_evolution" / f"{artifact_id}.json"
+            from core.web.security import resolve_artifact_path
+
+            artifact_path = resolve_artifact_path(
+                project_dir / "self_evolution", artifact_id
+            )
             if not artifact_path.exists():
-                return {"error": "Artifact not found", "status": "error"}
+                raise APIError(404, "artifact_not_found", "Artifact not found")
             import json as _json
             return _json.loads(artifact_path.read_text(encoding="utf-8"))
+        except APIError:
+            raise
         except Exception as exc:
             logger.exception("self_evolution_get error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(
+                500, "self_evolution_read_failed", "Unable to read artifact"
+            ) from exc
 
     @app.delete("/api/v1/self-evolution/{artifact_id}")
     async def self_evolution_delete(artifact_id: str) -> dict[str, Any]:
@@ -638,14 +704,22 @@ def create_app() -> Any:
         try:
             from pathlib import Path as _P
             project_dir = _P.cwd()
-            artifact_path = project_dir / "self_evolution" / f"{artifact_id}.json"
+            from core.web.security import resolve_artifact_path
+
+            artifact_path = resolve_artifact_path(
+                project_dir / "self_evolution", artifact_id
+            )
             if not artifact_path.exists():
-                return {"error": "Artifact not found", "status": "error"}
+                raise APIError(404, "artifact_not_found", "Artifact not found")
             artifact_path.unlink()
             return {"success": True, "message": f"Artifact {artifact_id} deleted"}
+        except APIError:
+            raise
         except Exception as exc:
             logger.exception("self_evolution_delete error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(
+                500, "self_evolution_delete_failed", "Unable to delete artifact"
+            ) from exc
 
     # ---- Diagnose endpoints ----------------------------------------------
 
@@ -656,7 +730,7 @@ def create_app() -> Any:
             return _get_cli().diagnose()
         except Exception as exc:
             logger.exception("diagnose_all error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     @app.get("/api/v1/diagnose/all")
     async def diagnose_all_compat() -> dict[str, Any]:
@@ -671,7 +745,7 @@ def create_app() -> Any:
             return result.get("config", {})
         except Exception as exc:
             logger.exception("diagnose_config error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     @app.get("/api/v1/diagnose/llm")
     async def diagnose_llm() -> dict[str, Any]:
@@ -681,7 +755,7 @@ def create_app() -> Any:
             return result.get("llm", {})
         except Exception as exc:
             logger.exception("diagnose_llm error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     @app.get("/api/v1/diagnose/install")
     async def diagnose_install() -> dict[str, Any]:
@@ -694,7 +768,7 @@ def create_app() -> Any:
             }
         except Exception as exc:
             logger.exception("diagnose_install error")
-            return {"error": str(exc), "status": "error"}
+            raise APIError(500, "internal_error", "Internal server error") from exc
 
     @app.post("/api/v1/shutdown")
     async def shutdown() -> dict[str, Any]:
@@ -703,10 +777,42 @@ def create_app() -> Any:
 
     # ---- WebSocket chat --------------------------------------------------
 
-    @app.websocket("/ws/chat")
     async def websocket_chat(websocket: Any) -> None:
         """Streaming chat via WebSocket with thinking/reasoning support."""
         await websocket.accept()
+        if auth_token is not None:
+            raw_auth = await websocket.receive_text()
+            try:
+                auth_message = json.loads(raw_auth)
+            except json.JSONDecodeError:
+                auth_message = {}
+
+            supplied_token = auth_message.get("token", "")
+            if auth_message.get("type") != "auth" or not supplied_token:
+                await websocket.send_json(
+                    {
+                        "type": "error",
+                        "code": "authentication_required",
+                        "content": "WebSocket authentication is required",
+                    }
+                )
+                await websocket.close(code=1008)
+                return
+
+            from core.web.security import verify_token
+
+            if not verify_token(supplied_token, auth_token):
+                await websocket.send_json(
+                    {
+                        "type": "error",
+                        "code": "invalid_authentication",
+                        "content": "WebSocket authentication failed",
+                    }
+                )
+                await websocket.close(code=1008)
+                return
+            await websocket.send_json({"type": "auth_ok"})
+
         logger.info("WebSocket client connected")
 
         try:
@@ -762,6 +868,9 @@ def create_app() -> Any:
         except Exception as exc:
             logger.info("WebSocket disconnected: %s", exc)
 
+    websocket_chat.__annotations__["websocket"] = WebSocket
+    app.websocket("/ws/chat")(websocket_chat)
+
     # ---- Static files & index --------------------------------------------
 
     frontend_dir = Path(__file__).parent / "frontend"
@@ -784,6 +893,7 @@ def start_server(
     port: int = 8000,
     *,
     reload: bool = False,
+    auth_token_file: str | Path | None = None,
 ) -> None:
     """Start the SuperMedicine web server.
 
@@ -800,14 +910,23 @@ def start_server(
 
     import uvicorn
 
+    from core.web.security import load_remote_auth_token
+
+    auth_token = load_remote_auth_token(host, auth_token_file)
+    if auth_token is not None and reload:
+        raise ValueError("--reload cannot be combined with authenticated Web startup")
+
     logger.info("Starting SuperMedicine Web server on %s:%s", host, port)
-    uvicorn.run(
-        "core.web.server:create_app",
-        host=host,
-        port=port,
-        reload=reload,
-        factory=True,
-    )
+    if auth_token is None:
+        uvicorn.run(
+            "core.web.server:create_app",
+            host=host,
+            port=port,
+            reload=reload,
+            factory=True,
+        )
+    else:
+        uvicorn.run(create_app(auth_token=auth_token), host=host, port=port)
 
 
 def create_server_app():

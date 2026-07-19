@@ -20,6 +20,11 @@
     <header>
         <button id="hamburger-btn" class="hamburger" aria-label="切换菜单" aria-controls="drawer-menu" aria-expanded="false" title="切换菜单">&#9776;</button>
         <h1>SuperMedicine</h1>
+        <div id="web-auth-controls">
+            <label for="web-auth-token">Web token</label>
+            <input id="web-auth-token" type="password" autocomplete="off" placeholder="Bearer token">
+            <button id="web-auth-save" type="button">连接</button>
+        </div>
         <div id="status-bar">
             <span id="status-indicator" class="disconnected" title="连接状态"></span>
             <span id="status-text">连接中...</span>
