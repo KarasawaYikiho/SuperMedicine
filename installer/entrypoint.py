@@ -844,13 +844,13 @@ def _execute_interactive_plan(
 def _log_interactive_completion(plan: _InteractiveInstallPlan) -> None:
     if plan.add_to_path:
         logger.info(
-            "PATH 提示: 可将 Python Scripts 目录加入系统 PATH，或使用 python Cli.py。"
+            "PATH 提示: 可将 Python Scripts 目录加入系统 PATH，或使用 python cli_entry.py。"
         )
     if plan.create_shortcut:
         logger.info(
-            "快捷方式提示: 当前版本请手动创建指向 supermedicine 或 python Cli.py 的快捷方式。"
+            "快捷方式提示: 当前版本请手动创建指向 supermedicine 或 python cli_entry.py 的快捷方式。"
         )
-    logger.info("安装完成。可运行 python Cli.py status 检查状态。")
+    logger.info("安装完成。可运行 python cli_entry.py status 检查状态。")
 
 
 def _run_interactive_installer(args: argparse.Namespace) -> None:
@@ -858,7 +858,7 @@ def _run_interactive_installer(args: argparse.Namespace) -> None:
     logger.info("%s", INSTALLER_TITLE)
     logger.info("%s", INSTALLER_RULE)
     logger.info("回车使用默认值；API key 不会显示在屏幕上。")
-    logger.info("准备: 建议先执行 pip install -e .；命令不可用时可用 python Cli.py。")
+    logger.info("准备: 建议先执行 pip install -e .；命令不可用时可用 python cli_entry.py。")
 
     install_service, components = _load_interactive_components()
     while True:
@@ -1075,7 +1075,7 @@ def init_config(
     logger.info("如果 'supermedicine' 命令不可用，请将以下目录添加到系统 PATH：")
     logger.info("  Windows:  %APPDATA%\\Python\\Python<版本>\\Scripts")
     logger.info("  Linux/macOS: ~/.local/bin")
-    logger.info("或者使用 'python Cli.py' 代替 'supermedicine' 命令。")
+    logger.info("或者使用 'python cli_entry.py' 代替 'supermedicine' 命令。")
 
 
 def _log_exe_release_result(result: dict[str, Any]) -> None:

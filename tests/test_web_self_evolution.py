@@ -168,6 +168,28 @@ def test_diagnose_install(client):
     data = response.json()
     assert isinstance(data, dict)
     assert "audit" in data or "error" in data
+    assert data["database"]["persistence"] == "required"
+    assert data["database"]["ephemeral_fallback"] is False
+
+
+def test_shutdown_requires_a_real_server_controller(client):
+    response = client.post("/api/v1/shutdown")
+
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "shutdown_unavailable"
+
+
+def test_shutdown_invokes_the_injected_server_controller():
+    from core.web.server import create_app
+
+    requested = []
+    client = TestClient(create_app(shutdown_callback=lambda: requested.append(True)))
+
+    response = client.post("/api/v1/shutdown")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "closing"
+    assert requested == [True]
 
 
 def test_web_routes_delegate_status_and_diagnostics_to_application_services():

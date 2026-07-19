@@ -73,9 +73,8 @@ python install.py
 supermedicine status
 ```
 
-The lowercase `python install.py` path is the canonical source entry. The
-legacy-compatible `python Install.py` form is also documented for release users
-and older automation.
+The lowercase `python install.py` path is the canonical source entry. For direct
+module execution and lightweight fallback initialization, use `install_entry.py`.
 
 For development:
 
@@ -202,10 +201,8 @@ screen controls remain reachable through focus navigation and the `M` menu.
 Dynamic refresh is targeted by screen and action rather than a broad filesystem
 watcher or polling loop.
 
-Compatibility markers used by the current TUI documentation tests:
-Exact test markers: `选择视图`, `切换主题`, `帮助`, `最大化/还原`, `LLM 状态`, `任务运行状态`.
-`ѡ����ͼ`, `�л�����`, `����`, `���/��ԭ`, `LLM ״̬`,
-`��������״̬`.
+Readable UTF-8 labels covered by the TUI documentation tests include
+`选择视图`, `切换主题`, `帮助`, `最大化/还原`, `LLM 状态`, and `任务运行状态`.
 
 ## LLM Providers
 

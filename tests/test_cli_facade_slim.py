@@ -78,3 +78,33 @@ def test_cli_parser_can_enable_and_disable_multi_agent(tmp_path, monkeypatch):
     assert CLI().multi_agent_status()["enabled"] is True
     main(["multi-agent", "disable"])
     assert CLI().multi_agent_status()["enabled"] is False
+
+
+def test_cli_test_reports_source_suite_unavailable_in_wheel_layout(tmp_path, monkeypatch):
+    captured = {}
+    method_globals = CLI.test.__globals__
+    monkeypatch.setitem(method_globals, "__file__", str(tmp_path / "cli_entry.py"))
+    monkeypatch.setitem(
+        method_globals, "_log_json", lambda value: captured.update(value)
+    )
+
+    result = CLI().test()
+
+    assert result == captured
+    assert result["status"] == "unavailable"
+    assert result["reason"] == "source_tests_not_installed"
+    assert result["self_check_command"] == "supermedicine diagnose"
+
+
+def test_cli_test_refuses_recursive_pytest_execution(monkeypatch):
+    captured = {}
+    monkeypatch.setenv("PYTEST_CURRENT_TEST", "outer-suite")
+    monkeypatch.setitem(
+        CLI.test.__globals__, "_log_json", lambda value: captured.update(value)
+    )
+
+    result = CLI().test()
+
+    assert result == captured
+    assert result["status"] == "unavailable"
+    assert result["reason"] == "source_test_run_already_active"

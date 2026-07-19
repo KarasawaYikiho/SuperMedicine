@@ -29,8 +29,8 @@ python install.py
 supermedicine status
 ```
 
-Use `python install.py` for new source checkouts. `python Install.py` remains a
-legacy-compatible spelling for release users and older automation.
+Use `python install.py` for new source checkouts. Use `python install_entry.py`
+when invoking the dependency-light module entry directly.
 
 The installer creates or updates local `.supermedicine/` state. It asks for the
 target project root, optional LLM provider settings, and confirmation before

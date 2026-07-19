@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import replace
 from pathlib import Path
 from uuid import uuid4
@@ -45,6 +46,8 @@ from core.kernel_llm_chat import (
 )
 from core.kernel_plugin_select import select_plugin_action
 
+logger = logging.getLogger(__name__)
+
 
 class Kernel:
     """SuperMedicine 微内核"""
@@ -54,6 +57,8 @@ class Kernel:
         config_path: Path | None = None,
         plugins_dir: Path | None = None,
         policies_dir: Path | None = None,
+        *,
+        allow_ephemeral: bool = False,
     ):
         import os
 
@@ -91,10 +96,12 @@ class Kernel:
         )
         self._refresh_runtime_capabilities()
 
-        # Database initialization with graceful fallback
+        # Persistence is mandatory unless a caller explicitly requests an
+        # ephemeral runtime (primarily controlled recovery and tests).
         self._database: Database | None = None
+        self._persistence_reason = ""
+        db_path = self._config_path.parent / "data.db"
         try:
-            db_path = self._config_path.parent / "data.db"
             self._database = Database(db_path)
             self._database.connect()
             # Run pending migrations
@@ -102,14 +109,24 @@ class Kernel:
             migration_manager.run_pending()
             # Re-initialize SessionManager with database support
             self._session_manager = SessionManager(db=self._database)
-        except Exception:
-            # Fall back to in-memory mode (no persistence)
+        except Exception as exc:
+            self._persistence_reason = f"{type(exc).__name__}: {exc}"
             if self._database is not None:
                 try:
                     self._database.disconnect()
                 except Exception:
                     pass
             self._database = None
+            if not allow_ephemeral:
+                raise RuntimeError(
+                    f"Database initialization failed for {db_path}: "
+                    f"{self._persistence_reason}"
+                ) from exc
+            logger.warning(
+                "Kernel persistence mode=ephemeral database=%s reason=%s",
+                db_path,
+                self._persistence_reason,
+            )
 
         # Agent repository for state persistence
         self._agent_repo: AgentRepository | None = None
@@ -309,6 +326,15 @@ class Kernel:
     def database(self) -> Database | None:
         """Database instance for persistent storage, or None if in-memory mode."""
         return self._database
+
+    @property
+    def persistence(self) -> dict[str, str]:
+        """Return explicit persistence mode and any fallback reason."""
+        return {
+            "mode": "persistent" if self._database is not None else "ephemeral",
+            "database": str(self._config_path.parent / "data.db"),
+            "reason": self._persistence_reason,
+        }
 
     @property
     def permission_engine(self) -> PermissionEngine:

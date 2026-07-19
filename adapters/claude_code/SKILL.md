@@ -176,7 +176,7 @@ git clone https://github.com/KarasawaYikiho/SuperMedicine.git
 cd SuperMedicine
 pip install -e ".[dev]"
 python install.py
-python Cli.py status
+python cli_entry.py status
 ```
 
 For Anthropic-compatible configuration, use `--provider anthropic` with
@@ -187,13 +187,13 @@ For Anthropic-compatible configuration, use `--provider anthropic` with
 
 ```bash
 # Check project status
-python Cli.py status
+python cli_entry.py status
 
 # Run a research task
-python Cli.py run "analyze clinical trial data with survival analysis"
+python cli_entry.py run "analyze clinical trial data with survival analysis"
 
 # Run all tests
-python Cli.py test
+python cli_entry.py test
 ```
 
 ## Stable Python API Examples

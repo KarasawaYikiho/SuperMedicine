@@ -1524,16 +1524,11 @@
             closeDrawer();
         }
 
-        // Ctrl+Q 退出（向后端发送关闭请求）
+        // Ctrl+Q 仅关闭当前窗口；服务生命周期由启动它的进程管理。
         if (e.ctrlKey && e.key === "q") {
             e.preventDefault();
             if (confirm("确定要退出 SuperMedicine 吗？")) {
-                apiCall("POST", "/api/v1/shutdown").then(function () {
-                    showToast("正在关闭...", "info");
-                    setTimeout(function () { window.close(); }, 1000);
-                }).catch(function () {
-                    window.close();
-                });
+                window.close();
             }
         }
 

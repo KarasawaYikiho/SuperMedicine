@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLI argument parser and command dispatch (extracted from Cli.py)."""
+"""CLI argument parser and command dispatch for ``cli_entry.py``."""
 
 from __future__ import annotations
 
@@ -801,7 +801,7 @@ def _build_parser() -> tuple[
 ]:
     parser = argparse.ArgumentParser(
         prog="supermedicine",
-        description="SuperMedicine - ??????? Agent ??",
+        description="SuperMedicine - 医学科研 Agent 平台",
     )
     subparsers = parser.add_subparsers(dest="command")
     command_parsers: dict[str, argparse.ArgumentParser] = {}
@@ -828,11 +828,20 @@ def _build_parser() -> tuple[
 
 def _dispatch_setup_command(args, cli, parsers) -> bool:
     if args.command == "init":
-        from installer.entrypoint import (
-            _normalize_provider,
-            _resolve_api_key,
-            _resolve_install_value,
-        )
+        try:
+            from installer.entrypoint import (
+                _normalize_provider,
+                _resolve_api_key,
+                _resolve_install_value,
+            )
+        except ModuleNotFoundError as exc:
+            if exc.name not in {"installer", "installer.entrypoint"}:
+                raise
+            from install_entry import (
+                _normalize_provider,
+                _resolve_api_key,
+                _resolve_install_value,
+            )
 
         provider = _resolve_install_value("provider", args.provider)
         normalized_provider = _normalize_provider(provider)

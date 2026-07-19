@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [master, main]
+    tags: ["v*"]
   pull_request:
     branches: [master, main]
   workflow_dispatch:
@@ -151,11 +152,7 @@ jobs:
     name: Publish GitHub Release
     needs: packaging-smoke
     runs-on: ubuntu-latest
-    if: >-
-      github.event_name != 'pull_request' &&
-      (github.event_name == 'workflow_dispatch' ||
-       github.ref == 'refs/heads/master' ||
-       github.ref == 'refs/heads/main')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
     env:
@@ -185,7 +182,7 @@ jobs:
               previous_tag="$candidate"
               break
             fi
-          done < <(git tag --list 'Beta*' --sort=-v:refname)
+          done < <(git tag --list 'v*' --sort=-v:refname)
 
           {
             echo "## Changes"
@@ -195,7 +192,7 @@ jobs:
               echo
               git log --no-merges --pretty=format:'- %s (%h)' "${previous_tag}..HEAD" || true
             else
-              echo "No previous Beta tag was found; summarizing available history:"
+              echo "No previous version tag was found; summarizing available history:"
               echo
               git log --no-merges --pretty=format:'- %s (%h)' --max-count=30 || true
             fi
@@ -210,7 +207,7 @@ jobs:
           EOF
           fi
 
-      - name: Create or update tag, release, and Zip asset
+      - name: Verify immutable tag and publish release assets
         shell: bash
         run: |
           set -euo pipefail
@@ -227,8 +224,13 @@ jobs:
           fi
 
           git fetch --tags
-          if git rev-parse -q --verify "refs/tags/${RELEASE_TAG}" >/dev/null; then
-            echo "ERROR: Tag ${RELEASE_TAG} already exists; refusing to overwrite this version." >&2
+          if [[ "$GITHUB_REF_TYPE" != "tag" || "$GITHUB_REF_NAME" != "$RELEASE_TAG" ]]; then
+            echo "ERROR: Workflow tag ${GITHUB_REF_NAME} does not match release ${RELEASE_TAG}." >&2
+            exit 1
+          fi
+          tag_commit="$(git rev-list -n 1 "$RELEASE_TAG")"
+          if [[ "$tag_commit" != "$GITHUB_SHA" ]]; then
+            echo "ERROR: Tag commit ${tag_commit} does not match build commit ${GITHUB_SHA}." >&2
             exit 1
           fi
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
@@ -236,12 +238,12 @@ jobs:
             exit 1
           fi
 
-          git tag "$RELEASE_TAG" "$GITHUB_SHA"
-          git push origin "refs/tags/${RELEASE_TAG}"
           gh release create "$RELEASE_TAG" --title "$RELEASE_TITLE" --notes-file release-body.md --target "$GITHUB_SHA"
 
+          checksum_path="${asset_path}.sha256"
+          sha256sum "$asset_path" > "$checksum_path"
           echo "Uploading release asset '${asset_path}' to ${RELEASE_TAG}..."
-          if ! gh release upload "$RELEASE_TAG" "$asset_path"; then
+          if ! gh release upload "$RELEASE_TAG" "$asset_path" "$checksum_path"; then
             echo "ERROR: Failed to upload release asset '${asset_path}' to ${RELEASE_TAG}." >&2
             exit 1
           fi

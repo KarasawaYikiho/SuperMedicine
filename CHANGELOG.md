@@ -46,7 +46,7 @@ Python package fallback version: **0.4.2b0**.
 
 - Added end-to-end or near end-to-end regression coverage for TUI internal LLM
   diagnostic redaction, cross-page workspace visibility after creation,
-  interactive `python Install.py` setup, and CI release artifacts that include a
+  interactive `python install.py` setup, and CI release artifacts that include a
   releasable application Exe plus standalone installer Exe.
 - Documented the user-facing self-evolution workflow, including preview-first
   generation, explicit write confirmation, sandbox/conservative/full access modes,
@@ -68,7 +68,7 @@ Python package fallback version: **0.4.2b0**.
 ### Fixed
 
 - Clarified installer/release documentation so ordinary users, scripted installs,
-  and CI artifact consumers follow the same `Install.py`, `dist/SuperMedicine.exe`,
+  and CI artifact consumers follow the same `install.py`, `dist/SuperMedicine.exe`,
   and `SuperMedicineInstaller.exe` layout contract.
 - Updated installation docs to make no-flag `python install.py` / no-flag
   `SuperMedicineInstaller.exe` the ordinary user path, with scripted `--` flags

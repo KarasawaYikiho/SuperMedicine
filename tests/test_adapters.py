@@ -737,7 +737,7 @@ class TestToolCall:
             "glob",
             {
                 "pattern": "*.py",
-                "path": str(Path(__file__).parent.parent / "Cli.py").rsplit("\\", 1)[0]
+                "path": str(Path(__file__).parent.parent / "cli_entry.py").rsplit("\\", 1)[0]
                 if "\\" in str(Path(__file__).parent.parent)
                 else str(Path(__file__).parent.parent),
             },

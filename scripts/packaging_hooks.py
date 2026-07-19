@@ -20,10 +20,10 @@ except Exception:  # pragma: no cover - wheel is a build dependency in pyproject
 LOWERCASE_INSTALL_NAME = "install.py"
 UPPERCASE_INSTALL_NAME = "install_entry.py"
 LOWERCASE_INSTALL_BYTES = b'''#!/usr/bin/env python3
-"""Lowercase compatibility entrypoint for the SuperMedicine installer."""
+"""Canonical lowercase installer entrypoint for source and release archives."""
 from __future__ import annotations
 
-from installer.entrypoint import main
+from install_entry import main
 
 
 if __name__ == "__main__":
@@ -73,7 +73,7 @@ def _lowercase_install_bytes() -> bytes:
         return LOWERCASE_INSTALL_BYTES
     if (
         result.returncode == 0
-        and b"from installer.entrypoint import main" in result.stdout
+        and b"from install_entry import main" in result.stdout
     ):
         return result.stdout.replace(b"\r\n", b"\n")
     return LOWERCASE_INSTALL_BYTES
@@ -94,7 +94,7 @@ def _uppercase_install_bytes() -> bytes:
     if (
         result is not None
         and result.returncode == 0
-        and b"installer.entrypoint" in result.stdout
+        and b"_fallback_init_config" in result.stdout
     ):
         return result.stdout.replace(b"\r\n", b"\n")
     return UPPERCASE_INSTALL_BYTES

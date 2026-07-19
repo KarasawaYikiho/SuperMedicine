@@ -54,7 +54,7 @@ def build_preview_text(project_root: Path) -> str:
             "",
             "Approval status:",
             "- User approval has NOT been recorded by this artifact.",
-            "- If image rendering is required, capture a terminal screenshot after running `python -m supermedicine tui` or `python Cli.py tui`.",
+            "- If image rendering is required, capture a terminal screenshot after running `supermedicine tui` or `python cli_entry.py tui`.",
         ]
     )
 

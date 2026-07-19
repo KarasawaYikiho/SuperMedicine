@@ -12,7 +12,7 @@ from tests.conftest import _cp1252_stdio_env
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-RELEASE_DIR_NAME = "SuperMedicine Beta0.4.2"
+RELEASE_DIR_NAME = "SuperMedicine v0.4.2b0"
 CRITICAL_RELEASE_PATHS = (
     "install.py",
     "install_entry.py",
@@ -61,7 +61,7 @@ PACKAGING_TOOLING_WITH_RUNTIME_INSTALL_RE = re.compile(
 )
 
 # Step-2 CI investigation note:
-# ``Install.py`` delegates to ``installer.entrypoint.main()``, which calls
+# ``install.py`` delegates to ``install_entry.main()``, which calls
 # ``_configure_stdio_errors()`` and reconfigures stdout/stderr with
 # ``errors="backslashreplace"``.  When release-smoke subprocesses run with
 # ``PYTHONIOENCODING=cp1252`` and parent decoding also uses cp1252, user-facing
@@ -71,7 +71,7 @@ PACKAGING_TOOLING_WITH_RUNTIME_INSTALL_RE = re.compile(
 # ``程序文件释放 dry-run`` or its escaped representation; otherwise the failure
 # is an assertion/encoding mismatch, not a release-copy behavior failure.
 # Related production/release files for any later fix decision are
-# ``Install.py``/``install.py``, ``installer/entrypoint.py``,
+# ``install.py``/``install_entry.py``, ``installer/entrypoint.py``,
 # ``installer/exe_release.py``, ``.github/workflows/ci.yml``, ``setup.py``, and
 # ``pyproject.toml``.
 PAYLOAD_DRY_RUN_SIGNAL = "程序文件释放 dry-run"
@@ -84,7 +84,7 @@ PAYLOAD_DRY_RUN_SIGNALS = (
     PAYLOAD_DRY_RUN_ESCAPED_SIGNAL,
 )
 
-RELEASE_LABEL = "Beta0.4.2"
+RELEASE_LABEL = "v0.4.2b0"
 PACKAGE_VERSION = "0.4.2b0"
 CRITICAL_RELEASE_FILES = {
     "cli_entry.py",
@@ -302,7 +302,7 @@ def test_ci_release_artifacts_include_standalone_installer_exe_and_shared_payloa
     # CI artifact contract: app Exe, installer Exe, shared payload, and upload.
     assert any(path in workflow for path in INSTALLER_EXE_RELEASE_PATHS), (
         "CI/release workflow must publish either dist/SuperMedicine.exe or "
-        "SuperMedicine.exe so Install.py --release-exe has a documented, packaged source path."
+        "SuperMedicine.exe so install.py --release-exe has a documented, packaged source path."
     )
     assert "actions/upload-artifact" in workflow
     assert any(
@@ -457,7 +457,7 @@ def test_ci_packaging_smoke_installs_runtime_dependencies_before_installer_entry
     before_installer_smokes = packaging_job[:first_installer_smoke_index]
 
     assert RUNTIME_DEPENDENCY_INSTALL_RE.search(before_installer_smokes), (
-        "The packaging-smoke job invokes Install.py/SuperMedicineInstaller.exe entrypoints that import "
+        "The packaging-smoke job invokes install.py/SuperMedicineInstaller.exe entrypoints that import "
         "runtime modules such as yaml from PyYAML. Install the project/runtime dependencies "
         "(for example `python -m pip install -e .`, `python -m pip install -r requirements.txt`, "
         "or an explicit PyYAML install) before those smoke commands; tool-only installs like "
@@ -474,7 +474,7 @@ def test_release_docs_describe_ci_artifact_layout_and_install_py_roles():
 
     assert "SuperMedicineInstaller.exe" in combined
     assert "dist/SuperMedicine.exe" in combined
-    assert "python Install.py" in combined
+    assert "python install.py" in combined
     assert "--extract-release-to" in combined
     assert "--release-exe" in combined
     assert "--exe-dry-run" in combined
@@ -500,7 +500,7 @@ def test_release_docs_describe_ci_artifact_layout_and_install_py_roles():
 
 
 def test_beta042_version_contract_is_single_source_consistent_across_release_surfaces(read_pyproject):
-    """Beta0.4.2 display labels and 0.4.2b0 package metadata must not drift."""
+    """The immutable release tag must retain the complete PEP 440 version."""
 
     pyproject = read_pyproject
     install_manifest = json.loads(
@@ -518,11 +518,11 @@ def test_beta042_version_contract_is_single_source_consistent_across_release_sur
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
 
     assert pyproject["project"]["version"] == PACKAGE_VERSION
-    assert install_manifest["version"] == RELEASE_LABEL
+    assert install_manifest["version"] == PACKAGE_VERSION
     assert opencode_plugin["version"] == PACKAGE_VERSION
-    assert f"## [{RELEASE_LABEL}]" in changelog
-    assert RELEASE_LABEL in readme
-    assert 'release_label = f"Beta{release_version}"' in build_release_zip
+    assert "Beta0.4.2" in changelog
+    assert "Beta0.4.2" in readme
+    assert 'release_label = f"v{version}"' in build_release_zip
     assert 'archive_name = f"SuperMedicine {release_label}.zip"' in build_release_zip
 
 

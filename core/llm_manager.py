@@ -20,7 +20,7 @@ class LLMConfigManager:
 
     REQUIRED_FIELDS = LLMProviderConfig.REQUIRED_FIELDS
     SETUP_HINT = (
-        "Configure LLM before running this task via Install.py --init, "
+        "Configure LLM before running this task via install.py --init, "
         ".supermedicine/config.yaml, supermedicine llm add/switch CLI, or the TUI LLM screen."
     )
 

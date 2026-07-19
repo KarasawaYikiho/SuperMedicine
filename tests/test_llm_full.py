@@ -947,7 +947,7 @@ def test_create_client_without_llm_config_returns_actionable_secret_safe_error(
 
     assert result["ok"] is False
     assert result["error"]["code"] == "missing_provider"
-    assert "Install.py --init" in result["error"]["message"]
+    assert "install.py --init" in result["error"]["message"]
     assert ".supermedicine/config.yaml" in result["error"]["message"]
     assert "supermedicine llm add/switch" in result["error"]["message"]
     assert "TUI" in result["error"]["message"]

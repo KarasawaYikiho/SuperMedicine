@@ -500,13 +500,22 @@ def register_diagnostic_routes(app: Any, runtime: WebRuntime) -> None:
             return service_data(result)
         return {
             "audit": result.data.get("audit", {}),
+            "database": result.data.get("database", {}),
             "log_storage": result.data.get("log_storage", {}),
         }
 
+
     @app.post("/api/v1/shutdown")
-    async def shutdown() -> dict[str, Any]:
-        """Acknowledge GUI close requests without forcing server termination."""
-        return {"status": "closing", "message": "GUI close requested"}
+    async def shutdown() -> Any:
+        """Request shutdown only when the embedding server supplied a controller."""
+        if runtime.shutdown_callback is None:
+            return web_error(
+                "Server shutdown is not available in this runtime",
+                503,
+                code="shutdown_unavailable",
+            )
+        runtime.shutdown_callback()
+        return {"status": "closing", "message": "Server shutdown requested"}
 
 
 def register_websocket_routes(app: Any, runtime: WebRuntime) -> None:

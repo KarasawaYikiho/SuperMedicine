@@ -14,7 +14,6 @@ everything into a zip archive at the repository root.
 from __future__ import annotations
 
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -41,10 +40,8 @@ def main() -> None:
     version = tomllib.loads(
         (root / "pyproject.toml").read_text(encoding="utf-8")
     )["project"]["version"]
-    beta_match = re.fullmatch(r"(\d+\.\d+\.\d+)b\d+", version)
-    release_version = beta_match.group(1) if beta_match else version
-    release_label = f"Beta{release_version}" if beta_match else f"v{release_version}"
-    release_title = f"Beta {release_version}" if beta_match else f"v{release_version}"
+    release_label = f"v{version}"
+    release_title = f"SuperMedicine {version}"
     archive_name = f"SuperMedicine {release_label}.zip"
 
     # --- Prepare staging directory ---

@@ -21,13 +21,14 @@ logger = logging.getLogger(__name__)
 
 
 def _ensure_fastapi() -> None:
-    """fastapi/uvicorn ???????????"""
+    """Ensure the optional FastAPI and Uvicorn dependencies are installed."""
     try:
         import fastapi  # noqa: F401
         import uvicorn  # noqa: F401
     except ImportError as exc:
         raise ImportError(
-            "?? GUI ?? 'fastapi' ? 'uvicorn'???????????pip install supermedicine[web]"
+            "Web GUI requires 'fastapi' and 'uvicorn'. "
+            "Install them with: pip install supermedicine[web]"
         ) from exc
 
 
@@ -89,7 +90,11 @@ def _install_web_security(app: Any, auth_token: str | None) -> None:
         return response
 
 
-def create_app(*, auth_token: str | None = None) -> Any:
+def create_app(
+    *,
+    auth_token: str | None = None,
+    shutdown_callback: Any = None,
+) -> Any:
     """Create the FastAPI application and register domain route adapters."""
     _ensure_fastapi()
     from fastapi import FastAPI
@@ -111,7 +116,7 @@ def create_app(*, auth_token: str | None = None) -> Any:
     app = FastAPI(
         title="SuperMedicine Web API",
         version="0.4.2",
-        description="SuperMedicine ???????????/?? GUI ??",
+        description="SuperMedicine browser and desktop GUI API",
     )
     _install_web_security(app, auth_token)
 
@@ -126,6 +131,7 @@ def create_app(*, auth_token: str | None = None) -> Any:
             "workspace": WorkspaceService,
         },
         auth_token=auth_token,
+        shutdown_callback=shutdown_callback,
     )
     registrars = (
         register_status_routes,
@@ -173,16 +179,28 @@ def start_server(
         raise ValueError("--reload cannot be combined with authenticated Web startup")
 
     logger.info("Starting SuperMedicine Web server on %s:%s", host, port)
-    if auth_token is None:
+    if reload:
         uvicorn.run(
             "core.web.server:create_app",
             host=host,
             port=port,
-            reload=reload,
+            reload=True,
             factory=True,
         )
-    else:
-        uvicorn.run(create_app(auth_token=auth_token), host=host, port=port)
+        return
+
+    server_holder: dict[str, Any] = {}
+
+    def request_shutdown() -> None:
+        server_holder["server"].should_exit = True
+
+    app = create_app(
+        auth_token=auth_token,
+        shutdown_callback=request_shutdown,
+    )
+    server = uvicorn.Server(uvicorn.Config(app, host=host, port=port))
+    server_holder["server"] = server
+    server.run()
 
 
 def create_server_app():

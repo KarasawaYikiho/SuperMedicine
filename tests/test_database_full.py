@@ -603,11 +603,10 @@ class TestAgentStatePersistsAfterChain:
 
 
 class TestKernelFallbackWhenDbUnavailable:
-    """数据库不可用时回退到纯内存模式."""
+    """数据库不可用时默认关闭失败，仅显式允许临时模式。"""
 
     def test_kernel_fallback_when_db_unavailable(self, tmp_path):
-        """When the database path's parent is unreadable, Kernel should
-        fall back to in-memory mode (database=None, agent_repo=None)."""
+        """Persistence failures must not silently become successful sessions."""
         # Point config at a non-existent nested path that will fail to create
         config_path = tmp_path / "config.yaml"
         config_path.write_text(yaml.dump({"project": "test"}), encoding="utf-8")
@@ -631,27 +630,12 @@ class TestKernelFallbackWhenDbUnavailable:
 
         Database.connect = failing_connect
         try:
-            kernel = Kernel(
-                config_path=config_path,
-                plugins_dir="plugins",
-                policies_dir=policies,
-            )
-
-            # Should fall back gracefully
-            assert kernel.database is None
-
-            # SessionManager should still work in-memory
-            session = kernel.session_manager.create()
-            session.set("key", "value")
-            assert session.get("key") == "value"
-            assert kernel.session_manager.get(session.session_id) is session
-
-            # Agent repo should be unavailable
-            assert kernel._agent_repo is None
-
-            # save/load agent state should be no-ops
-            kernel.save_agent_state("alpha", {"test": True})
-            assert kernel.load_agent_state("alpha") is None
+            with pytest.raises(RuntimeError, match="Database initialization failed"):
+                Kernel(
+                    config_path=config_path,
+                    plugins_dir="plugins",
+                    policies_dir=policies,
+                )
         finally:
             Database.connect = original_connect
 
@@ -712,8 +696,11 @@ class TestBackwardCompatibilityNoDb:
                 config_path=config_path,
                 plugins_dir="plugins",
                 policies_dir=policies,
+                allow_ephemeral=True,
             )
             assert kernel.database is None
+            assert kernel.persistence["mode"] == "ephemeral"
+            assert "no db" in kernel.persistence["reason"]
 
             session = kernel.session_manager.create()
             session.set("task", "analyze")
@@ -745,6 +732,7 @@ class TestBackwardCompatibilityNoDb:
                 config_path=config_path,
                 plugins_dir="plugins",
                 policies_dir=policies,
+                allow_ephemeral=True,
             )
 
             # Should not raise

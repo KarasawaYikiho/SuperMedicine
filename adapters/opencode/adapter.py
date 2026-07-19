@@ -62,7 +62,7 @@ class OpenCodeAdapter(BaseAdapter):
 
     AI_PROVIDER_SUPPORT = {
         "config_sources": [
-            "Installer/runtime injection flags: Install.py --provider <any-name> --base-url <url> --api-key <secret> --model <model>",
+            "Installer/runtime injection flags: install.py --provider <any-name> --base-url <url> --api-key <secret> --model <model>",
             "Generic environment variables: SM_LLM_PROVIDER, SM_LLM_BASE_URL, SM_LLM_API_KEY, SM_LLM_MODEL",
             "Provider environment variables: OPENAI_API_KEY, ANTHROPIC_API_KEY, or OPENROUTER_API_KEY",
             "Project-local config: .supermedicine/config.yaml llm.provider and llm.providers.*",

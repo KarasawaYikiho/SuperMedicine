@@ -126,6 +126,18 @@ evidence; the full suite provides the surrounding regression coverage.
 | 35 | Installer partial-copy rollback | FIXED | `test_install_service_rolls_back_files_created_before_copy_failure` |
 | 36 | Same-version overwrite and artifact-only CI | FIXED | `test_release_publish_refuses_to_overwrite_an_existing_version`, `test_packaging_ci_runs_real_artifact_self_tests_and_clean_wheel_install` |
 
+### Post-rebuild audit closures
+
+| Audit ID | Closure | Regression evidence |
+| --- | --- | --- |
+| UDBG-001 | Lightweight installer and CLI initialization no longer require the optional installer package. | `tests/test_installer.py` isolated-entry tests |
+| UDBG-005 | User-facing references use `install.py`, `install_entry.py`, `cli_entry.py`, and `uninstall_entry.py`; stale case-variant names are rejected by hygiene checks. | `test_tracked_text_is_utf8_without_known_encoding_corruption` |
+| UDBG-006 | Wheel users receive a structured source-suite-unavailable result; recursive pytest execution is refused. | `tests/test_cli_facade_slim.py` |
+| UDBG-022 | Shutdown succeeds only with an injected server controller; unsupported embeddings receive HTTP 503. | `test_shutdown_requires_a_real_server_controller`, `test_shutdown_invokes_the_injected_server_controller` |
+| UDBG-034 | Database initialization is fail-closed; ephemeral mode requires `allow_ephemeral=True` and exposes its reason. | `tests/test_database_full.py` |
+| UDBG-035 | Publishing is tag-only, preserves the full PEP 440 version, verifies tag/build commit identity, and uploads SHA-256 metadata. | `tests/test_release.py`, `test_release_publish_refuses_to_overwrite_an_existing_version` |
+| UDBG-036 | Corrupted UTF-8 text was restored and tracked text is scanned for replacement characters and known mojibake. | `test_tracked_text_is_utf8_without_known_encoding_corruption` |
+
 ## Release gate
 
 Run from a clean checkout:

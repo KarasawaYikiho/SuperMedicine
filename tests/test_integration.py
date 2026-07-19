@@ -56,7 +56,7 @@ class TestIntegration:
     def test_install_init_creates_canonical_default_policy_without_overwrite(
         self, tmp_path
     ):
-        """Install.py --init 应创建核心默认策略，并在重复初始化时保留用户策略。"""
+        """install.py --init 应创建核心默认策略，并在重复初始化时保留用户策略。"""
         expected_policy = PermissionEngine.default_policy_path().read_text(
             encoding="utf-8"
         )
@@ -117,7 +117,7 @@ class TestIntegration:
         assert created_policy.read_text(encoding="utf-8") == expected_policy
 
     def test_cli_init_and_install_init_create_same_default_policy(self, tmp_path):
-        """CLI init 与 Install.py --init 应生成同一份 canonical 默认策略。"""
+        """CLI init 与 install.py --init 应生成同一份 canonical 默认策略。"""
         cli_project = tmp_path / "cli" / "nonexistent-project"
         install_project = tmp_path / "install"
         install_project.mkdir()
@@ -166,7 +166,7 @@ class TestIntegration:
         fake_home.mkdir()
         monkeypatch.chdir(tmp_path)
         monkeypatch.setattr(Path, "home", lambda: fake_home)
-        monkeypatch.setattr("sys.argv", ["Install.py", "--init"])
+        monkeypatch.setattr("sys.argv", ["install.py", "--init"])
 
         with pytest.raises(ValueError, match="provider, base_url, api_key, model"):
             install_main()
@@ -261,7 +261,7 @@ class TestIntegration:
         monkeypatch.setenv("SM_LLM_BASE_URL", "https://env.example.test/v1")
         monkeypatch.setenv("SM_LLM_API_KEY", secret)
         monkeypatch.setenv("SM_LLM_MODEL", "gpt-env-install")
-        monkeypatch.setattr("sys.argv", ["Install.py", "--init"])
+        monkeypatch.setattr("sys.argv", ["install.py", "--init"])
 
         install_main()
 
@@ -364,7 +364,8 @@ class TestIntegration:
         )
         assert "supermedicine llm switch <provider>" == result["commands"]["llm_switch"]
         assert (
-            "python Uninstall.py --dry-run" == result["commands"]["uninstall_dry_run"]
+            "python uninstall_entry.py --dry-run"
+            == result["commands"]["uninstall_dry_run"]
         )
         assert secret not in str(result)
         assert env_secret not in str(result)

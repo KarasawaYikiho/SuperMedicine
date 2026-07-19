@@ -20,7 +20,7 @@
   },
   "ai_provider": {
     "config_sources": [
-      "Install.py --provider <any-name> --base-url <url> --api-key <placeholder-or-secret> --model <model>",
+      "install.py --provider <any-name> --base-url <url> --api-key <placeholder-or-secret> --model <model>",
       "SM_LLM_PROVIDER, SM_LLM_BASE_URL, SM_LLM_API_KEY, SM_LLM_MODEL",
       "OPENAI_API_KEY, ANTHROPIC_API_KEY, or OPENROUTER_API_KEY",
       ".supermedicine/config.yaml llm.provider and llm.providers.*"
@@ -116,13 +116,13 @@
     "ai_provider_config_boundary": "OpenCode reads provider metadata from installer/runtime/project configuration declarations only; manifests and docs contain no plaintext API keys."
   },
   "install": {
-    "entry": "Install.py --init",
+    "entry": "install.py --init",
     "provider_flags": ["--provider", "--base-url", "--api-key", "--model", "--interactive"],
     "env": ["SM_LLM_PROVIDER", "SM_LLM_BASE_URL", "SM_LLM_API_KEY", "SM_LLM_MODEL", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OPENROUTER_API_KEY"],
     "log_redaction_required": true
   },
   "uninstall": {
-    "entry": "Uninstall.py",
+    "entry": "uninstall_entry.py",
     "remove_recorded_opencode_artifacts_only": true,
     "candidate_artifacts": [".opencode/plugin/supermedicine", ".opencode/agents/supermedicine.md", ".opencode/skills/supermedicine"],
     "ownership_rule": "Remove only installer-recorded or explicitly targeted OpenCode artifacts owned by SuperMedicine; do not delete user-owned global OpenCode configuration."

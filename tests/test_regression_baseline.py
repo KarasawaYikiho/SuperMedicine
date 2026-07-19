@@ -90,7 +90,7 @@ def test_llm_client_missing_configuration_is_explicit_failure_not_success(tmp_pa
 
     assert result["ok"] is False
     assert result["error"]["code"] == "missing_provider"
-    assert "Install.py --init" in result["error"]["message"]
+    assert "install.py --init" in result["error"]["message"]
 
 
 def test_tui_visible_logging_does_not_show_llm_client_creation_noise(tmp_path, caplog):

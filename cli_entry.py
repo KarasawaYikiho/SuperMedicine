@@ -4,15 +4,20 @@
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from importlib import import_module
 from pathlib import Path
 from typing import Any
 
-from core.redaction import redact_sensitive
-from core.runtime_capabilities import required_runtime_snapshot
-
 logger = logging.getLogger(__name__)
+
+
+def required_runtime_snapshot(project_dir: Path) -> dict[str, Any]:
+    """Load runtime diagnostics lazily so lightweight CLI commands stay usable."""
+    from core.runtime_capabilities import required_runtime_snapshot as snapshot
+
+    return snapshot(project_dir)
 
 # 添加项目根目录到路径
 sys.path.insert(0, str(Path(__file__).parent))
@@ -147,7 +152,12 @@ class CLI:
         exe_dry_run: bool = False,
     ) -> None:
         """初始化项目"""
-        from installer.entrypoint import init_config
+        try:
+            from installer.entrypoint import init_config
+        except ModuleNotFoundError as exc:
+            if exc.name not in {"installer", "installer.entrypoint"}:
+                raise
+            from install_entry import init_config
 
         init_config(
             project_dir,
@@ -174,6 +184,8 @@ class CLI:
 
     def status(self) -> None:
         """显示项目状态"""
+        from core.runtime_capabilities import required_runtime_snapshot
+
         logger.info("SuperMedicine Beta0.4.2")
         logger.info("=" * 40)
         runtime = required_runtime_snapshot(Path.cwd())
@@ -216,15 +228,50 @@ class CLI:
             test_count = len(list(tests_dir.glob("test_*.py")))
             logger.info("[OK] 发现 %s 个测试模块", test_count)
 
-    def test(self) -> None:
-        """运行测试"""
+    def test(self) -> dict[str, Any]:
+        """Run maintainer tests when source assets exist; degrade cleanly in Wheels."""
         import subprocess
+        from importlib.util import find_spec
 
-        result = subprocess.run(
-            [sys.executable, "-m", "pytest", "tests/", "-v"],
-            cwd=Path(__file__).parent,
+        source_root = Path(__file__).resolve().parent
+        tests_dir = source_root / "tests"
+        if not tests_dir.is_dir() or find_spec("pytest") is None:
+            result: dict[str, Any] = {
+                "status": "unavailable",
+                "reason": (
+                    "source_tests_not_installed"
+                    if not tests_dir.is_dir()
+                    else "pytest_not_installed"
+                ),
+                "message": "The test command is for source maintainers.",
+                "self_check_command": "supermedicine diagnose",
+            }
+            _log_json(result)
+            return result
+        if os.environ.get("PYTEST_CURRENT_TEST"):
+            result = {
+                "status": "unavailable",
+                "reason": "source_test_run_already_active",
+                "message": "Refusing to start a recursive pytest run.",
+                "self_check_command": "supermedicine diagnose",
+            }
+            _log_json(result)
+            return result
+
+        completed = subprocess.run(
+            [sys.executable, "-m", "pytest", str(tests_dir), "-v"],
+            cwd=source_root,
+            check=False,
         )
-        sys.exit(result.returncode)
+        result = {
+            "status": "passed" if completed.returncode == 0 else "failed",
+            "returncode": completed.returncode,
+            "tests_dir": str(tests_dir),
+        }
+        _log_json(result)
+        if completed.returncode:
+            raise SystemExit(completed.returncode)
+        return result
 
     def run(
         self,
@@ -238,6 +285,7 @@ class CLI:
     ) -> dict:
         """执行任务 — 真实执行用户任务与医疗插件"""
         from core.kernel import Kernel
+        from core.redaction import redact_sensitive
         from permission.policy import ensure_default_policy
         from core.workspace import WorkspaceManager
 

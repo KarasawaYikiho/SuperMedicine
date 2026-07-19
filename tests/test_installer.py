@@ -974,7 +974,7 @@ def test_force_removes_owned_runtime_artifacts_but_not_unrecorded_platform_dirs(
 
 def test_uninstall_does_not_remove_user_owned_files_or_repo_root(tmp_path):
     user_file = tmp_path / "user-notes.md"
-    source_file = tmp_path / "Cli.py"
+    source_file = tmp_path / "cli_entry.py"
     user_file.write_text("keep", encoding="utf-8")
     source_file.write_text("keep", encoding="utf-8")
     (tmp_path / ".supermedicine").mkdir()

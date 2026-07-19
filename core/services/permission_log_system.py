@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any, Callable
 
@@ -138,6 +139,7 @@ class PermissionLogSystemService:
             config_diag = self.config.diagnostics()
             llm_diag = manager.diagnostics()
             runtime = required_runtime_snapshot(self.project_root)
+            database_path = self.config.config_path.parent / "data.db"
             result: dict[str, Any] = {
                 "ok": bool(config_diag.get("exists"))
                 and bool(llm_diag.get("ok"))
@@ -153,13 +155,21 @@ class PermissionLogSystemService:
                     "writable_parent": storage.audit_file.parent.exists(),
                 },
                 "log_storage": storage.to_dict(),
+                "database": {
+                    "path": str(database_path),
+                    "exists": database_path.is_file(),
+                    "writable_parent": database_path.parent.is_dir()
+                    and os.access(database_path.parent, os.W_OK),
+                    "persistence": "required",
+                    "ephemeral_fallback": False,
+                },
                 "required_runtime": runtime,
                 "commands": {
                     "init": "set provider API key env var first, then run: supermedicine init --provider <name> --base-url <url> --model <model>",
                     "llm_list": "supermedicine llm list",
                     "llm_switch": "supermedicine llm switch <provider>",
                     "tui_dry_run": "supermedicine tui --dry-run",
-                    "uninstall_dry_run": "python Uninstall.py --dry-run",
+                    "uninstall_dry_run": "python uninstall_entry.py --dry-run",
                 },
             }
             return result

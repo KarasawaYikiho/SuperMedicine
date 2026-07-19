@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from installer import entrypoint as _entrypoint
+from install_entry import main
 
 
 if __name__ == "__main__":
     try:
-        _entrypoint.main()
+        main()
     except ValueError as exc:
         raise SystemExit(f"error: {exc}") from exc

@@ -83,6 +83,33 @@ LOCAL_ONLY_ARCHIVE_DOCUMENTS = {
     "docs/archive/TestMergeInventory.md",
 }
 
+TRACKED_UTF8_TEXT_SUFFIXES = {
+    ".cfg",
+    ".css",
+    ".html",
+    ".in",
+    ".ini",
+    ".js",
+    ".json",
+    ".md",
+    ".mjs",
+    ".ps1",
+    ".py",
+    ".pyi",
+    ".sh",
+    ".toml",
+    ".txt",
+    ".yaml",
+    ".yml",
+}
+FORBIDDEN_TRACKED_TEXT_MARKERS = (
+    chr(0xFFFD),
+    "鏁板" + "瓧閿",
+    "Install" + ".py",
+    "Cli" + ".py",
+    "Uninstall" + ".py",
+)
+
 INTENTIONAL_GENERATED_ARTIFACT_REFERENCES = {
     "build/": "ignored build output pattern; not a required repository directory",
     "dist/": "ignored distribution output pattern; not a required repository directory",
@@ -227,6 +254,23 @@ def _tracked_python_files() -> list[Path]:
         for path in _tracked_files()
         if path.endswith(".py") and (REPO_ROOT / path).is_file()
     ]
+
+
+def test_tracked_text_is_utf8_without_known_encoding_corruption() -> None:
+    offenders: list[str] = []
+    for relative_path in _tracked_files():
+        path = REPO_ROOT / relative_path
+        if not path.is_file() or path.suffix.lower() not in TRACKED_UTF8_TEXT_SUFFIXES:
+            continue
+        try:
+            text = path.read_bytes().decode("utf-8-sig")
+        except UnicodeDecodeError as exc:
+            offenders.append(f"{relative_path}: invalid UTF-8 at byte {exc.start}")
+            continue
+        for marker in FORBIDDEN_TRACKED_TEXT_MARKERS:
+            if marker in text:
+                offenders.append(f"{relative_path}: contains {marker!r}")
+    assert not offenders, "Encoding corruption found:\n" + "\n".join(offenders)
 
 
 def _is_temporary_test_file(path: str) -> bool:
@@ -653,7 +697,7 @@ def test_release_label_and_package_version_stay_in_sync():
         r'^version\s*=\s*["\']([^"\']+)["\']\s*$', pyproject, re.MULTILINE
     )
 
-    assert install_manifest["version"] == "Beta0.4.2"
+    assert install_manifest["version"] == "0.4.2b0"
     assert package_version is not None
     assert package_version.group(1) == "0.4.2b0"
     assert "Beta0.4.2" in readme
@@ -661,7 +705,7 @@ def test_release_label_and_package_version_stay_in_sync():
     assert "metadata uses fallback version `0.4.2b0`" in changelog
 
 
-def test_release_zip_archive_name_uses_display_format_without_source_suffix():
+def test_release_zip_archive_name_retains_complete_pep440_version():
     workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
         encoding="utf-8"
     )
@@ -669,13 +713,10 @@ def test_release_zip_archive_name_uses_display_format_without_source_suffix():
         encoding="utf-8"
     )
     package_version = _read_pyproject()["project"]["version"]
-    beta_match = re.fullmatch(r"(\d+\.\d+\.\d+)b\d+", package_version)
-    assert beta_match is not None
-
-    expected_archive_name = f"SuperMedicine Beta{beta_match.group(1)}.zip"
+    expected_archive_name = f"SuperMedicine v{package_version}.zip"
     archive_body = expected_archive_name.removesuffix(".zip")
 
-    assert expected_archive_name == "SuperMedicine Beta0.4.2.zip"
+    assert expected_archive_name == "SuperMedicine v0.4.2b0.zip"
     assert "source" not in archive_body.lower()
     assert "_" not in archive_body
     assert 'archive_name = f"SuperMedicine {release_label}.zip"' in build_release_zip
@@ -715,7 +756,13 @@ def test_release_publish_refuses_to_overwrite_an_existing_version():
     assert "gh release delete-asset" not in workflow
     assert "--clobber" not in workflow
     assert 'Release already exists for ${RELEASE_TAG}; refusing to overwrite it.' in workflow
-    assert 'Tag ${RELEASE_TAG} already exists; refusing to overwrite this version.' in workflow
+    assert "startsWith(github.ref, 'refs/tags/v')" in workflow
+    publish_job = workflow.split("  publish-release:", maxsplit=1)[1]
+    assert "refs/heads/master" not in publish_job
+    assert "refs/heads/main" not in publish_job
+    assert 'GITHUB_REF_NAME" != "$RELEASE_TAG' in publish_job
+    assert 'tag_commit="$(git rev-list -n 1 "$RELEASE_TAG")"' in publish_job
+    assert 'sha256sum "$asset_path"' in publish_job
 
 
 def test_packaging_ci_runs_real_artifact_self_tests_and_clean_wheel_install():
@@ -815,8 +862,8 @@ def test_no_plaintext_secrets_in_docs_and_manifests():
         REPO_ROOT / "install.json",
         REPO_ROOT / "README.md",
         REPO_ROOT / "CHANGELOG.md",
-        REPO_ROOT / "Install.py",
-        REPO_ROOT / "Uninstall.py",
+        REPO_ROOT / "install.py",
+        REPO_ROOT / "uninstall_entry.py",
         REPO_ROOT / ".supermedicine" / "config.yaml",
         REPO_ROOT / ".supermedicine" / "policies" / "default.yaml",
         # Root-level markdown docs
@@ -949,7 +996,7 @@ def test_shebang_lines_are_portable():
 
 
 def test_distribution_build_forces_exact_lowercase_install_entry():
-    """Packaging must not rely on Windows materializing install.py and Install.py."""
+    """Packaging must not rely on nonexistent case-variant entrypoint names."""
 
     pyproject = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
     setup_py = (REPO_ROOT / "setup.py").read_text(encoding="utf-8")
@@ -979,11 +1026,20 @@ def test_distribution_build_forces_exact_lowercase_install_entry():
     assert "include scripts/packaging_hooks.py" in manifest_in
 
 
+def test_packaging_hook_preserves_dependency_light_installer_fallback():
+    from scripts.packaging_hooks import _install_payloads
+
+    payloads = _install_payloads()
+
+    assert b"from install_entry import main" in payloads["install.py"]
+    assert b"_fallback_init_config" in payloads["install_entry.py"]
+
+
 def test_install_manifest_declares_safe_uninstall_entry():
     manifest = json.loads((REPO_ROOT / "install.json").read_text(encoding="utf-8"))
     uninstall = manifest["uninstall"]
 
-    assert uninstall["entry"] == "Uninstall.py"
+    assert uninstall["entry"] == "uninstall_entry.py"
     assert uninstall["removes_pip_package"] is False
     assert uninstall["log_redaction_required"] is True
     assert "source repository" in uninstall["ownership_rule"]
@@ -1020,7 +1076,7 @@ def test_packaging_declares_installer_resource_strategy_without_tracked_exe():
     assert "resources/*.md" in installer_data
     assert "resources/*.txt" in installer_data
     assert resource_policy["installer_package"] == "installer"
-    assert "Install.py --release-exe" in resource_policy["exe_resource_strategy"]
+    assert "install.py --release-exe" in resource_policy["exe_resource_strategy"]
     assert "not committed" in resource_policy["exe_resource_strategy"]
     assert "*.exe" in resource_policy["generated_artifacts_excluded"]
     assert not any(path.lower().endswith(".exe") for path in _tracked_files())

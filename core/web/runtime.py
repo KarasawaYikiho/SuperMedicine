@@ -27,7 +27,7 @@ def web_error(message: str, status_code: int, *, code: str | None = None) -> Any
         "agent_mode must be 'single' or 'multi'": "invalid_agent_mode",
         "enabled must be a boolean": "invalid_multi_agent_state",
     }
-    if status_code >= 500:
+    if status_code >= 500 and code != "shutdown_unavailable":
         return api_error_response(
             APIError(status_code, "internal_error", "Internal server error")
         )
@@ -135,10 +135,12 @@ class WebRuntime:
         service_factories: dict[str, Callable[[Path], Any]],
         *,
         auth_token: str | None = None,
+        shutdown_callback: Callable[[], None] | None = None,
     ) -> None:
         self._instances: dict[str, Any] = {}
         self._service_factories = service_factories
         self.auth_token = auth_token
+        self.shutdown_callback = shutdown_callback
 
     def service(self, name: str) -> Any:
         """Create a request-scoped application service from injected factories."""

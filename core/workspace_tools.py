@@ -356,15 +356,15 @@ class WorkspaceToolService:
 
         language_value = str(data.get("language") or "").lower()
         if language_value in SUPPORTED_LANGUAGES:
-            # Language is explicitly provided and valid �?respect it
+            # Language is explicitly provided and valid; respect it.
             pass
         elif language_value:
-            # Language is set but not a recognized value �?fall back to directory inference
+            # Language is set but invalid; fall back to directory inference.
             inferred = "r" if source_path.name.lower().startswith("r_") else "python"
             language_value = inferred
             warnings.append(f"metadata language unsupported; inferred {inferred}")
         else:
-            # Language is missing entirely �?infer from directory name prefix
+            # Language is missing; infer it from the directory-name prefix.
             inferred = "r" if source_path.name.lower().startswith("r_") else "python"
             language_value = inferred
             warnings.append(f"metadata language missing; inferred {inferred}")
