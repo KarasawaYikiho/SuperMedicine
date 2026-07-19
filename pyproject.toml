@@ -45,6 +45,7 @@ desktop = [
     "pyinstaller>=6.0,<7",
 ]
 dev = [
+    "build>=1.2",
     "fastapi>=0.100.0",
     "httpx>=0.28.1,<1",
     "matplotlib>=3.7",
