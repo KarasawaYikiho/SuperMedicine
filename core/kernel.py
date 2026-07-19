@@ -72,7 +72,9 @@ class Kernel:
         self._config = ConfigCenter(self._config_path)
         self._llm_manager = LLMConfigManager(self._config)
         self._event_bus = EventBus()
-        self._plugin_registry = PluginRegistry(self._plugins_dir)
+        self._plugin_registry = PluginRegistry(
+            self._plugins_dir, allow_package_fallback=plugins_dir is None
+        )
         self._plugin_registry.discover()
         self._runtime_capabilities = validate_required_plugins(
             self._plugin_registry, self._config_path

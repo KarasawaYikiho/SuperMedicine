@@ -14,10 +14,11 @@ Desktop, unified installers/builders, and converged core files and long
 orchestrators. PR-11 owns final documentation, clean-install/artifact gates and
 the no-overwrite release policy.
 
-No baseline Feature ID was removed. The reviewed set grew from 158 to 185 only
-because 27 existing or required preserved surfaces gained explicit contracts:
+No baseline Feature ID was removed. The reviewed set grew from 158 to 186 only
+because 28 existing or required preserved surfaces gained explicit contracts:
 the Multi-Agent CLI switch (3 IDs), OpenTUI pages/interactions (23 IDs), and the
-versioned health route (1 ID). The complete additions are stored in
+versioned health route (1 ID), plus the mandatory Harness runtime health action
+(1 ID inherited from `master`). The complete additions are stored in
 `feature_manifest.json`; `baseline_feature_ids` remains the immutable 158-ID
 set.
 
@@ -51,7 +52,7 @@ OpenCode/Claude Code adapters are not required for the standalone core.
 | Functions over 60 lines | 78 | 79 | +1 |
 | Functions over 100 lines | 28 | 18 | -10 |
 | Top-level dependency edges | 17 | 15 | -2 |
-| Feature IDs | 158 | 185 | +27 classified preserved surfaces |
+| Feature IDs | 158 | 186 | +28 classified preserved surfaces |
 
 LOC and symbol growth comes from previously missing service, error, security,
 interactive and artifact contracts; it was not used to add unrelated product

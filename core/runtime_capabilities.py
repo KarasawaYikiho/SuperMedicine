@@ -170,7 +170,7 @@ def required_runtime_snapshot(project_dir: Path) -> dict[str, Any]:
     root = Path(project_dir).resolve()
     config_path = root / ".supermedicine" / "config.yaml"
     config = ConfigCenter(config_path)
-    registry = PluginRegistry(root / "plugins")
+    registry = PluginRegistry(root / "plugins", allow_package_fallback=True)
     registry.discover()
     try:
         capabilities = validate_required_plugins(registry, config_path)

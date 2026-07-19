@@ -117,7 +117,9 @@ class PermissionLogSystemService:
                 "project_dir": str(self.project_root),
                 "config_initialized": (self.project_root / ".supermedicine").exists(),
                 "plugin_count": len(
-                    PluginRegistry(self.project_root / "plugins").discover()
+                    PluginRegistry(
+                        self.project_root / "plugins", allow_package_fallback=True
+                    ).discover()
                 ),
                 "llm_provider": provider.get("provider", "未配置") if provider else "未配置",
                 "required_runtime": runtime,
@@ -177,7 +179,9 @@ class PermissionLogSystemService:
 
     def plugin_capabilities(self) -> ServiceResult[dict[str, dict[str, Any]]]:
         def action() -> dict[str, dict[str, Any]]:
-            registry = PluginRegistry(self.project_root / "plugins")
+            registry = PluginRegistry(
+                self.project_root / "plugins", allow_package_fallback=True
+            )
             return {
                 meta.name: {
                     "enabled": True,

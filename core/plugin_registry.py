@@ -17,8 +17,11 @@ class PluginRegistry:
     canonical PermissionEngine path cannot be bypassed accidentally by CLI code.
     """
 
-    def __init__(self, plugins_dir: Path):
+    def __init__(
+        self, plugins_dir: Path, *, allow_package_fallback: bool = True
+    ) -> None:
         self._plugins_dir = Path(plugins_dir)
+        self._allow_package_fallback = allow_package_fallback
         self._metas: dict[str, PluginMeta] = {}
         self._plugins: dict[str, BasePlugin] = {}
         self._diagnostics: list[dict[str, Any]] = []
@@ -64,6 +67,8 @@ class PluginRegistry:
         """Prefer an explicit source tree, then fall back to Wheel resources."""
         if self._plugins_dir.is_dir():
             return self._plugins_dir
+        if not self._allow_package_fallback:
+            return None
         try:
             package_root = Path(str(resources.files("plugins")))
         except (ModuleNotFoundError, TypeError):

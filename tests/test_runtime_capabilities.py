@@ -14,7 +14,7 @@ from core.runtime_capabilities import (
 
 
 def test_required_runtime_plugin_missing_fails_closed(tmp_path):
-    registry = PluginRegistry(tmp_path / "plugins")
+    registry = PluginRegistry(tmp_path / "plugins", allow_package_fallback=False)
     registry.discover()
 
     with pytest.raises(RuntimeInvariantError) as captured:

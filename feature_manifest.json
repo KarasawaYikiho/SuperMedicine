@@ -598,6 +598,13 @@
       "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
     },
     {
+      "feature_id": "plugin_provide:harness.runtime.health",
+      "category": "plugin_provide",
+      "entrypoint": "plugin_provide:harness.runtime.health",
+      "expected_result": "Reports mandatory Harness runtime health without a disable path.",
+      "contract_test": "tests/feature_contract/test_runtime_contract.py::test_required_plugins_are_discovered"
+    },
+    {
       "feature_id": "plugin_provide:harness.integration.checkpoint",
       "category": "plugin_provide",
       "entrypoint": "plugin_provide:harness.integration.checkpoint",

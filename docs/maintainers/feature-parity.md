@@ -35,9 +35,9 @@ RAG and Harness records additionally require `required=true` and
 ## Current Coverage
 
 The immutable PR-00 inventory covers 158 Feature IDs. The current reviewed
-manifest covers 185; the 27 additions classify preserved Multi-Agent,
-OpenTUI-interaction/page and versioned-health surfaces rather than unrelated
-new product features:
+manifest covers 186; the 28 additions classify preserved Multi-Agent,
+OpenTUI-interaction/page, versioned-health and mandatory Harness-health surfaces
+rather than unrelated new product features:
 
 | Surface | IDs |
 | --- | ---: |

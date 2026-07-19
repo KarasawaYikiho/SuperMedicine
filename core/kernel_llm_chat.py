@@ -346,15 +346,8 @@ def execute_llm_chat(
 ) -> dict[str, Any]:
     """Execute an unmatched natural-language task through the configured LLM."""
     execution = _ChatExecution(
-        task,
-        task_id,
-        agent_id,
-        llm_manager,
-        config,
-        config_path,
-        checkpoint_task_fn,
-        progress_callback,
-        rag_context,
+        task, task_id, agent_id, llm_manager, config, config_path,
+        checkpoint_task_fn, progress_callback, rag_context,
     )
     execution.emit(
         "reasoning",

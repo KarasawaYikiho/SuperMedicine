@@ -174,7 +174,9 @@ class RAGService:
             Path(workspace_path) / ".supermedicine" / "rag" / "local"
         )
         chunks: list[tuple[str, dict[str, Any]]] = []
-        inputs = page_texts or [(None, text)]
+        inputs: list[tuple[int | None, str]] = (
+            list(page_texts) if page_texts else [(None, text)]
+        )
         chunk_size = 1200
         overlap = 150
         for page, page_text in inputs:

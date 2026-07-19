@@ -27,7 +27,8 @@ def test_rag_stays_within_consolidated_file_and_function_targets():
         "providers.py",
         "pubmed_provider.py",
     ]
-    assert 35 <= _function_count(paths) <= 45
+    # The mandatory master runtime adds document replace/remove operations.
+    assert 35 <= _function_count(paths) <= 47
 
 
 def test_harness_keeps_one_entrypoint_and_one_shared_monitor_module():
