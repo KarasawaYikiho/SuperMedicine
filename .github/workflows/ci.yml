@@ -58,7 +58,11 @@ jobs:
       - name: Wheel smoke
         shell: pwsh
         run: |
-          python -m pip wheel . --no-deps --wheel-dir wheelhouse
+          python -m build --wheel --outdir wheelhouse
+          $wheel = (Get-ChildItem -LiteralPath wheelhouse -Filter *.whl | Select-Object -First 1).FullName
+          python -m pip install $wheel --no-deps --target wheel-smoke
+          python scripts/ci/smoke_wheel_install.py wheel-smoke
+          Remove-Item -LiteralPath "wheel-smoke" -Recurse -Force
           Remove-Item -LiteralPath "wheelhouse" -Recurse -Force
 
   packaging-smoke:
@@ -108,7 +112,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m PyInstaller --onefile --name SuperMedicine --distpath dist --workpath .pyinstaller-build --icon "assets/logo.ico" --add-data "core/tui/app.tcss;core/tui" --add-data "core/tui/opentui_runtime.mjs;core/tui" --add-data "assets;assets" cli_entry.py
+          python scripts/ci/_pyinstaller_builder.py application
           test -f dist/SuperMedicine.exe
           ./dist/SuperMedicine.exe tui --dry-run
           python install_entry.py --release-exe dist/SuperMedicine.exe --desktop-dir "$RUNNER_TEMP/Desktop" --exe-dry-run
@@ -117,23 +121,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          pip install pywebview
-          python -m PyInstaller --onefile --name SuperMedicineGUI --distpath dist --workpath build-pyinstaller --icon "assets/logo.ico" --add-data "core/tui/app.tcss;core/tui" --add-data "assets;assets" --add-data "core/web/frontend;core/web/frontend" --noconsole gui_standalone.py
+          python scripts/ci/build_gui_exe.py
           test -f dist/SuperMedicineGUI.exe
+          ./dist/SuperMedicineGUI.exe --self-test
 
       - name: Build standalone installer Exe artifact
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf .installer-payload-stage
-          python scripts/ci/build_installer_payload.py
-          payload_source="$(python -c "from pathlib import Path; print((Path.cwd() / '.installer-payload-stage' / 'release_payload').resolve().as_posix())")"
-          test -d "$payload_source"
-          python -m PyInstaller --onefile --name SuperMedicineInstaller --distpath dist --workpath .pyinstaller-installer-build --icon "assets/logo.ico" --hidden-import installer.exe_release --add-data "${payload_source};release_payload" install_entry.py
+          python scripts/ci/build_installer_exe.py
           test -f dist/SuperMedicineInstaller.exe
-          python install_entry.py --extract-release-to "$RUNNER_TEMP/InstallerDryRun" --release-payload-root .installer-payload-stage/release_payload --exe-dry-run
-          ./dist/SuperMedicineInstaller.exe --help
-          ./dist/SuperMedicineInstaller.exe --extract-release-to "$RUNNER_TEMP/InstallerExeDryRun" --exe-dry-run
+          ./dist/SuperMedicineInstaller.exe --self-test
 
       - name: Build release Zip
         id: source_zip
@@ -230,37 +228,20 @@ jobs:
 
           git fetch --tags
           if git rev-parse -q --verify "refs/tags/${RELEASE_TAG}" >/dev/null; then
-            echo "Tag ${RELEASE_TAG} already exists; leaving it unchanged."
-          else
-            git tag "$RELEASE_TAG" "$GITHUB_SHA"
-            git push origin "refs/tags/${RELEASE_TAG}"
+            echo "ERROR: Tag ${RELEASE_TAG} already exists; refusing to overwrite this version." >&2
+            exit 1
           fi
-
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release edit "$RELEASE_TAG" --title "$RELEASE_TITLE" --notes-file release-body.md --target "$GITHUB_SHA"
-          else
-            gh release create "$RELEASE_TAG" --title "$RELEASE_TITLE" --notes-file release-body.md --target "$GITHUB_SHA"
+            echo "ERROR: Release already exists for ${RELEASE_TAG}; refusing to overwrite it." >&2
+            exit 1
           fi
 
-          upload_asset_name="${ARCHIVE_NAME// /.}"
-          echo "Checking for existing release assets named '${ARCHIVE_NAME}' or '${upload_asset_name}'..."
-          existing_asset_names=$(gh release view "$RELEASE_TAG" --json assets --jq ".assets[] | select(.name == \"${ARCHIVE_NAME}\" or .name == \"${upload_asset_name}\") | .name")
-          if [[ -n "$existing_asset_names" ]]; then
-            while IFS= read -r asset_name; do
-              if [[ -n "$asset_name" ]]; then
-                echo "Deleting existing release asset by name: ${asset_name}"
-                if ! gh release delete-asset "$RELEASE_TAG" "$asset_name" --yes; then
-                  echo "ERROR: Failed to delete existing release asset '${asset_name}' for ${RELEASE_TAG}." >&2
-                  exit 1
-                fi
-              fi
-            done <<< "$existing_asset_names"
-          else
-            echo "No existing release assets found for '${ARCHIVE_NAME}' or '${upload_asset_name}'."
-          fi
+          git tag "$RELEASE_TAG" "$GITHUB_SHA"
+          git push origin "refs/tags/${RELEASE_TAG}"
+          gh release create "$RELEASE_TAG" --title "$RELEASE_TITLE" --notes-file release-body.md --target "$GITHUB_SHA"
 
           echo "Uploading release asset '${asset_path}' to ${RELEASE_TAG}..."
-          if ! gh release upload "$RELEASE_TAG" "$asset_path" --clobber; then
+          if ! gh release upload "$RELEASE_TAG" "$asset_path"; then
             echo "ERROR: Failed to upload release asset '${asset_path}' to ${RELEASE_TAG}." >&2
             exit 1
           fi

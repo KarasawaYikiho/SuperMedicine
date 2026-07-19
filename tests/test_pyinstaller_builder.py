@@ -44,3 +44,18 @@ def test_add_data_places_single_file_at_its_declared_relative_path(tmp_path):
     args = builder._add_data_args(tmp_path, ("install.json",))
 
     assert args == [f"--add-data={tmp_path / 'install.json'}{builder._separator()}."]
+
+
+def test_application_executable_preserves_console_mode(tmp_path, monkeypatch):
+    captured = {}
+
+    def fake_build(root, target):
+        captured["root"] = root
+        captured["target"] = target
+        return None
+
+    monkeypatch.setattr(builder, "build_executable", fake_build)
+    builder.build_application(tmp_path)
+
+    assert captured["root"] == tmp_path
+    assert captured["target"].windowed is False

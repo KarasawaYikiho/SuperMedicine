@@ -21,6 +21,7 @@ class PyInstallerTarget:
     icon: Path
     build_extras: str | None = None
     required_modules: tuple[str, ...] = ()
+    windowed: bool = True
 
 
 def _separator() -> str:
@@ -82,7 +83,7 @@ def build_executable(root: Path, target: PyInstallerTarget) -> Path | None:
         "PyInstaller",
         "--noconfirm",
         "--onefile",
-        "--windowed",
+        *(["--windowed"] if target.windowed else []),
         f"--name={target.output_name}",
         f"--distpath={dist}",
         f"--workpath={build_dir}",
@@ -116,3 +117,32 @@ def build_executable(root: Path, target: PyInstallerTarget) -> Path | None:
     if spec_file.exists():
         spec_file.unlink()
     return output
+
+
+def build_application(root: Path) -> Path | None:
+    """Build the standalone CLI application with all dynamic runtime resources."""
+
+    return build_executable(
+        root,
+        PyInstallerTarget(
+            entry_script="cli_entry.py",
+            output_name="SuperMedicine",
+            data_items=(
+                "core",
+                "permission",
+                "plugins",
+                "agents",
+                "adapters",
+                "assets",
+            ),
+            hidden_imports=("core", "permission", "plugins", "agents", "adapters"),
+            icon=root / "assets" / "logo.ico",
+            windowed=False,
+        ),
+    )
+
+
+if __name__ == "__main__":
+    if sys.argv[1:] != ["application"]:
+        raise SystemExit("usage: _pyinstaller_builder.py application")
+    build_application(Path.cwd())

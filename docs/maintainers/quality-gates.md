@@ -43,8 +43,22 @@ Keep at least one real OpenTUI smoke check when changing TUI release behavior.
 
 ## Packaging Gate
 
-Build into a temp directory, install into a fresh environment, and run
-`supermedicine --help` plus minimal imports before release claims.
+Run the final release commands and clean-install the built Wheel before release
+claims:
+
+```powershell
+python -m pytest -q
+python -m mypy core permission cli plugins agents adapters installer
+python -m ruff check .
+python -m build
+npm run opentui:smoke
+python -m pip install <wheel> --no-deps --target <clean-target>
+python scripts/ci/smoke_wheel_install.py <clean-target>
+```
+
+The application EXE must pass `tui --dry-run`; GUI and Installer EXEs must pass
+`--self-test`. A release publish must fail when its version tag or Release
+already exists.
 
 Generated wheels, build output, caches, and payload stages should stay outside
 the tracked checkout or under ignored paths.

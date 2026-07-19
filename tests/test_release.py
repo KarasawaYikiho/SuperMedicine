@@ -289,7 +289,7 @@ def test_ci_release_artifacts_include_standalone_installer_exe_and_shared_payloa
     workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
         encoding="utf-8"
     )
-    build_installer_payload = (REPO_ROOT / "scripts" / "ci" / "build_installer_payload.py").read_text(
+    build_installer_exe = (REPO_ROOT / "scripts" / "ci" / "build_installer_exe.py").read_text(
         encoding="utf-8"
     )
     build_release_zip = (REPO_ROOT / "scripts" / "ci" / "build_release_zip.py").read_text(
@@ -309,12 +309,12 @@ def test_ci_release_artifacts_include_standalone_installer_exe_and_shared_payloa
         f"--release-exe {path}" in workflow or f"--release-exe {path!r}" in workflow
         for path in INSTALLER_EXE_RELEASE_PATHS
     )
-    assert "build_installer_payload.py" in workflow
+    assert "build_installer_exe.py" in workflow
     assert "build_release_zip.py" in workflow
 
-    # Installer payload must stage release_payload
-    assert "release_payload" in build_installer_payload
-    assert '".installer-payload-stage"' in build_installer_payload
+    # Installer EXE embeds the manifest and every installable component tree.
+    for bundled_path in ("install.json", "core", "permission", "plugins", "adapters"):
+        assert f'"{bundled_path}"' in build_installer_exe
 
     # Release zip must include the standalone installer and app exe
     assert f"dist/{INSTALLER_EXE_NAME}" in build_release_zip
@@ -325,13 +325,13 @@ def test_ci_release_artifacts_include_standalone_installer_exe_and_shared_payloa
     assert "dist/SuperMedicine.exe" in workflow
     assert "npm ci" in workflow
     assert "oven-sh/setup-bun" in workflow
-    assert "core/tui/opentui_runtime.mjs;core/tui" in workflow
+    assert "_pyinstaller_builder.py application" in workflow
     assert "./dist/SuperMedicine.exe tui --dry-run" in workflow
 
     # CUR-DBG-010: release payload/zip must carry the logo resource used for
     # externally visible Windows Exe icons, not only the in-app GUI icon.
     assert '"assets/logo.ico"' in packaging_common
-    assert "copy_include_files(root, payload)" in build_installer_payload
+    assert '"assets"' in build_installer_exe
     assert "copy_include_files(root, stage)" in build_release_zip
 
     # Packaging must install runtime deps
@@ -358,6 +358,9 @@ def test_cur_dbg_010_release_icon_contract_is_packaged_and_documented():
     build_gui_exe = (REPO_ROOT / "scripts" / "ci" / "build_gui_exe.py").read_text(
         encoding="utf-8"
     )
+    build_application_exe = (REPO_ROOT / "scripts" / "ci" / "_pyinstaller_builder.py").read_text(
+        encoding="utf-8"
+    )
     build_installer_exe = (REPO_ROOT / "scripts" / "ci" / "build_installer_exe.py").read_text(
         encoding="utf-8"
     )
@@ -367,17 +370,18 @@ def test_cur_dbg_010_release_icon_contract_is_packaged_and_documented():
     exe_release = (REPO_ROOT / "installer" / "exe_release.py").read_text(
         encoding="utf-8"
     )
-    exe_names = ("SuperMedicine", "SuperMedicineGUI", "SuperMedicineInstaller")
-
     assert (REPO_ROOT / "assets" / "logo.ico").is_file()
-    for exe_name in exe_names:
-        command_tokens = _extract_bash_pyinstaller_command(workflow, exe_name)
-        icon = _token_value(command_tokens, "--icon")
-        assert icon is not None, f"{exe_name} PyInstaller command must set --icon"
-        assert icon.replace("\\", "/").endswith("assets/logo.ico")
-
-    assert "root / 'assets' / 'logo.ico'" in build_gui_exe
-    assert "root / 'assets' / 'logo.ico'" in build_installer_exe
+    for builder_name, builder in (
+        ("SuperMedicine", build_application_exe),
+        ("SuperMedicineGUI", build_gui_exe),
+        ("SuperMedicineInstaller", build_installer_exe),
+    ):
+        assert builder_name in builder
+        assert "assets" in builder and "logo.ico" in builder
+        assert "build_executable" in builder
+    assert "_pyinstaller_builder.py application" in workflow
+    assert "build_gui_exe.py" in workflow
+    assert "build_installer_exe.py" in workflow
     assert '"assets/logo.ico"' in packaging_common
     assert "WINDOWS_ICON_CACHE_NOTE" in exe_release
     assert "assets/logo.ico" in exe_release
@@ -408,45 +412,24 @@ def test_desktop_and_installer_exe_builders_share_one_parameterized_engine():
     assert len(installer_builder.splitlines()) <= 80
 
 
-def test_ci_standalone_installer_pyinstaller_payload_path_matches_specpath_contract():
-    """Regression: --specpath must not make PyInstaller look for a missing release_payload."""
+def test_ci_standalone_installer_uses_shared_absolute_add_data_contract():
+    """Regression: bundled installer data must resolve independently of spec paths."""
 
     workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
         encoding="utf-8"
     )
-    build_installer_payload = (REPO_ROOT / "scripts" / "ci" / "build_installer_payload.py").read_text(
+    build_installer_exe = (REPO_ROOT / "scripts" / "ci" / "build_installer_exe.py").read_text(
+        encoding="utf-8"
+    )
+    shared_builder = (REPO_ROOT / "scripts" / "ci" / "_pyinstaller_builder.py").read_text(
         encoding="utf-8"
     )
 
-    # CI must call the installer payload build script
-    assert "build_installer_payload.py" in workflow
-
-    # If a PyInstaller command for the standalone installer exists in the
-    # workflow or the build script, verify the --specpath contract.
-    for source in (workflow, build_installer_payload):
-        try:
-            command_tokens = _extract_bash_pyinstaller_command(
-                source, INSTALLER_EXE_NAME.removesuffix(".exe")
-            )
-        except AssertionError:
-            continue
-        specpath = _token_value(command_tokens, "--specpath")
-        add_data = _token_value(command_tokens, "--add-data")
-
-        assert specpath is None, (
-            "CI must not use --specpath for the standalone installer build. "
-            "PyInstaller resolves --add-data relative paths based on specpath directory, "
-            "not the current working directory. Removing --specpath ensures data files "
-            "are found correctly in CI environments."
-        )
-        assert add_data is not None and ";release_payload" in add_data
-
-        add_data_source, add_data_dest = add_data.split(";", 1)
-        assert add_data_dest == "release_payload"
-
-    # Verify the payload staging contract in the build script
-    assert '".installer-payload-stage"' in build_installer_payload
-    assert '"release_payload"' in build_installer_payload
+    assert "build_installer_exe.py" in workflow
+    assert 'data_items=(' in build_installer_exe
+    assert 'source = root / item' in shared_builder
+    assert 'f"--add-data={source}{separator}{destination}"' in shared_builder
+    assert 'f"--specpath={root}"' in shared_builder
 
 
 def test_ci_packaging_smoke_installs_runtime_dependencies_before_installer_entrypoints():
@@ -457,14 +440,13 @@ def test_ci_packaging_smoke_installs_runtime_dependencies_before_installer_entry
     )
     packaging_job = workflow[workflow.index("  packaging-smoke:") :]
 
-    # Use the installer payload build invocation as a key marker, together
-    # with any installer smoke markers still present in the workflow.
-    installer_smoke_markers = ["python scripts/ci/build_installer_payload.py"]
+    installer_smoke_markers = ["python scripts/ci/build_installer_exe.py"]
     for marker in (
         "python install_entry.py --release-exe",
         "python install_entry.py --extract-release-to",
         "./dist/SuperMedicineInstaller.exe --help",
         "./dist/SuperMedicineInstaller.exe --extract-release-to",
+        "./dist/SuperMedicineInstaller.exe --self-test",
     ):
         if marker in packaging_job:
             installer_smoke_markers.append(marker)

@@ -707,30 +707,27 @@ def test_release_zip_layout_includes_installer_package_for_install_entrypoint():
     assert "installer/exe_release.py" in _tracked_files()
 
 
-def test_release_asset_cleanup_does_not_delete_graphql_node_ids_with_rest_endpoint():
+def test_release_publish_refuses_to_overwrite_an_existing_version():
     workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
         encoding="utf-8"
     )
+    assert "gh release edit" not in workflow
+    assert "gh release delete-asset" not in workflow
+    assert "--clobber" not in workflow
+    assert 'Release already exists for ${RELEASE_TAG}; refusing to overwrite it.' in workflow
+    assert 'Tag ${RELEASE_TAG} already exists; refusing to overwrite this version.' in workflow
 
-    extracts_release_asset_node_ids = re.search(
-        r"gh\s+release\s+view\b(?:(?!\n\s*(?:if|else|fi|while|done)\b).)*"
-        r"--json\s+assets\b(?:(?!\n\s*(?:if|else|fi|while|done)\b).)*"
-        r"--jq\s+[\"'][^\"']*\.id\b",
-        workflow,
-        re.DOTALL,
-    )
-    deletes_release_asset_with_rest_endpoint = re.search(
-        r"gh\s+api\s+--method\s+DELETE\s+repos/[^\s\"']+/releases/assets/\$\{?asset_id\}?\b",
-        workflow,
-    )
 
-    assert not (
-        extracts_release_asset_node_ids and deletes_release_asset_with_rest_endpoint
-    ), (
-        "Release asset cleanup must not pass GraphQL asset node IDs from "
-        "`gh release view --json assets --jq ... .id` to the REST release asset delete endpoint."
+def test_packaging_ci_runs_real_artifact_self_tests_and_clean_wheel_install():
+    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
+        encoding="utf-8"
     )
-    assert "gh release delete-asset" in workflow
+    assert "SuperMedicineGUI.exe --self-test" in workflow
+    assert "SuperMedicineInstaller.exe --self-test" in workflow
+    assert "SuperMedicine.exe tui --dry-run" in workflow
+    assert "python -m build --wheel" in workflow
+    assert "--target wheel-smoke" in workflow
+    assert "scripts/ci/smoke_wheel_install.py" in workflow
 
 
 def test_opencode_plugin_declared_entry_skills_and_agents_exist():

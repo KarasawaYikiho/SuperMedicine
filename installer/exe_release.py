@@ -273,9 +273,10 @@ def _exe_search_candidates(requested: Path) -> list[Path]:
 
     if requested.is_absolute():
         _append_unique_path(candidates, requested)
-    else:
-        for root in roots:
-            _append_unique_path(candidates, root / requested)
+        return candidates
+
+    for root in roots:
+        _append_unique_path(candidates, root / requested)
 
     for relative in DEFAULT_EXE_SEARCH_RELATIVE_PATHS:
         for root in roots:

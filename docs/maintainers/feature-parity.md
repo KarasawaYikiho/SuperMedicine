@@ -34,15 +34,19 @@ RAG and Harness records additionally require `required=true` and
 
 ## Current Coverage
 
-The PR-00 inventory currently covers 158 Feature IDs:
+The immutable PR-00 inventory covers 158 Feature IDs. The current reviewed
+manifest covers 185; the 27 additions classify preserved Multi-Agent,
+OpenTUI-interaction/page and versioned-health surfaces rather than unrelated
+new product features:
 
 | Surface | IDs |
 | --- | ---: |
-| CLI commands | 40 |
-| Web HTTP/WebSocket routes | 45 |
+| CLI commands | 43 |
+| Web HTTP/WebSocket routes | 46 |
 | Plugin manifests and `provides` | 37 |
 | Adapters | 3 |
 | TUI actions | 5 |
+| OpenTUI pages and interactions | 23 |
 | Configuration environment keys | 7 |
 | Database tables | 5 |
 | Multi-Agent roles | 4 |
