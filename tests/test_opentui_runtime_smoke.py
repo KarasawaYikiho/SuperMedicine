@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
@@ -188,8 +189,10 @@ def test_service_bridge_jsonl_handles_multiple_requests(tmp_path):
             + "\n"
         ),
         text=True,
+        encoding="utf-8",
         capture_output=True,
         check=False,
+        env={**os.environ, "PYTHONIOENCODING": "cp1252"},
     )
     payloads = [json.loads(line) for line in result.stdout.splitlines()]
     assert result.returncode == 0

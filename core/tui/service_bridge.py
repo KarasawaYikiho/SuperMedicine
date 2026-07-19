@@ -19,6 +19,14 @@ from core.services import (
 )
 
 
+def _configure_utf8_stdio() -> None:
+    """Keep the JSONL protocol Unicode-safe on Windows and redirected pipes."""
+    for stream in (sys.stdin, sys.stdout):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8")
+
+
 def multi_agent_operation(action: str, project_root: str | Path) -> dict[str, Any]:
     service = PermissionLogSystemService(project_root)
     if action == "status":
@@ -257,6 +265,7 @@ def jsonl_bridge(project_root: str | Path) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    _configure_utf8_stdio()
     argv = list(sys.argv[1:] if argv is None else argv)
     if len(argv) == 2 and argv[0] == "--jsonl":
         return jsonl_bridge(argv[1])
