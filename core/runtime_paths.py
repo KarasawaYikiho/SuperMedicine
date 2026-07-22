@@ -7,7 +7,7 @@ import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Mapping
+from typing import Mapping, cast
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,7 +42,9 @@ class RuntimePaths:
                 executable_path if executable_path.is_dir() else executable_path.parent
             )
         resource_root = (
-            _absolute(bundle_root or getattr(sys, "_MEIPASS", source))
+            _absolute(
+                cast(str | Path, bundle_root or getattr(sys, "_MEIPASS", source))
+            )
             if is_frozen
             else source
         )
@@ -56,7 +58,7 @@ class RuntimePaths:
             or _project_from_config(config)
             or _default_project_root(is_frozen, platform or sys.platform, env, source)
         )
-        project = _absolute(selected)
+        project = _absolute(cast(str | Path, selected))
         return cls(
             project_root=project,
             data_root=project / ".supermedicine",

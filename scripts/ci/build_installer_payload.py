@@ -33,7 +33,7 @@ PAYLOAD_SUBDIR = "release_payload"
 
 
 def main() -> None:
-    root = Path.cwd()
+    root = _REPO_ROOT
     stage = root / STAGE_DIR
     payload = stage / PAYLOAD_SUBDIR
 
@@ -55,6 +55,14 @@ def main() -> None:
     exe_target = payload / "dist" / "SuperMedicine.exe"
     exe_target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(release_exe, exe_target)
+
+    gui_exe = root / "dist" / "SuperMedicineGUI.exe"
+    if not gui_exe.is_file():
+        print(
+            "Missing CI GUI executable: dist/SuperMedicineGUI.exe", file=sys.stderr
+        )
+        raise SystemExit(1)
+    shutil.copy2(gui_exe, payload / "SuperMedicineGUI.exe")
 
     # Copy include directories (core, permission, agents, etc.)
     copy_include_dirs(root, payload)

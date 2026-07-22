@@ -143,6 +143,21 @@ jobs:
           set -euo pipefail
           python scripts/ci/build_release_zip.py
 
+      - name: Self-test GUI from release Zip
+        shell: pwsh
+        run: |
+          $archive = Get-ChildItem -LiteralPath . -Filter "SuperMedicine v*.zip" | Select-Object -First 1
+          if (-not $archive) { throw "Release Zip was not created" }
+          $extractRoot = Join-Path $env:RUNNER_TEMP "supermedicine-release"
+          Expand-Archive -LiteralPath $archive.FullName -DestinationPath $extractRoot
+          $gui = Get-ChildItem -LiteralPath $extractRoot -Recurse -Filter SuperMedicineGUI.exe | Select-Object -First 1
+          if (-not $gui) { throw "GUI EXE missing from release Zip" }
+          $report = Join-Path $env:RUNNER_TEMP "zip-gui-self-test.json"
+          & $gui.FullName --self-test --self-test-report $report
+          if ($LASTEXITCODE -ne 0) { throw "Extracted GUI self-test failed" }
+          $result = Get-Content -LiteralPath $report -Raw | ConvertFrom-Json
+          if (-not $result.ok) { throw ($result | ConvertTo-Json -Depth 8) }
+
       - name: Upload release Zip artifact
         uses: actions/upload-artifact@v7
         with:

@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from core.redaction import redact_sensitive
 from core.runtime_paths import RuntimePaths
-from core.services import ServiceResult, WorkspaceService
+
+if TYPE_CHECKING:
+    from core.services.result import ServiceResult
+    from core.services.workspace import WorkspaceService
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,19 +33,28 @@ class ApplicationFacade:
 
     def __init__(self, paths: RuntimePaths) -> None:
         self.paths = paths
-        self._workspaces = WorkspaceService(paths.project_root)
+        self._workspaces: WorkspaceService | None = None
+
+    def _workspace_service(self) -> WorkspaceService:
+        if self._workspaces is None:
+            from core.services.workspace import WorkspaceService
+
+            self._workspaces = WorkspaceService(self.paths.project_root)
+        return self._workspaces
 
     def create_workspace(self, workspace_id: str, name: str | None = None) -> AppResult:
-        return _app_result(self._workspaces.create(workspace_id, name=name))
+        return _app_result(self._workspace_service().create(workspace_id, name=name))
 
     def list_workspaces(self) -> AppResult:
-        return _app_result(self._workspaces.list())
+        return _app_result(self._workspace_service().list())
 
     def get_workspace(self, workspace_id: str) -> AppResult:
-        return _app_result(self._workspaces.show(workspace_id))
+        return _app_result(self._workspace_service().show(workspace_id))
 
     def delete_workspace(self, workspace_id: str, *, confirm: str) -> AppResult:
-        return _app_result(self._workspaces.delete(workspace_id, confirm=confirm))
+        return _app_result(
+            self._workspace_service().delete(workspace_id, confirm=confirm)
+        )
 
 
 def _app_result(result: ServiceResult[Any]) -> AppResult:

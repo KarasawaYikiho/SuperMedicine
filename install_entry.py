@@ -112,6 +112,7 @@ def _fallback_parser() -> argparse.ArgumentParser:
     parser.add_argument("--api-key")
     parser.add_argument("--model")
     parser.add_argument("--release-exe", type=Path)
+    parser.add_argument("--release-gui-exe", type=Path)
     parser.add_argument("--desktop-dir", type=Path)
     parser.add_argument("--exe-target-name")
     parser.add_argument("--exe-overwrite", action="store_true")
@@ -161,12 +162,23 @@ def _fallback_main(argv: list[str] | None = None) -> None:
             model=args.model,
         )
         print(f"Initialized: {args.project_dir / '.supermedicine'}")
-    if args.release_exe is not None:
-        source = args.release_exe.expanduser().resolve()
+    releases = (
+        ("--release-exe", args.release_exe),
+        ("--release-gui-exe", args.release_gui_exe),
+    )
+    for option, requested_source in releases:
+        if requested_source is None:
+            continue
+        source = requested_source.expanduser().resolve()
         if not source.is_file():
-            parser.error(f"--release-exe source does not exist: {source}")
+            parser.error(f"{option} source does not exist: {source}")
         destination_dir = args.desktop_dir or (Path.home() / "Desktop")
-        destination = destination_dir / (args.exe_target_name or source.name)
+        target_name = (
+            "SuperMedicineGUI.exe"
+            if option == "--release-gui-exe"
+            else args.exe_target_name or source.name
+        )
+        destination = destination_dir / target_name
         if args.exe_dry_run:
             print(f"Release dry-run: {source} -> {destination}")
         else:

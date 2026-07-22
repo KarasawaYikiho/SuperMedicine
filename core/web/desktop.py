@@ -105,7 +105,9 @@ class DesktopServer:
     def start(self, *, timeout: float = 10.0) -> None:
         import uvicorn
 
-        config = uvicorn.Config(self.app, log_level="warning", access_log=False)
+        config = uvicorn.Config(
+            self.app, log_level="warning", access_log=False, log_config=None
+        )
         self._server = uvicorn.Server(config)
         self._thread = threading.Thread(
             target=self._server.run,

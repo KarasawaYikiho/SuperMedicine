@@ -81,6 +81,27 @@ def test_gui_entry_self_test_is_machine_readable_from_non_repo_directory(tmp_pat
     assert payload["checks"]["frontend"] is True
 
 
+def test_gui_entry_self_test_can_write_a_report(tmp_path):
+    root = Path(__file__).resolve().parents[1]
+    report_path = tmp_path / "reports" / "gui.json"
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(root / "gui_entry.py"),
+            "--self-test",
+            "--self-test-report",
+            str(report_path),
+        ],
+        cwd=tmp_path,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(report_path.read_text(encoding="utf-8"))["ok"] is True
+
+
 def test_desktop_extra_and_gui_builder_install_desktop_and_web_extras():
     root = Path(__file__).resolve().parents[1]
     pyproject = root.joinpath("pyproject.toml").read_text(encoding="utf-8")

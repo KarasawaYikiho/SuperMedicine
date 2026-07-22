@@ -34,7 +34,7 @@ from scripts.ci._packaging_common import (  # noqa: E402
 
 
 def main() -> None:
-    root = Path.cwd()
+    root = _REPO_ROOT
 
     # --- Determine version and release metadata ---
     version = tomllib.loads(

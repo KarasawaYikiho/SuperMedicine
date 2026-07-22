@@ -205,6 +205,7 @@ def _make_release_payload(root: Path) -> Path:
         payload / "installer" / "exe_release.py",
     )
     (payload / "dist" / "SuperMedicine.exe").write_bytes(b"app exe")
+    (payload / "SuperMedicineGUI.exe").write_bytes(b"gui exe")
     (payload / "README.md").write_text("docs\n", encoding="utf-8")
     return payload
 
@@ -674,6 +675,42 @@ def test_release_payload_to_directory_dry_run_does_not_create_target(tmp_path):
     assert result["status"] == "dry-run"
     assert result["file_count"] >= 5
     assert not (tmp_path / "Installed").exists()
+
+
+def test_release_gui_exe_dry_run_uses_gui_desktop_target(tmp_path, caplog):
+    from installer.entrypoint import main
+
+    gui_exe = tmp_path / "SuperMedicineGUI.exe"
+    gui_exe.write_bytes(b"gui exe")
+    desktop = tmp_path / "Desktop"
+    caplog.set_level(logging.INFO)
+
+    main(
+        [
+            "--release-gui-exe",
+            str(gui_exe),
+            "--desktop-dir",
+            str(desktop),
+            "--exe-dry-run",
+            "--if-installed",
+            "ignore",
+        ]
+    )
+
+    assert not desktop.exists()
+    assert "SuperMedicineGUI.exe" in caplog.text
+
+
+def test_missing_gui_exe_never_falls_back_to_cli_exe(tmp_path, monkeypatch):
+    from installer import exe_release
+
+    (tmp_path / "dist").mkdir()
+    (tmp_path / "dist" / "SuperMedicine.exe").write_bytes(b"cli exe")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(exe_release, "_release_root", lambda: tmp_path)
+
+    with pytest.raises(FileNotFoundError):
+        exe_release.resolve_exe_path(Path("dist") / "SuperMedicineGUI.exe")
 
 
 def test_release_payload_to_directory_rejects_incomplete_layout(tmp_path):

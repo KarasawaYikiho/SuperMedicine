@@ -18,6 +18,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 DEFAULT_TARGET_FILENAME = "SuperMedicine.exe"
+DEFAULT_GUI_TARGET_FILENAME = "SuperMedicineGUI.exe"
 DEFAULT_INSTALLER_FILENAME = "SuperMedicineInstaller.exe"
 DEFAULT_RELEASE_PAYLOAD_DIRNAME = "release_payload"
 WINDOWS_ICON_CACHE_NOTE = (
@@ -31,12 +32,18 @@ DEFAULT_EXE_SEARCH_RELATIVE_PATHS = (
     Path("Dist") / DEFAULT_TARGET_FILENAME,
     Path(DEFAULT_TARGET_FILENAME),
 )
+DEFAULT_GUI_EXE_SEARCH_RELATIVE_PATHS = (
+    Path("dist") / DEFAULT_GUI_TARGET_FILENAME,
+    Path("Dist") / DEFAULT_GUI_TARGET_FILENAME,
+    Path(DEFAULT_GUI_TARGET_FILENAME),
+)
 RELEASE_PAYLOAD_REQUIRED_PATHS = (
     Path("install_entry.py"),
     Path("installer") / "exe_release.py",
     Path("core"),
     Path("permission"),
     Path("dist") / DEFAULT_TARGET_FILENAME,
+    Path(DEFAULT_GUI_TARGET_FILENAME),
 )
 _PAYLOAD_EXCLUDED_DIR_NAMES = {
     "__pycache__",
@@ -278,7 +285,12 @@ def _exe_search_candidates(requested: Path) -> list[Path]:
     for root in roots:
         _append_unique_path(candidates, root / requested)
 
-    for relative in DEFAULT_EXE_SEARCH_RELATIVE_PATHS:
+    search_paths = (
+        DEFAULT_GUI_EXE_SEARCH_RELATIVE_PATHS
+        if requested.name.casefold() == DEFAULT_GUI_TARGET_FILENAME.casefold()
+        else DEFAULT_EXE_SEARCH_RELATIVE_PATHS
+    )
+    for relative in search_paths:
         for root in roots:
             _append_unique_path(candidates, root / relative)
 
@@ -287,14 +299,21 @@ def _exe_search_candidates(requested: Path) -> list[Path]:
 
 def _missing_exe_message(requested: Path, candidates: list[Path]) -> str:
     searched = "; ".join(str(path) for path in candidates)
-    expected = ", ".join(path.as_posix() for path in DEFAULT_EXE_SEARCH_RELATIVE_PATHS)
+    is_gui = requested.name.casefold() == DEFAULT_GUI_TARGET_FILENAME.casefold()
+    expected_paths = (
+        DEFAULT_GUI_EXE_SEARCH_RELATIVE_PATHS
+        if is_gui
+        else DEFAULT_EXE_SEARCH_RELATIVE_PATHS
+    )
+    expected_name = DEFAULT_GUI_TARGET_FILENAME if is_gui else DEFAULT_TARGET_FILENAME
+    expected = ", ".join(path.as_posix() for path in expected_paths)
     return (
         f"Exe source does not exist: {requested}. "
-        f"Missing required file: {DEFAULT_TARGET_FILENAME}. "
+        f"Missing required file: {expected_name}. "
         f"Searched paths: {searched}. "
         f"Expected release executable layout: {expected}. "
         "Regenerate the release package from CI or run the packaging workflow so "
-        "dist/SuperMedicine.exe is produced and included next to install_entry.py; for "
+        f"{expected_name} is produced and included in the release payload; for "
         "local builds, rebuild the executable into dist/ or Dist/ before rerunning "
         "install_entry.py --release-exe."
     )

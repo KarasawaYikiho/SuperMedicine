@@ -1225,15 +1225,19 @@ def _load_release_function_from_path(release_module: Path, function_name: str) -
     return getattr(module, function_name)
 
 
-def _release_exe_from_args(args: argparse.Namespace) -> dict[str, Any]:
+def _release_exe_from_args(
+    args: argparse.Namespace, *, gui: bool = False
+) -> dict[str, Any]:
     """Release the requested Exe and convert copy failures into CLI errors."""
 
+    source = args.release_gui_exe if gui else args.release_exe
+    target_filename = "SuperMedicineGUI.exe" if gui else args.exe_target_name
     try:
         release_exe_to_desktop = _load_release_exe_to_desktop()
         result = release_exe_to_desktop(
-            exe_path=args.release_exe,
+            exe_path=source,
             desktop_dir=args.desktop_dir,
-            target_filename=args.exe_target_name,
+            target_filename=target_filename,
             overwrite=args.exe_overwrite,
             dry_run=args.exe_dry_run,
         )
@@ -1282,30 +1286,46 @@ def _resolve_project_dir(args: argparse.Namespace) -> Path:
     return Path.cwd()
 
 
-def _align_release_exe_with_extracted_payload(args: argparse.Namespace) -> None:
+def _align_release_exe_with_extracted_payload(
+    args: argparse.Namespace, *, gui: bool = False
+) -> None:
     """Prefer the freshly extracted application Exe for combined installs."""
 
-    if not getattr(args, "release_exe", None) or not getattr(
-        args, "extract_release_to", None
-    ):
+    attribute = "release_gui_exe" if gui else "release_exe"
+    if not getattr(args, attribute, None) or not getattr(args, "extract_release_to", None):
         return
-    release_exe = Path(args.release_exe)
+    release_exe = Path(getattr(args, attribute))
     if release_exe.is_absolute() or release_exe.exists():
         return
     extracted_candidate = Path(args.extract_release_to).expanduser() / release_exe
     if extracted_candidate.exists():
-        args.release_exe = extracted_candidate
+        setattr(args, attribute, extracted_candidate)
+        return
+    if gui:
+        root_candidate = (
+            Path(args.extract_release_to).expanduser() / "SuperMedicineGUI.exe"
+        )
+        if root_candidate.exists():
+            setattr(args, attribute, root_candidate)
 
 
 def _resolve_desktop_collision_args(
     args: argparse.Namespace,
 ) -> tuple[Path | None, str | None]:
-    if not getattr(args, "release_exe", None):
+    if not (
+        getattr(args, "release_gui_exe", None)
+        or getattr(args, "release_exe", None)
+    ):
         return None, None
     desktop_dir = getattr(args, "desktop_dir", None)
     if desktop_dir is None:
-        return Path.home() / "Desktop", getattr(args, "exe_target_name", None)
-    return Path(desktop_dir).expanduser(), getattr(args, "exe_target_name", None)
+        desktop_dir = Path.home() / "Desktop"
+    target_name = (
+        "SuperMedicineGUI.exe"
+        if getattr(args, "release_gui_exe", None)
+        else getattr(args, "exe_target_name", None)
+    )
+    return Path(desktop_dir).expanduser(), target_name
 
 
 def _uninstall_existing_install(
@@ -1395,6 +1415,7 @@ def _install_record_artifacts_from_results(
     *,
     payload_result: dict[str, Any] | None = None,
     exe_result: dict[str, Any] | None = None,
+    gui_exe_result: dict[str, Any] | None = None,
     selected_components: list[str] | None = None,
 ) -> dict[str, Any]:
     artifacts: dict[str, Any] = {
@@ -1404,8 +1425,13 @@ def _install_record_artifacts_from_results(
     }
     if payload_result and payload_result.get("status") in {"copied", "dry-run"}:
         artifacts["payload_dir"] = payload_result.get("target_dir")
-    if exe_result and exe_result.get("target_path"):
-        artifacts["binaries"] = [exe_result.get("target_path")]
+    binaries = [
+        result.get("target_path")
+        for result in (exe_result, gui_exe_result)
+        if result and result.get("target_path")
+    ]
+    if binaries:
+        artifacts["binaries"] = binaries
     if selected_components:
         artifacts["installed_components"] = list(selected_components)
     return artifacts
@@ -1512,6 +1538,13 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="配合 --if-installed uninstall 使用：卸载旧版本时删除记录的用户数据",
     )
+    parser.add_argument(
+        "--release-gui-exe",
+        type=Path,
+        nargs="?",
+        const=Path("dist") / "SuperMedicineGUI.exe",
+        help="Release the GUI executable to the desktop",
+    )
     return parser
 
 
@@ -1532,6 +1565,8 @@ def _run_scripted_installer(
         parser.error(
             "--unified-install requires --release-exe <path-to-SuperMedicine.exe>"
         )
+    if args.unified_install and args.release_gui_exe is None:
+        args.release_gui_exe = Path("dist") / "SuperMedicineGUI.exe"
     if args.detect:
         logger.info("Detected platform: %s", detect_platform())
         return
@@ -1545,14 +1580,16 @@ def _run_scripted_installer(
         include_payload=bool(args.extract_release_to),
     )
     install_policy_action = "ignore"
-    if run_init or args.extract_release_to or args.release_exe:
+    if run_init or args.extract_release_to or args.release_exe or args.release_gui_exe:
         install_policy_action = _enforce_existing_install_policy(args, detection)
     payload_result: dict[str, Any] | None = None
     exe_result: dict[str, Any] | None = None
+    gui_exe_result: dict[str, Any] | None = None
     if args.extract_release_to:
         payload_result = _extract_release_from_args(args)
         _align_release_exe_with_extracted_payload(args)
-        if not run_init and not args.release_exe:
+        _align_release_exe_with_extracted_payload(args, gui=True)
+        if not run_init and not args.release_exe and not args.release_gui_exe:
             if payload_result.get("status") != "dry-run":
                 write_install_record(
                     scripted_project_dir,
@@ -1609,20 +1646,30 @@ def _run_scripted_installer(
         )
         if args.release_exe:
             exe_result = _release_exe_from_args(args)
+        if args.release_gui_exe:
+            gui_exe_result = _release_exe_from_args(args, gui=True)
         write_install_record(
             scripted_project_dir,
             artifacts=_install_record_artifacts_from_results(
-                payload_result=payload_result, exe_result=exe_result
+                payload_result=payload_result,
+                exe_result=exe_result,
+                gui_exe_result=gui_exe_result,
             ),
             mode="update" if install_policy_action == "update" else "init",
         )
         return
-    if args.release_exe:
-        exe_result = _release_exe_from_args(args)
-        if exe_result.get("status") != "dry-run":
+    if args.release_exe or args.release_gui_exe:
+        if args.release_exe:
+            exe_result = _release_exe_from_args(args)
+        if args.release_gui_exe:
+            gui_exe_result = _release_exe_from_args(args, gui=True)
+        results = [result for result in (exe_result, gui_exe_result) if result]
+        if any(result.get("status") != "dry-run" for result in results):
             write_install_record(
                 scripted_project_dir,
-                artifacts=_install_record_artifacts_from_results(exe_result=exe_result),
+                artifacts=_install_record_artifacts_from_results(
+                    exe_result=exe_result, gui_exe_result=gui_exe_result
+                ),
                 mode="update" if install_policy_action == "update" else "init",
             )
         return

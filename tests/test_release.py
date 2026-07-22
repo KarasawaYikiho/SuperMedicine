@@ -20,6 +20,7 @@ CRITICAL_RELEASE_PATHS = (
     "core",
     "core/__init__.py",
     "dist/SuperMedicine.exe",
+    "SuperMedicineGUI.exe",
     "permission",
     "permission/__init__.py",
     "installer",
@@ -181,6 +182,9 @@ def _copy_release_tree(tmp_path: Path) -> Path:
     release_dist_exe = release_dir / "dist" / "SuperMedicine.exe"
     release_dist_exe.parent.mkdir()
     release_dist_exe.write_bytes(b"fake dist exe bytes for payload smoke dry-run")
+    (release_dir / "SuperMedicineGUI.exe").write_bytes(
+        b"fake GUI exe bytes for payload smoke dry-run"
+    )
 
     return release_dir
 
@@ -235,6 +239,7 @@ def test_extracted_release_directory_installer_entrypoint_smoke(tmp_path):
     assert help_result.returncode == 0, help_output
     assert "usage:" in help_output.lower()
     assert "--release-exe" in help_output
+    assert "--release-gui-exe" in help_output
     assert "UnicodeEncodeError" not in help_output
 
     lowercase_help_result = _run_release_python(
@@ -248,6 +253,7 @@ def test_extracted_release_directory_installer_entrypoint_smoke(tmp_path):
     assert lowercase_help_result.returncode == 0, lowercase_help_output
     assert "usage:" in lowercase_help_output.lower()
     assert "--release-exe" in lowercase_help_output
+    assert "--release-gui-exe" in lowercase_help_output
     assert "UnicodeEncodeError" not in lowercase_help_output
 
     fake_exe = release_dir / "SuperMedicine.exe"
@@ -295,6 +301,9 @@ def test_ci_release_artifacts_include_standalone_installer_exe_and_shared_payloa
     build_release_zip = (REPO_ROOT / "scripts" / "ci" / "build_release_zip.py").read_text(
         encoding="utf-8"
     )
+    build_installer_payload = (
+        REPO_ROOT / "scripts" / "ci" / "build_installer_payload.py"
+    ).read_text(encoding="utf-8")
     packaging_common = (REPO_ROOT / "scripts" / "ci" / "_packaging_common.py").read_text(
         encoding="utf-8"
     )
@@ -315,11 +324,14 @@ def test_ci_release_artifacts_include_standalone_installer_exe_and_shared_payloa
     # Installer EXE embeds the manifest and every installable component tree.
     for bundled_path in ("install.json", "core", "permission", "plugins", "adapters"):
         assert f'"{bundled_path}"' in build_installer_exe
+    assert '".installer-payload-stage/release_payload"' in build_installer_exe
+    assert '"SuperMedicineGUI.exe"' in build_installer_payload
 
     # Release zip must include the standalone installer and app exe
     assert f"dist/{INSTALLER_EXE_NAME}" in build_release_zip
     assert INSTALLER_EXE_NAME in build_release_zip
     assert "dist/SuperMedicine.exe" in build_release_zip
+    assert "SuperMedicineGUI.exe" in build_release_zip
 
     # CI workflow must reference the app exe
     assert "dist/SuperMedicine.exe" in workflow
@@ -327,6 +339,7 @@ def test_ci_release_artifacts_include_standalone_installer_exe_and_shared_payloa
     assert "oven-sh/setup-bun" in workflow
     assert "_pyinstaller_builder.py application" in workflow
     assert "./dist/SuperMedicine.exe tui --dry-run" in workflow
+    assert "zip-gui-self-test.json" in workflow
 
     # CUR-DBG-010: release payload/zip must carry the logo resource used for
     # externally visible Windows Exe icons, not only the in-app GUI icon.
@@ -427,7 +440,7 @@ def test_ci_standalone_installer_uses_shared_absolute_add_data_contract():
 
     assert "build_installer_exe.py" in workflow
     assert 'data_items=(' in build_installer_exe
-    assert 'source = root / item' in shared_builder
+    assert 'source = root / source_item' in shared_builder
     assert 'f"--add-data={source}{separator}{destination}"' in shared_builder
     assert 'f"--specpath={root}"' in shared_builder
 
