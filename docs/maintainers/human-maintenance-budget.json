@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "hard_maximums": {
+    "production_python_files": 159,
+    "production_python_loc": 38772,
+    "production_python_effective_loc": 33526,
+    "functions_and_methods": 1586,
+    "public_top_level_symbols": 520,
+    "functions_over_60_lines": 88,
+    "functions_over_100_lines": 19,
+    "top_level_dependency_edges": 12
+  },
+  "stretch_targets": {
+    "production_python_files": "138-145",
+    "production_python_effective_loc": "32500-34000",
+    "functions_and_methods": "1450-1500",
+    "public_top_level_symbols": "410-430",
+    "functions_over_60_lines": "55-58",
+    "functions_over_100_lines": "at most 10",
+    "top_level_dependency_edges": "at most 12"
+  },
+  "stop_rationale": [
+    "CLI and Web entry functions remain static feature-review surfaces.",
+    "Permissions, audit, RAG, Harness, installer, and plugin contracts stay explicit.",
+    "Research and experiment/tool authorities have reached the 700-800 line merge limit.",
+    "Further AST reduction would require dynamic callables or hiding public contracts."
+  ]
+}

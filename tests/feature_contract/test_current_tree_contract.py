@@ -13,6 +13,7 @@ from scripts.maintainers.human_maintenance_snapshot import (
 
 
 BASELINE_PATH = Path("docs/maintainers/human-maintenance-baseline.json")
+BUDGET_PATH = Path("docs/maintainers/human-maintenance-budget.json")
 HISTORICAL_IMPORTS = {
     "core.workspace_tool_templates": "BUILTIN_TEMPLATES",
     "core.log_severity": "format_log_message",
@@ -60,6 +61,14 @@ def test_current_public_signatures_are_reviewed(repository_root: Path) -> None:
     _files, current_signatures = collect_file_inventory(repository_root)
 
     assert current_signatures == baseline["public_signatures"]
+
+
+def test_human_maintenance_hard_budgets_do_not_regress(repository_root: Path) -> None:
+    budget = json.loads((repository_root / BUDGET_PATH).read_text(encoding="utf-8"))
+    current = build_snapshot(repository_root)["structural_metrics"]
+
+    for metric, maximum in budget["hard_maximums"].items():
+        assert current[metric] <= maximum, metric
 
 
 def test_every_production_file_has_one_maintenance_role(repository_root: Path) -> None:

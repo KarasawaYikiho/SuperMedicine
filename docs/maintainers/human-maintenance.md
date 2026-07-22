@@ -38,6 +38,13 @@ Targets are structural budgets, not permission to hide functions, generate Web
 routes dynamically, weaken runtime contracts, or combine unrelated domains in
 large files. Feature and surface preservation remains the hard gate.
 
+The non-regression ceiling is stored separately in
+`human-maintenance-budget.json` and enforced by the current-tree contract test.
+It freezes the achieved tree so later maintenance cannot spend the recovered
+file, LOC, function, symbol, long-function, or dependency budget silently. The
+lower values above remain stretch targets, not permission to conceal static
+feature surfaces or exceed the reviewed file-size limits.
+
 ## File roles
 
 Every production Python file has exactly one reviewed role in the snapshot:
@@ -102,6 +109,26 @@ The CLI change groups the existing static command functions into four files:
 research, execution, tools, and system. `cli/parser.py` remains the static
 43-command authority; the nine former module paths and every command signature
 remain available through aliases and `.pyi` facades.
+
+## Final verification
+
+The completed maintenance tree passed the following release gates on
+2026-07-22:
+
+- isolated Python suite: 1,256 passed, 4 skipped;
+- Ruff and mypy checks over all 163 production Python files;
+- wheel and source-distribution build, followed by a clean wheel-install smoke
+  that discovered all 15 manifests/plugins;
+- OpenTUI suite: 26 passed, 516 assertions, including automated navigation and
+  full-page interaction checks;
+- rebuilt CLI, GUI, and installer executables with successful dry-run or
+  self-test entrypoints;
+- packaged `SuperMedicine v0.4.2b0.zip` extracted into a clean directory, where
+  the CLI dry-run, GUI self-test report, and installer self-test all exited
+  successfully.
+
+The only Python warning was the known upstream `wheel.bdist_wheel` deprecation
+warning exercised by the repository-hygiene packaging test.
 
 ## Change rule
 
