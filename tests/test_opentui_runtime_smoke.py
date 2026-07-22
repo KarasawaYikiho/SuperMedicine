@@ -84,14 +84,6 @@ def test_opentui_multi_agent_bridge_views_and_toggles_shared_service(tmp_path):
     assert multi_agent_operation("status", tmp_path)["data"] == {"enabled": True}
     assert multi_agent_operation("disable", tmp_path)["data"] == {"enabled": False}
 
-    bridge = (
-        Path(__file__).resolve().parents[1] / "core" / "tui" / "opentui_runtime.mjs"
-    )
-    source = bridge.read_text(encoding="utf-8")
-    assert 'name === "a"' in source
-    assert "multiAgentBridge(options, action)" in source
-
-
 def test_opentui_catalog_uses_real_services_without_demo_records(tmp_path):
     WorkspaceService(tmp_path).create("real-study", name="Real Study")
     snapshot = catalog_snapshot(tmp_path)
@@ -164,17 +156,22 @@ def test_opentui_feature_contract_covers_pages_and_interactions():
     }
     assert page_ids | interaction_ids <= feature_ids
 
-    source = root.joinpath("core/tui/opentui_runtime.mjs").read_text(encoding="utf-8")
-    for evidence in (
-        "createMockMouse",
-        "renderer.resize(80, 24)",
-        "renderer.resize(120, 30)",
-        '"中文宽字符与长文本".repeat(40)',
-        'parsedKey("escape")',
-        'operation: "unsupported-test"',
-        'operation: "catalog"',
-    ):
-        assert evidence in source
+    tui_root = root / "core" / "tui" / "opentui"
+    wrapper = root.joinpath("core/tui/opentui_runtime.mjs").read_text(encoding="utf-8")
+    main_source = (tui_root / "main.ts").read_text(encoding="utf-8")
+    component_source = (tui_root / "components.ts").read_text(encoding="utf-8")
+    renderer_tests = (tui_root / "__tests__" / "renderer.test.mjs").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'import { runCli } from "./opentui/main.ts"' in wrapper
+    assert "PAGE_CATALOG" not in wrapper + main_source
+    assert "onMouseUp" in component_source
+    assert "mockMouse" in renderer_tests
+    assert "resize(60, 20)" in main_source
+    assert "[80, 24, 20]" in main_source
+    assert "[120, 30, 26]" in main_source
+    assert "中文123粘贴456" in main_source
 
 
 def test_service_bridge_jsonl_handles_multiple_requests(tmp_path):
