@@ -12,12 +12,18 @@ Python package fallback version: **0.4.2b0**.
 
 ### Added
 
+- Added authenticated NDJSON OpenTUI business operations, real mouse/focus/scroll
+  renderer tests, deterministic desktop paths, frozen GUI self-tests, and GUI
+  delivery in installer/release payloads.
 - Added mandatory runtime capability validation, a UUID-based Harness lifecycle,
   local-first RAG orchestration, workspace paper indexing, PDF page extraction,
   and shared CLI/TUI/Web health reporting.
 
 ### Changed
 
+- Pinned OpenTUI to `0.4.3`, rebuilt the desktop frontend and error contracts,
+  and removed the legacy Textual renderer, stylesheet, compatibility screens,
+  and runtime dependency after the OpenTUI and packaging gates passed.
 - Harness and RAG are now fail-closed required capabilities. Knowledge tasks
   inject traceable BM25 evidence into LLM and multi-agent contexts; empty sources
   are explicit and deterministic/control tasks record enumerated skip reasons.

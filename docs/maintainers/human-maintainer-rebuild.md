@@ -75,8 +75,7 @@ facades, not duplicate implementations.
 | `core/log_severity.py` | `core/log_report_models.py` plus typed compatibility facade |
 | `core/paper_import/errors.py`, `models.py` | `core/paper_import/contracts.py` plus typed facades |
 | `core/workspace_tool_templates.py` | `core/workspace_tool_spec.py` plus typed facade |
-| Eleven `core/tui` helper modules | `core/tui/support.py` plus runtime/typed facades |
-| Sixteen `core/tui/screens` modules | `core_views.py`, `workspace_views.py`, `research_views.py`, `system_views.py` plus facades |
+| Legacy Textual helpers and screens | Removed after OpenTUI renderer and bridge equivalence gates passed |
 | `plugins/rag/interface.py`, `local_provider.py` | `plugins/rag/providers.py` |
 | `plugins/harness/checkpoint_verifier.py` | `plugins/harness/main.py`, `monitor.py`, shared `agents/checkpoint.py` |
 | `plugins/figure/{check,layout,qa,style}.py` | `audit.py`, `presentation.py` and package aliases |

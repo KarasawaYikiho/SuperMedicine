@@ -36,7 +36,7 @@ Python core plus CLI.
 | Area | Risk |
 | --- | --- |
 | `tests/test_tui.py` | Can become a catch-all for unrelated screen behavior. |
-| `core/tui/app.py` | Launcher, metadata, and UI support can drift together. |
+| `core/tui/app.py` | Thin status, dry-run, and OpenTUI launcher compatibility surface. |
 | `core/web/frontend/app.js` | Browser behavior may need feature-based modules. |
 | `core/web/server.py` | API and CLI delegation boundaries can blur. |
 | `setup.py` | Packaging behavior is release-critical and needs narrow tests. |

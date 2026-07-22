@@ -97,6 +97,7 @@ Important release files include:
 
 - `SuperMedicineInstaller.exe`
 - `dist/SuperMedicine.exe`
+- `SuperMedicineGUI.exe`
 - `install.py`
 - `install_entry.py`
 - `uninstall_entry.py`
@@ -195,14 +196,10 @@ Global shortcuts:
 Number keys `1-0` are not direct view-switching shortcuts; they remain normal
 input when the prompt has focus.
 
-During active chat work, the status bar shows `Chat Processing`. Only the main
-prompt input is locked until the request reaches success or failure; other
-screen controls remain reachable through focus navigation and the `M` menu.
-Dynamic refresh is targeted by screen and action rather than a broad filesystem
-watcher or polling loop.
-
-Readable UTF-8 labels covered by the TUI documentation tests include
-`选择视图`, `切换主题`, `帮助`, `最大化/还原`, `LLM 状态`, and `任务运行状态`.
+The renderer uses native OpenTUI focus, mouse hit testing, scroll containers,
+responsive breakpoints, and an authenticated local bridge to Python services.
+Long-running requests expose progress and cancellation without printing secrets
+or internal bridge state into the terminal frame.
 
 ## LLM Providers
 
@@ -257,7 +254,7 @@ belong in ignored `Temp/`, not in `docs/archive/`.
 | `No module named 'yaml'` | Run `python -m pip install -e .`. |
 | `supermedicine` is not found | Add the Python Scripts directory to `PATH`, or run `python -m cli_entry`. |
 | TUI does not start | Run `npm ci`, confirm Bun is on `PATH`, then run `supermedicine tui --dry-run`. |
-| Missing release executable | Use a complete release archive containing `dist/SuperMedicine.exe`. |
+| Missing release executable | Use a complete release archive containing both `dist/SuperMedicine.exe` and `SuperMedicineGUI.exe`. |
 | LLM setup fails | Provide provider, API format, Base URL, model, and key source. |
 
 ## License

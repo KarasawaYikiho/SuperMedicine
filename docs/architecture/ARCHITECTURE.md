@@ -10,10 +10,13 @@ Current release label: **Beta0.4.2**. Python package fallback version:
 ## System Shape
 
 ```text
-CLI / TUI / Web / optional adapters
-        |
-        v
-      Kernel
+CLI / OpenTUI bridge / Web + Desktop
+                 |
+                 v
+        ApplicationFacade
+                 |
+                 v
+      shared services / Kernel
         |
         +-- config
         +-- event bus
@@ -89,13 +92,14 @@ configured with explicit Base URLs.
 
 ## TUI Model
 
-The TUI has two surfaces:
+The TUI has two implementation layers and one production renderer:
 
-- Python support code in `core/tui/`
-- Bun/OpenTUI runtime bridge in `core/tui/opentui_runtime.mjs`
+- Python launcher and authenticated NDJSON bridge in `core/tui/`
+- Bun/OpenTUI renderer in `core/tui/opentui/`
 
-The JS runtime depends on `@opentui/core@0.4.1`. Route metadata and shortcut
-contracts are tested because they are user-facing behavior.
+The JS runtime depends on `@opentui/core@0.4.3`. Textual is not a runtime or
+fallback dependency. Mouse, keyboard, focus, scrolling, responsive layout,
+stream cancellation, and terminal cleanup are tested against the real renderer.
 
 ## Adapter Model
 
@@ -108,8 +112,8 @@ runtime behavior.
 
 Release archives keep installer entrypoints, `installer/`, runtime packages,
 OpenTUI npm manifests, documentation, and executables together. Release package
-tests protect `SuperMedicineInstaller.exe`, `dist/SuperMedicine.exe`, and the
-OpenTUI smoke path.
+tests protect `SuperMedicineInstaller.exe`, `dist/SuperMedicine.exe`,
+`SuperMedicineGUI.exe`, the frozen GUI self-test, and the OpenTUI smoke path.
 
 ## Repository Hygiene
 

@@ -87,7 +87,7 @@ supermedicine diagnose
 
 ## OpenTUI Setup
 
-The TUI uses Bun and the npm lockfile dependency `@opentui/core@0.4.1`.
+The TUI uses Bun and the npm lockfile dependency `@opentui/core@0.4.3`.
 
 ```bash
 npm ci
@@ -108,6 +108,7 @@ Required release files include:
 
 - `SuperMedicineInstaller.exe`
 - `dist/SuperMedicine.exe`
+- `SuperMedicineGUI.exe`
 - `install.py`
 - `install_entry.py`
 - `uninstall_entry.py`
@@ -124,8 +125,9 @@ Required release files include:
 `SuperMedicineInstaller.exe` defaults to yes for release payload extraction when
 run as a frozen installer. Scripted CI paths may pass `--extract-release-to` and
 `--release-payload-root` to control extraction targets.
-Use `--release-exe dist/SuperMedicine.exe` when testing or scripting the desktop
-executable release path.
+Use `--release-exe dist/SuperMedicine.exe` only for the compatibility CLI Exe.
+Use `--release-gui-exe SuperMedicineGUI.exe` for the desktop GUI; unified installs
+select the GUI desktop entry by default.
 Use `--exe-dry-run` when validating installer behavior without copying files.
 
 Do not copy only `install.py` or `SuperMedicineInstaller.exe` out of the release
@@ -142,6 +144,7 @@ Advanced automation / CI may use explicit flags such as:
 
 ```bash
 python install.py --release-exe dist/SuperMedicine.exe --exe-dry-run
+python install.py --release-gui-exe SuperMedicineGUI.exe --exe-dry-run
 python install.py --extract-release-to C:\Temp\SuperMedicine --release-payload-root C:\Temp\SuperMedicinePayload --exe-dry-run
 ```
 
