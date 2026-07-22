@@ -158,8 +158,11 @@ jobs:
           $gui = Get-ChildItem -LiteralPath $extractRoot -Recurse -Filter SuperMedicineGUI.exe | Select-Object -First 1
           if (-not $gui) { throw "GUI EXE missing from release Zip" }
           $report = Join-Path $env:RUNNER_TEMP "zip-gui-self-test.json"
-          & $gui.FullName --self-test --self-test-report $report
-          if ($LASTEXITCODE -ne 0) { throw "Extracted GUI self-test failed" }
+          $process = Start-Process -FilePath $gui.FullName -ArgumentList "--self-test", "--self-test-report", $report -WindowStyle Hidden -Wait -PassThru
+          if ($process.ExitCode -ne 0) {
+            if (Test-Path -LiteralPath $report) { Get-Content -LiteralPath $report -Raw }
+            throw "Extracted GUI self-test failed with exit code $($process.ExitCode)"
+          }
           $result = Get-Content -LiteralPath $report -Raw | ConvertFrom-Json
           if (-not $result.ok) { throw ($result | ConvertTo-Json -Depth 8) }
 
