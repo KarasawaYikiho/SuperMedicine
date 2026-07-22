@@ -26,7 +26,6 @@ requires-python = ">=3.10"
 dependencies = [
     "pyyaml>=6.0",
     "rich>=13.7,<15",
-    "textual>=0.79,<2",
 ]
 
 [project.urls]
@@ -87,7 +86,7 @@ py-modules = ["cli_entry", "uninstall_entry"]
 
 [tool.setuptools.package-data]
 permission = ["default_policy.yaml"]
-core = ["tui/app.tcss", "tui/*.mjs", "web/frontend/*"]
+core = ["tui/*.mjs", "web/frontend/*"]
 plugins = ["**/plugin.yaml", "**/*.yaml", "**/*.R"]
 adapters = ["opencode/plugin.json", "opencode/skills/*.md", "opencode/agents/*.md", "claude_code/SKILL.md"]
 installer = ["resources/*.json", "resources/*.md", "resources/*.txt"]
@@ -119,8 +118,6 @@ exclude = "^build/|\\.pytest-tmp|\\.pytest_tmp|^workspaces/|^workspaces\\\\"
 module = [
     "rpy2",
     "rpy2.*",
-    "textual",
-    "textual.*",
     "yaml",
     "matplotlib",
     "matplotlib.*",

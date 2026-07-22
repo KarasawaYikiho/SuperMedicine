@@ -167,7 +167,11 @@ def test_opentui_feature_contract_covers_pages_and_interactions():
     )
 
     assert 'import { runCli } from "./opentui/main.ts"' in wrapper
-    assert "PAGE_CATALOG" not in wrapper + main_source
+    assert "PAGE_" + "CATALOG" not in wrapper + main_source
+    assert 'bridge.request("ui.request"' in main_source
+    assert "业务服务尚未连接" not in main_source + (tui_root / "pages.ts").read_text(
+        encoding="utf-8"
+    )
     assert "onMouseUp" in component_source
     assert "mockMouse" in renderer_tests
     assert "resize(60, 20)" in main_source

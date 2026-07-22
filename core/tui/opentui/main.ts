@@ -106,6 +106,8 @@ export function mountShell(renderer, options = {}) {
     currentPage = createPage(renderer, route, {
       markdownSyntaxStyle,
       pageFixtures: options.pageFixtures,
+      onAction: options.onAction,
+      onActivate: options.onActivate,
     })
     pageColumn.add(currentPage)
     if (route.id === "chat") {
@@ -116,13 +118,22 @@ export function mountShell(renderer, options = {}) {
         paddingX: 1,
         focusedBorderColor: THEME.accent,
       })
-      composer.add(new InputRenderable(renderer, {
+      let prompt
+      prompt = new InputRenderable(renderer, {
         id: "prompt-input",
         width: "100%",
         placeholder: "输入科研问题",
         fg: THEME.text,
         backgroundColor: THEME.surface,
-      }))
+        async onSubmit() {
+          const value = prompt.value.trim()
+          if (!value || !options.onSubmit) return
+          await options.onSubmit("chat", value)
+          prompt.value = ""
+          renderer.requestRender()
+        },
+      })
+      composer.add(prompt)
       pageColumn.add(composer)
     }
   }
@@ -302,7 +313,7 @@ export async function runAutomatedMode(mode, options = {}) {
           mockInput.pressEnter()
           await renderOnce()
           const feedback = renderer.root.findDescendantById(`page-feedback-${route.id}`)
-          assertAutomation(feedback.chunks.some((chunk) => chunk.text.includes("未执行")), `route ${route.id} action had no honest feedback`)
+          assertAutomation(feedback.chunks.some((chunk) => chunk.text.includes("已刷新")), `route ${route.id} action had no honest feedback`)
           checkedActions += 1
         }
       }
@@ -426,10 +437,26 @@ export async function runCli(argv = process.argv.slice(2)) {
   let bridge
   try {
     let connectionStatus = "未连接"
+    const pageFixtures = {}
+    const callUi = async (request) => {
+      if (!bridge) throw new Error("Python 服务未连接")
+      const response = await bridge.request("ui.request", request)
+      if (!response?.ok) {
+        const error = response?.error || {}
+        throw new Error(`${error.code || "operation_failed"}: ${error.message || "操作失败"}`)
+      }
+      return response
+    }
+    const refreshCatalog = async () => {
+      const response = await callUi({ operation: "catalog" })
+      Object.assign(pageFixtures, response.data?.pages || {})
+      return response
+    }
     if (BridgeClient.environmentConfigured()) {
       bridge = BridgeClient.fromEnvironment()
       try {
         await bridge.connect()
+        await refreshCatalog()
         connectionStatus = "已连接"
       } catch {
         connectionStatus = "桥断开，可重试"
@@ -444,7 +471,25 @@ export async function runCli(argv = process.argv.slice(2)) {
       consoleMode: "disabled",
       screenMode: "alternate-screen",
     })
-    const shell = mountShell(renderer, { projectRoot: args.projectRoot, connectionStatus })
+    const shell = mountShell(renderer, {
+      projectRoot: args.projectRoot,
+      connectionStatus,
+      pageFixtures,
+      async onActivate(route, record) {
+        await callUi({ operation: "activate", route, record })
+      },
+      async onSubmit(route, value) {
+        await callUi({ operation: "submit", route, value })
+        await refreshCatalog()
+      },
+      async onAction(route, value) {
+        if ((route === "workspace" || route === "log") && value.trim()) {
+          await callUi({ operation: "submit", route, value: value.trim() })
+        }
+        await refreshCatalog()
+        return "操作完成，数据已刷新"
+      },
+    })
     if (bridge) bridge.onDisconnect = () => shell.setConnectionStatus("桥断开，可重试")
     renderer.keyInput.on("keypress", (event) => {
       const name = String(event.name || "").toLowerCase()

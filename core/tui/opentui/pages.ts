@@ -3,19 +3,19 @@ import { createActionButton, createListItem, createPanel, createText } from "./c
 import { THEME } from "./theme.ts"
 
 const PAGE_CONTENT = Object.freeze({
-  chat: ["开始新的科研对话", "在下方输入问题。业务服务尚未连接。"],
-  dashboard: ["暂无运行状态", "连接业务服务后可读取工作区、模型与插件状态。"],
-  workspace: ["尚未载入工作区", "输入仅保留在当前界面；连接服务前不会创建工作区。"],
-  paper: ["暂无论文", "连接业务服务后可导入论文并读取元数据。"],
-  experience: ["暂无经验记录", "连接业务服务后可整理研究经验。"],
-  tool: ["暂无工具", "连接业务服务后可扫描已授权工具。"],
-  dialog: ["暂无对话历史", "连接业务服务后可读取脱敏会话摘要。"],
-  llm: ["尚未载入模型配置", "密钥不会在此页面回显。连接服务前不会保存。"],
-  experiment: ["暂无实验", "连接业务服务后可建立实验步骤。"],
-  log: ["暂无日志报告", "连接业务服务后可生成脱敏报告。"],
-  permission: ["尚未载入权限策略", "默认保持保守权限；高风险操作仍需明确确认。"],
-  "self-evolution": ["暂无可预览变更", "连接业务服务前不会执行写入。"],
-  diagnose: ["尚未开始诊断", "连接业务服务后可检查运行环境与配置。"],
+  chat: ["开始新的科研对话", "选择工作区后在下方输入问题。"],
+  dashboard: ["暂无运行状态", "刷新以读取工作区、模型与插件状态。"],
+  workspace: ["暂无工作区", "输入名称后可创建工作区。"],
+  paper: ["暂无论文", "选择工作区后可读取论文元数据。"],
+  experience: ["暂无经验记录", "选择工作区后可读取研究经验。"],
+  tool: ["暂无工具", "选择工作区后可扫描已授权工具。"],
+  dialog: ["暂无对话历史", "这里只显示脱敏会话摘要。"],
+  llm: ["暂无模型配置", "密钥不会在此页面回显。"],
+  experiment: ["暂无实验", "刷新以读取实验步骤。"],
+  log: ["暂无日志报告", "输入标题可写入脱敏日志。"],
+  permission: ["暂无权限状态", "高风险操作仍需明确确认。"],
+  "self-evolution": ["暂无可预览变更", "写入操作需要单独明确确认。"],
+  diagnose: ["暂无诊断记录", "刷新以检查运行环境与配置。"],
 })
 
 const FORM_ROUTES = Object.freeze({
@@ -27,17 +27,24 @@ const FORM_ROUTES = Object.freeze({
 const ACTION_LABELS = Object.freeze({
   dashboard: "刷新状态",
   workspace: "创建工作区",
-  paper: "导入论文",
-  experience: "记录经验",
-  tool: "扫描工具",
+  paper: "刷新论文",
+  experience: "刷新经验",
+  tool: "刷新工具",
   dialog: "刷新历史",
-  llm: "保存配置",
-  experiment: "建立实验",
-  log: "生成报告",
+  llm: "刷新配置",
+  experiment: "刷新实验",
+  log: "写入日志",
   permission: "读取权限策略",
-  "self-evolution": "预览变更",
+  "self-evolution": "刷新预览",
   diagnose: "开始诊断",
 })
+
+function recordLabel(record) {
+  if (typeof record === "string") return record
+  if (record === null || record === undefined) return "空记录"
+  if (typeof record !== "object") return String(record)
+  return JSON.stringify(record)
+}
 
 function addEmptyState(renderer, page, route) {
   const [title, body] = PAGE_CONTENT[route.id]
@@ -75,7 +82,7 @@ export function createPage(renderer, route, resources) {
       id: "page-markdown-chat",
       width: "100%",
       height: 5,
-      content: "## 开始新的科研对话\n\n业务服务尚未连接。",
+      content: "## 开始新的科研对话\n\n选择工作区后在下方输入问题。",
       syntaxStyle: resources.markdownSyntaxStyle,
       fg: THEME.text,
       renderNode(token) {
@@ -89,22 +96,25 @@ export function createPage(renderer, route, resources) {
   }
 
   const form = FORM_ROUTES[route.id]
+  let field = null
   if (form) {
     page.add(createText(renderer, { content: form[0], fg: THEME.muted }))
-    page.add(new InputRenderable(renderer, {
+    field = new InputRenderable(renderer, {
       id: `page-field-${route.id}`,
       width: "100%",
       placeholder: form[1],
       fg: THEME.text,
       backgroundColor: THEME.surface,
-    }))
+    })
+    page.add(field)
   }
 
   const records = resources.pageFixtures?.[route.id] || []
   for (const [index, record] of records.entries()) {
     page.add(createListItem(renderer, {
       id: `page-record-${route.id}-${index}`,
-      label: String(record),
+      label: recordLabel(record),
+      onActivate: () => resources.onActivate?.(route.id, record),
     }))
   }
 
@@ -118,8 +128,14 @@ export function createPage(renderer, route, resources) {
     page.add(createActionButton(renderer, {
       id: `page-action-${route.id}`,
       label: ACTION_LABELS[route.id],
-      onActivate() {
-        feedback.content = "业务服务未连接，未执行。"
+      async onActivate() {
+        feedback.content = "处理中…"
+        renderer.requestRender()
+        try {
+          feedback.content = await resources.onAction?.(route.id, field?.value || "") || "已刷新"
+        } catch (error) {
+          feedback.content = error instanceof Error ? error.message : String(error)
+        }
         renderer.requestRender()
       },
     }))

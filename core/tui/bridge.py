@@ -10,6 +10,7 @@ import socket
 import threading
 import time
 from dataclasses import dataclass, field
+from functools import partial
 from multiprocessing.connection import Connection
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -79,8 +80,8 @@ class _ActiveRequest:
     request_id: str
     connection: _Connection
     cancelled: Any = field(default_factory=threading.Event)
-    process: multiprocessing.Process | None = None
-    pipe: Connection | None = None
+    process: Any = None
+    pipe: Any = None
     terminal: bool = False
     retired: bool = False
     timer: threading.Timer | None = None
@@ -113,6 +114,7 @@ class BridgeContext:
 
 _FACADE_METHODS = {
     "status",
+    "ui.request",
     "workspace.list",
     "workspace.get",
     "workspace.create",
@@ -128,13 +130,17 @@ def _call_facade(
             "ok": True,
             "workspace_count": len(application.list_workspaces().data or []),
         }
-    operations = {
-        "workspace.list": application.list_workspaces,
-        "workspace.get": application.get_workspace,
-        "workspace.create": application.create_workspace,
-        "workspace.delete": application.delete_workspace,
-    }
-    return operations[method](**params)
+    if method == "ui.request":
+        from core.tui.service_bridge import bridge_request
+
+        return bridge_request(params, application.paths.project_root)
+    if method == "workspace.list":
+        return application.list_workspaces(**params)
+    if method == "workspace.get":
+        return application.get_workspace(**params)
+    if method == "workspace.create":
+        return application.create_workspace(**params)
+    return application.delete_workspace(**params)
 
 
 def _request_worker(
@@ -194,11 +200,16 @@ def _request_worker(
 
     try:
         context = BridgeContext(emit, cancelled)
+        application = ApplicationFacade(paths)
+        if handler is None:
+            application._workspace_service()
+            if method == "ui.request":
+                from core.tui import service_bridge  # noqa: F401
         pipe.send(("ready",))
         result = (
             handler(context, params)
             if handler is not None
-            else _call_facade(ApplicationFacade(paths), method, params)
+            else _call_facade(application, method, params)
         )
         if isinstance(result, AppResult):
             if result.ok:
@@ -320,7 +331,7 @@ class TUIBridgeServer:
         self._address: tuple[str, int] | None = None
         self._closing = threading.Event()
         self._service_threads: set[threading.Thread] = set()
-        self._workers: set[multiprocessing.Process] = set()
+        self._workers: set[Any] = set()
         self._connections: set[_Connection] = set()
         self._active: dict[tuple[int, str], _ActiveRequest] = {}
         self._lock = threading.Lock()
@@ -436,7 +447,7 @@ class TUIBridgeServer:
                 client.close()
                 continue
             self._spawn_service(
-                lambda connection=connection: self._connection_loop(connection),
+                partial(self._connection_loop, connection),
                 f"tui-bridge-client-{client.fileno()}",
             )
 
@@ -851,7 +862,11 @@ def bridge_worker_self_test(project_root: str | Path | None = None) -> dict[str,
     """Exercise a real source/frozen-compatible worker request/cancel/exit cycle."""
 
     temporary = TemporaryDirectory() if project_root is None else None
-    root = Path(temporary.name) if temporary is not None else Path(project_root)
+    if temporary is not None:
+        root = Path(temporary.name)
+    else:
+        assert project_root is not None
+        root = Path(project_root)
     paths = RuntimePaths.resolve(project_root=root, source_root=root)
     server = TUIBridgeServer(
         ApplicationFacade(paths),

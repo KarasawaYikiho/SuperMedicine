@@ -83,6 +83,19 @@ def discover_tui_actions(root: Path) -> set[str]:
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("action_"):
                 actions.add(f"tui_action:{node.name.removeprefix('action_')}")
+    bridge_path = root / "core" / "tui" / "bridge.py"
+    if bridge_path.is_file():
+        tree = ast.parse(bridge_path.read_text(encoding="utf-8"))
+        for node in tree.body:
+            if not isinstance(node, ast.Assign) or not any(
+                isinstance(target, ast.Name) and target.id == "_FACADE_METHODS"
+                for target in node.targets
+            ):
+                continue
+            if isinstance(node.value, (ast.Set, ast.Tuple, ast.List)):
+                for item in node.value.elts:
+                    if isinstance(item, ast.Constant) and isinstance(item.value, str):
+                        actions.add(f"tui_action:{item.value.replace('.', '_')}")
     return actions
 
 

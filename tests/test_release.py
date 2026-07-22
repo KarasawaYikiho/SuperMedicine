@@ -560,7 +560,7 @@ def test_opentui_release_runtime_dependency_and_notice_are_packaged():
     assert package_lock["packages"]["node_modules/@opentui/core"]["version"] == "0.4.3"
     assert (REPO_ROOT / "core" / "tui" / "opentui_runtime.mjs").is_file()
     assert (REPO_ROOT / "core" / "tui" / "opentui_runtime.py").is_file()
-    assert 'core = ["tui/app.tcss", "tui/*.mjs", "web/frontend/*"]' in pyproject
+    assert 'core = ["tui/*.mjs", "web/frontend/*"]' in pyproject
     assert "include THIRD_PARTY_NOTICES.md" in manifest
     for relative_path in (
         "package.json",

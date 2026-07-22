@@ -27,7 +27,6 @@ FRONTEND_STREAMING_HINT_SCAN_PATHS = (
     "core/web/frontend/app.js",
     "core/web/frontend/index.html",
     "core/web/frontend/style.css",
-    "core/tui/screens/core_views.py",
     "core/tui/i18n.py",
     "core/tui/app.py",
     "core/kernel_llm_chat.py",
@@ -1051,16 +1050,15 @@ def test_gitignore_excludes_mypy_cache():
     assert ".mypy_cache/" in gitignore
 
 
-def test_package_data_includes_tui_css():
-    """pyproject.toml package-data must include core/tui/app.tcss."""
+def test_package_data_includes_opentui_wrapper_without_legacy_css():
+    """Package data must carry the OpenTUI wrapper, not Textual CSS."""
     pyproject = _read_pyproject()
     package_data = (
         pyproject.get("tool", {}).get("setuptools", {}).get("package-data", {})
     )
     core_data = package_data.get("core", [])
-    assert "tui/app.tcss" in core_data, (
-        f"core package-data must include 'tui/app.tcss', got {core_data!r}"
-    )
+    assert "tui/*.mjs" in core_data
+    assert "tui/app" + "." + "tcss" not in core_data
 
 
 def test_packaging_declares_installer_resource_strategy_without_tracked_exe():

@@ -12,7 +12,7 @@ from setuptools.command.build_py import build_py as _build_py  # type: ignore[im
 from setuptools.command.sdist import sdist as _sdist  # type: ignore[import-untyped]
 
 try:
-    from wheel.bdist_wheel import bdist_wheel as _bdist_wheel  # type: ignore[import-untyped]
+    from wheel.bdist_wheel import bdist_wheel as _bdist_wheel  # type: ignore[import-not-found,import-untyped]
 except Exception:  # pragma: no cover - wheel is a build dependency in pyproject
     _bdist_wheel = None  # type: ignore[assignment]
 

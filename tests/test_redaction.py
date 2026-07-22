@@ -5,7 +5,6 @@ import logging
 
 from cli import _RedactingFormatter
 from core.redaction import redact_sensitive
-from core.tui.app import SuperMedicineTUI
 
 
 def test_redact_sensitive_covers_headers_cloud_keys_private_keys_and_query_values():
@@ -149,7 +148,7 @@ def test_cli_redacting_formatter_redacts_log_arguments_headers_and_error_reports
         assert all(value in rendered for value in case["visible"])
 
 
-def test_cli_formatter_and_tui_kernel_format_redact_plain_auth_fields():
+def test_cli_formatter_redacts_plain_auth_fields():
     secret = "auth-secret"
     formatter = _RedactingFormatter("%(levelname)s:%(message)s")
     record = logging.LogRecord(
@@ -163,12 +162,5 @@ def test_cli_formatter_and_tui_kernel_format_redact_plain_auth_fields():
     )
 
     cli_rendered = formatter.format(record)
-    tui_rendered = SuperMedicineTUI._format_kernel_result(
-        {"status": "success", "output": {"auth": secret, "ok": True}}
-    )["message"]
-
     assert secret not in cli_rendered
-    assert secret not in tui_rendered
     assert "[REDACTED]" in cli_rendered
-    assert "[已隐藏]" in tui_rendered
-    assert '\n  "ok": true' in tui_rendered

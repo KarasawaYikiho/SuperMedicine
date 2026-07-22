@@ -982,6 +982,48 @@
       "contract_test": "tests/test_opentui_runtime_smoke.py::test_opentui_feature_contract_covers_pages_and_interactions"
     },
     {
+      "feature_id": "tui_action:status",
+      "category": "tui_action",
+      "entrypoint": "tui_action:status",
+      "expected_result": "Preserves the authenticated OpenTUI status bridge action.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "tui_action:ui_request",
+      "category": "tui_action",
+      "entrypoint": "tui_action:ui_request",
+      "expected_result": "Preserves the authenticated OpenTUI service request action.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "tui_action:workspace_create",
+      "category": "tui_action",
+      "entrypoint": "tui_action:workspace_create",
+      "expected_result": "Preserves the authenticated OpenTUI workspace create action.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "tui_action:workspace_delete",
+      "category": "tui_action",
+      "entrypoint": "tui_action:workspace_delete",
+      "expected_result": "Preserves the authenticated OpenTUI workspace delete action.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "tui_action:workspace_get",
+      "category": "tui_action",
+      "entrypoint": "tui_action:workspace_get",
+      "expected_result": "Preserves the authenticated OpenTUI workspace read action.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "tui_action:workspace_list",
+      "category": "tui_action",
+      "entrypoint": "tui_action:workspace_list",
+      "expected_result": "Preserves the authenticated OpenTUI workspace list action.",
+      "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
       "feature_id": "tui_action:command_palette",
       "category": "tui_action",
       "entrypoint": "tui_action:command_palette",

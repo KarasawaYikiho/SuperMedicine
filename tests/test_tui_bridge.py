@@ -151,11 +151,23 @@ def test_loopback_authentication_request_ids_and_workspace_facade(bridge) -> Non
     created = peer.receive()
     peer.send(_request("list", "workspace.list", token=bridge.token))
     listed = peer.receive()
+    peer.send(
+        _request(
+            "catalog",
+            "ui.request",
+            {"operation": "catalog"},
+            token=bridge.token,
+        )
+    )
+    catalog = peer.receive()
 
     assert created["type"] == "result" and created["id"] == "create"
     assert created["result"]["id"] == "bridge-one"
     assert listed["type"] == "result" and listed["id"] == "list"
     assert [item["id"] for item in listed["result"]] == ["bridge-one"]
+    assert catalog["type"] == "result"
+    assert catalog["result"]["ok"] is True
+    assert "workspace" in catalog["result"]["data"]["pages"]
     peer.close()
 
 
@@ -600,12 +612,13 @@ def test_python_launcher_exception_still_closes_bridge(tmp_path, monkeypatch) ->
 
 @pytest.mark.skipif(not os.environ.get("PATH"), reason="runtime lookup unavailable")
 def test_real_bun_client_python_bridge_lifecycle_integration(tmp_path) -> None:
-    bun = (
-        [shutil.which("bun")]
-        if shutil.which("bun")
-        else [shutil.which("npx"), "--yes", "bun"]
-    )
-    if not bun[0]:
+    bun_path = shutil.which("bun")
+    npx_path = shutil.which("npx")
+    if bun_path:
+        bun = [bun_path]
+    elif npx_path:
+        bun = [npx_path, "--yes", "bun"]
+    else:
         pytest.skip("Bun is not installed")
     server = TUIBridgeServer(
         _application(tmp_path),
@@ -632,6 +645,10 @@ def test_real_bun_client_python_bridge_lifecycle_integration(tmp_path) -> None:
         "await client.connect();\n"
         "const workspace = await client.request('workspace.create', {workspace_id:'from-bun'});\n"
         "if (workspace.id !== 'from-bun') throw new Error('workspace path failed');\n"
+        "const catalog = await client.request('ui.request', {operation:'catalog'});\n"
+        "if (!catalog.ok || !catalog.data.pages.workspace.some(item => item.id === 'from-bun')) throw new Error('catalog path failed');\n"
+        "const logged = await client.request('ui.request', {operation:'submit', route:'log', value:'OpenTUI bridge log'});\n"
+        "if (!logged.ok) throw new Error('submit path failed');\n"
         "const events = [];\n"
         "const streamed = await client.request('test.complete', {}, (event) => events.push(event));\n"
         "if (streamed.text !== 'done' || events.join(',') !== 'progress,chunk,completed') throw new Error('stream path failed');\n"
@@ -679,13 +696,15 @@ def test_real_bun_client_python_bridge_lifecycle_integration(tmp_path) -> None:
 @pytest.mark.skipif(not os.environ.get("PATH"), reason="runtime lookup unavailable")
 def test_real_bun_client_keeps_socket_after_late_abandoned_stream(
     tmp_path,
+    monkeypatch,
 ) -> None:
-    bun = (
-        [shutil.which("bun")]
-        if shutil.which("bun")
-        else [shutil.which("npx"), "--yes", "bun"]
-    )
-    if not bun[0]:
+    bun_path = shutil.which("bun")
+    npx_path = shutil.which("npx")
+    if bun_path:
+        bun = [bun_path]
+    elif npx_path:
+        bun = [npx_path, "--yes", "bun"]
+    else:
         pytest.skip("Bun is not installed")
     server = TUIBridgeServer(
         _application(tmp_path),
@@ -698,7 +717,7 @@ def test_real_bun_client_keeps_socket_after_late_abandoned_stream(
         time.sleep(1.5)
         original_cancel(connection, request_id)
 
-    server._cancel = delayed_cancel
+    monkeypatch.setattr(server, "_cancel", delayed_cancel)
     emitted: list[str] = []
     original_send_event = server._send_event_bytes
 
@@ -706,7 +725,7 @@ def test_real_bun_client_keeps_socket_after_late_abandoned_stream(
         emitted.append(json.loads(payload)["event"])
         original_send_event(active, payload)
 
-    server._send_event_bytes = record_event
+    monkeypatch.setattr(server, "_send_event_bytes", record_event)
     script = tmp_path / "late-bridge-client.mjs"
     bridge_module = Path(__file__).parents[1] / "core" / "tui" / "opentui" / "bridge.ts"
     script.write_text(
