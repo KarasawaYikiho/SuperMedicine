@@ -1,11 +1,11 @@
-"""Permission, log, and system application service."""
+"""Permission, log, diagnostics, and adapter application services."""
 
 from __future__ import annotations
 
 import os
 from functools import partial
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Protocol
 
 from core.config_center import ConfigCenter
 from core.llm_manager import LLMConfigManager
@@ -22,6 +22,8 @@ from permission.access_mode import (
     FullAccessConfirmationRequired,
     normalize_access_mode,
 )
+from permission.engine import PermissionEngine
+from permission.policy import DEFAULT_POLICY_RELATIVE_PATH, PermissionResult
 
 from . import result as _result
 from .result import ServiceResult
@@ -285,3 +287,69 @@ class PermissionLogSystemService:
                 _result._safe_internal_message(exc, "System service failed"),
                 meta=self._meta(operation),
             )
+
+
+class PermissionChecker(Protocol):
+    def check(
+        self,
+        agent_id: str,
+        action: str,
+        resource: str,
+        context: dict[str, Any] | None = None,
+    ) -> PermissionResult: ...
+
+
+class AdapterService:
+    """Own canonical permission loading and decisions for every adapter host."""
+
+    def __init__(
+        self,
+        project_root: str | Path | None = None,
+        permission_engine: PermissionChecker | None = None,
+    ) -> None:
+        self.project_root = Path(project_root or Path.cwd()).resolve()
+        self._permission_engine = permission_engine
+
+    @property
+    def policy_path(self) -> Path:
+        return self.project_root / DEFAULT_POLICY_RELATIVE_PATH
+
+    def authorize(
+        self,
+        *,
+        adapter: str,
+        agent_id: str,
+        action: str,
+        resource: str,
+        context: dict[str, Any] | None = None,
+    ) -> ServiceResult[dict[str, Any]]:
+        try:
+            engine = self._permission_engine or self._load_permission_engine()
+            decision = engine.check(
+                agent_id,
+                action,
+                resource,
+                context={
+                    "adapter": adapter,
+                    "policy_path": str(self.policy_path),
+                    **(context or {}),
+                },
+            )
+            return ServiceResult.success(
+                {"allowed": decision == PermissionResult.ALLOWED},
+                meta={"service": "adapter", "operation": "authorize"},
+            )
+        except Exception as exc:
+            return ServiceResult.failure(
+                "permission_engine_unavailable",
+                _result._safe_internal_message(exc, "Permission service unavailable"),
+                details={"policy_path": str(self.policy_path)},
+                meta={"service": "adapter", "operation": "authorize"},
+            )
+
+    def _load_permission_engine(self) -> PermissionChecker:
+        policy_dir = self.policy_path.parent
+        self._permission_engine = PermissionEngine(
+            policy_dir, policy_dir / "audit.jsonl"
+        )
+        return self._permission_engine

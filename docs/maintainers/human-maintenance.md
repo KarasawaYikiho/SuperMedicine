@@ -26,8 +26,8 @@ reviewed starting point is therefore:
 | Metric | Reviewed current tree | Steady-state target |
 | --- | ---: | ---: |
 | Feature IDs | 195 | at least 195 |
-| Production Python files | 167 | 138-145 |
-| Effective production Python LOC | 33,558 | 32,500-34,000 |
+| Production Python files | 166 | 138-145 |
+| Effective production Python LOC | 33,554 | 32,500-34,000 |
 | Functions/methods | 1,586 | 1,450-1,500 |
 | Public top-level symbols | 520 | 410-430 |
 | Functions over 60 lines | 88 | at most 55-58 |
@@ -67,6 +67,7 @@ implementation.
 | Shared ServiceResult compatibility conversion | 8 | +3 | -5 | -10 |
 | Redaction compatibility module registry | -1 | +3 | +4 | 0 |
 | LLM and agent/harness execution service authority | -1 | -2 | 0 | 0 |
+| Permission/log and adapter system service authority | -1 | -7 | -4 | 0 |
 
 The workspace change preserves `AppResult`, `AppError`, and
 `ApplicationFacade`, moves atomic create/delete into `WorkspaceService`, and
@@ -87,6 +88,10 @@ The execution service change co-locates the two small LLM and agent/harness
 application services in `core/services/execution.py`; explicit module aliases
 and `.pyi` facades preserve both historical import paths and every reviewed
 method signature.
+The system service change similarly co-locates adapter authorization with the
+permission/log/diagnostics application boundary. `PermissionChecker`, both
+service classes, and both historical module paths remain directly importable;
+permission decisions and policy loading remain explicit code.
 
 ## Change rule
 

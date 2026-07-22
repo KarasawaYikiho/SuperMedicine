@@ -115,6 +115,21 @@ def test_legacy_service_modules_resolve_to_execution_authority():
     assert llm.LLMService is execution.LLMService
     assert agent_harness.AgentHarnessService is execution.AgentHarnessService
 
+    system = importlib.import_module("core.services.system")
+    adapter = importlib.import_module("core.services.adapter")
+    permission_log_system = importlib.import_module(
+        "core.services.permission_log_system"
+    )
+
+    assert adapter is system
+    assert permission_log_system is system
+    assert adapter.AdapterService is system.AdapterService
+    assert adapter.PermissionChecker is system.PermissionChecker
+    assert (
+        permission_log_system.PermissionLogSystemService
+        is system.PermissionLogSystemService
+    )
+
 
 def test_cli_help_and_init_do_not_require_platform_runtime_or_config(
     monkeypatch, tmp_path, capsys
