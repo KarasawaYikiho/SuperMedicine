@@ -1,4 +1,4 @@
-"""CLI commands: LLM provider management."""
+"""CLI commands for LLM execution configuration."""
 
 from __future__ import annotations
 

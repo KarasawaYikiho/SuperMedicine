@@ -154,6 +154,27 @@ def test_legacy_service_modules_resolve_to_execution_authority():
         assert getattr(services, name) is authority
 
 
+def test_legacy_cli_command_modules_resolve_to_group_authorities():
+    commands = importlib.import_module("cli.commands")
+    authorities = {
+        "workspace": "research",
+        "paper": "research",
+        "experience": "research",
+        "tool": "tools",
+        "experiment": "tools",
+        "log": "tools",
+        "permission": "system",
+        "self_evolve": "system",
+        "llm": "execution",
+    }
+
+    for legacy_name, authority_name in authorities.items():
+        authority = importlib.import_module(f"cli.commands.{authority_name}")
+        legacy = importlib.import_module(f"cli.commands.{legacy_name}")
+        assert legacy is authority
+        assert getattr(commands, legacy_name) is authority
+
+
 def test_cli_help_and_init_do_not_require_platform_runtime_or_config(
     monkeypatch, tmp_path, capsys
 ):
