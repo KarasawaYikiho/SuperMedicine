@@ -546,7 +546,11 @@ def test_outbound_frame_limit_returns_bounded_error(tmp_path, source) -> None:
 def test_shutdown_closes_clients_and_leaves_no_bridge_threads(bridge) -> None:
     peer = BridgePeer(bridge)
     bridge.close()
-    assert peer.reader.readline() == ""
+    try:
+        closed = peer.reader.readline()
+    except ConnectionResetError:
+        closed = ""
+    assert closed == ""
     assert not [t for t in threading.enumerate() if t.name.startswith("tui-bridge-")]
     peer.close()
 
@@ -613,13 +617,9 @@ def test_python_launcher_exception_still_closes_bridge(tmp_path, monkeypatch) ->
 @pytest.mark.skipif(not os.environ.get("PATH"), reason="runtime lookup unavailable")
 def test_real_bun_client_python_bridge_lifecycle_integration(tmp_path) -> None:
     bun_path = shutil.which("bun")
-    npx_path = shutil.which("npx")
-    if bun_path:
-        bun = [bun_path]
-    elif npx_path:
-        bun = [npx_path, "--yes", "bun"]
-    else:
+    if not bun_path:
         pytest.skip("Bun is not installed")
+    bun = [bun_path]
     server = TUIBridgeServer(
         _application(tmp_path),
         handlers={
@@ -699,13 +699,9 @@ def test_real_bun_client_keeps_socket_after_late_abandoned_stream(
     monkeypatch,
 ) -> None:
     bun_path = shutil.which("bun")
-    npx_path = shutil.which("npx")
-    if bun_path:
-        bun = [bun_path]
-    elif npx_path:
-        bun = [npx_path, "--yes", "bun"]
-    else:
+    if not bun_path:
         pytest.skip("Bun is not installed")
+    bun = [bun_path]
     server = TUIBridgeServer(
         _application(tmp_path),
         handlers={"test.late": _late_stream},
