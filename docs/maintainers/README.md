@@ -10,6 +10,7 @@ This directory is the starting point for repository maintenance.
 4. [maintenance-backlog.md](maintenance-backlog.md)
 5. [feature-parity.md](feature-parity.md)
 6. [human-maintainer-rebuild.md](human-maintainer-rebuild.md)
+7. [human-maintenance.md](human-maintenance.md)
 
 ## Sources of Truth
 
@@ -25,6 +26,7 @@ This directory is the starting point for repository maintenance.
 | Web server | `core/web/server.py` |
 | Installer/release | `installer/`, `setup.py`, `.github/workflows/ci.yml`, `scripts/ci/` |
 | User install docs | `docs/guides/INSTALL.md` |
+| Current maintenance snapshot | `docs/maintainers/human-maintenance-baseline.json` |
 
 ## Archive Rule
 

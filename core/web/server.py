@@ -57,7 +57,7 @@ def create_app(*, auth_token: str | None = None, shutdown_callback: Any = None, 
     from fastapi import FastAPI
     from core.application import ApplicationFacade
     from core.runtime_paths import RuntimePaths
-    from core.web.routes import register_agent_evolution_routes, register_diagnostic_routes, register_experience_tool_routes, register_llm_permission_routes, register_log_experiment_routes, register_multi_agent_routes, register_static_routes, register_status_routes, register_websocket_routes, register_workspace_paper_routes
+    from core.web import routes
     from core.web.runtime import WebRuntime
 
     resolved_paths = paths or RuntimePaths.resolve(project_root=Path.cwd())
@@ -73,7 +73,19 @@ def create_app(*, auth_token: str | None = None, shutdown_callback: Any = None, 
         auth_token=auth_token,
         shutdown_callback=shutdown_callback,
     )
-    for register in (register_status_routes, register_workspace_paper_routes, register_experience_tool_routes, register_llm_permission_routes, register_log_experiment_routes, register_multi_agent_routes, register_agent_evolution_routes, register_diagnostic_routes, register_websocket_routes, register_static_routes):
+    registrars = (
+        routes.register_status_routes,
+        routes.register_workspace_paper_routes,
+        routes.register_experience_tool_routes,
+        routes.register_llm_permission_routes,
+        routes.register_log_experiment_routes,
+        routes.register_multi_agent_routes,
+        routes.register_agent_evolution_routes,
+        routes.register_diagnostic_routes,
+        routes.register_websocket_routes,
+        routes.register_static_routes,
+    )
+    for register in registrars:
         register(app, runtime)
     return app
 

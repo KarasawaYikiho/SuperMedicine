@@ -24,6 +24,17 @@ python -m ruff check --select=E,F,W --ignore=E501 .
 python -m pytest tests/ -v
 ```
 
+## Human Maintenance Contract
+
+```powershell
+python -m scripts.maintainers.human_maintenance_snapshot --output Temp\human-maintenance-current.json
+python -m pytest tests/feature_contract tests/test_core_convergence.py tests/test_application_service_boundaries.py -q
+```
+
+Compare a temporary snapshot before replacing the reviewed baseline. A baseline
+update is an explicit review of Feature IDs, surfaces, signatures, file roles,
+and implementation authorities; it is not a routine formatting step.
+
 ## Optional Web Gate
 
 ```powershell

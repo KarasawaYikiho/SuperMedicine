@@ -31,20 +31,30 @@ def discover_cli_commands(root: Path) -> set[str]:
 
 
 def discover_web_routes(root: Path) -> set[str]:
-    tree = ast.parse((root / "core" / "web" / "server.py").read_text(encoding="utf-8"))
     routes: set[str] = set()
-    for node in ast.walk(tree):
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            continue
-        for decorator in node.decorator_list:
-            if not isinstance(decorator, ast.Call) or not isinstance(decorator.func, ast.Attribute):
+    for source_path in sorted((root / "core" / "web").glob("*.py")):
+        tree = ast.parse(source_path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
-            method = decorator.func.attr
-            if method not in {"get", "post", "put", "patch", "delete", "websocket"} or not decorator.args:
-                continue
-            path = _literal_text(decorator.args[0])
-            if path:
-                routes.add(f"web:{method.upper()} {path}")
+            for decorator in node.decorator_list:
+                if not isinstance(decorator, ast.Call) or not isinstance(
+                    decorator.func, ast.Attribute
+                ):
+                    continue
+                method = decorator.func.attr
+                if method not in {
+                    "get",
+                    "post",
+                    "put",
+                    "patch",
+                    "delete",
+                    "websocket",
+                } or not decorator.args:
+                    continue
+                path = _literal_text(decorator.args[0])
+                if path:
+                    routes.add(f"web:{method.upper()} {path}")
     return routes
 
 

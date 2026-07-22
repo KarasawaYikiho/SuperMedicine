@@ -423,6 +423,13 @@
       "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
     },
     {
+      "feature_id": "config_env:SM_PROJECT_ROOT",
+      "category": "config_env",
+      "entrypoint": "config_env:SM_PROJECT_ROOT",
+      "expected_result": "Selects the explicit project root used by shared runtime paths.",
+      "contract_test": "tests/test_runtime_paths.py::test_environment_overrides_install_record"
+    },
+    {
       "feature_id": "database_table:agents",
       "category": "database_table",
       "entrypoint": "database_table:agents",
@@ -1246,6 +1253,20 @@
       "entrypoint": "web:POST /api/v1/llm/switch",
       "expected_result": "Preserves declared web entrypoint.",
       "contract_test": "tests/feature_contract/test_manifest_contract.py::test_manifest_matches_static_inventory"
+    },
+    {
+      "feature_id": "web:GET /api/v1/multi-agent",
+      "category": "web",
+      "entrypoint": "web:GET /api/v1/multi-agent",
+      "expected_result": "Returns the persisted Multi-Agent runtime switch.",
+      "contract_test": "tests/test_web_self_evolution.py::test_multi_agent_api_views_and_toggles_persisted_state"
+    },
+    {
+      "feature_id": "web:POST /api/v1/multi-agent",
+      "category": "web",
+      "entrypoint": "web:POST /api/v1/multi-agent",
+      "expected_result": "Persists the requested Multi-Agent runtime switch.",
+      "contract_test": "tests/test_web_self_evolution.py::test_multi_agent_api_views_and_toggles_persisted_state"
     },
     {
       "feature_id": "web:POST /api/v1/logs",
