@@ -45,6 +45,29 @@ file, LOC, function, symbol, long-function, or dependency budget silently. The
 lower values above remain stretch targets, not permission to conceal static
 feature surfaces or exceed the reviewed file-size limits.
 
+## Plan reconciliation and phase disposition
+
+The planning document's prose estimated 37 plugin `provides`, 7 configuration
+environment keys, and 12 release entrypoints. The first machine snapshot in
+HM2-00, before any convergence change, discovered 36, 6, and 8 respectively.
+Those same entries are still present in the final snapshot. The difference is
+therefore a planning-count mismatch, not a surface regression. Other reviewed
+surfaces grew from the plan's estimates: the final tree contains 48 Web routes,
+6 TUI bridge actions, and 195 Feature IDs.
+
+| Phase | Disposition | Evidence |
+| --- | --- | --- |
+| Phase 0 | Complete | Machine snapshot, signatures, surfaces, file roles, and feature-to-authority map are frozen by current-tree tests. |
+| Phase 1 | Complete | Compatibility aliases, redaction authority, and shared `ServiceResult` conversion are converged without removing historical imports. |
+| Phase 2 | Complete | Workspace, research, execution, and system application services have one reviewed implementation authority per behavior. |
+| Phase 3 | Complete | Four CLI command authorities, static Web routes, the OpenTUI bridge, and the desktop GUI/release entrypoints are preserved and tested. |
+| Phase 4 | Reviewed; no eligible rewrite | The plugin/tool scope contains 40 authority files, 2 compatibility files, 1 data file, and no convergence candidate. No proposed abstraction met the plan's minimum deletion threshold, so adding a manifest runner would increase indirection without a qualifying structural gain. |
+| Phase 5 | Complete | The achieved structural ceiling is a hard test gate; lower planning ranges remain documented stretch targets. |
+
+This disposition applies the plan's explicit stop rule: mechanical reduction
+ends when the next step would hide static contracts, combine unrelated domains,
+or require new metaprogramming even if a stretch target remains unmet.
+
 ## File roles
 
 Every production Python file has exactly one reviewed role in the snapshot:
