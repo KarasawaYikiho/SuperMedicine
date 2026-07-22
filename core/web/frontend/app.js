@@ -41,12 +41,12 @@
         return div.innerHTML;
     }
 
-    function escapeJsString(text) {
-        return JSON.stringify(String(text == null ? "" : text));
-    }
-
-    function inlineJsArg(text) {
-        return escapeHtml(escapeJsString(text));
+    function escapeAttribute(text) {
+        return String(text == null ? "" : text)
+            .replace(/&/g, "&amp;")
+            .replace(/"/g, "&quot;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
     }
 
     function showToast(message, type) {
@@ -59,6 +59,73 @@
         setTimeout(function () {
             toast.remove();
         }, 3000);
+    }
+
+    function openAppDialog(options) {
+        const dialog = document.createElement("dialog");
+        dialog.className = "app-dialog";
+        dialog.setAttribute("aria-labelledby", "app-dialog-title");
+
+        const panel = document.createElement("div");
+        panel.className = "app-dialog-panel";
+        const title = document.createElement("h3");
+        title.id = "app-dialog-title";
+        title.textContent = options.title || "SuperMedicine";
+        const body = document.createElement(options.preformatted ? "pre" : "p");
+        body.className = "app-dialog-body";
+        body.textContent = options.message || "";
+        const actions = document.createElement("div");
+        actions.className = "app-dialog-actions";
+        const cancel = document.createElement("button");
+        cancel.type = "button";
+        cancel.className = "btn btn-secondary";
+        cancel.textContent = options.cancelLabel || "取消";
+        const accept = document.createElement("button");
+        accept.type = "button";
+        accept.className = options.danger ? "btn btn-danger" : "btn btn-primary";
+        accept.textContent = options.acceptLabel || "确定";
+        actions.append(cancel, accept);
+        panel.append(title, body, actions);
+        dialog.appendChild(panel);
+        document.body.appendChild(dialog);
+
+        return new Promise(function (resolve) {
+            function finish(value) {
+                dialog.close();
+                dialog.remove();
+                resolve(value);
+            }
+            cancel.addEventListener("click", function () { finish(false); });
+            accept.addEventListener("click", function () { finish(true); });
+            dialog.addEventListener("cancel", function (event) {
+                event.preventDefault();
+                finish(false);
+            });
+            dialog.addEventListener("click", function (event) {
+                if (event.target === dialog) finish(false);
+            });
+            dialog.showModal();
+            (options.focusCancel ? cancel : accept).focus();
+        });
+    }
+
+    function requestConfirmation(message, title) {
+        return openAppDialog({
+            title: title || "确认操作",
+            message: message,
+            danger: true,
+            focusCancel: true
+        });
+    }
+
+    function showJsonDetails(title, data) {
+        return openAppDialog({
+            title: title,
+            message: JSON.stringify(data, null, 2),
+            preformatted: true,
+            cancelLabel: "关闭",
+            acceptLabel: "关闭"
+        });
     }
 
     function addMessage(role, content, extraClass) {
@@ -323,7 +390,7 @@
                 "<td>" + escapeHtml(ws.id || ws.name || "-") + "</td>" +
                 "<td>" + escapeHtml(ws.name || ws.id || "-") + "</td>" +
                 "<td><span class=\"status-badge success\">活跃</span></td>" +
-                "<td><button class=\"btn btn-danger btn-sm\" onclick=\"deleteWorkspace(" + inlineJsArg(ws.id || ws.name) + ")\">删除</button></td>" +
+                "<td><button class=\"btn btn-danger btn-sm\" data-action=\"delete-workspace\" data-id=\"" + escapeAttribute(ws.id || ws.name) + "\">删除</button></td>" +
                 "</tr>";
         }).join("");
     }
@@ -358,9 +425,8 @@
         document.getElementById("btn-refresh-workspaces").addEventListener("click", loadWorkspaces);
     }
 
-    // 供内联 onclick 使用的全局函数
-    window.deleteWorkspace = async function (id) {
-        if (!confirm("确定要删除工作区 '" + id + "' 吗？")) return;
+    async function deleteWorkspace(id) {
+        if (!await requestConfirmation("确定要删除工作区 '" + id + "' 吗？", "删除工作区")) return;
         try {
             await apiCall("DELETE", "/api/v1/workspaces/" + encodeURIComponent(id), { confirm: id });
             showToast("工作区已删除", "success");
@@ -372,7 +438,7 @@
         } catch (err) {
             showToast("删除工作区失败: " + err.message, "error");
         }
-    };
+    }
 
     // ---- 工作区选择器 -----------------------------------------------------
 
@@ -491,12 +557,12 @@
                 "<td>" + escapeHtml(p.title || p.metadata?.title || "-") + "</td>" +
                 "<td>" + escapeHtml(p.authors || p.metadata?.authors || "-") + "</td>" +
                 "<td><span class=\"status-badge " + (p.enriched ? "success" : "info") + "\">" + (p.enriched ? "已充实" : "已导入") + "</span></td>" +
-                "<td><button class=\"btn btn-secondary btn-sm\" onclick=\"enrichPaper(" + inlineJsArg(currentWorkspaceId || "") + "," + inlineJsArg(p.id || "") + ")\">充实</button></td>" +
+                "<td><button class=\"btn btn-secondary btn-sm\" data-action=\"enrich-paper\" data-workspace=\"" + escapeAttribute(currentWorkspaceId || "") + "\" data-id=\"" + escapeAttribute(p.id || "") + "\">充实</button></td>" +
                 "</tr>";
         }).join("");
     }
 
-    window.enrichPaper = async function (wsId, paperId) {
+    async function enrichPaper(wsId, paperId) {
         if (!wsId || !paperId) return;
         try {
             await apiCall("POST", "/api/v1/workspaces/" + encodeURIComponent(wsId) + "/papers/" + encodeURIComponent(paperId) + "/enrich", { confirm_enrich: true });
@@ -505,7 +571,7 @@
         } catch (err) {
             showToast("充实论文失败: " + err.message, "error");
         }
-    };
+    }
 
     // ---- 经验管理 ---------------------------------------------------------
 
@@ -579,13 +645,13 @@
                 "<td>" + escapeHtml(e.title || "-") + "</td>" +
                 "<td>" + escapeHtml(localizeStatus(e.scope || "-")) + "</td>" +
                 "<td>" + escapeHtml(tags) + "</td>" +
-                "<td><button class=\"btn btn-danger btn-sm\" onclick=\"deleteExperience(" + inlineJsArg(currentWorkspaceId || "") + "," + inlineJsArg(e.id || "") + "," + inlineJsArg(e.scope || "") + ")\">删除</button></td>" +
+                "<td><button class=\"btn btn-danger btn-sm\" data-action=\"delete-experience\" data-workspace=\"" + escapeAttribute(currentWorkspaceId || "") + "\" data-id=\"" + escapeAttribute(e.id || "") + "\" data-scope=\"" + escapeAttribute(e.scope || "") + "\">删除</button></td>" +
                 "</tr>";
         }).join("");
     }
 
-    window.deleteExperience = async function (wsId, expId, scope) {
-        if (!confirm("确定要删除此经验吗？")) return;
+    async function deleteExperience(wsId, expId, scope) {
+        if (!await requestConfirmation("确定要删除此经验吗？", "删除经验")) return;
         try {
             await apiCall("DELETE", "/api/v1/workspaces/" + encodeURIComponent(wsId) + "/experiences/" + encodeURIComponent(expId), { scope: scope });
             showToast("经验已删除", "success");
@@ -593,7 +659,7 @@
         } catch (err) {
             showToast("删除经验失败: " + err.message, "error");
         }
-    };
+    }
 
     // ---- 工具管理 ---------------------------------------------------------
 
@@ -772,16 +838,16 @@
                 "<td>" + escapeHtml((e.protocol || "").substring(0, 50)) + "</td>" +
                 "<td><span class=\"status-badge " + (e.status === "completed" ? "success" : e.status === "error" ? "error" : "info") + "\">" + escapeHtml(localizeStatus(e.status || "running")) + "</span></td>" +
                 "<td>" + escapeHtml(e.current_step || "-") + "</td>" +
-                "<td><button class=\"btn btn-secondary btn-sm\" onclick=\"viewExperiment(" + inlineJsArg(e.session_file || e.session_id || "") + ")\">查看</button></td>" +
+                "<td><button class=\"btn btn-secondary btn-sm\" data-action=\"view-experiment\" data-id=\"" + escapeAttribute(e.session_file || e.session_id || "") + "\">查看</button></td>" +
                 "</tr>";
         }).join("");
     }
 
     function showExperimentDetails(data) {
-        alert(JSON.stringify(data, null, 2));
+        showJsonDetails("实验详情", data);
     }
 
-    window.viewExperiment = async function (sessionFile) {
+    async function viewExperiment(sessionFile) {
         if (!sessionFile) return;
         try {
             var data = await apiCall(
@@ -792,7 +858,7 @@
         } catch (err) {
             showToast("加载实验详情失败: " + err.message, "error");
         }
-    };
+    }
 
     // ---- 对话历史 ---------------------------------------------------------
 
@@ -874,24 +940,24 @@
                 "<td>" + escapeHtml(p.model || "-") + "</td>" +
                 "<td><span class=\"status-badge " + (p.active || p.current ? "success" : "info") + "\">" + (p.active || p.current ? "当前" : "可用") + "</span></td>" +
                 "<td>" +
-                "<button class=\"btn btn-secondary btn-sm\" onclick=\"showLLM(" + inlineJsArg(providerName) + ")\">详情</button> " +
-                "<button class=\"btn btn-primary btn-sm\" onclick=\"switchLLM(" + inlineJsArg(providerName) + ")\">切换</button>" +
+                "<button class=\"btn btn-secondary btn-sm\" data-action=\"show-llm\" data-provider=\"" + escapeAttribute(providerName) + "\">详情</button> " +
+                "<button class=\"btn btn-primary btn-sm\" data-action=\"switch-llm\" data-provider=\"" + escapeAttribute(providerName) + "\">切换</button>" +
                 "</td>" +
                 "</tr>";
         }).join("");
     }
 
-    window.showLLM = async function (provider) {
+    async function showLLM(provider) {
         if (!provider) return;
         try {
             var data = await apiCall("GET", "/api/v1/llm/providers/" + encodeURIComponent(provider));
-            alert(JSON.stringify(data, null, 2));
+            showJsonDetails("LLM 提供商详情", data);
         } catch (err) {
             showToast("加载提供商详情失败: " + err.message, "error");
         }
-    };
+    }
 
-    window.switchLLM = async function (provider) {
+    async function switchLLM(provider) {
         try {
             await apiCall("POST", "/api/v1/llm/switch", { provider: provider });
             showToast("已切换至 " + provider, "success");
@@ -899,7 +965,7 @@
         } catch (err) {
             showToast("切换提供商失败: " + err.message, "error");
         }
-    };
+    }
 
     function setupLLMForm() {
         document.getElementById("btn-refresh-llm").addEventListener("click", loadLLMProviders);
@@ -1128,8 +1194,8 @@
                 "<td>" + escapeHtml(item.instruction || "-") + "</td>" +
                 "<td><span class=\"status-badge " + (item.status === "success" ? "success" : item.status === "error" ? "error" : "info") + "\">" + escapeHtml(localizeStatus(item.status || "pending")) + "</span></td>" +
                 "<td>" +
-                "<button class=\"btn btn-sm btn-secondary\" onclick=\"viewArtifact(" + inlineJsArg(item.id) + ")\">查看</button> " +
-                "<button class=\"btn btn-sm btn-danger\" onclick=\"deleteArtifact(" + inlineJsArg(item.id) + ")\">删除</button>" +
+                "<button class=\"btn btn-sm btn-secondary\" data-action=\"view-artifact\" data-id=\"" + escapeAttribute(item.id) + "\">查看</button> " +
+                "<button class=\"btn btn-sm btn-danger\" data-action=\"delete-artifact\" data-id=\"" + escapeAttribute(item.id) + "\">删除</button>" +
                 "</td>" +
                 "</tr>";
         }).join("");
@@ -1163,17 +1229,17 @@
         }
     }
 
-    window.viewArtifact = async function (id) {
+    async function viewArtifact(id) {
         try {
             var data = await apiCall("GET", "/api/v1/self-evolution/" + encodeURIComponent(id));
-            alert(JSON.stringify(data, null, 2));
+            showJsonDetails("自进化制品", data);
         } catch (err) {
             showToast("查看制品失败: " + err.message, "error");
         }
-    };
+    }
 
-    window.deleteArtifact = async function (id) {
-        if (!confirm("确定要删除此制品吗？")) return;
+    async function deleteArtifact(id) {
+        if (!await requestConfirmation("确定要删除此制品吗？", "删除制品")) return;
         try {
             var data = await apiCall("DELETE", "/api/v1/self-evolution/" + encodeURIComponent(id));
             if (data.success) {
@@ -1185,7 +1251,7 @@
         } catch (err) {
             showToast("删除制品失败: " + err.message, "error");
         }
-    };
+    }
 
     function setupSelfEvolutionForm() {
         var refreshBtn = document.getElementById("btn-refresh-self-evolution");
@@ -1501,11 +1567,23 @@
                 e.target.remove();
             }, 300);
         }
+
+        var actionTarget = e.target.closest("[data-action]");
+        if (!actionTarget) return;
+        var action = actionTarget.dataset.action;
+        if (action === "delete-workspace") deleteWorkspace(actionTarget.dataset.id);
+        if (action === "enrich-paper") enrichPaper(actionTarget.dataset.workspace, actionTarget.dataset.id);
+        if (action === "delete-experience") deleteExperience(actionTarget.dataset.workspace, actionTarget.dataset.id, actionTarget.dataset.scope);
+        if (action === "view-experiment") viewExperiment(actionTarget.dataset.id);
+        if (action === "show-llm") showLLM(actionTarget.dataset.provider);
+        if (action === "switch-llm") switchLLM(actionTarget.dataset.provider);
+        if (action === "view-artifact") viewArtifact(actionTarget.dataset.id);
+        if (action === "delete-artifact") deleteArtifact(actionTarget.dataset.id);
     });
 
     // ---- 键盘快捷键 -------------------------------------------------------
 
-    document.addEventListener("keydown", function (e) {
+    document.addEventListener("keydown", async function (e) {
         // Ctrl/Cmd + K 聚焦搜索框（如果存在）
         if ((e.ctrlKey || e.metaKey) && e.key === "k") {
             e.preventDefault();
@@ -1527,7 +1605,7 @@
         // Ctrl+Q 仅关闭当前窗口；服务生命周期由启动它的进程管理。
         if (e.ctrlKey && e.key === "q") {
             e.preventDefault();
-            if (confirm("确定要退出 SuperMedicine 吗？")) {
+            if (await requestConfirmation("确定要退出 SuperMedicine 吗？", "退出应用")) {
                 window.close();
             }
         }

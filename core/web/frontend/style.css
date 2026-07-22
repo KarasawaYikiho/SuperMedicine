@@ -22,7 +22,47 @@
     --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
     --font-mono: "Cascadia Code", "Fira Code", "Consolas", monospace;
     --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
-    --transition: all 0.2s ease;
+    --transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.app-dialog {
+    width: min(34rem, calc(100vw - 2rem));
+    padding: 0;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    color: var(--color-text);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-lg);
+}
+
+.app-dialog::backdrop {
+    background: rgb(0 0 0 / 0.58);
+}
+
+.app-dialog-panel {
+    display: grid;
+    gap: 1rem;
+    padding: 1.25rem;
+}
+
+.app-dialog-panel h3,
+.app-dialog-body {
+    margin: 0;
+}
+
+pre.app-dialog-body {
+    max-height: 55vh;
+    overflow: auto;
+    padding: 0.75rem;
+    border-radius: var(--radius);
+    background: var(--color-bg);
+    white-space: pre-wrap;
+}
+
+.app-dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
 }
 
 *,

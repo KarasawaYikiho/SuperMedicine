@@ -413,8 +413,8 @@ def test_paper_enrich_requires_explicit_confirmation(monkeypatch):
     }
 
 
-def test_frontend_inline_handlers_escape_javascript_string_arguments():
-    """Inline onclick handlers must not be broken by IDs containing quotes."""
+def test_frontend_actions_use_escaped_data_attributes_and_event_delegation():
+    """User-controlled IDs must not be interpolated into executable handlers."""
 
     app_js = (
         Path(__file__)
@@ -424,8 +424,10 @@ def test_frontend_inline_handlers_escape_javascript_string_arguments():
         .read_text(encoding="utf-8")
     )
 
-    assert "function escapeJsString" in app_js
-    assert 'onclick=\\"deleteWorkspace(\'" + escapeHtml' not in app_js
-    assert 'onclick=\\"showLLM(\'" + escapeHtml' not in app_js
-    assert 'onclick=\\"viewArtifact(\'" + escapeHtml' not in app_js
-    assert 'onclick=\\"deleteArtifact(\'" + escapeHtml' not in app_js
+    assert "function escapeAttribute" in app_js
+    assert "onclick=" not in app_js
+    assert 'e.target.closest("[data-action]")' in app_js
+    assert 'data-action=\\"delete-workspace\\"' in app_js
+    assert 'data-action=\\"show-llm\\"' in app_js
+    assert 'data-action=\\"view-artifact\\"' in app_js
+    assert 'data-action=\\"delete-artifact\\"' in app_js
