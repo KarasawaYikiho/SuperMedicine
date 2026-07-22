@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import inspect
 import json
 
+import pytest
 import yaml
 
 
@@ -45,6 +47,47 @@ def test_service_result_failure_uses_stable_error_code():
         "request_id": "request-2",
         "meta": {},
     }
+
+
+def test_service_require_data_preserves_domain_exception_mapping():
+    from core.paper_import.contracts import (
+        MissingPaperSourceError,
+        UnsupportedPaperFormatError,
+    )
+    from core.services import (
+        ExperimentToolService,
+        PaperRAGService,
+        PermissionLogSystemService,
+        ServiceResult,
+        WorkspaceService,
+    )
+    from core.workspace import WorkspaceNotFoundError
+    from permission.access_mode import FullAccessConfirmationRequired
+
+    cases = (
+        (WorkspaceService, "permission_denied", PermissionError),
+        (WorkspaceService, "required_file_missing", FileNotFoundError),
+        (WorkspaceService, "workspace_not_found", WorkspaceNotFoundError),
+        (PaperRAGService, "unsupported_paper_format", UnsupportedPaperFormatError),
+        (PaperRAGService, "paper_not_found", MissingPaperSourceError),
+        (ExperimentToolService, "workspace_not_found", WorkspaceNotFoundError),
+        (
+            PermissionLogSystemService,
+            "full_access_confirmation_required",
+            FullAccessConfirmationRequired,
+        ),
+        (PaperRAGService, "paper_error", ValueError),
+    )
+
+    for service_type, code, exception_type in cases:
+        signature = inspect.signature(service_type.require_data)
+        assert tuple(signature.parameters) == ("result",)
+        assert (
+            signature.parameters["result"].kind
+            is inspect.Parameter.POSITIONAL_OR_KEYWORD
+        )
+        with pytest.raises(exception_type, match="blocked"):
+            service_type.require_data(ServiceResult.failure(code, "blocked"))
 
 
 def test_workspace_service_owns_create_list_and_show(tmp_path):

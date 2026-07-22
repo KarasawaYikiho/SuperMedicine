@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from functools import partial
 from pathlib import Path
 from typing import Any, Callable, Sequence, cast
 
@@ -27,7 +28,6 @@ from core.kernel import Kernel
 from core.log_report import LogReportStore
 from core.redaction import redact_sensitive
 from core.serialization import json_ready
-from core.services.result import ServiceResult
 from core.workspace import InvalidWorkspaceId, WorkspaceError, WorkspaceNotFoundError
 from core.workspace_tool_models import (
     InvalidToolId,
@@ -41,9 +41,21 @@ from core.workspace_tools import WorkspaceToolService
 from permission.policy import ensure_default_policy
 from plugins.tools.experiment_wb import main as wb_plugin
 
+from . import result as _result
+from .result import ServiceResult
+
 
 class ExperimentToolService:
     """Own experiment and workspace-tool use cases used by all interfaces."""
+
+    require_data = staticmethod(
+        partial(
+            _result._require_data,
+            "Experiment/tool service failed",
+            {"workspace_not_found": WorkspaceNotFoundError},
+        )
+    )
+    _meta = staticmethod(partial(_result._service_meta, "experiment_tool"))
 
     def __init__(self, project_root: str | Path | None = None) -> None:
         self.tools = WorkspaceToolService(project_root)
@@ -608,7 +620,7 @@ class ExperimentToolService:
         except Exception as exc:
             return ServiceResult.failure(
                 "internal_error",
-                str(redact_sensitive(str(exc))) or "Experiment/tool service failed",
+                _result._safe_internal_message(exc, "Experiment/tool service failed"),
                 request_id=request_id,
                 details=details,
                 meta=self._meta(operation),
@@ -734,7 +746,7 @@ class ExperimentToolService:
         except Exception as exc:
             return ServiceResult.failure(
                 "internal_error",
-                str(redact_sensitive(str(exc))) or "Experiment/tool service failed",
+                _result._safe_internal_message(exc, "Experiment/tool service failed"),
                 request_id=request_id,
                 details=details,
                 meta=self._meta(operation),
@@ -757,17 +769,3 @@ class ExperimentToolService:
         if isinstance(exc, InvalidWorkspaceId):
             return "invalid_workspace_id"
         return "tool_error"
-
-    @staticmethod
-    def require_data(result: ServiceResult[Any]) -> Any:
-        if result.ok:
-            return result.data
-        error = result.error
-        message = error.message if error else "Experiment/tool service failed"
-        if error and error.code == "workspace_not_found":
-            raise WorkspaceNotFoundError(message)
-        raise ValueError(message)
-
-    @staticmethod
-    def _meta(operation: str) -> dict[str, str]:
-        return {"service": "experiment_tool", "operation": operation}

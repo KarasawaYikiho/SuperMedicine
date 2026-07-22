@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -9,8 +10,6 @@ import yaml
 
 from core.operation_guard import authorize_dangerous_operation
 from core.path_safety import validate_destructive_path
-from core.redaction import redact_sensitive
-from core.services.result import ServiceResult
 from core.workspace import (
     InvalidWorkspaceId,
     WorkspaceError,
@@ -23,9 +22,25 @@ from permission.audit import AuditLogger
 from permission.engine import PermissionEngine
 from permission.policy import ensure_default_policy
 
+from . import result as _result
+from .result import ServiceResult
+
 
 class WorkspaceService:
     """Own workspace use cases, including guarded destructive deletion."""
+
+    require_data = staticmethod(
+        partial(
+            _result._require_data,
+            "Workspace service failed",
+            {
+                "permission_denied": PermissionError,
+                "required_file_missing": FileNotFoundError,
+                "workspace_not_found": WorkspaceNotFoundError,
+            },
+        )
+    )
+    _meta = staticmethod(partial(_result._service_meta, "workspace"))
 
     def __init__(self, project_root: str | Path | None = None) -> None:
         self.manager = WorkspaceManager(project_root)
@@ -203,22 +218,6 @@ class WorkspaceService:
         except Exception as exc:
             return self._unexpected_result(exc, operation, request_id)
 
-    @staticmethod
-    def require_data(result: ServiceResult[Any]) -> Any:
-        """Restore legacy exception behavior at compatibility interfaces."""
-        if result.ok:
-            return result.data
-        error = result.error
-        message = error.message if error else "Workspace service failed"
-        code = error.code if error else "workspace_error"
-        if code == "permission_denied":
-            raise PermissionError(message)
-        if code == "required_file_missing":
-            raise FileNotFoundError(message)
-        if code == "workspace_not_found":
-            raise WorkspaceNotFoundError(message)
-        raise ValueError(message)
-
     def _exception_result(
         self, exc: Exception, operation: str, request_id: str | None
     ) -> ServiceResult[Any]:
@@ -240,7 +239,7 @@ class WorkspaceService:
     ) -> ServiceResult[Any]:
         return ServiceResult.failure(
             "internal_error",
-            str(redact_sensitive(str(exc))) or "Workspace service failed",
+            _result._safe_internal_message(exc, "Workspace service failed"),
             request_id=request_id,
             meta=self._meta(operation),
         )
@@ -264,7 +263,3 @@ class WorkspaceService:
         if display_name is not None:
             data["name"] = display_name
         return data
-
-    @staticmethod
-    def _meta(operation: str) -> dict[str, str]:
-        return {"service": "workspace", "operation": operation}

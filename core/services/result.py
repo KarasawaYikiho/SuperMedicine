@@ -3,11 +3,36 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from collections.abc import Mapping
 from typing import Any, Generic, TypeVar
 from uuid import uuid4
 
+from core.redaction import redact_sensitive
+
 
 T = TypeVar("T")
+
+
+def _service_meta(service: str, operation: str) -> dict[str, str]:
+    return {"service": service, "operation": operation}
+
+
+def _safe_internal_message(exc: Exception, fallback: str) -> str:
+    return str(redact_sensitive(str(exc))) or fallback
+
+
+def _require_data(
+    default_message: str,
+    error_map: Mapping[str, type[Exception]],
+    result: ServiceResult[Any],
+) -> Any:
+    """Restore legacy exceptions at compatibility interfaces."""
+    if result.ok:
+        return result.data
+    error = result.error
+    message = error.message if error else default_message
+    exception_type = error_map.get(error.code if error else "", ValueError)
+    raise exception_type(message)
 
 
 @dataclass(frozen=True, slots=True)

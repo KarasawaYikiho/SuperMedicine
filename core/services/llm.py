@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
+from functools import partial
 from pathlib import Path
 from typing import Any
 
 from core.config_center import ConfigCenter
 from core.llm_manager import LLMConfigManager
-from core.redaction import redact_sensitive
-from core.services.result import ServiceResult
+
+from . import result as _result
+from .result import ServiceResult
 
 
 class LLMService:
+    _meta = staticmethod(partial(_result._service_meta, "llm"))
+
     def __init__(
         self,
         project_root: str | Path | None = None,
@@ -167,7 +171,7 @@ class LLMService:
         except Exception as exc:
             return ServiceResult.failure(
                 "internal_error",
-                str(redact_sensitive(str(exc))) or "LLM service failed",
+                _result._safe_internal_message(exc, "LLM service failed"),
                 request_id=request_id,
                 meta=self._meta(operation),
             )
@@ -195,7 +199,3 @@ class LLMService:
             details=details,
             meta=self._meta(operation),
         )
-
-    @staticmethod
-    def _meta(operation: str) -> dict[str, str]:
-        return {"service": "llm", "operation": operation}

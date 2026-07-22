@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from functools import partial
 from pathlib import Path
 from typing import Any, Callable
 
@@ -14,9 +15,7 @@ from core.log_report import (
     resolve_log_storage_locations,
 )
 from core.plugin_registry import PluginRegistry
-from core.redaction import redact_sensitive
 from core.runtime_capabilities import required_runtime_snapshot
-from core.services.result import ServiceResult
 from permission.access_mode import (
     AccessMode,
     FileAccessOperation,
@@ -24,9 +23,21 @@ from permission.access_mode import (
     normalize_access_mode,
 )
 
+from . import result as _result
+from .result import ServiceResult
+
 
 class PermissionLogSystemService:
     """Own runtime permission configuration and redacted log storage use cases."""
+
+    require_data = staticmethod(
+        partial(
+            _result._require_data,
+            "System service failed",
+            {"full_access_confirmation_required": FullAccessConfirmationRequired},
+        )
+    )
+    _meta = staticmethod(partial(_result._service_meta, "permission_log_system"))
 
     def __init__(self, project_root: str | Path | None = None) -> None:
         self.project_root = Path(project_root or Path.cwd()).resolve()
@@ -271,20 +282,6 @@ class PermissionLogSystemService:
         except Exception as exc:
             return ServiceResult.failure(
                 "internal_error",
-                str(redact_sensitive(str(exc))) or "System service failed",
+                _result._safe_internal_message(exc, "System service failed"),
                 meta=self._meta(operation),
             )
-
-    @staticmethod
-    def require_data(result: ServiceResult[Any]) -> Any:
-        if result.ok:
-            return result.data
-        if result.error and result.error.code == "full_access_confirmation_required":
-            raise FullAccessConfirmationRequired(result.error.message)
-        raise ValueError(
-            result.error.message if result.error else "System service failed"
-        )
-
-    @staticmethod
-    def _meta(operation: str) -> dict[str, str]:
-        return {"service": "permission_log_system", "operation": operation}

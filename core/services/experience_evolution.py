@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from functools import partial
 from pathlib import Path
 from typing import Any, Callable, cast
 
@@ -12,15 +13,21 @@ from core.experience import (
     ExperienceStore,
     ExportFormat,
 )
-from core.redaction import redact_sensitive
 from core.self_evolution import SelfEvolutionService
-from core.services.result import ServiceResult
 from core.workspace import WorkspaceError, WorkspaceNotFoundError
 from permission.audit import AuditLogger
+
+from . import result as _result
+from .result import ServiceResult
 
 
 class ExperienceEvolutionService:
     """Own confirmed experience CRUD and guarded self-evolution generation."""
+
+    require_data = staticmethod(
+        partial(_result._require_data, "Experience service failed", {})
+    )
+    _meta = staticmethod(partial(_result._service_meta, "experience_evolution"))
 
     def __init__(self, project_root: str | Path | None = None) -> None:
         self.store = ExperienceStore(project_root)
@@ -272,15 +279,9 @@ class ExperienceEvolutionService:
         except Exception as exc:
             return ServiceResult.failure(
                 "internal_error",
-                str(redact_sensitive(str(exc))) or "Experience service failed",
+                _result._safe_internal_message(exc, "Experience service failed"),
                 meta=self._meta(operation),
             )
-
-    @staticmethod
-    def require_data(result: ServiceResult[Any]) -> Any:
-        if result.ok:
-            return result.data
-        raise ValueError(result.error.message if result.error else "Experience service failed")
 
     @staticmethod
     def _scope(value: str) -> ExperienceScope:
@@ -293,7 +294,3 @@ class ExperienceEvolutionService:
         if value not in {"json", "md"}:
             raise ValueError("experience export format must be one of: json, md")
         return cast(ExportFormat, value)
-
-    @staticmethod
-    def _meta(operation: str) -> dict[str, str]:
-        return {"service": "experience_evolution", "operation": operation}

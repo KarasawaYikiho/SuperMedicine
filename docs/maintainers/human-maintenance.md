@@ -25,11 +25,12 @@ reviewed starting point is therefore:
 
 | Metric | Reviewed current tree | Steady-state target |
 | --- | ---: | ---: |
-| Feature IDs | 189 | at least 189 |
-| Production Python files | 172 | 138-145 |
-| Functions/methods | 1,914 | 1,450-1,500 |
-| Public top-level symbols | 556 | 410-430 |
-| Functions over 60 lines | 90 | at most 55-58 |
+| Feature IDs | 195 | at least 195 |
+| Production Python files | 169 | 138-145 |
+| Effective production Python LOC | 33,554 | 32,500-34,000 |
+| Functions/methods | 1,586 | 1,450-1,500 |
+| Public top-level symbols | 520 | 410-430 |
+| Functions over 60 lines | 88 | at most 55-58 |
 | Functions over 100 lines | 19 | at most 10 |
 | Top-level dependency edges | 12 | at most 12 |
 
@@ -61,12 +62,22 @@ implementation.
 
 | Change | Files | Raw LOC | Effective LOC | Functions/methods |
 | --- | ---: | ---: | ---: | ---: |
-| Workspace service/facade authority | 3 | -107 | -99 | -4 |
+| Workspace service/facade authority | 3 | -104 | -96 | -4 |
+| OpenTUI/desktop convergence and Textual retirement | -4 | -5,600 | -4,796 | -361 |
+| Shared ServiceResult compatibility conversion | 8 | +3 | -5 | -10 |
 
 The workspace change preserves `AppResult`, `AppError`, and
 `ApplicationFacade`, moves atomic create/delete into `WorkspaceService`, and
 removes the duplicate manager, payload, permission, audit, and destructive-path
 implementation from the facade.
+
+The TUI/desktop change keeps the OpenTUI renderer as the only production TUI,
+retains reviewed historical TUI imports through an explicit alias registry,
+and connects its authenticated bridge actions to real services. The result
+compatibility change centralizes service/operation metadata, safe internal
+error text, and legacy error-code-to-exception conversion. Existing
+`Service.require_data(result)` call signatures remain intact as declarative
+callables and are covered by direct runtime signature and exception tests.
 
 ## Change rule
 

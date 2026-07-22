@@ -2,17 +2,24 @@
 
 from __future__ import annotations
 
+from functools import partial
 from pathlib import Path
 from typing import Any, Callable
 
 from core.dialog_history import DialogHistoryPrivacyError, DialogHistoryStore
-from core.redaction import redact_sensitive
-from core.services.result import ServiceResult
 from core.workspace import WorkspaceError
+
+from . import result as _result
+from .result import ServiceResult
 
 
 class AgentHarnessService:
     """Own user-facing agent/harness summaries without raw conversation storage."""
+
+    require_data = staticmethod(
+        partial(_result._require_data, "Agent/harness service failed", {})
+    )
+    _meta = staticmethod(partial(_result._service_meta, "agent_harness"))
 
     def __init__(self, project_root: str | Path | None = None) -> None:
         self.history = DialogHistoryStore(project_root)
@@ -60,18 +67,6 @@ class AgentHarnessService:
         except Exception as exc:
             return ServiceResult.failure(
                 "internal_error",
-                str(redact_sensitive(str(exc))) or "Agent/harness service failed",
+                _result._safe_internal_message(exc, "Agent/harness service failed"),
                 meta=self._meta(operation),
             )
-
-    @staticmethod
-    def require_data(result: ServiceResult[Any]) -> Any:
-        if result.ok:
-            return result.data
-        raise ValueError(
-            result.error.message if result.error else "Agent/harness service failed"
-        )
-
-    @staticmethod
-    def _meta(operation: str) -> dict[str, str]:
-        return {"service": "agent_harness", "operation": operation}
