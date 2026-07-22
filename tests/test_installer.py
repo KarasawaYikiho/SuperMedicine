@@ -891,6 +891,7 @@ def test_unified_install_dry_run_initializes_project_without_real_desktop_write(
     source = tmp_path / "dist" / "SuperMedicine.exe"
     source.parent.mkdir()
     source.write_bytes(b"fake exe bytes")
+    (source.parent / "SuperMedicineGUI.exe").write_bytes(b"fake gui exe bytes")
     desktop_dir = tmp_path / "fake-desktop"
     real_home = tmp_path / "real-home"
     real_home.mkdir()
@@ -912,6 +913,7 @@ def test_unified_install_dry_run_initializes_project_without_real_desktop_write(
 
     assert (tmp_path / ".supermedicine" / "config.yaml").exists()
     assert not (desktop_dir / "SuperMedicine.exe").exists()
+    assert not (desktop_dir / "SuperMedicineGUI.exe").exists()
     assert not (real_home / "Desktop" / "SuperMedicine.exe").exists()
     assert "安装初始化结果" in caplog.text
     assert "桌面 Exe 释放 dry-run" in caplog.text
@@ -1505,6 +1507,7 @@ def test_unified_install_flag_still_works_without_component_changes(tmp_path, mo
     source = tmp_path / "dist" / "SuperMedicine.exe"
     source.parent.mkdir()
     source.write_bytes(b"fake exe bytes")
+    (source.parent / "SuperMedicineGUI.exe").write_bytes(b"fake gui exe bytes")
     desktop_dir = tmp_path / "fake-desktop"
     real_home = tmp_path / "real-home"
     real_home.mkdir()
@@ -1525,6 +1528,7 @@ def test_unified_install_flag_still_works_without_component_changes(tmp_path, mo
 
     assert (tmp_path / ".supermedicine" / "config.yaml").exists()
     assert not (desktop_dir / "SuperMedicine.exe").exists()
+    assert not (desktop_dir / "SuperMedicineGUI.exe").exists()
 
     # Verify the install record does NOT contain installed_components
     # (since no components were selected in --unified-install mode)

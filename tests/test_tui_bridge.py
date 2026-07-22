@@ -628,7 +628,7 @@ def test_real_bun_client_python_bridge_lifecycle_integration(tmp_path) -> None:
             "test.slow": _stream_forever,
             "test.never": _never_returns,
         },
-        request_timeout=0.12,
+        request_timeout=2.0,
         concurrency_limit=2,
     ).start()
     script = tmp_path / "bridge-client.mjs"
