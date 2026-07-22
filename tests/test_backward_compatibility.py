@@ -106,6 +106,7 @@ def test_legacy_core_redaction_module_resolves_to_security_authority():
 
 
 def test_legacy_service_modules_resolve_to_execution_authority():
+    services = importlib.import_module("core.services")
     execution = importlib.import_module("core.services.execution")
     llm = importlib.import_module("core.services.llm")
     agent_harness = importlib.import_module("core.services.agent_harness")
@@ -129,6 +130,28 @@ def test_legacy_service_modules_resolve_to_execution_authority():
         permission_log_system.PermissionLogSystemService
         is system.PermissionLogSystemService
     )
+
+    research = importlib.import_module("core.services.research")
+    workspace = importlib.import_module("core.services.workspace")
+    paper_rag = importlib.import_module("core.services.paper_rag")
+    experience = importlib.import_module("core.services.experience_evolution")
+
+    assert workspace is research
+    assert paper_rag is research
+    assert experience is research
+    assert workspace.WorkspaceService is research.WorkspaceService
+    assert paper_rag.PaperRAGService is research.PaperRAGService
+    assert experience.ExperienceEvolutionService is research.ExperienceEvolutionService
+    for name, authority in {
+        "agent_harness": execution,
+        "llm": execution,
+        "adapter": system,
+        "permission_log_system": system,
+        "workspace": research,
+        "paper_rag": research,
+        "experience_evolution": research,
+    }.items():
+        assert getattr(services, name) is authority
 
 
 def test_cli_help_and_init_do_not_require_platform_runtime_or_config(

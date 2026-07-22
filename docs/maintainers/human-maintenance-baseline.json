@@ -371,9 +371,9 @@
     ]
   },
   "structural_metrics": {
-    "production_python_files": 166,
-    "production_python_loc": 38823,
-    "production_python_effective_loc": 33554,
+    "production_python_files": 164,
+    "production_python_loc": 38802,
+    "production_python_effective_loc": 33541,
     "functions_and_methods": 1586,
     "public_top_level_symbols": 520,
     "functions_over_60_lines": 88,
@@ -410,11 +410,11 @@
       "production_python_files": 1
     },
     "core": {
-      "raw_loc": 18512,
-      "effective_loc": 16141,
+      "raw_loc": 18491,
+      "effective_loc": 16128,
       "functions_and_methods": 886,
       "public_top_level_symbols": 252,
-      "production_python_files": 70
+      "production_python_files": 68
     },
     "gui_entry.py": {
       "raw_loc": 52,
@@ -1067,8 +1067,8 @@
     "core/services/__init__.py": {
       "role": "authority",
       "group": "core",
-      "raw_loc": 35,
-      "effective_loc": 31,
+      "raw_loc": 42,
+      "effective_loc": 38,
       "functions_and_methods": 0,
       "public_top_level_symbols": 0,
       "longest_function": 0
@@ -1082,15 +1082,6 @@
       "public_top_level_symbols": 2,
       "longest_function": 26
     },
-    "core/services/experience_evolution.py": {
-      "role": "authority",
-      "group": "core",
-      "raw_loc": 296,
-      "effective_loc": 269,
-      "functions_and_methods": 19,
-      "public_top_level_symbols": 1,
-      "longest_function": 33
-    },
     "core/services/experiment_tool.py": {
       "role": "authority",
       "group": "core",
@@ -1100,14 +1091,14 @@
       "public_top_level_symbols": 1,
       "longest_function": 51
     },
-    "core/services/paper_rag.py": {
+    "core/services/research.py": {
       "role": "authority",
       "group": "core",
-      "raw_loc": 266,
-      "effective_loc": 243,
-      "functions_and_methods": 14,
-      "public_top_level_symbols": 1,
-      "longest_function": 28
+      "raw_loc": 799,
+      "effective_loc": 738,
+      "functions_and_methods": 43,
+      "public_top_level_symbols": 3,
+      "longest_function": 75
     },
     "core/services/result.py": {
       "role": "authority",
@@ -1126,15 +1117,6 @@
       "functions_and_methods": 37,
       "public_top_level_symbols": 3,
       "longest_function": 45
-    },
-    "core/services/workspace.py": {
-      "role": "authority",
-      "group": "core",
-      "raw_loc": 265,
-      "effective_loc": 246,
-      "functions_and_methods": 10,
-      "public_top_level_symbols": 1,
-      "longest_function": 75
     },
     "core/session_manager.py": {
       "role": "authority",
@@ -2369,17 +2351,6 @@
     "core/services/execution.py::LLMService.show_provider": "(self, provider: str | None=None, *, request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
     "core/services/execution.py::LLMService.switch_provider": "(self, provider: str, *, request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
     "core/services/execution.py::LLMService.validate_provider": "(self, provider: str) -> ServiceResult[dict[str, Any]]",
-    "core/services/experience_evolution.py::ExperienceEvolutionService.add_experience": "(self, workspace_id: str, scope: str, title: str, summary: str, *, tags: list[str] | None=None, confirm: bool, source: dict[str, Any] | None=None) -> ServiceResult[dict[str, Any]]",
-    "core/services/experience_evolution.py::ExperienceEvolutionService.delete_evolution_artifact": "(self, artifact_id: str) -> ServiceResult[dict[str, Any]]",
-    "core/services/experience_evolution.py::ExperienceEvolutionService.delete_experience": "(self, record_id: str, workspace_id: str, scope: str, *, confirm: str) -> ServiceResult[dict[str, Any]]",
-    "core/services/experience_evolution.py::ExperienceEvolutionService.edit_experience": "(self, record_id: str, workspace_id: str, scope: str, *, title: str | None=None, summary: str | None=None, tags: list[str] | None=None) -> ServiceResult[dict[str, Any]]",
-    "core/services/experience_evolution.py::ExperienceEvolutionService.export_experiences": "(self, workspace_id: str, format: str, *, include_general: bool=False, path: str | Path | None=None) -> ServiceResult[str]",
-    "core/services/experience_evolution.py::ExperienceEvolutionService.generate_evolution": "(self, *, instruction: str, artifact_type: str, output: str | Path, access_mode: str='sandbox', experience_source: Any | None=None, workspace_id: str | None=None, confirmed: bool=False, overwrite: bool=False, confirm_full_access: bool=False, acknowledge_risk: bool=False, metadata: dict[str, Any] | None=None) -> ServiceResult[dict[str, Any]]",
-    "core/services/experience_evolution.py::ExperienceEvolutionService.get_evolution_artifact": "(self, artifact_id: str) -> ServiceResult[dict[str, Any]]",
-    "core/services/experience_evolution.py::ExperienceEvolutionService.list_evolution_artifacts": "(self) -> ServiceResult[list[dict[str, Any]]]",
-    "core/services/experience_evolution.py::ExperienceEvolutionService.list_experiences": "(self, workspace_id: str, *, include_general: bool=False) -> ServiceResult[list[dict[str, Any]]]",
-    "core/services/experience_evolution.py::ExperienceEvolutionService.suggest_experience": "(self, workspace_id: str, summary: str, *, title: str | None=None, tags: list[str] | None=None, metadata: dict[str, Any] | None=None) -> ServiceResult[dict[str, Any]]",
-    "core/services/experience_evolution.py::ExperienceEvolutionService.view_experience": "(self, record_id: str, workspace_id: str, scope: str | None=None) -> ServiceResult[dict[str, Any]]",
     "core/services/experiment_tool.py::ExperimentToolService.add_experiment_config": "(self, *, instruction: str | None=None, config: dict[str, Any] | None=None, filename: str | None=None, overwrite: bool=False, request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
     "core/services/experiment_tool.py::ExperimentToolService.append_live_event": "(self, event_type: str, session: ExperimentSession, **kwargs: Any) -> ServiceResult[dict[str, Any]]",
     "core/services/experiment_tool.py::ExperimentToolService.calculate_live_step": "(self, session: ExperimentSession, user_input: dict[str, Any]) -> ServiceResult[dict[str, Any]]",
@@ -2401,14 +2372,31 @@
     "core/services/experiment_tool.py::ExperimentToolService.start_experiment": "(self, protocol: str, *, session_id: str | None=None, request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
     "core/services/experiment_tool.py::ExperimentToolService.submit_experiment": "(self, session_file: str | Path, step_id: str, input_data: str | dict[str, Any], *, calculate: bool=False, request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
     "core/services/experiment_tool.py::ExperimentToolService.submit_live_step": "(self, session: ExperimentSession, user_input: dict[str, Any], outputs: dict[str, Any]) -> ServiceResult[dict[str, Any]]",
-    "core/services/paper_rag.py::PaperRAGService.edit_metadata": "(self, workspace_id: str, paper_id: str, metadata: dict[str, Any], *, request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
-    "core/services/paper_rag.py::PaperRAGService.enrich_metadata": "(self, workspace_id: str, paper_id: str, *, confirm: bool, request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
-    "core/services/paper_rag.py::PaperRAGService.enrichment_payload": "(enrichment: PaperEnrichmentResult) -> dict[str, Any]",
-    "core/services/paper_rag.py::PaperRAGService.import_paper": "(self, workspace_id: str, source_path: str | Path, metadata: dict[str, Any] | None=None, *, enrich: bool=False, confirm_enrich: bool=False, request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
-    "core/services/paper_rag.py::PaperRAGService.import_payload": "(imported: PaperImportResult, *, warnings: list[str] | None=None) -> dict[str, Any]",
-    "core/services/paper_rag.py::PaperRAGService.list_papers": "(self, workspace_id: str, *, request_id: str | None=None) -> ServiceResult[list[dict[str, Any]]]",
-    "core/services/paper_rag.py::PaperRAGService.metadata_payload": "(metadata: PaperMetadata) -> dict[str, Any]",
-    "core/services/paper_rag.py::PaperRAGService.show_paper": "(self, workspace_id: str, paper_id: str, *, request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
+    "core/services/research.py::ExperienceEvolutionService.add_experience": "(self, workspace_id: str, scope: str, title: str, summary: str, *, tags: list[str] | None=None, confirm: bool, source: dict[str, Any] | None=None) -> ServiceResult[dict[str, Any]]",
+    "core/services/research.py::ExperienceEvolutionService.delete_evolution_artifact": "(self, artifact_id: str) -> ServiceResult[dict[str, Any]]",
+    "core/services/research.py::ExperienceEvolutionService.delete_experience": "(self, record_id: str, workspace_id: str, scope: str, *, confirm: str) -> ServiceResult[dict[str, Any]]",
+    "core/services/research.py::ExperienceEvolutionService.edit_experience": "(self, record_id: str, workspace_id: str, scope: str, *, title: str | None=None, summary: str | None=None, tags: list[str] | None=None) -> ServiceResult[dict[str, Any]]",
+    "core/services/research.py::ExperienceEvolutionService.export_experiences": "(self, workspace_id: str, format: str, *, include_general: bool=False, path: str | Path | None=None) -> ServiceResult[str]",
+    "core/services/research.py::ExperienceEvolutionService.generate_evolution": "(self, *, instruction: str, artifact_type: str, output: str | Path, access_mode: str='sandbox', experience_source: Any | None=None, workspace_id: str | None=None, confirmed: bool=False, overwrite: bool=False, confirm_full_access: bool=False, acknowledge_risk: bool=False, metadata: dict[str, Any] | None=None) -> ServiceResult[dict[str, Any]]",
+    "core/services/research.py::ExperienceEvolutionService.get_evolution_artifact": "(self, artifact_id: str) -> ServiceResult[dict[str, Any]]",
+    "core/services/research.py::ExperienceEvolutionService.list_evolution_artifacts": "(self) -> ServiceResult[list[dict[str, Any]]]",
+    "core/services/research.py::ExperienceEvolutionService.list_experiences": "(self, workspace_id: str, *, include_general: bool=False) -> ServiceResult[list[dict[str, Any]]]",
+    "core/services/research.py::ExperienceEvolutionService.suggest_experience": "(self, workspace_id: str, summary: str, *, title: str | None=None, tags: list[str] | None=None, metadata: dict[str, Any] | None=None) -> ServiceResult[dict[str, Any]]",
+    "core/services/research.py::ExperienceEvolutionService.view_experience": "(self, record_id: str, workspace_id: str, scope: str | None=None) -> ServiceResult[dict[str, Any]]",
+    "core/services/research.py::PaperRAGService.edit_metadata": "(self, workspace_id: str, paper_id: str, metadata: dict[str, Any], *, request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
+    "core/services/research.py::PaperRAGService.enrich_metadata": "(self, workspace_id: str, paper_id: str, *, confirm: bool, request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
+    "core/services/research.py::PaperRAGService.enrichment_payload": "(enrichment: PaperEnrichmentResult) -> dict[str, Any]",
+    "core/services/research.py::PaperRAGService.import_paper": "(self, workspace_id: str, source_path: str | Path, metadata: dict[str, Any] | None=None, *, enrich: bool=False, confirm_enrich: bool=False, request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
+    "core/services/research.py::PaperRAGService.import_payload": "(imported: PaperImportResult, *, warnings: list[str] | None=None) -> dict[str, Any]",
+    "core/services/research.py::PaperRAGService.list_papers": "(self, workspace_id: str, *, request_id: str | None=None) -> ServiceResult[list[dict[str, Any]]]",
+    "core/services/research.py::PaperRAGService.metadata_payload": "(metadata: PaperMetadata) -> dict[str, Any]",
+    "core/services/research.py::PaperRAGService.show_paper": "(self, workspace_id: str, paper_id: str, *, request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
+    "core/services/research.py::WorkspaceService.create": "(self, workspace_id: str, *, name: str | None=None, fail_if_exists: bool=False, request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
+    "core/services/research.py::WorkspaceService.delete": "(self, workspace_id: str, *, confirm: str, agent_id: str='delta', request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
+    "core/services/research.py::WorkspaceService.list": "(self, *, request_id: str | None=None) -> ServiceResult[list[dict[str, Any]]]",
+    "core/services/research.py::WorkspaceService.load_selection": "(self, workspace_id: str, *, request_id: str | None=None) -> ServiceResult[str | None]",
+    "core/services/research.py::WorkspaceService.save_selection": "(self, workspace_id: str, selected_workspace_id: str | None=None, *, request_id: str | None=None) -> ServiceResult[str]",
+    "core/services/research.py::WorkspaceService.show": "(self, workspace_id: str, *, request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
     "core/services/result.py::ServiceError.to_dict": "(self) -> dict[str, Any]",
     "core/services/result.py::ServiceResult.failure": "(cls, code: str, message: str, *, request_id: str | None=None, details: dict[str, Any] | None=None, meta: dict[str, Any] | None=None) -> ServiceResult[Any]",
     "core/services/result.py::ServiceResult.success": "(cls, data: T, *, request_id: str | None=None, meta: dict[str, Any] | None=None) -> ServiceResult[T]",
@@ -2437,12 +2425,6 @@
     "core/services/system.py::PermissionLogSystemService.show_log": "(self, file_name: str) -> ServiceResult[dict[str, Any]]",
     "core/services/system.py::PermissionLogSystemService.system_diagnostics": "(self) -> ServiceResult[dict[str, Any]]",
     "core/services/system.py::PermissionLogSystemService.write_log": "(self, message: str, *, session_id: str | None=None) -> ServiceResult[dict[str, Any]]",
-    "core/services/workspace.py::WorkspaceService.create": "(self, workspace_id: str, *, name: str | None=None, fail_if_exists: bool=False, request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
-    "core/services/workspace.py::WorkspaceService.delete": "(self, workspace_id: str, *, confirm: str, agent_id: str='delta', request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
-    "core/services/workspace.py::WorkspaceService.list": "(self, *, request_id: str | None=None) -> ServiceResult[list[dict[str, Any]]]",
-    "core/services/workspace.py::WorkspaceService.load_selection": "(self, workspace_id: str, *, request_id: str | None=None) -> ServiceResult[str | None]",
-    "core/services/workspace.py::WorkspaceService.save_selection": "(self, workspace_id: str, selected_workspace_id: str | None=None, *, request_id: str | None=None) -> ServiceResult[str]",
-    "core/services/workspace.py::WorkspaceService.show": "(self, workspace_id: str, *, request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
     "core/session_manager.py::Session.age_seconds": "(self) -> float",
     "core/session_manager.py::Session.get": "(self, key: str, default: Any=None) -> Any",
     "core/session_manager.py::Session.is_dirty": "(self) -> bool",

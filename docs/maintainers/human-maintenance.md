@@ -26,8 +26,8 @@ reviewed starting point is therefore:
 | Metric | Reviewed current tree | Steady-state target |
 | --- | ---: | ---: |
 | Feature IDs | 195 | at least 195 |
-| Production Python files | 166 | 138-145 |
-| Effective production Python LOC | 33,554 | 32,500-34,000 |
+| Production Python files | 164 | 138-145 |
+| Effective production Python LOC | 33,541 | 32,500-34,000 |
 | Functions/methods | 1,586 | 1,450-1,500 |
 | Public top-level symbols | 520 | 410-430 |
 | Functions over 60 lines | 88 | at most 55-58 |
@@ -68,6 +68,7 @@ implementation.
 | Redaction compatibility module registry | -1 | +3 | +4 | 0 |
 | LLM and agent/harness execution service authority | -1 | -2 | 0 | 0 |
 | Permission/log and adapter system service authority | -1 | -7 | -4 | 0 |
+| Workspace, paper/RAG, and experience research authority | -2 | -21 | -13 | 0 |
 
 The workspace change preserves `AppResult`, `AppError`, and
 `ApplicationFacade`, moves atomic create/delete into `WorkspaceService`, and
@@ -92,6 +93,10 @@ The system service change similarly co-locates adapter authorization with the
 permission/log/diagnostics application boundary. `PermissionChecker`, both
 service classes, and both historical module paths remain directly importable;
 permission decisions and policy loading remain explicit code.
+The research service change places its three related application services in a
+799-line authority, preserving explicit RAG, enrichment, permission, audit,
+confirmation, and evolution flows. That file is now at the merge-size limit;
+additional domains must not be added to it.
 
 ## Change rule
 
