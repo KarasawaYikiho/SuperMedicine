@@ -35,6 +35,17 @@ def test_facade_requires_explicit_runtime_paths() -> None:
         ApplicationFacade()  # type: ignore[call-arg]
 
 
+def test_facade_keeps_workspace_service_as_the_only_authority() -> None:
+    source = (Path(__file__).parent.parent / "core" / "application.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "WorkspaceService" in source
+    assert "WorkspaceManager" not in source
+    assert "authorize_dangerous_operation" not in source
+    assert "PermissionEngine" not in source
+
+
 def test_cli_facade_and_web_endpoint_share_core_workspace_data(tmp_path) -> None:
     paths = _paths(tmp_path)
     cli = CLI(paths=paths)

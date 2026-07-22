@@ -48,11 +48,25 @@ Every production Python file has exactly one reviewed role in the snapshot:
 - `generated/release`: installer, build, or release-critical code;
 - `candidate`: a reviewed convergence candidate.
 
-The initial explicit candidates are `core/application.py`, whose workspace
-operations overlap the established application services, and
-`core/time_utils.py`, whose two aliases can be reviewed for direct reuse. A
-candidate label does not authorize deletion; its Feature IDs, callers,
-signatures, and tests must first be traced to an authority implementation.
+The initial review identified `core/application.py`, whose workspace operations
+overlapped the established application services, and `core/time_utils.py`,
+whose two aliases can be reviewed for direct reuse. Workspace behavior now has
+one authority in `WorkspaceService`; `ApplicationFacade` remains a compatibility
+contract for authenticated UI bridges and only adapts service results. The
+remaining candidate label does not authorize deletion; its Feature IDs,
+callers, signatures, and tests must first be traced to an authority
+implementation.
+
+## Completed convergence
+
+| Change | Files | Raw LOC | Effective LOC | Functions/methods |
+| --- | ---: | ---: | ---: | ---: |
+| Workspace service/facade authority | 3 | -107 | -99 | -4 |
+
+The workspace change preserves `AppResult`, `AppError`, and
+`ApplicationFacade`, moves atomic create/delete into `WorkspaceService`, and
+removes the duplicate manager, payload, permission, audit, and destructive-path
+implementation from the facade.
 
 ## Change rule
 
@@ -60,4 +74,3 @@ Keep one domain or one duplicate pattern per change. Regenerate the snapshot
 only after reviewing every signature, Feature ID, surface, and role delta. Do
 not accept fewer surface entries, historical imports, permission checks, audit
 events, RAG/Harness enforcement, Multi-Agent roles, or release entrypoints.
-

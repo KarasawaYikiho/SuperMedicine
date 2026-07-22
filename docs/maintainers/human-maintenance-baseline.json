@@ -365,9 +365,9 @@
   },
   "structural_metrics": {
     "production_python_files": 173,
-    "production_python_loc": 44530,
-    "production_python_effective_loc": 38451,
-    "functions_and_methods": 1961,
+    "production_python_loc": 44426,
+    "production_python_effective_loc": 38355,
+    "functions_and_methods": 1957,
     "public_top_level_symbols": 562,
     "functions_over_60_lines": 92,
     "functions_over_100_lines": 20,
@@ -403,9 +403,9 @@
       "production_python_files": 1
     },
     "core": {
-      "raw_loc": 24390,
-      "effective_loc": 21205,
-      "functions_and_methods": 1262,
+      "raw_loc": 24283,
+      "effective_loc": 21106,
+      "functions_and_methods": 1258,
       "public_top_level_symbols": 294,
       "production_python_files": 77
     },
@@ -459,8 +459,8 @@
       "production_python_files": 41
     },
     "scripts": {
-      "raw_loc": 1182,
-      "effective_loc": 958,
+      "raw_loc": 1185,
+      "effective_loc": 961,
       "functions_and_methods": 43,
       "public_top_level_symbols": 19,
       "production_python_files": 12
@@ -716,13 +716,13 @@
       "longest_function": 11
     },
     "core/application.py": {
-      "role": "candidate",
+      "role": "compat",
       "group": "core",
-      "raw_loc": 169,
-      "effective_loc": 143,
-      "functions_and_methods": 10,
+      "raw_loc": 75,
+      "effective_loc": 57,
+      "functions_and_methods": 6,
       "public_top_level_symbols": 3,
-      "longest_function": 54
+      "longest_function": 25
     },
     "core/config_center.py": {
       "role": "authority",
@@ -1150,11 +1150,11 @@
     "core/services/workspace.py": {
       "role": "authority",
       "group": "core",
-      "raw_loc": 283,
-      "effective_loc": 264,
+      "raw_loc": 270,
+      "effective_loc": 251,
       "functions_and_methods": 12,
       "public_top_level_symbols": 1,
-      "longest_function": 78
+      "longest_function": 75
     },
     "core/session_manager.py": {
       "role": "authority",
@@ -2005,8 +2005,8 @@
     "scripts/maintainers/human_maintenance_snapshot.py": {
       "role": "authority",
       "group": "scripts",
-      "raw_loc": 256,
-      "effective_loc": 226,
+      "raw_loc": 259,
+      "effective_loc": 229,
       "functions_and_methods": 11,
       "public_top_level_symbols": 4,
       "longest_function": 38

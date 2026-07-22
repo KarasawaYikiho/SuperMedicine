@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 from typing import Any
 
@@ -55,16 +54,7 @@ class WorkspaceService:
                         details={"workspace_id": slug},
                         meta=self._meta("create"),
                     )
-            info = self.manager.initialize_workspace(slug)
-            if name is not None:
-                metadata_path = info.path / "workspace.yaml"
-                metadata = yaml.safe_load(metadata_path.read_text(encoding="utf-8")) or {}
-                metadata["display_name"] = name
-                metadata_path.write_text(
-                    yaml.safe_dump(metadata, sort_keys=False, allow_unicode=True),
-                    encoding="utf-8",
-                )
-                info = self.manager.get_workspace(slug)
+            info = self.manager.initialize_workspace_atomic(slug, name=name)
             return ServiceResult.success(
                 self._workspace_data(info, name=name),
                 request_id=request_id,
@@ -184,10 +174,7 @@ class WorkspaceService:
                 audit_logger=audit_logger,
                 operation="workspace_delete",
             )
-            if authorization.path.is_dir():
-                shutil.rmtree(authorization.path)
-            else:
-                authorization.path.unlink()
+            self.manager.delete_workspace_atomic(authorization.path)
             return ServiceResult.success(
                 {
                     "status": "deleted",

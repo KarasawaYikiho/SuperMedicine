@@ -26,7 +26,8 @@ RELEASE_FILES = {
     "setup.py",
     "uninstall_entry.py",
 }
-CANDIDATE_FILES = {"core/application.py", "core/time_utils.py"}
+CANDIDATE_FILES = {"core/time_utils.py"}
+COMPAT_FILES = {"core/application.py"}
 DATA_FILES = {
     "core/experiment_protocols.py",
     "core/kernel_constants.py",
@@ -72,6 +73,8 @@ def _file_role(relative: str, tree: ast.Module) -> str:
         return "generated/release"
     if relative.startswith(INTERFACE_PREFIXES) or relative == "cli_entry.py":
         return "interface"
+    if relative in COMPAT_FILES:
+        return "compat"
     if relative in DATA_FILES:
         return "data"
     if relative in CANDIDATE_FILES:
