@@ -23,6 +23,15 @@ def _never_returns(_context: BridgeContext, _params: dict) -> None:
         time.sleep(1)
 
 
+def _never_ready_worker(*_args) -> None:
+    while True:
+        time.sleep(1)
+
+
+def _bootstrap_failure_worker(*_args) -> None:
+    raise RuntimeError("bootstrap failed")
+
+
 def _delayed_side_effect(_context: BridgeContext, params: dict) -> None:
     time.sleep(float(params["delay"]))
     Path(params["path"]).write_text("mutated", encoding="utf-8")
@@ -349,6 +358,41 @@ def test_close_terminates_an_active_noncooperative_worker(tmp_path) -> None:
             for process in multiprocessing.active_children()
             if process.name.startswith("tui-worker-")
         ]
+    finally:
+        peer.close()
+        server.close()
+
+
+@pytest.mark.parametrize(
+    ("worker_target", "expected", "timeout"),
+    [
+        (_never_ready_worker, "timeout", 0.15),
+        (_bootstrap_failure_worker, "internal_error", 5),
+    ],
+)
+def test_worker_bootstrap_is_bounded_before_ready_and_slot_is_reusable(
+    tmp_path, worker_target, expected, timeout
+) -> None:
+    server = TUIBridgeServer(
+        _application(tmp_path),
+        request_timeout=5,
+        worker_start_timeout=timeout,
+        concurrency_limit=1,
+    ).start()
+    normal_target = server._worker_target
+    server._worker_target = worker_target
+    peer = BridgePeer(server)
+    try:
+        peer.send(_request("bootstrap", "status", token=server.token))
+        response = peer.receive()
+        assert response["error"]["code"] == expected
+        assert server.worker_count == 0
+        assert server.active_request_count == 0
+
+        server._worker_target = normal_target
+        server.worker_start_timeout = 5
+        peer.send(_request("after-bootstrap", "status", token=server.token))
+        assert peer.receive()["type"] == "result"
     finally:
         peer.close()
         server.close()

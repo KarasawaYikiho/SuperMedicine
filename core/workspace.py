@@ -10,7 +10,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 import re
+import shutil
 from typing import Any
+from uuid import uuid4
 
 import yaml
 
@@ -26,6 +28,8 @@ WORKSPACES_DIR = "workspaces"
 WORKSPACE_METADATA_FILE = "workspace.yaml"
 WORKSPACE_METADATA_VERSION = 1
 SESSION_STATE_FILE = "tui_recent_selection.yaml"
+_STAGING_PREFIX = ".sm-staging-"
+_TOMBSTONE_PREFIX = ".sm-tombstone-"
 
 WORKSPACE_DIRECTORIES: tuple[str, ...] = (
     ".supermedicine",
@@ -181,6 +185,72 @@ class WorkspaceManager:
         return WorkspaceInfo(id=slug, path=workspace, metadata=metadata)
 
     create_workspace = initialize_workspace
+
+    def initialize_workspace_atomic(
+        self, workspace_id: str, *, name: str | None = None
+    ) -> WorkspaceInfo:
+        """Publish a fully built new workspace with one same-volume rename."""
+
+        slug = validate_workspace_id(workspace_id)
+        target = self.workspace_path(slug)
+        if target.exists():
+            return self.get_workspace(slug)
+        self.workspaces_root.mkdir(parents=True, exist_ok=True)
+        staging = validate_path_in_project_root(
+            self.workspaces_root / f"{_STAGING_PREFIX}{slug}-{uuid4().hex}",
+            self.project_root,
+        )
+        staging.mkdir()
+        for directory in WORKSPACE_DIRECTORIES:
+            validate_path_in_project_root(
+                staging / directory, self.project_root
+            ).mkdir(parents=True)
+        now = utc_now()
+        metadata: dict[str, Any] = WorkspaceMetadata(
+            id=slug, created_at=now, updated_at=now
+        ).to_dict()
+        if name is not None:
+            metadata["display_name"] = name
+        (staging / WORKSPACE_METADATA_FILE).write_text(
+            yaml.safe_dump(metadata, sort_keys=False, allow_unicode=True),
+            encoding="utf-8",
+        )
+        try:
+            staging.replace(target)
+        except OSError:
+            if target.exists():
+                shutil.rmtree(staging, ignore_errors=True)
+                return self.get_workspace(slug)
+            raise
+        return self.get_workspace(slug)
+
+    def delete_workspace_atomic(self, workspace: Path) -> None:
+        """Hide a workspace atomically before best-effort physical cleanup."""
+
+        target = validate_path_in_project_root(workspace, self.project_root)
+        tombstone = validate_path_in_project_root(
+            self.workspaces_root
+            / f"{_TOMBSTONE_PREFIX}{target.name}-{uuid4().hex}",
+            self.project_root,
+        )
+        target.replace(tombstone)
+        if tombstone.is_dir() and not tombstone.is_symlink():
+            shutil.rmtree(tombstone)
+        else:
+            tombstone.unlink()
+
+    def recover_atomic_transactions(self) -> None:
+        """Remove unpublished staging and already-hidden delete tombstones."""
+
+        if not self.workspaces_root.is_dir():
+            return
+        for entry in self.workspaces_root.iterdir():
+            if not entry.name.startswith((_STAGING_PREFIX, _TOMBSTONE_PREFIX)):
+                continue
+            if entry.is_dir() and not entry.is_symlink():
+                shutil.rmtree(entry)
+            else:
+                entry.unlink(missing_ok=True)
 
     def load_metadata(self, workspace_id: str) -> WorkspaceMetadata:
         """Load a workspace's UTF-8 YAML metadata."""

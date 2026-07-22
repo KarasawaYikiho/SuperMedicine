@@ -144,6 +144,65 @@ def test_initialize_workspace_creates_expected_layout_only_under_workspaces(tmp_
     assert not (tmp_path / ".supermedicine").exists()
 
 
+def test_atomic_workspace_create_publishes_only_a_complete_layout(
+    tmp_path, monkeypatch
+) -> None:
+    manager = WorkspaceManager(tmp_path)
+    original_replace = Path.replace
+
+    def interrupt_publish(source: Path, target: Path):
+        if source.name.startswith(".sm-staging-"):
+            assert (source / "workspace.yaml").is_file()
+            assert all((source / directory).is_dir() for directory in WORKSPACE_DIRECTORIES)
+            raise OSError("simulated terminate before publish")
+        return original_replace(source, target)
+
+    monkeypatch.setattr(Path, "replace", interrupt_publish)
+    with pytest.raises(OSError, match="simulated terminate"):
+        manager.initialize_workspace_atomic("atomic-create", name="Atomic")
+
+    assert not (tmp_path / "workspaces" / "atomic-create").exists()
+    assert list((tmp_path / "workspaces").glob(".sm-staging-*"))
+    monkeypatch.setattr(Path, "replace", original_replace)
+    manager.recover_atomic_transactions()
+    assert not list((tmp_path / "workspaces").glob(".sm-staging-*"))
+
+
+def test_atomic_workspace_delete_hides_before_cleanup_and_recovers(
+    tmp_path, monkeypatch
+) -> None:
+    manager = WorkspaceManager(tmp_path)
+    workspace = manager.initialize_workspace("atomic-delete").path
+
+    def interrupted_cleanup(_path: Path) -> None:
+        raise OSError("simulated terminate during cleanup")
+
+    monkeypatch.setattr("core.workspace.shutil.rmtree", interrupted_cleanup)
+    with pytest.raises(OSError, match="simulated terminate"):
+        manager.delete_workspace_atomic(workspace)
+
+    assert not workspace.exists()
+    assert list((tmp_path / "workspaces").glob(".sm-tombstone-*"))
+    monkeypatch.undo()
+    manager.recover_atomic_transactions()
+    assert not list((tmp_path / "workspaces").glob(".sm-tombstone-*"))
+
+
+def test_workspace_transaction_recovery_removes_only_internal_artifacts(tmp_path) -> None:
+    root = tmp_path / "workspaces"
+    staging = root / ".sm-staging-stale"
+    tombstone = root / ".sm-tombstone-stale"
+    visible = root / "visible"
+    for path in (staging, tombstone, visible):
+        path.mkdir(parents=True)
+
+    WorkspaceManager(tmp_path).recover_atomic_transactions()
+
+    assert not staging.exists()
+    assert not tombstone.exists()
+    assert visible.exists()
+
+
 def test_workspace_metadata_is_stored_and_reloaded(tmp_path):
     manager = WorkspaceManager(tmp_path)
 

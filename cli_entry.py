@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import multiprocessing
 import os
@@ -402,7 +403,19 @@ class CLI:
         )
 
 
-from cli.parser import main  # noqa: E402
+from cli.parser import main as _cli_main  # noqa: E402
+
+
+def main(argv: list[str] | None = None) -> None:
+    """Run the CLI or the packaged bridge worker lifecycle self-test."""
+
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments == ["--bridge-self-test"]:
+        from core.tui.bridge import bridge_worker_self_test
+
+        print(json.dumps(bridge_worker_self_test(), sort_keys=True))
+        return
+    _cli_main(arguments)
 
 if __name__ == "__main__":
     multiprocessing.freeze_support()

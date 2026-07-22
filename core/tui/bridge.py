@@ -11,12 +11,17 @@ import threading
 import time
 from dataclasses import dataclass, field
 from multiprocessing.connection import Connection
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any, Callable
 
 from core.application import AppResult, ApplicationFacade
+from core.runtime_paths import RuntimePaths
+from core.workspace import WorkspaceManager
 
 PROTOCOL_VERSION = 1
 DEFAULT_MAX_FRAME_BYTES = 1024 * 1024
+BRIDGE_TOPOLOGY = "python-parent-managed-isolated-worker"
 Handler = Callable[["BridgeContext", dict[str, Any]], Any]
 
 
@@ -260,11 +265,18 @@ def _request_worker(
         pipe.close()
 
 
+def _self_test_never(_context: BridgeContext, _params: dict[str, Any]) -> None:
+    while True:
+        time.sleep(1)
+
+
 class TUIBridgeServer:
     """Serve facade operations to authenticated loopback clients.
 
     Each request runs in a spawn worker process. Cancellation, timeout, disconnect,
     and close terminate and join that worker before exposing terminal state.
+    The existing Python parent owns both TCP and workers; Bun only connects to the
+    environment-provided loopback port and never starts Python or a worker.
     """
 
     def __init__(
@@ -274,6 +286,7 @@ class TUIBridgeServer:
         handlers: dict[str, Handler] | None = None,
         max_frame_bytes: int = DEFAULT_MAX_FRAME_BYTES,
         request_timeout: float = 30.0,
+        worker_start_timeout: float = 5.0,
         concurrency_limit: int = 8,
         connection_limit: int | None = None,
         authentication_timeout: float = 2.0,
@@ -285,6 +298,7 @@ class TUIBridgeServer:
         if (
             max_frame_bytes < 256
             or request_timeout <= 0
+            or worker_start_timeout <= 0
             or concurrency_limit < 1
             or connection_limit < 1
             or authentication_timeout <= 0
@@ -296,6 +310,7 @@ class TUIBridgeServer:
         self.token = secrets.token_urlsafe(32)
         self.max_frame_bytes = max_frame_bytes
         self.request_timeout = request_timeout
+        self.worker_start_timeout = worker_start_timeout
         self.concurrency_limit = concurrency_limit
         self.connection_limit = connection_limit
         self.authentication_timeout = authentication_timeout
@@ -312,6 +327,7 @@ class TUIBridgeServer:
         self._slots = threading.BoundedSemaphore(concurrency_limit)
         self._handlers = dict(handlers or {})
         self._mp = multiprocessing.get_context("spawn")
+        self._worker_target = _request_worker
 
     @property
     def address(self) -> tuple[str, int]:
@@ -345,6 +361,9 @@ class TUIBridgeServer:
     def start(self) -> "TUIBridgeServer":
         if self._listener is not None:
             return self
+        WorkspaceManager(
+            self.application.paths.project_root
+        ).recover_atomic_transactions()
         listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         listener.bind(("127.0.0.1", 0))
@@ -555,8 +574,10 @@ class TUIBridgeServer:
             self._active[key] = active
         parent_pipe, child_pipe = self._mp.Pipe(duplex=False)
         cancelled = self._mp.Event()
+        active.pipe = parent_pipe
+        active.cancelled = cancelled
         process = self._mp.Process(
-            target=_request_worker,
+            target=self._worker_target,
             args=(
                 child_pipe,
                 cancelled,
@@ -570,10 +591,17 @@ class TUIBridgeServer:
             name=f"tui-worker-{request_id[:12]}",
         )
         active.process = process
-        active.pipe = parent_pipe
-        active.cancelled = cancelled
         with self._lock:
             self._workers.add(process)
+        timer = threading.Timer(
+            self.worker_start_timeout,
+            lambda: self._terminate_error(
+                active, "timeout", "bridge worker startup timed out"
+            ),
+        )
+        timer.daemon = True
+        active.timer = timer
+        timer.start()
         try:
             with active.stop_lock:
                 if active.cancelled.is_set() or self._closing.is_set():
@@ -636,14 +664,17 @@ class TUIBridgeServer:
                     with active.lock:
                         if active.terminal:
                             return
-                    timer = threading.Timer(
-                        self.request_timeout,
-                        lambda: self._terminate_error(
-                            active, "timeout", "request timed out"
-                        ),
-                    )
-                    timer.daemon = True
-                    active.timer = timer
+                        startup_timer = active.timer
+                        timer = threading.Timer(
+                            self.request_timeout,
+                            lambda: self._terminate_error(
+                                active, "timeout", "request timed out"
+                            ),
+                        )
+                        timer.daemon = True
+                        active.timer = timer
+                    if startup_timer is not None:
+                        startup_timer.cancel()
                     timer.start()
                     continue
                 if kind == "event":
@@ -706,11 +737,11 @@ class TUIBridgeServer:
                 "error": {"code": code, "message": message},
             },
         )
+        self._retire(active)
         try:
             active.connection.send_bytes(encoded)
         except OSError:
             pass
-        self._retire(active)
 
     def _encode(self, frame: dict[str, Any]) -> bytes:
         return _encode_frame(frame, self.max_frame_bytes)
@@ -743,11 +774,11 @@ class TUIBridgeServer:
             if active.terminal:
                 return
             active.terminal = True
-            try:
-                active.connection.send_bytes(payload)
-            except OSError:
-                active.cancelled.set()
         self._retire(active)
+        try:
+            active.connection.send_bytes(payload)
+        except OSError:
+            active.cancelled.set()
 
     def _finish(self, active: _ActiveRequest, frame_type: str, **payload: Any) -> None:
         with active.lock:
@@ -763,11 +794,11 @@ class TUIBridgeServer:
                 },
             )
             active.terminal = True
-            try:
-                active.connection.send_bytes(encoded)
-            except OSError:
-                active.cancelled.set()
         self._retire(active)
+        try:
+            active.connection.send_bytes(encoded)
+        except OSError:
+            active.cancelled.set()
 
     def _finish_error(
         self,
@@ -815,4 +846,71 @@ class TUIBridgeServer:
         except (OSError, TypeError, ValueError, _OutboundTooLarge):
             pass
 
-__all__ = ["BridgeCancelled", "BridgeContext", "TUIBridgeServer"]
+
+def bridge_worker_self_test(project_root: str | Path | None = None) -> dict[str, Any]:
+    """Exercise a real source/frozen-compatible worker request/cancel/exit cycle."""
+
+    temporary = TemporaryDirectory() if project_root is None else None
+    root = Path(temporary.name) if temporary is not None else Path(project_root)
+    paths = RuntimePaths.resolve(project_root=root, source_root=root)
+    server = TUIBridgeServer(
+        ApplicationFacade(paths),
+        handlers={"self-test.never": _self_test_never},
+        request_timeout=10,
+        concurrency_limit=1,
+    ).start()
+    request_result = "failed"
+    cancel_result = "failed"
+    peer = socket.create_connection(server.address, timeout=20)
+    reader = peer.makefile("r", encoding="utf-8", newline="\n")
+
+    def send(request_id: str, method: str, frame_type: str = "request") -> None:
+        peer.sendall(
+            (
+                json.dumps(
+                    {
+                        "version": PROTOCOL_VERSION,
+                        "id": request_id,
+                        "type": frame_type,
+                        "method": method,
+                        "params": {},
+                        "token": server.token,
+                    }
+                )
+                + "\n"
+            ).encode()
+        )
+
+    try:
+        send("status", "status")
+        request_result = (
+            "ok" if json.loads(reader.readline()).get("type") == "result" else "failed"
+        )
+        send("cancel", "self-test.never")
+        send("cancel", "self-test.never", "cancel")
+        response = json.loads(reader.readline())
+        cancel_result = response.get("error", {}).get("code", "failed")
+    finally:
+        reader.close()
+        peer.close()
+        server.close()
+        if temporary is not None:
+            temporary.cleanup()
+    return {
+        "topology": BRIDGE_TOPOLOGY,
+        "request": request_result,
+        "cancel": cancel_result,
+        "workers_after_exit": server.worker_count,
+        "connections_after_exit": server.connection_count,
+        "bun_spawns_python": False,
+        "worker_start_method": server._mp.get_start_method(),
+    }
+
+
+__all__ = [
+    "BRIDGE_TOPOLOGY",
+    "BridgeCancelled",
+    "BridgeContext",
+    "TUIBridgeServer",
+    "bridge_worker_self_test",
+]

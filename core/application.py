@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import shutil
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -44,16 +43,7 @@ class ApplicationFacade:
     def create_workspace(self, workspace_id: str, name: str | None = None) -> AppResult:
         def operation() -> dict[str, Any]:
             manager = WorkspaceManager(self.paths.project_root)
-            info = manager.initialize_workspace(workspace_id)
-            if name is not None:
-                metadata_path = info.path / "workspace.yaml"
-                metadata = yaml.safe_load(metadata_path.read_text(encoding="utf-8")) or {}
-                metadata["display_name"] = name
-                metadata_path.write_text(
-                    yaml.safe_dump(metadata, sort_keys=False, allow_unicode=True),
-                    encoding="utf-8",
-                )
-                info = manager.get_workspace(workspace_id)
+            info = manager.initialize_workspace_atomic(workspace_id, name=name)
             return _workspace_data(info, name=name)
 
         return self._run(operation)
@@ -123,10 +113,7 @@ class ApplicationFacade:
                 audit_logger=audit_logger,
                 operation="workspace_delete",
             )
-            if authorization.path.is_dir():
-                shutil.rmtree(authorization.path)
-            else:
-                authorization.path.unlink()
+            manager.delete_workspace_atomic(authorization.path)
             return {"status": "deleted", "id": slug, "path": str(authorization.path)}
 
         return self._run(operation)

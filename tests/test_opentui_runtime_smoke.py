@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import multiprocessing.spawn
 import os
 import subprocess
+import sys
 from collections.abc import Callable
 from pathlib import Path
 
@@ -264,6 +266,51 @@ def test_opentui_submit_uses_real_workspace_chat_and_log_services(tmp_path):
     refreshed = catalog_snapshot(tmp_path)["data"]["pages"]
     assert any(record.get("summary") == "summarize trial" for record in refreshed["chat"])
     assert any(record.get("status") != "empty" for record in refreshed["log"])
+
+
+def test_bun_runtime_has_no_python_or_worker_spawn_capability() -> None:
+    root = Path(__file__).parents[1] / "core" / "tui"
+    source = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in [
+            root / "opentui_runtime.mjs",
+            *sorted((root / "opentui").glob("*.ts")),
+        ]
+    )
+    assert "child_process" not in source
+    assert "Bun.spawn" not in source
+    assert "python.exe" not in source.lower()
+    assert "BridgeClient.fromEnvironment()" in source
+
+
+def test_frozen_spawn_command_and_real_bridge_worker_self_test(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "_MEIPASS", str(tmp_path), raising=False)
+    command = multiprocessing.spawn.get_command_line(pipe_handle=123)
+    assert command[0] == sys.executable
+    assert "--multiprocessing-fork" in command
+    monkeypatch.delattr(sys, "frozen", raising=False)
+    monkeypatch.delattr(sys, "_MEIPASS", raising=False)
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(Path(__file__).parents[1] / "cli_entry.py"),
+            "--bridge-self-test",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert completed.returncode == 0, completed.stderr
+    report = json.loads(completed.stdout)
+    assert report["topology"] == "python-parent-managed-isolated-worker"
+    assert report["request"] == "ok"
+    assert report["cancel"] == "cancelled"
+    assert report["workers_after_exit"] == 0
+    assert report["bun_spawns_python"] is False
 
 
 def test_opentui_command_prefers_release_bridge_when_npm_dependencies_exist(
