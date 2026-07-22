@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from core.redaction import redact_path_for_display
+from permission.redaction import redact_path_for_display
 
 
 def new_application_log_session_id(prefix: str = "application") -> str:

@@ -5,11 +5,17 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 import sys
 
-from core import workspace_tool_spec as _workspace_tool_spec
 from core import log_report_models as _log_report_models
+from core import workspace_tool_spec as _workspace_tool_spec
+from permission import redaction as _redaction
 
-sys.modules.setdefault("core.workspace_tool_templates", _workspace_tool_spec)
-sys.modules.setdefault("core.log_severity", _log_report_models)
+_COMPAT_MODULES = {
+    "core.workspace_tool_templates": _workspace_tool_spec,
+    "core.log_severity": _log_report_models,
+    "core.redaction": _redaction,
+}
+for _module_name, _module in _COMPAT_MODULES.items():
+    sys.modules.setdefault(_module_name, _module)
 
 if TYPE_CHECKING:
     from core.config_center import ConfigCenter

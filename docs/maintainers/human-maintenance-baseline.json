@@ -371,9 +371,9 @@
     ]
   },
   "structural_metrics": {
-    "production_python_files": 169,
-    "production_python_loc": 38829,
-    "production_python_effective_loc": 33554,
+    "production_python_files": 168,
+    "production_python_loc": 38832,
+    "production_python_effective_loc": 33558,
     "functions_and_methods": 1586,
     "public_top_level_symbols": 520,
     "functions_over_60_lines": 88,
@@ -410,11 +410,11 @@
       "production_python_files": 1
     },
     "core": {
-      "raw_loc": 18518,
-      "effective_loc": 16141,
+      "raw_loc": 18521,
+      "effective_loc": 16145,
       "functions_and_methods": 886,
       "public_top_level_symbols": 252,
-      "production_python_files": 73
+      "production_python_files": 72
     },
     "gui_entry.py": {
       "raw_loc": 52,
@@ -716,8 +716,8 @@
     "core/__init__.py": {
       "role": "authority",
       "group": "core",
-      "raw_loc": 70,
-      "effective_loc": 56,
+      "raw_loc": 76,
+      "effective_loc": 62,
       "functions_and_methods": 2,
       "public_top_level_symbols": 0,
       "longest_function": 11
@@ -1009,15 +1009,6 @@
       "functions_and_methods": 8,
       "public_top_level_symbols": 2,
       "longest_function": 62
-    },
-    "core/redaction.py": {
-      "role": "compat",
-      "group": "core",
-      "raw_loc": 3,
-      "effective_loc": 2,
-      "functions_and_methods": 0,
-      "public_top_level_symbols": 0,
-      "longest_function": 0
     },
     "core/runtime_capabilities.py": {
       "role": "authority",

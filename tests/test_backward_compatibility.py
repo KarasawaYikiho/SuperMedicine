@@ -96,6 +96,15 @@ def test_core_cli_kernel_imports_do_not_load_platform_adapters():
     assert "adapters.claude_code.adapter" not in sys.modules
 
 
+def test_legacy_core_redaction_module_resolves_to_security_authority():
+    legacy = importlib.import_module("core.redaction")
+    authority = importlib.import_module("permission.redaction")
+
+    assert legacy is authority
+    assert legacy.redact_sensitive is authority.redact_sensitive
+    assert legacy.redact_path_for_display is authority.redact_path_for_display
+
+
 def test_cli_help_and_init_do_not_require_platform_runtime_or_config(
     monkeypatch, tmp_path, capsys
 ):

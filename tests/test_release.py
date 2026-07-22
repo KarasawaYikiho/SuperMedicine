@@ -118,7 +118,7 @@ HIGH_RISK_MODULES = {
     "permission/policy.py",
     "core/path_safety.py",
     "core/operation_guard.py",
-    "core/redaction.py",
+    "permission/redaction.py",
     "core/config_center.py",
     "core/llm_providers/config.py",
     "adapters/opencode/adapter.py",

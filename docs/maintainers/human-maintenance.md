@@ -26,8 +26,8 @@ reviewed starting point is therefore:
 | Metric | Reviewed current tree | Steady-state target |
 | --- | ---: | ---: |
 | Feature IDs | 195 | at least 195 |
-| Production Python files | 169 | 138-145 |
-| Effective production Python LOC | 33,554 | 32,500-34,000 |
+| Production Python files | 168 | 138-145 |
+| Effective production Python LOC | 33,558 | 32,500-34,000 |
 | Functions/methods | 1,586 | 1,450-1,500 |
 | Public top-level symbols | 520 | 410-430 |
 | Functions over 60 lines | 88 | at most 55-58 |
@@ -65,6 +65,7 @@ implementation.
 | Workspace service/facade authority | 3 | -104 | -96 | -4 |
 | OpenTUI/desktop convergence and Textual retirement | -4 | -5,600 | -4,796 | -361 |
 | Shared ServiceResult compatibility conversion | 8 | +3 | -5 | -10 |
+| Redaction compatibility module registry | -1 | +3 | +4 | 0 |
 
 The workspace change preserves `AppResult`, `AppError`, and
 `ApplicationFacade`, moves atomic create/delete into `WorkspaceService`, and
@@ -78,6 +79,9 @@ compatibility change centralizes service/operation metadata, safe internal
 error text, and legacy error-code-to-exception conversion. Existing
 `Service.require_data(result)` call signatures remain intact as declarative
 callables and are covered by direct runtime signature and exception tests.
+The redaction compatibility change removes the star-import implementation file,
+maps `core.redaction` directly to the security-owned `permission.redaction`
+authority, and keeps static typing through `core/redaction.pyi`.
 
 ## Change rule
 
