@@ -24,15 +24,15 @@ def application_data(result: Any) -> Any:
         return result.data
     error = result.error
     assert error is not None
-    return {
-        "status": "error",
-        "error": {
-            "code": error.code,
-            "message": error.message,
-            "details": error.details,
-            "retryable": error.retryable,
-        },
-    }
+    status_code = {
+        "validation_error": 422,
+        "not_found": 404,
+        "permission_denied": 403,
+        "conflict": 409,
+        "dependency_unavailable": 503,
+        "internal_error": 500,
+    }.get(error.code, 500)
+    return web_error(error.message, status_code, code=error.code)
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +84,8 @@ def register_workspace_paper_routes(app: Any, runtime: WebRuntime) -> None:
     async def workspace_create(request: dict[str, Any]) -> dict[str, Any]:
         """Initialize a new workspace."""
         workspace_id = request.get("id", "")
+        if not workspace_id:
+            return web_error("No workspace id provided", 400)
         return application_data(
             runtime.application.create_workspace(workspace_id, name=request.get("name"))
         )

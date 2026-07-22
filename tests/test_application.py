@@ -150,8 +150,8 @@ def test_web_workspace_delete_requires_caller_confirmation(tmp_path) -> None:
         "DELETE", "/api/v1/workspaces/keep-me", json={"confirm": "wrong"}
     )
 
-    assert missing.status_code == 200
-    assert wrong.status_code == 200
+    assert missing.status_code == 422
+    assert wrong.status_code == 422
     assert missing.json()["error"]["code"] == "validation_error"
     assert wrong.json()["error"]["code"] == "validation_error"
     assert app.get_workspace("keep-me").ok is True

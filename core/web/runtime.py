@@ -141,21 +141,21 @@ class WebRuntime:
     ) -> None:
         self._instances: dict[str, Any] = {}
         self._service_factories = service_factories
-        self.project_root = Path(project_root or Path.cwd()).resolve()
+        self.project_root = Path(project_root).resolve() if project_root is not None else None
         self.application = application
         self.auth_token = auth_token
         self.shutdown_callback = shutdown_callback
 
     def service(self, name: str) -> Any:
         """Create a request-scoped application service from injected factories."""
-        return self._service_factories[name](self.project_root)
+        return self._service_factories[name](self.project_root or Path.cwd())
 
     def get_kernel(self) -> Any:
         if "kernel" not in self._instances:
             from core.kernel import Kernel
             from permission.policy import ensure_default_policy
 
-            project_dir = self.project_root
+            project_dir = self.project_root or Path.cwd()
             policies_dir = project_dir / ".supermedicine" / "policies"
             ensure_default_policy(project_dir)
             self._instances["kernel"] = Kernel(
