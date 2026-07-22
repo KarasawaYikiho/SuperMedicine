@@ -371,8 +371,8 @@
     ]
   },
   "structural_metrics": {
-    "production_python_files": 168,
-    "production_python_loc": 38832,
+    "production_python_files": 167,
+    "production_python_loc": 38830,
     "production_python_effective_loc": 33558,
     "functions_and_methods": 1586,
     "public_top_level_symbols": 520,
@@ -410,11 +410,11 @@
       "production_python_files": 1
     },
     "core": {
-      "raw_loc": 18521,
+      "raw_loc": 18519,
       "effective_loc": 16145,
       "functions_and_methods": 886,
       "public_top_level_symbols": 252,
-      "production_python_files": 72
+      "production_python_files": 71
     },
     "gui_entry.py": {
       "raw_loc": 52,
@@ -1067,8 +1067,8 @@
     "core/services/__init__.py": {
       "role": "authority",
       "group": "core",
-      "raw_loc": 24,
-      "effective_loc": 22,
+      "raw_loc": 33,
+      "effective_loc": 29,
       "functions_and_methods": 0,
       "public_top_level_symbols": 0,
       "longest_function": 0
@@ -1082,14 +1082,14 @@
       "public_top_level_symbols": 2,
       "longest_function": 32
     },
-    "core/services/agent_harness.py": {
+    "core/services/execution.py": {
       "role": "authority",
       "group": "core",
-      "raw_loc": 72,
-      "effective_loc": 61,
-      "functions_and_methods": 4,
-      "public_top_level_symbols": 1,
-      "longest_function": 19
+      "raw_loc": 262,
+      "effective_loc": 237,
+      "functions_and_methods": 16,
+      "public_top_level_symbols": 2,
+      "longest_function": 26
     },
     "core/services/experience_evolution.py": {
       "role": "authority",
@@ -1108,15 +1108,6 @@
       "functions_and_methods": 46,
       "public_top_level_symbols": 1,
       "longest_function": 51
-    },
-    "core/services/llm.py": {
-      "role": "authority",
-      "group": "core",
-      "raw_loc": 201,
-      "effective_loc": 183,
-      "functions_and_methods": 12,
-      "public_top_level_symbols": 1,
-      "longest_function": 26
     },
     "core/services/paper_rag.py": {
       "role": "authority",
@@ -2379,8 +2370,17 @@
     "core/services/adapter.py::AdapterService.authorize": "(self, *, adapter: str, agent_id: str, action: str, resource: str, context: dict[str, Any] | None=None) -> ServiceResult[dict[str, Any]]",
     "core/services/adapter.py::AdapterService.policy_path": "(self) -> Path",
     "core/services/adapter.py::PermissionChecker.check": "(self, agent_id: str, action: str, resource: str, context: dict[str, Any] | None=None) -> PermissionResult",
-    "core/services/agent_harness.py::AgentHarnessService.append_dialog_event": "(self, workspace_id: str, *, event: str, summary: str, metadata: dict[str, Any] | None=None, session_id: str='default') -> ServiceResult[dict[str, Any]]",
-    "core/services/agent_harness.py::AgentHarnessService.list_dialog_events": "(self, workspace_id: str, *, session_id: str='default') -> ServiceResult[list[dict[str, Any]]]",
+    "core/services/execution.py::AgentHarnessService.append_dialog_event": "(self, workspace_id: str, *, event: str, summary: str, metadata: dict[str, Any] | None=None, session_id: str='default') -> ServiceResult[dict[str, Any]]",
+    "core/services/execution.py::AgentHarnessService.list_dialog_events": "(self, workspace_id: str, *, session_id: str='default') -> ServiceResult[list[dict[str, Any]]]",
+    "core/services/execution.py::LLMService.add_provider": "(self, provider: str, values: dict[str, Any], *, set_current: bool=False, request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
+    "core/services/execution.py::LLMService.delete_provider": "(self, provider: str, *, request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
+    "core/services/execution.py::LLMService.legacy_result": "(result: ServiceResult[Any]) -> Any",
+    "core/services/execution.py::LLMService.list_providers": "(self, *, request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
+    "core/services/execution.py::LLMService.provider_values": "(*, api_format: str | None=None, base_url: str | None=None, api_key: str | None=None, api_key_env: str | None=None, model: str | None=None, timeout: float | None=None, headers: dict[str, Any] | None=None) -> dict[str, Any]",
+    "core/services/execution.py::LLMService.save_exit_state": "(self, provider: str | None=None, *, request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
+    "core/services/execution.py::LLMService.show_provider": "(self, provider: str | None=None, *, request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
+    "core/services/execution.py::LLMService.switch_provider": "(self, provider: str, *, request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
+    "core/services/execution.py::LLMService.validate_provider": "(self, provider: str) -> ServiceResult[dict[str, Any]]",
     "core/services/experience_evolution.py::ExperienceEvolutionService.add_experience": "(self, workspace_id: str, scope: str, title: str, summary: str, *, tags: list[str] | None=None, confirm: bool, source: dict[str, Any] | None=None) -> ServiceResult[dict[str, Any]]",
     "core/services/experience_evolution.py::ExperienceEvolutionService.delete_evolution_artifact": "(self, artifact_id: str) -> ServiceResult[dict[str, Any]]",
     "core/services/experience_evolution.py::ExperienceEvolutionService.delete_experience": "(self, record_id: str, workspace_id: str, scope: str, *, confirm: str) -> ServiceResult[dict[str, Any]]",
@@ -2413,15 +2413,6 @@
     "core/services/experiment_tool.py::ExperimentToolService.start_experiment": "(self, protocol: str, *, session_id: str | None=None, request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
     "core/services/experiment_tool.py::ExperimentToolService.submit_experiment": "(self, session_file: str | Path, step_id: str, input_data: str | dict[str, Any], *, calculate: bool=False, request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
     "core/services/experiment_tool.py::ExperimentToolService.submit_live_step": "(self, session: ExperimentSession, user_input: dict[str, Any], outputs: dict[str, Any]) -> ServiceResult[dict[str, Any]]",
-    "core/services/llm.py::LLMService.add_provider": "(self, provider: str, values: dict[str, Any], *, set_current: bool=False, request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
-    "core/services/llm.py::LLMService.delete_provider": "(self, provider: str, *, request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
-    "core/services/llm.py::LLMService.legacy_result": "(result: ServiceResult[Any]) -> Any",
-    "core/services/llm.py::LLMService.list_providers": "(self, *, request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
-    "core/services/llm.py::LLMService.provider_values": "(*, api_format: str | None=None, base_url: str | None=None, api_key: str | None=None, api_key_env: str | None=None, model: str | None=None, timeout: float | None=None, headers: dict[str, Any] | None=None) -> dict[str, Any]",
-    "core/services/llm.py::LLMService.save_exit_state": "(self, provider: str | None=None, *, request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
-    "core/services/llm.py::LLMService.show_provider": "(self, provider: str | None=None, *, request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
-    "core/services/llm.py::LLMService.switch_provider": "(self, provider: str, *, request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
-    "core/services/llm.py::LLMService.validate_provider": "(self, provider: str) -> ServiceResult[dict[str, Any]]",
     "core/services/paper_rag.py::PaperRAGService.edit_metadata": "(self, workspace_id: str, paper_id: str, metadata: dict[str, Any], *, request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
     "core/services/paper_rag.py::PaperRAGService.enrich_metadata": "(self, workspace_id: str, paper_id: str, *, confirm: bool, request_id: str | None=None) -> ServiceResult[dict[str, Any]]",
     "core/services/paper_rag.py::PaperRAGService.enrichment_payload": "(enrichment: PaperEnrichmentResult) -> dict[str, Any]",

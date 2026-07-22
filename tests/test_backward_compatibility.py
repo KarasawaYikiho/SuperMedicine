@@ -105,6 +105,17 @@ def test_legacy_core_redaction_module_resolves_to_security_authority():
     assert legacy.redact_path_for_display is authority.redact_path_for_display
 
 
+def test_legacy_service_modules_resolve_to_execution_authority():
+    execution = importlib.import_module("core.services.execution")
+    llm = importlib.import_module("core.services.llm")
+    agent_harness = importlib.import_module("core.services.agent_harness")
+
+    assert llm is execution
+    assert agent_harness is execution
+    assert llm.LLMService is execution.LLMService
+    assert agent_harness.AgentHarnessService is execution.AgentHarnessService
+
+
 def test_cli_help_and_init_do_not_require_platform_runtime_or_config(
     monkeypatch, tmp_path, capsys
 ):
