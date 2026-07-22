@@ -41,7 +41,7 @@ web = [
     "websockets>=12,<16",
 ]
 desktop = [
-    "pywebview>=5.0,<7",
+    "pywebview==6.2.1",
     "pyinstaller>=6.0,<7",
 ]
 dev = [
@@ -52,7 +52,7 @@ dev = [
     "mypy>=1.0",
     "pandas>=2.0",
     "pypdf>=4.0",
-    "pywebview>=5.0,<7",
+    "pywebview==6.2.1",
     "pytest>=7.0",
     "pytest-cov>=4.0",
     "ruff>=0.4.0",
