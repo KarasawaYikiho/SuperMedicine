@@ -22,7 +22,7 @@ from core.tui.opentui_runtime import (
     opentui_command,
     runtime_info,
 )
-from core.services import WorkspaceService
+from core.services import LLMService, WorkspaceService
 from core.tui.service_bridge import bridge_request, catalog_snapshot, multi_agent_operation
 
 
@@ -88,6 +88,14 @@ def test_opentui_multi_agent_bridge_views_and_toggles_shared_service(tmp_path):
 
 def test_opentui_catalog_uses_real_services_without_demo_records(tmp_path):
     WorkspaceService(tmp_path).create("real-study", name="Real Study")
+    LLMService(tmp_path).add_provider(
+        "safe-provider",
+        {
+            "base_url": "https://private-provider.example/v1",
+            "model": "safe-model",
+            "api_key": "sk-must-never-reach-opentui",
+        },
+    )
     snapshot = catalog_snapshot(tmp_path)
 
     assert snapshot["ok"] is True
@@ -107,7 +115,20 @@ def test_opentui_catalog_uses_real_services_without_demo_records(tmp_path):
         "self-evolution",
         "diagnose",
     }
-    assert any(item.get("id") == "real-study" for item in pages["workspace"])
+    assert any(
+        item.get("activation", {}).get("id") == "real-study"
+        for item in pages["workspace"]
+    )
+    serialized_pages = json.dumps(pages, ensure_ascii=False)
+    assert '"status": "empty"' not in serialized_pages
+    assert "no dialog events" not in serialized_pages
+    assert "sk-must-never-reach-opentui" not in serialized_pages
+    assert "private-provider.example" not in serialized_pages
+    assert all(
+        set(item) <= {"label", "activation"}
+        for records in pages.values()
+        for item in records
+    )
     capabilities = snapshot["data"]["capabilities"]
     assert capabilities["rag-interface"]["enabled"] is True
     assert capabilities["harness-core"]["enabled"] is True
@@ -268,8 +289,9 @@ def test_opentui_submit_uses_real_workspace_chat_and_log_services(tmp_path):
     )
     assert log["ok"] is True
     refreshed = catalog_snapshot(tmp_path)["data"]["pages"]
-    assert any(record.get("summary") == "summarize trial" for record in refreshed["chat"])
-    assert any(record.get("status") != "empty" for record in refreshed["log"])
+    assert any("summarize trial" in record["label"] for record in refreshed["chat"])
+    assert refreshed["log"]
+    assert all("status" not in record for record in refreshed["log"])
 
 
 def test_bun_runtime_has_no_python_or_worker_spawn_capability() -> None:

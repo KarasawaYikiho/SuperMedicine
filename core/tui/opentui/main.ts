@@ -8,7 +8,8 @@ import { createNavigationItem, createPanel, createText } from "./components.ts"
 import { createPage } from "./pages.ts"
 import { ROUTES, createShellState, findRoute } from "./state.ts"
 import { THEME } from "./theme.ts"
-import { BridgeClient } from "./bridge.ts"
+import { BridgeClient, BridgeError } from "./bridge.ts"
+import { userFacingError } from "./ui_safety.ts"
 
 function safeWorkspaceLabel(projectRoot) {
   if (!projectRoot) return "未选择"
@@ -106,6 +107,7 @@ export function mountShell(renderer, options = {}) {
     currentPage = createPage(renderer, route, {
       markdownSyntaxStyle,
       pageFixtures: options.pageFixtures,
+      pageNotices: options.pageNotices,
       onAction: options.onAction,
       onActivate: options.onActivate,
     })
@@ -114,26 +116,42 @@ export function mountShell(renderer, options = {}) {
       composer = createPanel(renderer, {
         id: "chat-composer",
         width: "100%",
-        height: 3,
+        height: 4,
+        flexDirection: "column",
         paddingX: 1,
         focusedBorderColor: THEME.accent,
       })
       let prompt
+      const submitFeedback = createText(renderer, {
+        id: "chat-feedback",
+        content: "",
+        fg: THEME.warning,
+      })
       prompt = new InputRenderable(renderer, {
         id: "prompt-input",
         width: "100%",
         placeholder: "输入科研问题",
         fg: THEME.text,
         backgroundColor: THEME.surface,
-        async onSubmit() {
+      })
+      prompt.on("enter", () => {
+        void (async () => {
           const value = prompt.value.trim()
           if (!value || !options.onSubmit) return
-          await options.onSubmit("chat", value)
-          prompt.value = ""
+          submitFeedback.content = "处理中…"
           renderer.requestRender()
-        },
+          try {
+            await options.onSubmit("chat", value)
+            prompt.value = ""
+            submitFeedback.content = "已提交。"
+          } catch (error) {
+            submitFeedback.content = userFacingError(error)
+          }
+          renderer.requestRender()
+        })().catch(() => {})
       })
       composer.add(prompt)
+      composer.add(submitFeedback)
       pageColumn.add(composer)
     }
   }
@@ -253,7 +271,10 @@ export function mountShell(renderer, options = {}) {
     serviceStatus.content = `服务: ${status}`
     renderer.requestRender()
   }
-  return { root, state, activateRoute, openMenu, closeMenu, setConnectionStatus }
+  function reportError(error) {
+    setConnectionStatus(userFacingError(error))
+  }
+  return { root, state, activateRoute, openMenu, closeMenu, setConnectionStatus, reportError }
 }
 
 function assertAutomation(condition, message) {
@@ -438,18 +459,22 @@ export async function runCli(argv = process.argv.slice(2)) {
   try {
     let connectionStatus = "未连接"
     const pageFixtures = {}
+    const pageNotices = {}
     const callUi = async (request) => {
-      if (!bridge) throw new Error("Python 服务未连接")
+      if (!bridge) throw new BridgeError("disconnected", "服务连接已中断", true)
       const response = await bridge.request("ui.request", request)
       if (!response?.ok) {
         const error = response?.error || {}
-        throw new Error(`${error.code || "operation_failed"}: ${error.message || "操作失败"}`)
+        throw new BridgeError(error.code || "operation_failed", "操作未完成")
       }
       return response
     }
     const refreshCatalog = async () => {
       const response = await callUi({ operation: "catalog" })
+      for (const key of Object.keys(pageFixtures)) delete pageFixtures[key]
+      for (const key of Object.keys(pageNotices)) delete pageNotices[key]
       Object.assign(pageFixtures, response.data?.pages || {})
+      Object.assign(pageNotices, response.data?.notices || {})
       return response
     }
     if (BridgeClient.environmentConfigured()) {
@@ -475,6 +500,7 @@ export async function runCli(argv = process.argv.slice(2)) {
       projectRoot: args.projectRoot,
       connectionStatus,
       pageFixtures,
+      pageNotices,
       async onActivate(route, record) {
         await callUi({ operation: "activate", route, record })
       },
@@ -491,6 +517,14 @@ export async function runCli(argv = process.argv.slice(2)) {
       },
     })
     if (bridge) bridge.onDisconnect = () => shell.setConnectionStatus("桥断开，可重试")
+    const onUnhandledRejection = (error) => shell.reportError(error)
+    const onUncaughtException = () => {
+      if (!renderer.isDestroyed) renderer.destroy()
+      process.stderr.write("SuperMedicine TUI 遇到错误，已安全退出。\n")
+      process.exitCode = 1
+    }
+    process.on("unhandledRejection", onUnhandledRejection)
+    process.on("uncaughtException", onUncaughtException)
     renderer.keyInput.on("keypress", (event) => {
       const name = String(event.name || "").toLowerCase()
       if (name === "q" && !renderer.currentFocusedEditor) {
@@ -505,6 +539,8 @@ export async function runCli(argv = process.argv.slice(2)) {
       }
     })
     renderer.once("destroy", () => {
+      process.off("unhandledRejection", onUnhandledRejection)
+      process.off("uncaughtException", onUncaughtException)
       bridge?.close()
       if (args.mode === "smoke") process.stdout.write("SUPERMEDICINE_OPENTUI_SMOKE_OK\n")
     })
@@ -514,8 +550,7 @@ export async function runCli(argv = process.argv.slice(2)) {
   } catch (error) {
     bridge?.close()
     if (renderer && !renderer.isDestroyed) renderer.destroy()
-    const message = error instanceof Error ? error.message : String(error)
-    process.stderr.write(`SuperMedicine OpenTUI runtime failed: ${message}\n`)
+    process.stderr.write(`SuperMedicine OpenTUI runtime failed: ${userFacingError(error)}\n`)
     process.exitCode = 1
   }
 }

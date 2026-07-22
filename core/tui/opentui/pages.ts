@@ -1,6 +1,7 @@
 import { InputRenderable, MarkdownRenderable, ScrollBoxRenderable } from "@opentui/core"
 import { createActionButton, createListItem, createPanel, createText } from "./components.ts"
 import { THEME } from "./theme.ts"
+import { presentationRecord, safeUiText, userFacingError } from "./ui_safety.ts"
 
 const PAGE_CONTENT = Object.freeze({
   chat: ["开始新的科研对话", "选择工作区后在下方输入问题。"],
@@ -39,14 +40,7 @@ const ACTION_LABELS = Object.freeze({
   diagnose: "开始诊断",
 })
 
-function recordLabel(record) {
-  if (typeof record === "string") return record
-  if (record === null || record === undefined) return "空记录"
-  if (typeof record !== "object") return String(record)
-  return JSON.stringify(record)
-}
-
-function addEmptyState(renderer, page, route) {
+function addEmptyState(renderer, page, route, notice = "") {
   const [title, body] = PAGE_CONTENT[route.id]
   const empty = createPanel(renderer, {
     id: `page-empty-${route.id}`,
@@ -56,7 +50,11 @@ function addEmptyState(renderer, page, route) {
     paddingX: 1,
   })
   empty.add(createText(renderer, { content: title }))
-  empty.add(createText(renderer, { content: body, fg: THEME.muted, height: 2 }))
+  empty.add(createText(renderer, {
+    content: safeUiText(notice, body),
+    fg: notice ? THEME.warning : THEME.muted,
+    height: 2,
+  }))
   page.add(empty)
 }
 
@@ -109,22 +107,42 @@ export function createPage(renderer, route, resources) {
     page.add(field)
   }
 
-  const records = resources.pageFixtures?.[route.id] || []
+  const feedback = createText(renderer, {
+    id: `page-feedback-${route.id}`,
+    content: "",
+    fg: THEME.warning,
+  })
+  const records = Array.isArray(resources.pageFixtures?.[route.id])
+    ? resources.pageFixtures[route.id]
+    : []
   for (const [index, record] of records.entries()) {
+    const presented = presentationRecord(record)
     page.add(createListItem(renderer, {
       id: `page-record-${route.id}-${index}`,
-      label: recordLabel(record),
-      onActivate: () => resources.onActivate?.(route.id, record),
+      label: presented.label,
+      async onActivate() {
+        if (!presented.activation || !resources.onActivate) return
+        feedback.content = "处理中…"
+        renderer.requestRender()
+        try {
+          await resources.onActivate(route.id, presented.activation)
+          feedback.content = "已更新。"
+        } catch (error) {
+          feedback.content = userFacingError(error)
+        }
+        renderer.requestRender()
+      },
+      onError(error) {
+        feedback.content = userFacingError(error)
+        renderer.requestRender()
+      },
     }))
   }
 
-  if (route.id !== "chat" && records.length === 0) addEmptyState(renderer, page, route)
+  if (route.id !== "chat" && records.length === 0) {
+    addEmptyState(renderer, page, route, resources.pageNotices?.[route.id] || "")
+  }
   if (route.id !== "chat") {
-    const feedback = createText(renderer, {
-      id: `page-feedback-${route.id}`,
-      content: "",
-      fg: THEME.warning,
-    })
     page.add(createActionButton(renderer, {
       id: `page-action-${route.id}`,
       label: ACTION_LABELS[route.id],
@@ -134,8 +152,12 @@ export function createPage(renderer, route, resources) {
         try {
           feedback.content = await resources.onAction?.(route.id, field?.value || "") || "已刷新"
         } catch (error) {
-          feedback.content = error instanceof Error ? error.message : String(error)
+          feedback.content = userFacingError(error)
         }
+        renderer.requestRender()
+      },
+      onError(error) {
+        feedback.content = userFacingError(error)
         renderer.requestRender()
       },
     }))

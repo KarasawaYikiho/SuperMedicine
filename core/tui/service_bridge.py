@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,50 @@ from core.services import (
     ServiceResult,
     WorkspaceService,
 )
+from core.redaction import redact_sensitive
+
+
+_CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f]")
+_ROUTE_LABELS = {
+    "chat": "对话",
+    "dashboard": "状态",
+    "workspace": "工作区",
+    "paper": "论文",
+    "experience": "经验",
+    "tool": "工具",
+    "dialog": "对话历史",
+    "llm": "模型",
+    "experiment": "实验",
+    "log": "日志",
+    "permission": "权限",
+    "self-evolution": "自进化",
+    "diagnose": "诊断",
+}
+_DISPLAY_KEYS = {
+    "chat": ("summary", "event", "title"),
+    "workspace": ("name", "id"),
+    "paper": ("title", "name", "id"),
+    "experience": ("title", "name", "id"),
+    "tool": ("name", "title", "id"),
+    "dialog": ("summary", "event", "title"),
+    "llm": ("provider", "model", "current"),
+    "experiment": ("name", "title", "id", "status"),
+    "log": ("title", "name", "status", "id"),
+    "permission": ("mode_label", "mode", "enabled", "status"),
+    "self-evolution": ("title", "name", "id", "status"),
+    "diagnose": ("title", "name", "status", "message"),
+}
+_DISPLAY_VALUE_TRANSLATIONS = {
+    "conservative": "保守模式",
+    "full_access": "完全访问模式",
+    "enabled": "已启用",
+    "disabled": "未启用",
+    "running": "运行中",
+    "completed": "已完成",
+    "failed": "失败",
+    "pending": "等待中",
+    "ready": "就绪",
+}
 
 
 def _configure_utf8_stdio() -> None:
@@ -40,21 +85,69 @@ def multi_agent_operation(action: str, project_root: str | Path) -> dict[str, An
     return result.to_dict()
 
 
-def _records(
-    result: ServiceResult[Any], *, empty_reason: str = "no records"
-) -> list[Any]:
+def _records(result: ServiceResult[Any]) -> list[Any]:
+    """Return real records only; empty/error state is carried as page metadata."""
+
     if not result.ok:
-        return [
-            {"status": "error", "error": result.error.to_dict() if result.error else {}}
-        ]
+        return []
     data = result.data
     if isinstance(data, list):
-        return data or [{"status": "empty", "reason": empty_reason}]
-    return (
-        [data]
-        if data not in (None, {}, "")
-        else [{"status": "empty", "reason": empty_reason}]
-    )
+        return data
+    return [data] if data not in (None, {}, "") else []
+
+
+def _page_notice(result: ServiceResult[Any]) -> str:
+    if result.ok:
+        return ""
+    return "数据暂时无法读取，请稍后重试。"
+
+
+def _first_page_notice(*results: ServiceResult[Any]) -> str:
+    return next((notice for result in results if (notice := _page_notice(result))), "")
+
+
+def _safe_label(value: Any, fallback: str) -> str:
+    text = str(redact_sensitive(str(value)))
+    text = _CONTROL_CHARACTERS.sub(" ", text)
+    text = " ".join(text.split()).strip()
+    return (text or fallback)[:160]
+
+
+def _presentation_entry(route: str, record: Any) -> dict[str, Any]:
+    fallback = f"{_ROUTE_LABELS.get(route, '页面')}记录"
+    if isinstance(record, str):
+        return {"label": _safe_label(record, fallback)}
+    if not isinstance(record, dict):
+        return {"label": fallback}
+
+    parts: list[str] = []
+    for key in _DISPLAY_KEYS.get(route, ("title", "name", "id", "status")):
+        value = record.get(key)
+        if isinstance(value, bool):
+            if key == "current":
+                value = "当前" if value else ""
+            elif key == "enabled":
+                value = "已启用" if value else "未启用"
+            else:
+                value = "是" if value else "否"
+        if isinstance(value, str):
+            value = _DISPLAY_VALUE_TRANSLATIONS.get(value.lower(), value)
+        if isinstance(value, (str, int, float)) and str(value).strip():
+            parts.append(_safe_label(value, fallback))
+        if len(parts) == 2:
+            break
+    entry: dict[str, Any] = {"label": " · ".join(parts) or fallback}
+    if route == "workspace" and record.get("id"):
+        entry["activation"] = {"id": _safe_label(record["id"], "")}
+    elif route == "llm" and record.get("provider"):
+        entry["activation"] = {
+            "provider": _safe_label(record["provider"], "")
+        }
+    return entry
+
+
+def _present(route: str, records: list[Any]) -> list[dict[str, Any]]:
+    return [_presentation_entry(route, record) for record in records]
 
 
 def catalog_snapshot(project_root: str | Path) -> dict[str, Any]:
@@ -95,35 +188,57 @@ def catalog_snapshot(project_root: str | Path) -> dict[str, Any]:
         else missing_workspace
     )
     tools = experiments.list_tools(workspace_id) if workspace_id else missing_workspace
+    experiment_records = experiments.list_experiments()
+    log_records = system.list_logs()
+    permission_status = system.permission_status()
+    multi_agent_status = system.multi_agent_status()
+    evolution_records = ExperienceEvolutionService(root).list_evolution_artifacts()
+    diagnostics = system.config_diagnostics()
     pages = {
-        "chat": _records(dialog, empty_reason="no dialog events"),
+        "chat": _present("chat", _records(dialog)),
         "dashboard": [
-            {"runtime_state": runtime_data},
-            {"workspace_count": len(workspaces.data or []) if workspaces.ok else 0},
-            {"capabilities": capability_data},
+            {"label": f"工作区：{len(workspaces.data or []) if workspaces.ok else 0} 个"},
+            {"label": f"可用插件：{sum(1 for value in capability_data.values() if isinstance(value, dict) and value.get('enabled'))} 个"},
+            {"label": f"当前工作区：{_safe_label(workspace_id, '未选择') if workspace_id else '未选择'}"},
         ],
-        "workspace": _records(workspaces, empty_reason="no workspaces"),
-        "paper": _records(papers, empty_reason="select a workspace to list papers"),
-        "experience": _records(
-            experiences, empty_reason="select a workspace to list experiences"
+        "workspace": _present("workspace", _records(workspaces)),
+        "paper": _present("paper", _records(papers)),
+        "experience": _present("experience", _records(experiences)),
+        "tool": _present("tool", _records(tools)),
+        "dialog": _present("dialog", _records(dialog)),
+        "llm": _present("llm", _llm_records(llm)),
+        "experiment": _present("experiment", _records(experiment_records)),
+        "log": _present("log", _records(log_records)),
+        "permission": _present(
+            "permission", _records(permission_status) + _records(multi_agent_status)
         ),
-        "tool": _records(tools, empty_reason="select a workspace to list tools"),
-        "dialog": _records(dialog, empty_reason="no dialog events"),
-        "llm": _llm_records(llm),
-        "experiment": _records(experiments.list_experiments()),
-        "log": _records(system.list_logs(), empty_reason="no log reports"),
-        "permission": _records(system.permission_status())
-        + _records(system.multi_agent_status()),
-        "self-evolution": _records(
-            ExperienceEvolutionService(root).list_evolution_artifacts(),
-            empty_reason="no evolution artifacts",
-        ),
-        "diagnose": _records(system.config_diagnostics())
-        + [{"plugin_capabilities": capability_data}],
+        "self-evolution": _present("self-evolution", _records(evolution_records)),
+        "diagnose": _present("diagnose", _records(diagnostics)),
+    }
+    notice_results = {
+        "chat": (dialog,),
+        "dashboard": (runtime, workspaces, capabilities),
+        "workspace": (workspaces,),
+        "paper": (papers,),
+        "experience": (experiences,),
+        "tool": (tools,),
+        "dialog": (dialog,),
+        "llm": (llm,),
+        "experiment": (experiment_records,),
+        "log": (log_records,),
+        "permission": (permission_status, multi_agent_status),
+        "self-evolution": (evolution_records,),
+        "diagnose": (diagnostics,),
+    }
+    notices = {
+        route: notice
+        for route, results in notice_results.items()
+        if (notice := _first_page_notice(*results))
     }
     return ServiceResult.success(
         {
             "pages": pages,
+            "notices": notices,
             "runtime_state": runtime_data,
             "capabilities": capability_data,
         },
@@ -133,13 +248,17 @@ def catalog_snapshot(project_root: str | Path) -> dict[str, Any]:
 
 def _llm_records(result: ServiceResult[Any]) -> list[dict[str, Any]]:
     if not result.ok or not isinstance(result.data, dict):
-        return _records(result, empty_reason="no LLM providers")
+        return []
     current = result.data.get("current_provider")
     providers = result.data.get("providers")
     if not isinstance(providers, dict) or not providers:
-        return [{"status": "empty", "reason": "no LLM providers"}]
+        return []
     return [
-        {"provider": name, "current": name == current, **values}
+        {
+            "provider": name,
+            "model": values.get("model", ""),
+            "current": name == current,
+        }
         for name, values in providers.items()
         if isinstance(values, dict)
     ]

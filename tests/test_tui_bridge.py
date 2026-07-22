@@ -646,7 +646,7 @@ def test_real_bun_client_python_bridge_lifecycle_integration(tmp_path) -> None:
         "const workspace = await client.request('workspace.create', {workspace_id:'from-bun'});\n"
         "if (workspace.id !== 'from-bun') throw new Error('workspace path failed');\n"
         "const catalog = await client.request('ui.request', {operation:'catalog'});\n"
-        "if (!catalog.ok || !catalog.data.pages.workspace.some(item => item.id === 'from-bun')) throw new Error('catalog path failed');\n"
+        "if (!catalog.ok || !catalog.data.pages.workspace.some(item => item.activation?.id === 'from-bun')) throw new Error('catalog path failed');\n"
         "const logged = await client.request('ui.request', {operation:'submit', route:'log', value:'OpenTUI bridge log'});\n"
         "if (!logged.ok) throw new Error('submit path failed');\n"
         "const events = [];\n"

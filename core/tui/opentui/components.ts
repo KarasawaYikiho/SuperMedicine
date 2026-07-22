@@ -1,6 +1,14 @@
 import { BoxRenderable, MouseButton, TextRenderable } from "@opentui/core"
 import { THEME } from "./theme.ts"
 
+function invokeActivation(onActivate, onError) {
+  try {
+    Promise.resolve(onActivate()).catch(onError)
+  } catch (error) {
+    onError(error)
+  }
+}
+
 export function createText(renderer, options) {
   return new TextRenderable(renderer, {
     fg: THEME.text,
@@ -73,7 +81,7 @@ export function createPanel(renderer, options = {}) {
   })
 }
 
-export function createActionButton(renderer, { id, label, onActivate }) {
+export function createActionButton(renderer, { id, label, onActivate, onError = () => {} }) {
   let hovered = false
   const button = createPanel(renderer, {
     id,
@@ -98,12 +106,12 @@ export function createActionButton(renderer, { id, label, onActivate }) {
       if (event.button !== MouseButton.LEFT) return
       event.stopPropagation()
       button.focus()
-      onActivate()
+      invokeActivation(onActivate, onError)
     },
     onKeyDown(event) {
       if (event.name !== "enter" && event.name !== "return") return
       event.preventDefault()
-      onActivate()
+      invokeActivation(onActivate, onError)
     },
   })
   const text = createText(renderer, { content: label, fg: THEME.accent })
@@ -114,7 +122,7 @@ export function createActionButton(renderer, { id, label, onActivate }) {
   return button
 }
 
-export function createListItem(renderer, { id, label, onActivate = () => {} }) {
+export function createListItem(renderer, { id, label, onActivate = () => {}, onError = () => {} }) {
   const item = new BoxRenderable(renderer, {
     id,
     width: "100%",
@@ -135,12 +143,12 @@ export function createListItem(renderer, { id, label, onActivate = () => {} }) {
       if (event.button !== MouseButton.LEFT) return
       event.stopPropagation()
       item.focus()
-      onActivate()
+      invokeActivation(onActivate, onError)
     },
     onKeyDown(event) {
       if (event.name !== "enter" && event.name !== "return") return
       event.preventDefault()
-      onActivate()
+      invokeActivation(onActivate, onError)
     },
   })
   const text = createText(renderer, { content: `› ${label}` })

@@ -3,6 +3,95 @@ import { BoxRenderable, InputRenderable, MarkdownRenderable, ScrollBoxRenderable
 import { createTestRenderer, MouseButtons } from "@opentui/core/testing"
 import { ROUTES } from "../state.ts"
 import { mountShell, runAutomatedMode } from "../main.ts"
+import { presentationRecord, safeUiText, userFacingError } from "../ui_safety.ts"
+
+test("page presentation never stringifies internal objects or error stacks", async () => {
+  const { renderer, mockMouse, renderOnce, captureCharFrame } = await createTestRenderer({ width: 100, height: 30 })
+  try {
+    const shell = mountShell(renderer, {
+      pageFixtures: {
+        workspace: [{
+          label: "安全工作区",
+          activation: { id: "safe-workspace" },
+          internal: { status: "empty", token: "secret-token" },
+        }],
+      },
+      async onActivate() {
+        const error = new Error("C:\\private\\bridge.ts:134 secret-token")
+        error.code = "disconnected"
+        throw error
+      },
+    })
+    shell.activateRoute("workspace")
+    await renderOnce()
+    let frame = captureCharFrame()
+    expect(frame).toContain("安全工作区")
+    expect(frame).not.toContain("{")
+    expect(frame).not.toContain("status")
+    expect(frame).not.toContain("secret-token")
+
+    const record = renderer.root.findDescendantById("page-record-workspace-0")
+    await mockMouse.click(record.x + 2, record.y)
+    await Bun.sleep(0)
+    await renderOnce()
+    frame = captureCharFrame()
+    expect(frame).toContain("服务连接已中断")
+    expect(frame).not.toContain("BridgeError")
+    expect(frame).not.toContain("bridge.ts")
+    expect(frame).not.toContain("secret-token")
+  } finally {
+    renderer.destroy()
+  }
+})
+
+test("all UI safety fallbacks reject raw objects, control bytes, and unknown errors", () => {
+  expect(presentationRecord({ status: "empty", reason: "internal" })).toEqual({
+    label: "记录",
+    activation: null,
+  })
+  expect(safeUiText("visible\u001b[31m hidden\nnext")).toBe("visible hidden next")
+  expect(safeUiText('{"status":"empty","reason":"internal"}')).toBe("记录")
+  expect(safeUiText("BridgeError: at C:\\private\\bridge.ts:134:16")).toBe("记录")
+  expect(safeUiText("provider api_key=secret-value ready")).toBe("provider api_key=[已隐藏] ready")
+  expect(userFacingError(new Error("C:\\secret\\source.ts:99"))).toBe("操作未完成，请重试。")
+})
+
+test("action and chat submission failures stay inside sanitized page feedback", async () => {
+  const { renderer, mockMouse, mockInput, renderOnce, captureCharFrame } = await createTestRenderer({ width: 100, height: 30 })
+  const fail = async () => {
+    throw new Error("BridgeError at C:\\private\\main.ts:515 api_key=secret")
+  }
+  try {
+    const shell = mountShell(renderer, { onAction: fail, onSubmit: fail })
+    shell.activateRoute("dashboard")
+    await renderOnce()
+    const action = renderer.root.findDescendantById("page-action-dashboard")
+    await mockMouse.click(action.x + 2, action.y + 1)
+    await Bun.sleep(0)
+    await renderOnce()
+    let frame = captureCharFrame()
+    expect(frame).toContain("操作未完成，请重试")
+    expect(frame).not.toContain("BridgeError")
+    expect(frame).not.toContain("main.ts")
+    expect(frame).not.toContain("secret")
+
+    shell.activateRoute("chat")
+    await renderOnce()
+    const prompt = renderer.root.findDescendantById("prompt-input")
+    await mockMouse.click(prompt.x + 2, prompt.y)
+    await mockInput.typeText("科研问题")
+    prompt.submit()
+    await Bun.sleep(0)
+    await renderOnce()
+    frame = captureCharFrame()
+    expect(frame).toContain("操作未完成，请重试")
+    expect(frame).not.toContain("BridgeError")
+    expect(frame).not.toContain("main.ts")
+    expect(frame).not.toContain("api_key")
+  } finally {
+    renderer.destroy()
+  }
+})
 
 test("OpenTUI 0.4.3 test renderer renders and is destroyed", async () => {
   const { renderer, renderOnce, captureCharFrame } = await createTestRenderer({
