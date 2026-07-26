@@ -29,7 +29,11 @@ def web_error(message: str, status_code: int, *, code: str | None = None) -> Any
     }
     if status_code >= 500 and code != "shutdown_unavailable":
         return api_error_response(
-            APIError(status_code, "internal_error", "Internal server error")
+            APIError(
+                status_code,
+                code or "internal_error",
+                "系统暂时无法完成请求，请稍后重试。",
+            )
         )
     return api_error_response(
         APIError(status_code, code or codes.get(message, "request_error"), message)

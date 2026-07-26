@@ -271,6 +271,136 @@ def _runtime_workspace(project_root: str | Path) -> str:
     return str(state.data.get("last_workspace_id") or "")
 
 
+def _path_pair(target: Any) -> tuple[Path, Path]:
+    """Accept RuntimePaths from the real bridge and Path in focused tests."""
+    project = Path(getattr(target, "project_root", target)).resolve()
+    resource = Path(getattr(target, "resource_root", project)).resolve()
+    return project, resource
+
+
+def _execute_chat(value: str, target: Any) -> dict[str, Any]:
+    """Run TUI chat through the same Kernel runtime as Web."""
+    from core.web.runtime import WebRuntime
+
+    project_root, resource_root = _path_pair(target)
+    runtime = WebRuntime(
+        {
+            "agent_harness": AgentHarnessService,
+            "experiment_tool": ExperimentToolService,
+            "experience_evolution": ExperienceEvolutionService,
+            "llm": LLMService,
+            "paper_rag": PaperRAGService,
+            "permission_log_system": PermissionLogSystemService,
+            "workspace": WorkspaceService,
+        },
+        project_root=project_root,
+        resource_root=resource_root,
+    )
+    try:
+        result = runtime.execute_chat_message(
+            value, workspace_id=_runtime_workspace(project_root) or None
+        )
+        output = result.get("output") if isinstance(result, dict) else None
+        if isinstance(output, dict):
+            message = output.get("message") or output.get("text")
+        else:
+            message = output
+        workspace_id = _runtime_workspace(project_root)
+        if workspace_id:
+            history = AgentHarnessService(project_root)
+            history.append_dialog_event(
+                workspace_id, event="user_message", summary=value
+            )
+            history.append_dialog_event(
+                workspace_id,
+                event="assistant_message",
+                summary=_safe_label(message, "对话已完成"),
+            )
+        return ServiceResult.success(
+            {"message": _safe_label(message, "对话已完成")},
+            meta={"service": "opentui", "operation": "chat"},
+        ).to_dict()
+    except Exception:
+        return ServiceResult.failure(
+            "chat_unavailable",
+            "对话服务暂时不可用，请检查模型配置后重试。",
+            meta={"service": "opentui", "operation": "chat"},
+        ).to_dict()
+    finally:
+        runtime.close()
+
+
+def perform_action(route: str, value: str, target: Any) -> dict[str, Any]:
+    """Execute the primary business action exposed by each TUI page."""
+    project_root, _ = _path_pair(target)
+    workspace_id = _runtime_workspace(project_root)
+    if route == "dashboard":
+        return PermissionLogSystemService(project_root).application_status().to_dict()
+    if route == "workspace":
+        return submit_value(route, value, project_root)
+    if route == "paper":
+        if not workspace_id or not value:
+            return ServiceResult.failure(
+                "paper_input_required",
+                "请先选择工作区并输入论文文件路径。",
+                meta={"service": "opentui", "route": route},
+            ).to_dict()
+        return PaperRAGService(project_root).import_paper(
+            workspace_id, value
+        ).to_dict()
+    if route == "experience":
+        if not workspace_id or not value:
+            return ServiceResult.failure(
+                "experience_input_required",
+                "请先选择工作区并输入经验摘要。",
+                meta={"service": "opentui", "route": route},
+            ).to_dict()
+        return ExperienceEvolutionService(project_root).add_experience(
+            workspace_id,
+            "workspace",
+            value[:60],
+            value,
+            confirm=True,
+        ).to_dict()
+    if route == "tool":
+        if not workspace_id:
+            return ServiceResult.failure(
+                "workspace_not_selected",
+                "请先选择工作区。",
+                meta={"service": "opentui", "route": route},
+            ).to_dict()
+        return ExperimentToolService(project_root).initialize_tools(
+            workspace_id
+        ).to_dict()
+    if route == "llm":
+        return activate_record("llm", {"provider": value}, project_root)
+    if route == "experiment":
+        if not value:
+            return ServiceResult.failure(
+                "protocol_required",
+                "请输入实验协议。",
+                meta={"service": "opentui", "route": route},
+            ).to_dict()
+        return ExperimentToolService(project_root).start_experiment(value).to_dict()
+    if route == "log":
+        return submit_value(route, value, project_root)
+    if route == "permission":
+        return PermissionLogSystemService(project_root).permission_status().to_dict()
+    if route == "self-evolution":
+        return ExperienceEvolutionService(project_root).list_evolution_artifacts().to_dict()
+    if route == "diagnose":
+        return PermissionLogSystemService(project_root).system_diagnostics().to_dict()
+    if route == "dialog":
+        if not workspace_id:
+            return ServiceResult.success([], meta={"service": "opentui"}).to_dict()
+        return AgentHarnessService(project_root).list_dialog_events(workspace_id).to_dict()
+    return ServiceResult.failure(
+        "unsupported_route_action",
+        "此页面没有可执行操作。",
+        meta={"service": "opentui", "route": route},
+    ).to_dict()
+
+
 def activate_record(
     route: str, record: dict[str, Any], project_root: str | Path
 ) -> dict[str, Any]:
@@ -306,16 +436,7 @@ def submit_value(route: str, value: str, project_root: str | Path) -> dict[str, 
         )
         return created.to_dict()
     if route == "chat":
-        workspace_id = _runtime_workspace(project_root)
-        if not workspace_id:
-            return ServiceResult.failure(
-                "workspace_not_selected",
-                "Select a workspace before submitting chat input",
-                meta={"service": "opentui", "operation": "submit", "route": route},
-            ).to_dict()
-        return AgentHarnessService(project_root).append_dialog_event(
-            workspace_id, event="user_message", summary=value
-        ).to_dict()
+        return _execute_chat(value, project_root)
     if route == "log":
         return PermissionLogSystemService(project_root).write_log(value).to_dict()
     return ServiceResult.failure(
@@ -325,7 +446,8 @@ def submit_value(route: str, value: str, project_root: str | Path) -> dict[str, 
     ).to_dict()
 
 
-def bridge_request(request: dict[str, Any], project_root: str | Path) -> dict[str, Any]:
+def bridge_request(request: dict[str, Any], target: Any) -> dict[str, Any]:
+    project_root, _ = _path_pair(target)
     operation = str(request.get("operation") or "")
     if operation == "catalog":
         return catalog_snapshot(project_root)
@@ -350,10 +472,18 @@ def bridge_request(request: dict[str, Any], project_root: str | Path) -> dict[st
             ).to_dict()
         return activate_record(str(request.get("route") or ""), record, project_root)
     if operation == "submit":
+        if str(request.get("route") or "") == "chat":
+            return _execute_chat(str(request.get("value") or ""), target)
         return submit_value(
             str(request.get("route") or ""),
             str(request.get("value") or ""),
             project_root,
+        )
+    if operation == "action":
+        return perform_action(
+            str(request.get("route") or ""),
+            str(request.get("value") or "").strip(),
+            target,
         )
     return ServiceResult.failure(
         "unsupported_bridge_operation",

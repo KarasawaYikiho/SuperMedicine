@@ -126,7 +126,7 @@ def test_frontend_all_buttons_are_wired_and_packaged_for_offline_access():
         if value.startswith("btn-")
         or value in {"hamburger-btn", "drawer-close-btn", "send-btn"}
     }
-    assert len(button_ids) == 47
+    assert len(button_ids) == 51
     assert not {button_id for button_id in button_ids if button_id not in javascript}
     assert html.count('data-tab="') == 13
     assert "https://fonts." not in html

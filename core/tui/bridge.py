@@ -133,7 +133,7 @@ def _call_facade(
     if method == "ui.request":
         from core.tui.service_bridge import bridge_request
 
-        return bridge_request(params, application.paths.project_root)
+        return bridge_request(params, application.paths)
     if method == "workspace.list":
         return application.list_workspaces(**params)
     if method == "workspace.get":

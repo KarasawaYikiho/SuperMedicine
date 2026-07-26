@@ -8,6 +8,8 @@ Use this page as the entry point for maintained documentation.
   release archives, OpenTUI prerequisites, and uninstall behavior.
 - [Getting started](guides/getting-started.md) covers the first project and core
   workflows.
+- [Web and desktop UI](guides/WEB.md) covers local startup, remote access,
+  security boundaries, and troubleshooting.
 - [Examples](examples/README.md) links runnable and copyable examples.
 - [References](references/README.md) contains research and figure guidance.
 

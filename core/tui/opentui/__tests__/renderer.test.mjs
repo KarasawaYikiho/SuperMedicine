@@ -174,7 +174,7 @@ test("page shells use honest native markdown, form, empty state, and action cont
       for (const child of node.getChildren()) visit(child)
     }
     visit(page)
-    expect(focusableIds).toEqual(["page-action-paper"])
+    expect(focusableIds).toEqual(["page-field-paper", "page-action-paper"])
     expect(captureCharFrame()).toContain("暂无论文")
     expect(captureCharFrame()).not.toMatch(/study-a|heatmap\.py|openai\s+ready|step 1/)
   } finally {

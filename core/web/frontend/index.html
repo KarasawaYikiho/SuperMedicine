@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="format-detection" content="telephone=no">
     <meta name="msapplication-tap-highlight" content="no">
-    <title>SuperMedicine — 桌面版</title>
+    <title>SuperMedicine — 医学研究工作台</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -18,8 +18,8 @@
         <button id="hamburger-btn" class="hamburger" aria-label="切换菜单" aria-controls="drawer-menu" aria-expanded="false" title="切换菜单">&#9776;</button>
         <h1>SuperMedicine</h1>
         <div id="web-auth-controls">
-            <label for="web-auth-token">Web token</label>
-            <input id="web-auth-token" type="password" autocomplete="off" placeholder="Bearer token">
+            <label for="web-auth-token">访问令牌</label>
+            <input id="web-auth-token" type="password" autocomplete="off" placeholder="仅远程访问时需要">
             <button id="web-auth-save" type="button">连接</button>
         </div>
         <div id="status-bar">
@@ -174,6 +174,8 @@
                     <option value="">选择工作区</option>
                 </select>
                 <button id="btn-refresh-experiences" class="btn btn-secondary">刷新</button>
+                <button id="btn-suggest-experience" class="btn btn-secondary">智能分类</button>
+                <button id="btn-export-experiences" class="btn btn-secondary">导出</button>
                 <button id="btn-add-experience" class="btn btn-primary">+ 添加经验</button>
             </div>
             <div id="experience-form" class="form-container hidden">
@@ -234,6 +236,7 @@
                     <option value="javascript">JavaScript</option>
                 </select>
                 <button id="btn-refresh-tools" class="btn btn-secondary">刷新</button>
+                <button id="btn-init-tools" class="btn btn-secondary">初始化目录</button>
                 <button id="btn-scan-tools" class="btn btn-primary">扫描工具</button>
                 <button id="btn-add-tool" class="btn btn-primary">+ 添加工具</button>
             </div>
@@ -268,6 +271,7 @@
             <h2>实验指南</h2>
             <div class="toolbar">
                 <button id="btn-refresh-experiments" class="btn btn-secondary">刷新</button>
+                <button id="btn-experiment-context" class="btn btn-secondary">查看模型上下文</button>
                 <button id="btn-start-experiment" class="btn btn-primary">+ 开始实验</button>
             </div>
             <div id="experiment-form" class="form-container hidden">
@@ -351,7 +355,7 @@
                     <input type="text" id="llm-api-format" placeholder="例如 openai、anthropic 或留空">
                 </div>
                 <div class="form-group">
-                    <label for="llm-base-url">Base URL（可选）</label>
+                    <label for="llm-base-url">接口地址（可选）</label>
                     <input type="text" id="llm-base-url" placeholder="例如 https://api.example.com/v1">
                 </div>
                 <div class="form-group">
@@ -359,11 +363,11 @@
                     <input type="text" id="llm-model" placeholder="例如 gpt-4.1">
                 </div>
                 <div class="form-group">
-                    <label for="llm-api-key-env">API Key 环境变量（推荐）</label>
+                    <label for="llm-api-key-env">API 密钥环境变量（推荐）</label>
                     <input type="text" id="llm-api-key-env" placeholder="例如 OPENAI_API_KEY">
                 </div>
                 <div class="form-group">
-                    <label for="llm-api-key">API Key（可选，将由后端按安全策略处理）</label>
+                    <label for="llm-api-key">API 密钥（可选，将由后端按安全策略处理）</label>
                     <input type="text" id="llm-api-key" placeholder="不建议在共享环境填写明文密钥">
                 </div>
                 <div class="form-group">
@@ -413,7 +417,7 @@
                 <div id="permission-mode-info">加载中...</div>
             </div>
             <div class="form-container">
-                <h3>Multi-Agent 流程</h3>
+                <h3>多智能体流程</h3>
                 <div id="multi-agent-info" class="text-muted">加载中...</div>
                 <div class="form-group">
                     <select id="multi-agent-enabled" class="select-input">

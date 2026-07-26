@@ -270,7 +270,15 @@ def test_opentui_activation_persists_workspace_and_provider_state(tmp_path):
     assert providers["last_provider"] == "local-provider"
 
 
-def test_opentui_submit_uses_real_workspace_chat_and_log_services(tmp_path):
+def test_opentui_submit_uses_real_workspace_chat_and_log_services(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(
+        "core.web.runtime.WebRuntime.execute_chat_message",
+        lambda self, message, **kwargs: {
+            "output": {"message": f"assistant: {message}"}
+        },
+    )
     created = bridge_request(
         {"operation": "submit", "route": "workspace", "value": "study-two"},
         tmp_path,

@@ -24,6 +24,67 @@
     const webAuthTokenInput = document.getElementById("web-auth-token");
     const webAuthSave = document.getElementById("web-auth-save");
 
+    function installDocumentationShell() {
+        document.documentElement.classList.add("docs-shell");
+
+        const notice = document.createElement("div");
+        notice.className = "product-notice";
+        notice.textContent = "本地优先 · 医学研究数据由你掌控";
+        document.body.prepend(notice);
+
+        const brand = document.querySelector("header h1");
+        if (brand) {
+            brand.textContent = "SuperMedicine";
+            const subtitle = document.createElement("span");
+            subtitle.className = "brand-subtitle";
+            subtitle.textContent = "医学研究工作台";
+            brand.after(subtitle);
+        }
+
+        const drawerHeader = document.querySelector(".drawer-header");
+        if (drawerHeader) {
+            const search = document.createElement("input");
+            search.id = "navigation-search";
+            search.type = "search";
+            search.placeholder = "搜索功能（Ctrl+K）";
+            search.setAttribute("aria-label", "搜索功能");
+            drawerHeader.after(search);
+            search.addEventListener("input", function () {
+                const query = search.value.trim().toLowerCase();
+                document.querySelectorAll(".drawer-nav .tab-btn").forEach(function (button) {
+                    button.hidden = Boolean(query) &&
+                        !button.textContent.toLowerCase().includes(query);
+                });
+            });
+        }
+
+        document.querySelectorAll(".tab-content").forEach(function (section) {
+            const title = section.querySelector(":scope > h2");
+            if (!title) return;
+            const eyebrow = document.createElement("div");
+            eyebrow.className = "section-eyebrow";
+            eyebrow.textContent = "SUPERMEDICINE / " + title.textContent.trim();
+            title.before(eyebrow);
+        });
+
+        const dashboard = document.getElementById("tab-dashboard");
+        if (dashboard) {
+            const hero = document.createElement("div");
+            hero.className = "dashboard-hero";
+            hero.innerHTML =
+                '<div><span class="hero-kicker">研究从这里开始</span>' +
+                '<h3>把论文、经验、实验与模型放进同一条可信工作流</h3>' +
+                '<p>所有界面共用同一服务层；Web、TUI 与 CLI 的结果保持一致，错误信息经过脱敏后再展示。</p></div>' +
+                '<button type="button" class="btn btn-primary" data-open-tab="chat">开始对话</button>';
+            const status = document.getElementById("project-status");
+            dashboard.insertBefore(hero, status);
+            hero.querySelector("[data-open-tab]").addEventListener("click", function () {
+                const button = document.querySelector('.tab-btn[data-tab="chat"]');
+                if (button) button.click();
+            });
+        }
+    }
+
     // ---- 状态 -------------------------------------------------------------
 
     let ws = null;
@@ -119,9 +180,44 @@
     }
 
     function showJsonDetails(title, data) {
+        const labels = {
+            id: "标识",
+            title: "标题",
+            name: "名称",
+            status: "状态",
+            summary: "摘要",
+            scope: "范围",
+            model: "模型",
+            provider: "提供方",
+            language: "语言",
+            version: "版本",
+            message: "说明",
+            tags: "标签",
+            current_provider: "当前提供方",
+            selected_protocol: "当前实验协议"
+        };
+        const blockedKey = /(token|secret|password|api.?key|trace|stack|path|directory|command|headers?)/i;
+        function lines(value, prefix, depth) {
+            if (depth > 3 || value == null) return [];
+            if (Array.isArray(value)) {
+                return value.slice(0, 30).flatMap(function (item, index) {
+                    return lines(item, prefix + " " + (index + 1), depth + 1);
+                });
+            }
+            if (typeof value !== "object") {
+                const text = String(value).replace(/[\u0000-\u001f\u007f]/g, " ").trim();
+                return text ? [prefix + "：" + text.slice(0, 500)] : [];
+            }
+            return Object.keys(value).flatMap(function (key) {
+                if (blockedKey.test(key)) return [];
+                const label = labels[key] || key.replace(/_/g, " ");
+                return lines(value[key], prefix ? prefix + " / " + label : label, depth + 1);
+            });
+        }
+        const message = lines(data, "", 0).join("\n") || "暂无可显示的信息。";
         return openAppDialog({
             title: title,
-            message: JSON.stringify(data, null, 2),
+            message: message,
             preformatted: true,
             cancelLabel: "关闭",
             acceptLabel: "关闭"
@@ -136,7 +232,13 @@
 
         const roleLabel = document.createElement("div");
         roleLabel.className = "role";
-        roleLabel.textContent = role === "user" ? "你" : role === "assistant" ? "SuperMedicine" : role;
+        const roleLabels = {
+            user: "你",
+            assistant: "SuperMedicine",
+            progress: "处理进度",
+            system: "系统提示"
+        };
+        roleLabel.textContent = roleLabels[role] || "系统提示";
         div.appendChild(roleLabel);
 
         const body = document.createElement("div");
@@ -257,8 +359,33 @@
         if (body) opts.body = JSON.stringify(body);
 
         const resp = await authorizedFetch(url, opts);
-        if (!resp.ok) throw new Error("HTTP " + resp.status);
-        return resp.json();
+        let payload = {};
+        try {
+            payload = await resp.json();
+        } catch (_) {
+            payload = {};
+        }
+        if (!resp.ok) {
+            const code = payload?.error?.code || payload?.code || "";
+            const messages = {
+                authentication_required: "需要访问令牌，请在页面顶部填写后连接。",
+                invalid_authentication: "访问令牌无效，请检查后重试。",
+                workspace_not_found: "找不到所选工作区，请刷新列表。",
+                provider_not_found: "找不到该模型提供方，请刷新配置。",
+                paper_not_found: "找不到该论文，请刷新列表。",
+                tool_not_found: "找不到该工具，请重新扫描。",
+                confirmation_required: "该操作需要明确确认。",
+                chat_unavailable: "对话服务暂时不可用，请检查模型配置后重试。",
+                internal_error: "系统暂时无法完成请求，请稍后重试。"
+            };
+            throw new Error(
+                messages[code] ||
+                (resp.status >= 500
+                    ? "系统暂时无法完成请求，请稍后重试。"
+                    : "请求未完成，请检查输入后重试。")
+            );
+        }
+        return payload;
     }
 
     // ---- 页面导航 ---------------------------------------------------------
@@ -1027,7 +1154,7 @@
                 ? "已启用：任务自动经过完整四角色流程。"
                 : "已关闭：任务使用轻量单流程。";
         } catch (err) {
-            showToast("加载 Multi-Agent 设置失败: " + err.message, "error");
+            showToast("加载多智能体设置失败：" + err.message, "error");
         }
     }
 
@@ -1060,7 +1187,7 @@
                 showToast(enabled ? "完整四角色流程已启用" : "已切换为轻量单流程", "success");
                 loadMultiAgent();
             } catch (err) {
-                showToast("设置 Multi-Agent 失败: " + err.message, "error");
+                showToast("设置多智能体失败：" + err.message, "error");
             }
         });
         document.getElementById("btn-set-permission").addEventListener("click", async function () {
@@ -1450,13 +1577,13 @@
                     } else if (result.error) {
                         text = result.error && typeof result.error.message === "string"
                             ? result.error.message
-                            : "Operation could not be completed. Please retry.";
+                            : "操作未完成，请重试。";
                         addMessage("assistant", text, "error");
                         return;
                     } else {
                         text = "操作未完成，请重试。";
                     }
-                    addMessage("assistant", text || "Operation completed.");
+                    addMessage("assistant", text || "操作已完成。");
                     break;
                 }
 
@@ -1642,8 +1769,81 @@
         }
     });
 
+    function setupExtendedActions() {
+        document.getElementById("btn-suggest-experience")?.addEventListener("click", async function () {
+            const workspaceId = document.getElementById("exp-ws-select").value;
+            const summary = document.getElementById("exp-summary").value.trim();
+            if (!workspaceId || !summary) {
+                showToast("请先选择工作区并填写经验摘要。", "warning");
+                document.getElementById("experience-form").classList.remove("hidden");
+                return;
+            }
+            try {
+                const result = await apiCall(
+                    "POST",
+                    "/api/v1/workspaces/" + encodeURIComponent(workspaceId) + "/experiences/suggest",
+                    {
+                        title: document.getElementById("exp-title").value.trim() || null,
+                        summary: summary
+                    }
+                );
+                showJsonDetails("经验分类建议", result);
+            } catch (error) {
+                showToast("无法生成分类建议：" + error.message, "error");
+            }
+        });
+
+        document.getElementById("btn-export-experiences")?.addEventListener("click", async function () {
+            const workspaceId = document.getElementById("exp-ws-select").value;
+            if (!workspaceId) {
+                showToast("请先选择工作区。", "warning");
+                return;
+            }
+            try {
+                await apiCall(
+                    "POST",
+                    "/api/v1/workspaces/" + encodeURIComponent(workspaceId) + "/experiences/export",
+                    { format: "json", include_general: true }
+                );
+                showToast("经验已导出到受管项目目录。", "success");
+            } catch (error) {
+                showToast("导出失败：" + error.message, "error");
+            }
+        });
+
+        document.getElementById("btn-init-tools")?.addEventListener("click", async function () {
+            const workspaceId = document.getElementById("tool-ws-select").value;
+            if (!workspaceId) {
+                showToast("请先选择工作区。", "warning");
+                return;
+            }
+            try {
+                await apiCall(
+                    "POST",
+                    "/api/v1/workspaces/" + encodeURIComponent(workspaceId) + "/tools/initialize"
+                );
+                await loadTools();
+                showToast("工具目录已初始化。", "success");
+            } catch (error) {
+                showToast("初始化失败：" + error.message, "error");
+            }
+        });
+
+        document.getElementById("btn-experiment-context")?.addEventListener("click", async function () {
+            const protocol = document.getElementById("exp-protocol").value.trim();
+            const suffix = protocol ? "?protocol=" + encodeURIComponent(protocol) : "";
+            try {
+                const result = await apiCall("GET", "/api/v1/experiments/context" + suffix);
+                showJsonDetails("模型使用的实验上下文", result);
+            } catch (error) {
+                showToast("读取实验上下文失败：" + error.message, "error");
+            }
+        });
+    }
+
     // ---- 初始化 -----------------------------------------------------------
 
+    installDocumentationShell();
     initTabs();
     setupWorkspaceForm();
     setupPaperForm();
@@ -1656,6 +1856,7 @@
     setupLogForm();
     setupSelfEvolutionForm();
     setupDiagnoseForm();
+    setupExtendedActions();
     loadWorkspaceSelectors();
     fetchStatus();
     connect();

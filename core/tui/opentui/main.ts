@@ -9,7 +9,7 @@ import { createPage } from "./pages.ts"
 import { ROUTES, createShellState, findRoute } from "./state.ts"
 import { THEME } from "./theme.ts"
 import { BridgeClient, BridgeError } from "./bridge.ts"
-import { userFacingError } from "./ui_safety.ts"
+import { safeUiText, userFacingError } from "./ui_safety.ts"
 
 function safeWorkspaceLabel(projectRoot) {
   if (!projectRoot) return "未选择"
@@ -141,9 +141,9 @@ export function mountShell(renderer, options = {}) {
           submitFeedback.content = "处理中…"
           renderer.requestRender()
           try {
-            await options.onSubmit("chat", value)
+            const outcome = await options.onSubmit("chat", value)
             prompt.value = ""
-            submitFeedback.content = "已提交。"
+            submitFeedback.content = safeUiText(outcome, "已完成。")
           } catch (error) {
             submitFeedback.content = userFacingError(error)
           }
@@ -234,7 +234,7 @@ export function mountShell(renderer, options = {}) {
       state.menuOpen ? closeMenu() : openMenu()
       return
     }
-    if ((name === "pageup" || name === "pagedown") && !renderer.currentFocusedEditor) {
+    if (name === "pageup" || name === "pagedown") {
       event.preventDefault()
       currentPage?.scrollBy(name === "pageup" ? -0.5 : 0.5, "viewport")
       return
@@ -505,13 +505,12 @@ export async function runCli(argv = process.argv.slice(2)) {
         await callUi({ operation: "activate", route, record })
       },
       async onSubmit(route, value) {
-        await callUi({ operation: "submit", route, value })
+        const response = await callUi({ operation: "submit", route, value })
         await refreshCatalog()
+        return response.data?.message || "操作已完成。"
       },
       async onAction(route, value) {
-        if ((route === "workspace" || route === "log") && value.trim()) {
-          await callUi({ operation: "submit", route, value: value.trim() })
-        }
+        await callUi({ operation: "action", route, value: value.trim() })
         await refreshCatalog()
         return "操作完成，数据已刷新"
       },

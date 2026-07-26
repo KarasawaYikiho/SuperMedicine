@@ -823,7 +823,20 @@ def _build_parser() -> tuple[
     )
     _add_experience_read_commands(experience_subparsers)
     command_parsers["experience"] = experience_parser
+    _localize_parser_help(parser)
     return parser, command_parsers
+
+
+def _localize_parser_help(parser: argparse.ArgumentParser) -> None:
+    """Localize argparse's built-in section and help labels recursively."""
+    parser._positionals.title = "位置参数"
+    parser._optionals.title = "选项"
+    for action in parser._actions:
+        if isinstance(action, argparse._HelpAction):
+            action.help = "显示帮助信息并退出"
+        if isinstance(action, argparse._SubParsersAction):
+            for child in action.choices.values():
+                _localize_parser_help(child)
 
 
 def _dispatch_setup_command(args, cli, parsers) -> bool:

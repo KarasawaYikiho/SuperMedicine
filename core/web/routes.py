@@ -68,9 +68,13 @@ def register_status_routes(app: Any, runtime: WebRuntime) -> None:
                 message, workspace_id=workspace_id, agent_mode=agent_mode
             )
             return result
-        except Exception as exc:
+        except Exception:
             logger.exception("Chat error")
-            return web_error(str(exc), 500)
+            return web_error(
+                "对话服务暂时不可用，请检查模型配置后重试。",
+                500,
+                code="chat_unavailable",
+            )
 
 
 def register_workspace_paper_routes(app: Any, runtime: WebRuntime) -> None:
@@ -202,6 +206,56 @@ def register_experience_tool_routes(app: Any, runtime: WebRuntime) -> None:
             )
         )
 
+    @app.post("/api/v1/workspaces/{workspace_id}/experiences/suggest")
+    async def experience_suggest(
+        workspace_id: str, request: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Suggest a safe scope and tags before persisting an experience."""
+        summary = str(request.get("summary") or "").strip()
+        if not summary:
+            return web_error("请填写经验摘要。", 400, code="summary_required")
+        return service_data(
+            runtime.service("experience_evolution").suggest_experience(
+                workspace_id,
+                summary,
+                title=request.get("title"),
+                tags=request.get("tags"),
+            )
+        )
+
+    @app.patch("/api/v1/workspaces/{workspace_id}/experiences/{experience_id}")
+    async def experience_update(
+        workspace_id: str, experience_id: str, request: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Edit one experience without exposing its backing file."""
+        scope = str(request.get("scope") or "").strip()
+        if not scope:
+            return web_error("请选择经验范围。", 400, code="scope_required")
+        return service_data(
+            runtime.service("experience_evolution").edit_experience(
+                experience_id,
+                workspace_id,
+                scope,
+                title=request.get("title"),
+                summary=request.get("summary"),
+                tags=request.get("tags"),
+            )
+        )
+
+    @app.post("/api/v1/workspaces/{workspace_id}/experiences/export")
+    async def experience_export(
+        workspace_id: str, request: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Export experiences through the shared service contract."""
+        return service_data(
+            runtime.service("experience_evolution").export_experiences(
+                workspace_id,
+                str(request.get("format") or "json"),
+                include_general=bool(request.get("include_general", False)),
+                path=request.get("path"),
+            )
+        )
+
     @app.delete("/api/v1/workspaces/{workspace_id}/experiences/{experience_id}")
     async def experience_remove(
         workspace_id: str, experience_id: str, request: dict[str, Any]
@@ -236,6 +290,40 @@ def register_experience_tool_routes(app: Any, runtime: WebRuntime) -> None:
                 request.get("selections"),
                 language=request.get("language"),
                 overwrite=request.get("overwrite", False),
+            )
+        )
+
+    @app.post("/api/v1/workspaces/{workspace_id}/tools/initialize")
+    async def tool_initialize(workspace_id: str) -> dict[str, Any]:
+        """Create the workspace tool layout."""
+        return service_data(
+            runtime.service("experiment_tool").initialize_tools(workspace_id)
+        )
+
+    @app.get("/api/v1/workspaces/{workspace_id}/tools/{language}/{tool_id}")
+    async def tool_get(
+        workspace_id: str, language: str, tool_id: str
+    ) -> dict[str, Any]:
+        """Show one tool using safe service data."""
+        return service_data(
+            runtime.service("experiment_tool").show_tool(
+                workspace_id, language, tool_id
+            )
+        )
+
+    @app.post("/api/v1/workspaces/{workspace_id}/tools/{language}/{tool_id}/prepare")
+    async def tool_prepare(
+        workspace_id: str, language: str, tool_id: str, request: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Validate and prepare a tool invocation."""
+        return service_data(
+            runtime.service("experiment_tool").prepare_tool(
+                workspace_id,
+                language,
+                tool_id,
+                dry_run=bool(request.get("dry_run", False)),
+                input_path=request.get("input_path"),
+                output_path=request.get("output_path"),
             )
         )
 
@@ -394,6 +482,25 @@ def register_log_experiment_routes(app: Any, runtime: WebRuntime) -> None:
             return service_data(runtime.service("experiment_tool").list_experiments())
         except ValueError as exc:
             return web_error(str(exc), 400)
+
+    @app.get("/api/v1/experiments/context")
+    async def experiment_context(protocol: str | None = None) -> dict[str, Any]:
+        """Return the selected protocol context used by the model."""
+        return service_data(
+            runtime.service("experiment_tool").experiment_context(protocol)
+        )
+
+    @app.post("/api/v1/experiments/configs")
+    async def experiment_config_create(request: dict[str, Any]) -> dict[str, Any]:
+        """Create a reviewed experiment configuration."""
+        return service_data(
+            runtime.service("experiment_tool").add_experiment_config(
+                instruction=request.get("instruction"),
+                config=request.get("config"),
+                filename=request.get("filename"),
+                overwrite=bool(request.get("overwrite", False)),
+            )
+        )
 
     @app.post("/api/v1/experiments")
     async def experiment_create(request: dict[str, Any]) -> dict[str, Any]:

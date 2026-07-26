@@ -21,19 +21,21 @@ const PAGE_CONTENT = Object.freeze({
 
 const FORM_ROUTES = Object.freeze({
   workspace: ["工作区名称", "输入工作区名称"],
+  paper: ["论文文件", "输入本地论文文件路径"],
+  experience: ["经验摘要", "输入可复用的研究经验"],
   llm: ["模型提供方", "输入提供方名称"],
-  experiment: ["实验名称", "输入实验名称"],
-  log: ["报告标题", "输入报告标题"],
+  experiment: ["实验协议", "输入协议名称"],
+  log: ["日志内容", "输入脱敏日志内容"],
 })
 const ACTION_LABELS = Object.freeze({
   dashboard: "刷新状态",
   workspace: "创建工作区",
-  paper: "刷新论文",
-  experience: "刷新经验",
-  tool: "刷新工具",
+  paper: "导入论文",
+  experience: "添加经验",
+  tool: "初始化工具目录",
   dialog: "刷新历史",
-  llm: "刷新配置",
-  experiment: "刷新实验",
+  llm: "切换模型",
+  experiment: "开始实验",
   log: "写入日志",
   permission: "读取权限策略",
   "self-evolution": "刷新预览",

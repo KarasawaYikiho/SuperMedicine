@@ -109,6 +109,7 @@ explicit denies still apply in every mode. Use `supermedicine permission`,
 - [Documentation index](docs/README.md)
 - [Installation](docs/guides/INSTALL.md)
 - [Getting started](docs/guides/getting-started.md)
+- [Web and desktop UI (Chinese)](docs/guides/WEB.md)
 - [Architecture](docs/architecture/ARCHITECTURE.md)
 - [Runtime pipeline](docs/architecture/runtime-pipeline.md)
 - [Release architecture](docs/architecture/release-architecture.md)

@@ -98,6 +98,7 @@ limits 与显式 deny。使用 `permission`、`authorize`、`revoke` 查看或�
 - [文档总入口](docs/README.md)
 - [安装](docs/guides/INSTALL.md)
 - [入门](docs/guides/getting-started.md)
+- [Web 与桌面界面](docs/guides/WEB.md)
 - [架构](docs/architecture/ARCHITECTURE.md)
 - [运行管线](docs/architecture/runtime-pipeline.md)
 - [发布架构](docs/architecture/release-architecture.md)

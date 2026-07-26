@@ -1145,3 +1145,227 @@ body {
         font-size: 0.75rem;
     }
 }
+
+/* Documentation-style application shell. The visual language is intentionally
+   local and asset-free: quiet surfaces, fine dividers and one strong action. */
+.docs-shell {
+    --docs-bg: #fafaf8;
+    --docs-surface: #ffffff;
+    --docs-soft: #f3f3f0;
+    --docs-border: #e5e5df;
+    --docs-ink: #151515;
+    --docs-muted: #6f706b;
+    --docs-accent: #ff6a2a;
+}
+
+.docs-shell body {
+    background: var(--docs-bg);
+    color: var(--docs-ink);
+}
+
+.product-notice {
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #171717;
+    color: #fff;
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+}
+
+.docs-shell header {
+    top: 30px;
+    min-height: 66px;
+    background: rgba(255, 255, 255, 0.96);
+    border-bottom: 1px solid var(--docs-border);
+    box-shadow: none;
+    backdrop-filter: blur(12px);
+}
+
+.docs-shell header h1 {
+    letter-spacing: -0.035em;
+}
+
+.brand-subtitle {
+    margin-left: 0.25rem;
+    color: var(--docs-muted);
+    font-size: 0.8rem;
+}
+
+.docs-shell .drawer-menu {
+    top: 96px;
+    width: 268px;
+    background: #f7f7f4;
+    border-right: 1px solid var(--docs-border);
+    box-shadow: none;
+}
+
+#navigation-search {
+    width: calc(100% - 2rem);
+    margin: 0 1rem 0.75rem;
+    padding: 0.7rem 0.8rem;
+    border: 1px solid var(--docs-border);
+    border-radius: 9px;
+    background: var(--docs-surface);
+    font-size: 0.82rem;
+}
+
+.docs-shell .drawer-nav {
+    gap: 0.15rem;
+    padding: 0 0.75rem 1rem;
+}
+
+.docs-shell .drawer-nav .tab-btn {
+    border-radius: 8px;
+    color: #555650;
+    font-weight: 500;
+}
+
+.docs-shell .drawer-nav .tab-btn:hover {
+    background: #ecece7;
+    color: var(--docs-ink);
+}
+
+.docs-shell .drawer-nav .tab-btn.active {
+    background: #e7e7e1;
+    color: #111;
+    box-shadow: inset 3px 0 0 var(--docs-accent);
+}
+
+.docs-shell main {
+    max-width: 1500px;
+    padding: 3rem clamp(1.5rem, 5vw, 5rem) 5rem;
+}
+
+.docs-shell .tab-content {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+.section-eyebrow,
+.hero-kicker {
+    color: var(--docs-accent);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.11em;
+}
+
+.docs-shell .tab-content > h2 {
+    margin: 0.45rem 0 2rem;
+    font-size: clamp(2rem, 4vw, 3.4rem);
+    line-height: 1.08;
+    letter-spacing: -0.045em;
+}
+
+.dashboard-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2rem;
+    align-items: end;
+    margin-bottom: 1.5rem;
+    padding: clamp(1.5rem, 4vw, 3.5rem);
+    border: 1px solid var(--docs-border);
+    border-radius: 18px;
+    background:
+        radial-gradient(circle at 90% 15%, rgba(255, 106, 42, 0.12), transparent 30%),
+        var(--docs-soft);
+}
+
+.dashboard-hero h3 {
+    max-width: 760px;
+    margin: 0.75rem 0;
+    font-size: clamp(1.55rem, 3vw, 2.65rem);
+    line-height: 1.18;
+    letter-spacing: -0.035em;
+}
+
+.dashboard-hero p {
+    max-width: 700px;
+    margin: 0;
+    color: var(--docs-muted);
+    line-height: 1.75;
+}
+
+.docs-shell .status-card,
+.docs-shell .info-card,
+.docs-shell .form-container,
+.docs-shell .data-table-container,
+.docs-shell #messages,
+.docs-shell .log-viewer {
+    border: 1px solid var(--docs-border);
+    border-radius: 14px;
+    background: var(--docs-surface);
+    box-shadow: none;
+}
+
+.docs-shell .btn {
+    border-radius: 8px;
+    box-shadow: none;
+}
+
+.docs-shell .btn-primary,
+.docs-shell #send-btn,
+.docs-shell #web-auth-save {
+    border-color: #111;
+    background: #111;
+    color: #fff;
+}
+
+.docs-shell .btn-primary:hover,
+.docs-shell #send-btn:hover,
+.docs-shell #web-auth-save:hover {
+    border-color: #333;
+    background: #333;
+}
+
+.docs-shell input:focus,
+.docs-shell textarea:focus,
+.docs-shell select:focus {
+    border-color: #777;
+    box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.08);
+}
+
+@media (min-width: 901px) {
+    .docs-shell .drawer-menu {
+        left: 0;
+        transform: none;
+        visibility: visible;
+    }
+
+    .docs-shell .drawer-header,
+    .docs-shell .drawer-overlay,
+    .docs-shell .hamburger {
+        display: none;
+    }
+
+    .docs-shell main {
+        margin-left: 268px;
+        width: calc(100% - 268px);
+        box-sizing: border-box;
+    }
+}
+
+@media (max-width: 900px) {
+    .brand-subtitle {
+        display: none;
+    }
+
+    .docs-shell .drawer-menu {
+        top: 0;
+    }
+
+    .docs-shell main {
+        padding: 1.5rem 1rem 3rem;
+        width: 100%;
+    }
+
+    .dashboard-hero {
+        grid-template-columns: 1fr;
+        align-items: start;
+    }
+}
