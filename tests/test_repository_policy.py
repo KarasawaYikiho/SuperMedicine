@@ -102,7 +102,7 @@ def test_tracked_text_is_valid_utf8_without_known_mojibake() -> None:
         except UnicodeDecodeError as exc:
             offenders.append(f"{relative}: invalid UTF-8 at byte {exc.start}")
             continue
-        if "\ufffd" in text or "鏁板瓧閿" in text:
+        if "\ufffd" in text or ("鏁板" + "瓧閿") in text:
             offenders.append(f"{relative}: known encoding corruption")
     assert offenders == []
 

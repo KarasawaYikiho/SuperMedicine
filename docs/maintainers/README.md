@@ -7,10 +7,10 @@ This directory is the starting point for repository maintenance.
 1. [repository-map.md](repository-map.md)
 2. [entrypoints.md](entrypoints.md)
 3. [quality-gates.md](quality-gates.md)
-4. [maintenance-backlog.md](maintenance-backlog.md)
-5. [feature-parity.md](feature-parity.md)
-6. [human-maintainer-rebuild.md](human-maintainer-rebuild.md)
-7. [human-maintenance.md](human-maintenance.md)
+4. [ci-workflows.md](ci-workflows.md)
+5. [maintenance-backlog.md](maintenance-backlog.md)
+6. [feature-parity.md](feature-parity.md)
+7. [rebuild-0.4.2.md](history/rebuild-0.4.2.md) (frozen history)
 
 ## Sources of Truth
 
@@ -24,9 +24,9 @@ This directory is the starting point for repository maintenance.
 | Plugin contract | `plugins/base_plugin.py` and manifests |
 | TUI launcher/runtime | `core/tui/` |
 | Web server | `core/web/server.py` |
-| Installer/release | `installer/`, `setup.py`, `.github/workflows/ci.yml`, `scripts/ci/` |
+| Installer/release | `installer/`, `setup.py`, `scripts/ci/`, and release workflows |
 | User install docs | `docs/guides/INSTALL.md` |
-| Current maintenance snapshot | `docs/maintainers/human-maintenance-baseline.json` |
+| CI structure | `docs/maintainers/ci-workflows.md` |
 
 ## Archive Rule
 

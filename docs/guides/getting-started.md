@@ -107,6 +107,6 @@ supermedicine experiment list
 ## Next Reading
 
 - [Installation guide](INSTALL.md)
-- [Architecture guide](architecture.md)
+- [Architecture](../architecture/ARCHITECTURE.md)
 - [API reference](../api/README.md)
 - [Examples](../examples/README.md)

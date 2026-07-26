@@ -1,236 +1,124 @@
 # SuperMedicine
 
-<p align="center"><img src="assets/logo.jpg" alt="SuperMedicine" width="360"></p>
+SuperMedicine 是模块化医学科研助手，包含独立 Python 运行时、CLI、OpenTUI、
+Web、Desktop、可选平台适配器与科研插件，覆盖证据检索、论文、统计、规范核查、
+绘图、权限和可审计执行。
 
-![Version](https://img.shields.io/badge/version-Beta0.4.2-blue)
-![Python](https://img.shields.io/badge/python-3.10%2B-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
+<!-- BEGIN GENERATED: release-metadata -->
+当前版本：**0.4.2b0**
+<!-- END GENERATED: release-metadata -->
 
-**语言：** [English](README.md) | 简体中文
+发布系列：**Beta0.4.2**
 
-SuperMedicine 是一个本地优先的 Python 医学科研辅助框架。它提供 CLI、
-Kernel、权限引擎、插件运行、工作区和论文管理、LLM Provider 配置、本地
-RAG、医学写作和引用辅助、实验/日志流程，以及中文 OpenTUI 终端界面。
+English: [README.md](README.md)
 
-SuperMedicine 不是临床决策系统。所有生成内容都只应作为科研辅助材料，并
-由具备资质的人类使用者复核。
+<a id="product"></a>
+## 产品
 
-当前发布标签：**Beta0.4.2**。Python 包 fallback 版本：**0.4.2b0**。
+独立核心是默认产品；OpenCode 与 Claude Code 适配器是可选层，不会重新定义核心
+行为。
 
-## 强制 Harness 与 RAG 运行时
+稳定能力包括：
 
-所有正式 CLI、TUI、Web、插件、LLM 与可选多 Agent 任务都进入同一 Kernel
-管线。Harness 与 local-first RAG 是不可关闭的必需能力；配置、环境变量或插件
-参数都不能绕过。必需组件缺失、损坏或存储不可写时以结构化错误 fail closed。
+- workspace、paper、experiment、experience 与日志工作流；
+- 本地检索与已配置 LLM Provider；
+- 强制启用的本地 RAG 与 Harness 生命周期；
+- 可选 Alpha/Beta/Gamma/Delta Multi-Agent 与 checkpoint resume；
+- 权限策略、审计、脱敏和路径安全；
+- CLI、OpenTUI、Web、Desktop、Standalone 与平台适配器；
+- Wheel、sdist、三个 Windows EXE 与版本化 Release ZIP。
 
-知识生成任务在生成前检索证据；空索引明确报告 `rag.status=empty`，不得伪造
-来源。确定性和控制动作记录枚举化 `skipped` 原因。PubMed 始终经过权限检查，
-被拒绝时降级使用本地证据。多 Agent 默认 `agents.mode: single`，启用后仍使用
-同一 Harness、RAG、权限、审计与结果封装。
+机器可读能力清单见 [`feature_manifest.json`](feature_manifest.json)。
 
-## 先读这些
+<a id="safety"></a>
+## 安全边界
 
-- [安装指南](docs/guides/INSTALL.md)
-- [架构概览](docs/architecture/ARCHITECTURE.md)
-- [安全策略](SECURITY.md)
-- [贡献指南](CONTRIBUTING.md)
-- [变更记录](CHANGELOG.md)
+本项目仅辅助科研工作，不提供临床建议、诊断或治疗决策。使用前必须人工审查生成
+的论断、引用、统计、图表与代码。
 
-## 功能范围
+Harness 与 RAG 是必选能力，默认启用；所需存储或运行状态缺失、损坏、不可写时
+必须 fail closed。Multi-Agent 可选：关闭时走 single-agent，开启时保留四角色
+与断点恢复。
 
-| 模块 | 范围 |
-| --- | --- |
-| CLI 和 Kernel | 命令分发、配置、事件总线、插件路由、会话和权限检查。 |
-| 权限 | 默认保守模式，完整访问需要明确确认，并写入审计记录。 |
-| 工作区 | 工作区、论文、工具、经验命令都使用显式 `--workspace`。 |
-| LLM Provider | 支持 OpenAI、Anthropic、OpenRouter 和 OpenAI-compatible 自定义端点。 |
-| 插件 | RAG、harness、医学写作、引用格式、实验辅助、Python/R 工具模板和图表工具。 |
-| TUI | 基于 Bun 和 `@opentui/core@0.4.3` 的中文 OpenTUI 终端界面。 |
-| 可选适配器 | `adapters/` 下包含 OpenCode 和 Claude Code 的元数据/适配器文件；独立 Python 运行时不依赖它们。 |
+禁止提交 API key、患者数据、私有端点、权限审计日志或用户 workspace。
 
-## 从源码安装
+<a id="install"></a>
+## 安装
 
-需求：
+要求：
 
-- Python 3.10 或更高版本
-- Git
-- pip
-- Bun 和 npm，用于 OpenTUI
-- R 4.3 或更高版本，仅在使用可选 R survival 后端时需要
+- Python 3.10–3.13；
+- OpenTUI 依赖需要 Node.js/npm；
+- 真实 OpenTUI 运行时需要 Bun。
 
 ```bash
 git clone https://github.com/KarasawaYikiho/SuperMedicine.git
 cd SuperMedicine
 python -m pip install -e .
-npm ci
 python install.py
-supermedicine status
 ```
 
-开发依赖：
+普通用户直接运行无参数 `python install.py` 并使用交互向导。自动化、Release
+归档、三个 EXE、payload、失败恢复与卸载说明统一见
+[安装指南](docs/guides/INSTALL.md)。
+
+OpenTUI 使用 `@opentui/core@0.4.3`：
 
 ```bash
-python -m pip install -e ".[dev]"
-```
-
-OpenTUI smoke 检查：
-
-```bash
+npm ci
 npm run opentui:smoke
 ```
 
-## 发布包布局
+默认 JavaScript 运行时是 Bun；高级诊断可通过
+`SUPERMEDICINE_OPENTUI_JS_RUNTIME` 指向受支持的运行时可执行文件。
 
-Windows 发布包应保持完整目录结构，不能只复制单个安装脚本。关键文件包括：
-
-- `SuperMedicineInstaller.exe`
-- `dist/SuperMedicine.exe`
-- `install.py`
-- `install_entry.py`
-- `uninstall_entry.py`
-- `installer/`
-- `package.json`
-- `package-lock.json`
-- `THIRD_PARTY_NOTICES.md`
-- `docs/guides/INSTALL.md`
-
-这些入口会导入同级 Python 包和资源，因此 release archive 应整体解压运行。
-
-## 快速命令
+<a id="quickstart"></a>
+## 快速开始
 
 ```bash
-supermedicine status
-supermedicine diagnose
-supermedicine workspace init --workspace demo --name "Demo Workspace"
-supermedicine paper import ./paper.pdf --workspace demo --title "Paper Title"
-supermedicine experience suggest --workspace demo --summary "Keep useful prompts short"
-supermedicine tool scan --language python
-supermedicine tool add --workspace demo --select 1
-supermedicine experiment list
-supermedicine experiment start --protocol western_blot_basic --session-id wb-demo
-supermedicine log follow --session-id wb-demo --interval 1 --max-entries 20
+supermedicine --help
+supermedicine init --provider openai --base-url https://api.openai.com/v1 \
+  --api-key "$OPENAI_API_KEY" --model gpt-4o-mini
+supermedicine workspace create demo
+supermedicine run "总结证据" --workspace demo
 supermedicine tui
+supermedicine web
 ```
 
-涉及工作区的 CLI 命令必须显式传入 `--workspace`，不会自动复用 TUI 最近工作区。
+Provider 也可通过 `SM_LLM_PROVIDER`、`SM_LLM_BASE_URL`、
+`SM_LLM_API_KEY`、`SM_LLM_MODEL` 或 `.supermedicine/config.yaml`
+配置。诊断和日志必须脱敏密钥。
 
-## 配置和密钥
+权限模式为 `strict`、`balanced` 和 `permissive`；所有模式仍执行 hard
+limits 与显式 deny。使用 `permission`、`authorize`、`revoke` 查看或修改。
 
-本地运行状态位于 `.supermedicine/`。
+<a id="documentation"></a>
+## 文档
 
-| 文件或变量 | 用途 |
-| --- | --- |
-| `.supermedicine/config.yaml` | 本地运行配置，应保持私有。 |
-| `.supermedicine/policies/default.yaml` | 仓库跟踪的默认权限策略。 |
-| `.supermedicine/policies/audit.jsonl` | 本地权限审计日志。 |
-| `SM_CONFIG` | 覆盖配置文件路径。 |
-| `SM_<KEY>` | 通过环境变量覆盖配置项。 |
-| `OPENAI_API_KEY`、`ANTHROPIC_API_KEY`、`OPENROUTER_API_KEY` | 常用 Provider 的推荐密钥来源。 |
+- [文档总入口](docs/README.md)
+- [安装](docs/guides/INSTALL.md)
+- [入门](docs/guides/getting-started.md)
+- [架构](docs/architecture/ARCHITECTURE.md)
+- [运行管线](docs/architecture/runtime-pipeline.md)
+- [发布架构](docs/architecture/release-architecture.md)
+- [质量门](docs/maintainers/quality-gates.md)
+- [CI Workflow](docs/maintainers/ci-workflows.md)
+- [安全政策](SECURITY.md)
+- [贡献指南](CONTRIBUTING.md)
+- [更新日志](CHANGELOG.md)
 
-真实密钥应放在环境变量、私有配置、密钥管理器或 CI secrets 中。公开示例只使用
-`<OPENAI_API_KEY>` 这类占位符。
-
-## 权限模式
-
-| 模式 | 行为 |
-| --- | --- |
-| `conservative` | 默认模式。允许项目内访问；项目外写入、删除和执行需要显式授权或被拒绝。 |
-| `full` | 在确认后放宽 SuperMedicine 自身检查。它只使用当前 OS 用户/进程已有权限，不绕过 UAC、ACL 或管理员要求。 |
+本地验证：
 
 ```bash
-supermedicine permission status
-supermedicine permission roots
-supermedicine permission authorize C:\path\to\allowed-dir
-supermedicine permission revoke C:\path\to\allowed-dir
-supermedicine permission mode conservative
-supermedicine permission mode full --confirm-full
+python scripts/maintainers/check_docs.py
+python scripts/maintainers/sync_release_metadata.py --check
+python -m ruff check .
+python -m mypy core permission cli plugins agents adapters installer
+python -m pytest tests -q --tb=short
 ```
 
-## TUI
-
-启动中文 OpenTUI：
-
-```bash
-supermedicine tui
-supermedicine tui --dry-run
-npm run opentui:smoke
-```
-
-非 dry-run 路径通过 Bun 启动 `core/tui/opentui_runtime.mjs`，并使用固定依赖
-`@opentui/core@0.4.3`。
-
-常用快捷键：
-
-| 按键 | 动作 |
-| --- | --- |
-| `Tab` | 焦点前移。 |
-| `Shift+Tab` | 焦点后移。 |
-| `Enter` | 提交当前输入或确认当前操作。 |
-| `M` | 打开或关闭菜单。 |
-| `P` / `Ctrl+P` | 打开权限视图。 |
-| `Esc` / `B` | 从当前页面或菜单返回。 |
-| `Q` | 退出 TUI。 |
-
-数字键 `1-0` 不是直接视图切换快捷键；输入框获得焦点时它们仍是普通输入。
-
-对话请求运行时，状态栏显示 `Chat Processing`。只会锁定主输入框，直到请求成功
-或失败；其他屏幕控件仍可通过焦点导航和 `M` 菜单访问。动态刷新按页面和动作
-定向触发，不是全局文件 watcher 或轮询。
-
-当前 TUI 兼容性测试使用可读 UTF-8 标签，并验证数字键 `1-0` 不是直接切换
-视图的快捷键、对话期间只锁定主输入框，以及动态刷新不使用全局 watcher 或轮询。
-
-## LLM Provider
-
-Provider 记录需要名称、API 格式、Base URL、模型，以及密钥或 `api_key_env`。
-
-```bash
-supermedicine llm add deepseek \
-  --api-format openai \
-  --base-url https://api.deepseek.com/v1 \
-  --api-key-env DEEPSEEK_API_KEY \
-  --model deepseek-chat \
-  --set-current
-
-supermedicine llm list
-supermedicine llm show deepseek
-supermedicine llm switch deepseek
-```
-
-真实凭据优先使用 `--api-key-env`。
-
-## 本地质量门
-
-```bash
-python -m pip install -e ".[dev]"
-ruff check --select=E,F,W --ignore=E501 .
-python -m pytest tests/test_repo_hygiene.py tests/test_release.py tests/test_maintainer_markdown_links.py
-```
-
-发布前运行更完整的测试：
-
-```bash
-python -m pytest tests/ -v
-```
-
-## 仓库卫生
-
-Git 中应保留源码、测试、CI、包元数据、文档、默认策略和小型资源。不要提交构建
-产物、缓存、本地工作区、日志、凭据、生成的 exe 或本地归档。历史归档材料应保留
-在被忽略的 `Temp/`，不要放回 `docs/archive/`。
-
-## 故障排查
-
-| 现象 | 处理 |
-| --- | --- |
-| `No module named 'yaml'` | 运行 `python -m pip install -e .`。 |
-| 找不到 `supermedicine` | 将 Python Scripts 目录加入 `PATH`，或运行 `python -m cli_entry`。 |
-| TUI 无法启动 | 运行 `npm ci`，确认 Bun 在 `PATH`，再运行 `supermedicine tui --dry-run`。 |
-| 发布包缺少 exe | 使用包含 `dist/SuperMedicine.exe` 的完整发布包。 |
-| LLM 初始化失败 | 提供 provider、API format、Base URL、model 和 key source。 |
-
+<a id="license"></a>
 ## 许可证
 
-MIT。详见 [LICENSE](LICENSE)。
-
-<!-- TUI compatibility markers: 只有主输入框 | watcher 或轮询 -->
+SuperMedicine 使用 MIT License。捆绑依赖声明见
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

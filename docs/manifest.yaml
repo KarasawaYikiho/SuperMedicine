@@ -1,0 +1,38 @@
+schema_version: 1
+documents:
+  - {path: README.md, audience: user, role: landing, translation_group: root-readme, release_critical: true}
+  - {path: README.zh-CN.md, audience: user, role: landing, translation_group: root-readme, release_critical: true}
+  - {path: CHANGELOG.md, audience: user, role: release-history, release_critical: true}
+  - {path: CONTRIBUTING.md, audience: contributor, role: policy}
+  - {path: SECURITY.md, audience: user, role: security-policy}
+  - {path: THIRD_PARTY_NOTICES.md, audience: user, role: legal, release_critical: true}
+  - {path: docs/README.md, audience: user, role: documentation-index}
+  - {path: docs/api/README.md, audience: developer, role: api-index}
+  - {path: docs/architecture/README.md, audience: maintainer, role: architecture-index}
+  - {path: docs/architecture/ARCHITECTURE.md, audience: maintainer, role: canonical-architecture}
+  - {path: docs/architecture/runtime-pipeline.md, audience: maintainer, role: canonical-runtime}
+  - {path: docs/architecture/release-architecture.md, audience: maintainer, role: canonical-release}
+  - {path: docs/examples/README.md, audience: user, role: examples-index}
+  - {path: docs/guides/getting-started.md, audience: user, role: getting-started}
+  - {path: docs/guides/INSTALL.md, audience: user, role: canonical-installation, release_critical: true}
+  - {path: docs/maintainers/README.md, audience: maintainer, role: maintainer-index}
+  - {path: docs/maintainers/entrypoints.md, audience: maintainer, role: entrypoint-reference}
+  - {path: docs/maintainers/feature-parity.md, audience: maintainer, role: capability-contract}
+  - {path: docs/maintainers/maintenance-backlog.md, audience: maintainer, role: backlog}
+  - {path: docs/maintainers/quality-gates.md, audience: maintainer, role: canonical-quality-gates}
+  - {path: docs/maintainers/ci-workflows.md, audience: maintainer, role: canonical-ci}
+  - {path: docs/maintainers/repository-map.md, audience: maintainer, role: canonical-repository-map}
+  - {path: docs/maintainers/history/rebuild-0.4.2.md, audience: maintainer, role: immutable-history, frozen: true}
+  - {path: docs/references/README.md, audience: user, role: reference-index}
+  - {path: docs/references/figure/chart_selection.md, audience: user, role: figure-reference}
+  - {path: docs/references/figure/data_profiling.md, audience: user, role: figure-reference}
+  - {path: docs/references/figure/journal_specs.md, audience: user, role: figure-reference}
+  - {path: docs/references/figure/plot_recipes.md, audience: user, role: figure-reference}
+  - {path: docs/references/figure/publication_checklist.md, audience: user, role: figure-reference}
+  - {path: docs/references/figure/visual_review.md, audience: user, role: figure-reference}
+  - {path: docs/references/figure/viz_pitfalls.md, audience: user, role: figure-reference}
+  - {path: docs/references/rag/provider-interface.md, audience: maintainer, role: rag-reference}
+  - {path: docs/references/standards/consort-checklist.md, audience: user, role: standards-reference}
+  - {path: docs/references/standards/prisma-checklist.md, audience: user, role: standards-reference}
+  - {path: docs/references/standards/stard-checklist.md, audience: user, role: standards-reference}
+  - {path: docs/references/standards/strobe-checklist.md, audience: user, role: standards-reference}

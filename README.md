@@ -1,262 +1,135 @@
 # SuperMedicine
 
-<p align="center"><img src="assets/logo.jpg" alt="SuperMedicine" width="360"></p>
+SuperMedicine is a modular medical-research assistant with a standalone Python
+runtime, CLI, OpenTUI, Web and Desktop surfaces, optional platform adapters, and
+research plugins. It supports evidence retrieval, paper workflows, statistical
+analysis, standards checks, figure workflows, permissions, and auditable
+execution.
 
-![Version](https://img.shields.io/badge/version-Beta0.4.2-blue)
-![Python](https://img.shields.io/badge/python-3.10%2B-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
+<!-- BEGIN GENERATED: release-metadata -->
+Current release: **0.4.2b0**
+<!-- END GENERATED: release-metadata -->
 
-**Language:** English | [Simplified Chinese](README.zh-CN.md)
+Release series: **Beta0.4.2**
 
-SuperMedicine is a local-first Python framework for medical research assistance.
-It provides a CLI, kernel, permission engine, plugin runtime, workspace and paper
-management, LLM provider configuration, local RAG utilities, writing/citation
-helpers, experiment/log workflows, and a Chinese OpenTUI terminal interface.
+中文说明：[README.zh-CN.md](README.zh-CN.md)
 
-SuperMedicine is not a clinical decision system. Treat every generated output as
-research assistance that needs qualified human review.
+<a id="product"></a>
+## Product
 
-Current release label: **Beta0.4.2**. Python package fallback version:
-**0.4.2b0**.
+The standalone core is the default product. OpenCode and Claude Code adapters
+are optional layers and do not redefine core behavior.
 
-## Mandatory Harness and RAG Runtime
+Stable capabilities include:
 
-Every formal CLI, TUI, Web, plugin, LLM, and optional multi-agent task enters the
-same Kernel pipeline. Harness and local-first RAG are required runtime
-capabilities and cannot be disabled by configuration, environment variables, or
-direct plugin parameters. Missing, damaged, or unwritable required components
-fail closed with structured errors.
+- workspace, paper, experiment, experience, and log workflows;
+- local and configured-provider LLM execution;
+- required local RAG retrieval and required Harness lifecycle checks;
+- optional Alpha/Beta/Gamma/Delta Multi-Agent execution with checkpoints;
+- canonical permission policy, audit, redaction, and path safety;
+- CLI, OpenTUI, Web, Desktop, Standalone, OpenCode, and Claude Code surfaces;
+- Wheel, sdist, three Windows executables, and a versioned Release ZIP.
 
-Knowledge-generation tasks retrieve evidence before generation. An empty index
-is reported as `rag.status=empty`; sources are never fabricated. Deterministic
-and control actions record an explicit `skipped` reason. PubMed remains
-permission-gated and degrades to local evidence when denied. Multi-agent mode
-defaults to `agents.mode: single` and uses the same Harness, RAG, permission,
-audit, and result envelope as single mode.
+The complete machine-readable capability inventory is
+[`feature_manifest.json`](feature_manifest.json).
 
-## Read First
+<a id="safety"></a>
+## Safety
 
-- [Installation guide](docs/guides/INSTALL.md)
-- [Architecture overview](docs/architecture/ARCHITECTURE.md)
-- [Security policy](SECURITY.md)
-- [Contribution guide](CONTRIBUTING.md)
-- [Changelog](CHANGELOG.md)
+SuperMedicine assists research workflows; it does not provide clinical advice,
+diagnosis, or treatment decisions. Review generated claims, citations,
+statistics, figures, and code before use.
 
-## What It Includes
+Harness and RAG are mandatory, enabled by default, and fail closed when their
+required runtime state is missing, damaged, or unwritable. Multi-Agent is
+optional: disabled runs use the single-agent path; enabled runs preserve all
+four roles and checkpoint resume.
 
-| Area | Scope |
-| --- | --- |
-| CLI and kernel | Command dispatch, configuration, event bus, plugin routing, sessions, and permission checks. |
-| Permissions | Conservative by default, with explicit full-access acknowledgement and audit logging. |
-| Workspaces | Explicit `--workspace` ids for workspace, paper, tool, and experience commands. |
-| LLM providers | OpenAI, Anthropic, OpenRouter, and OpenAI-compatible custom endpoints through local config or environment variables. |
-| Plugins | RAG, harness checks, medical writing, citation formatting, experiment helpers, Python/R tool templates, and figure utilities. |
-| TUI | Chinese OpenTUI terminal interface backed by Bun and `@opentui/core@0.4.3`. |
-| Optional adapters | OpenCode and Claude Code metadata/adapter files under `adapters/`; they are not required for the standalone Python runtime. |
+Never commit API keys, patient data, private endpoints, permission audit logs,
+or user workspaces.
 
-## Install From Source
+<a id="install"></a>
+## Install
 
 Requirements:
 
-- Python 3.10 or newer
-- Git
-- pip
-- Bun and npm for the OpenTUI runtime
-- R 4.3 or newer only when using optional R-backed survival tooling
+- Python 3.10–3.13;
+- Node.js/npm for OpenTUI dependencies;
+- Bun for the real OpenTUI runtime.
 
 ```bash
 git clone https://github.com/KarasawaYikiho/SuperMedicine.git
 cd SuperMedicine
 python -m pip install -e .
-npm ci
 python install.py
-supermedicine status
 ```
 
-The lowercase `python install.py` path is the canonical source entry. For direct
-module execution and lightweight fallback initialization, use `install_entry.py`.
+Ordinary users run `python install.py` with no flags and follow the interactive
+wizard. Advanced automation / CI can use explicit flags and a staged release
+payload. Full source, release archive, `SuperMedicineInstaller.exe`,
+`dist/SuperMedicine.exe`, `--extract-release-to`, `--release-exe`,
+`--exe-dry-run`, and failure recovery are documented in the
+[installation guide](docs/guides/INSTALL.md).
 
-For development:
-
-```bash
-python -m pip install -e ".[dev]"
-```
-
-For the OpenTUI smoke check:
+OpenTUI uses `@opentui/core@0.4.3`:
 
 ```bash
+npm ci
 npm run opentui:smoke
 ```
 
-## Release Package Layout
+The JavaScript runtime defaults to Bun. Advanced diagnosis may set
+`SUPERMEDICINE_OPENTUI_JS_RUNTIME` to the supported runtime executable.
 
-Windows release archives are expected to keep the installer, Python sources,
-OpenTUI manifests, documentation, and generated executables together.
-
-Important release files include:
-
-- `SuperMedicineInstaller.exe`
-- `dist/SuperMedicine.exe`
-- `SuperMedicineGUI.exe`
-- `install.py`
-- `install_entry.py`
-- `uninstall_entry.py`
-- `installer/`
-- `package.json`
-- `package-lock.json`
-- `THIRD_PARTY_NOTICES.md`
-- `docs/guides/INSTALL.md`
-
-Do not copy only `install.py` out of a release archive. The release installer
-entrypoints import sibling packages and expect the archive layout to remain
-intact.
-
-## Quick CLI Tour
+<a id="quickstart"></a>
+## Quickstart
 
 ```bash
-supermedicine status
-supermedicine diagnose
-supermedicine workspace init --workspace demo --name "Demo Workspace"
-supermedicine paper import ./paper.pdf --workspace demo --title "Paper Title"
-supermedicine experience suggest --workspace demo --summary "Keep useful prompts short"
-supermedicine tool scan --language python
-supermedicine tool add --workspace demo --select 1
-supermedicine experiment list
-supermedicine experiment start --protocol western_blot_basic --session-id wb-demo
-supermedicine log follow --session-id wb-demo --interval 1 --max-entries 20
+supermedicine --help
+supermedicine init --provider openai --base-url https://api.openai.com/v1 \
+  --api-key "$OPENAI_API_KEY" --model gpt-4o-mini
+supermedicine workspace create demo
+supermedicine run "Summarize the evidence" --workspace demo
 supermedicine tui
+supermedicine web
 ```
 
-CLI commands always require explicit `--workspace` when they operate on a
-workspace. They do not silently reuse the TUI's recent workspace.
+Provider configuration can also come from `SM_LLM_PROVIDER`,
+`SM_LLM_BASE_URL`, `SM_LLM_API_KEY`, `SM_LLM_MODEL`, or
+`.supermedicine/config.yaml`. Secret values are redacted from diagnostics and
+logs.
 
-## Configuration
+Permission modes remain `strict`, `balanced`, and `permissive`; hard limits and
+explicit denies still apply in every mode. Use `supermedicine permission`,
+`authorize`, and `revoke` to inspect or change policy.
 
-Local runtime state lives under `.supermedicine/`.
+<a id="documentation"></a>
+## Documentation
 
-| File or variable | Purpose |
-| --- | --- |
-| `.supermedicine/config.yaml` | Local runtime configuration. Keep it private. |
-| `.supermedicine/policies/default.yaml` | Tracked default permission policy. |
-| `.supermedicine/policies/audit.jsonl` | Local permission audit log. |
-| `SM_CONFIG` | Override the config file path. |
-| `SM_<KEY>` | Override config keys from the environment. |
-| `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY` | Preferred key sources for common providers. |
+- [Documentation index](docs/README.md)
+- [Installation](docs/guides/INSTALL.md)
+- [Getting started](docs/guides/getting-started.md)
+- [Architecture](docs/architecture/ARCHITECTURE.md)
+- [Runtime pipeline](docs/architecture/runtime-pipeline.md)
+- [Release architecture](docs/architecture/release-architecture.md)
+- [Quality gates](docs/maintainers/quality-gates.md)
+- [CI workflows](docs/maintainers/ci-workflows.md)
+- [Security policy](SECURITY.md)
+- [Contributing](CONTRIBUTING.md)
+- [Changelog](CHANGELOG.md)
 
-Prefer environment variables or private config for secrets. Shared examples must
-use placeholders such as `<OPENAI_API_KEY>`.
-
-## Permissions
-
-SuperMedicine has two file-access modes:
-
-| Mode | Behavior |
-| --- | --- |
-| `conservative` | Default. Project-local access is allowed; external writes, deletes, and execution require explicit authorization or are denied. |
-| `full` | Relaxes SuperMedicine's own checks after confirmation. It uses only the current OS user/process permissions and does not bypass UAC, ACLs, or administrator requirements. |
-
-Useful commands:
+For local validation:
 
 ```bash
-supermedicine permission status
-supermedicine permission roots
-supermedicine permission authorize C:\path\to\allowed-dir
-supermedicine permission revoke C:\path\to\allowed-dir
-supermedicine permission mode conservative
-supermedicine permission mode full --confirm-full
+python scripts/maintainers/check_docs.py
+python scripts/maintainers/sync_release_metadata.py --check
+python -m ruff check .
+python -m mypy core permission cli plugins agents adapters installer
+python -m pytest tests -q --tb=short
 ```
 
-## TUI
-
-Launch the Chinese OpenTUI interface:
-
-```bash
-supermedicine tui
-supermedicine tui --dry-run
-npm run opentui:smoke
-```
-
-The non-dry-run path uses Bun to start `core/tui/opentui_runtime.mjs` and the
-pinned `@opentui/core@0.4.3` dependency.
-If Bun is not on `PATH`, set `SUPERMEDICINE_OPENTUI_JS_RUNTIME` to a
-Bun-compatible executable.
-
-Global shortcuts:
-
-| Key | Action |
-| --- | --- |
-| `Tab` | Move focus forward. |
-| `Shift+Tab` | Move focus backward. |
-| `Enter` | Submit the focused input or confirm the selected action. |
-| `M` | Open or close the menu. |
-| `P` / `Ctrl+P` | Open the permission view. |
-| `Esc` / `B` | Go back from the current route or menu state. |
-| `Q` | Quit the TUI. |
-
-Number keys `1-0` are not direct view-switching shortcuts; they remain normal
-input when the prompt has focus.
-
-The renderer uses native OpenTUI focus, mouse hit testing, scroll containers,
-responsive breakpoints, and an authenticated local bridge to Python services.
-Long-running requests expose progress and cancellation without printing secrets
-or internal bridge state into the terminal frame.
-
-## LLM Providers
-
-Provider records require:
-
-- provider name
-- API format (`openai`, `anthropic`, or `openrouter`)
-- Base URL
-- model
-- API key or `api_key_env`
-
-Example:
-
-```bash
-supermedicine llm add deepseek \
-  --api-format openai \
-  --base-url https://api.deepseek.com/v1 \
-  --api-key-env DEEPSEEK_API_KEY \
-  --model deepseek-chat \
-  --set-current
-
-supermedicine llm list
-supermedicine llm show deepseek
-supermedicine llm switch deepseek
-```
-
-## Local Quality Gate
-
-```bash
-python -m pip install -e ".[dev]"
-ruff check --select=E,F,W --ignore=E501 .
-python -m pytest tests/test_repo_hygiene.py tests/test_release.py tests/test_maintainer_markdown_links.py
-```
-
-Run the broader test suite before release work:
-
-```bash
-python -m pytest tests/ -v
-```
-
-## Repository Hygiene
-
-Tracked files should be source, tests, CI, package metadata, docs, policies, and
-small assets. Do not commit build output, caches, local workspaces, logs,
-credentials, generated executables, or local archives. Historical archive notes
-belong in ignored `Temp/`, not in `docs/archive/`.
-
-## Troubleshooting
-
-| Symptom | Fix |
-| --- | --- |
-| `No module named 'yaml'` | Run `python -m pip install -e .`. |
-| `supermedicine` is not found | Add the Python Scripts directory to `PATH`, or run `python -m cli_entry`. |
-| TUI does not start | Run `npm ci`, confirm Bun is on `PATH`, then run `supermedicine tui --dry-run`. |
-| Missing release executable | Use a complete release archive containing both `dist/SuperMedicine.exe` and `SuperMedicineGUI.exe`. |
-| LLM setup fails | Provide provider, API format, Base URL, model, and key source. |
-
+<a id="license"></a>
 ## License
 
-MIT. See [LICENSE](LICENSE).
+SuperMedicine is released under the MIT License. Bundled dependency notices are
+in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

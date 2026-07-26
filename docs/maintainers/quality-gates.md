@@ -6,40 +6,41 @@ release or risky refactors.
 ## Documentation Gate
 
 ```powershell
-python scripts\maintainers\check_markdown_links.py docs
-python -m pytest tests/test_maintainer_markdown_links.py -q
+python scripts\maintainers\check_docs.py
+python scripts\maintainers\sync_release_metadata.py --check
+python -m pytest tests/test_docs_contract.py -q
 ```
 
 ## Repository Hygiene and Release Docs
 
 ```powershell
-python -m pytest tests/test_repo_hygiene.py tests/test_release.py -q
+python -m pytest tests/test_repository_policy.py tests/test_release.py -q
 ```
 
 ## Python Gate
 
 ```powershell
 python -m pip install -e ".[dev]"
-python -m ruff check --select=E,F,W --ignore=E501 .
-python -m pytest tests/ -v
+python -m ruff check .
+python -m mypy core permission cli plugins agents adapters installer
+python -m pytest tests/ -q --tb=short
 ```
 
-## Human Maintenance Contract
+## Architecture and Capability Contract
 
 ```powershell
-python -m scripts.maintainers.human_maintenance_snapshot --output Temp\human-maintenance-current.json
-python -m pytest tests/feature_contract tests/test_core_convergence.py tests/test_application_service_boundaries.py -q
+python -m pytest tests/test_architecture.py tests/test_feature_manifest.py tests/test_runtime.py -q
 ```
 
-Compare a temporary snapshot before replacing the reviewed baseline. A baseline
-update is an explicit review of Feature IDs, surfaces, signatures, file roles,
-and implementation authorities; it is not a routine formatting step.
+Feature IDs may be added but baseline IDs may not be removed. These tests protect
+stable boundaries and runtime behavior without fixing private filenames, file
+counts, function counts, or line counts.
 
 ## Optional Web Gate
 
 ```powershell
 python -m pip install -e ".[dev,web]"
-python -m pytest tests/test_web_self_evolution.py -q
+python -m pytest tests/test_web.py tests/test_web_artifacts.py tests/test_web_security.py -q
 ```
 
 ## Optional OpenTUI Gate

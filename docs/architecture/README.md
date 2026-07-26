@@ -6,7 +6,9 @@ repository.
 ## Files
 
 - [ARCHITECTURE.md](ARCHITECTURE.md): system boundary and runtime design.
-- [FUNCTION_MAP.md](FUNCTION_MAP.md): maintainer-facing module and callable map.
+- [Runtime pipeline](runtime-pipeline.md): Harness, RAG, and Multi-Agent order.
+- [Release architecture](release-architecture.md): package and publication boundaries.
+- [Repository map](../maintainers/repository-map.md): maintainer ownership map.
 - [Maintainer guide](../maintainers/README.md): repository ownership, entrypoints,
   and quality gates.
 

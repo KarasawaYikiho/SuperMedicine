@@ -4,9 +4,6 @@ SuperMedicine is a local-first Python framework for medical research assistance.
 The default supported product is the standalone Python runtime: CLI, Kernel,
 permission engine, plugins, workspace state, installer, and TUI launcher.
 
-Current release label: **Beta0.4.2**. Python package fallback version:
-**0.4.2b0**.
-
 ## System Shape
 
 ```text
@@ -126,7 +123,9 @@ ignored `Temp/`.
 
 ## Related Docs
 
-- [Function map](FUNCTION_MAP.md)
+- [Repository map](../maintainers/repository-map.md)
+- [Runtime pipeline](runtime-pipeline.md)
+- [Release architecture](release-architecture.md)
 - [Maintainer guide](../maintainers/README.md)
 - [Installation guide](../guides/INSTALL.md)
 - [Security policy](../../SECURITY.md)

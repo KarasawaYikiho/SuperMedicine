@@ -2,7 +2,7 @@
 
 This is the authoritative maintenance record for the fixed-baseline rebuild
 from `49ac6f88264fe4e06090af39154f2a089a18d8ef`. It complements the immutable
-[Feature Parity Baseline](feature-parity.md); it does not replace the machine
+[Feature Parity Baseline](../feature-parity.md); it does not replace the machine
 contract in `feature_manifest.json`.
 
 ## Outcome and scope

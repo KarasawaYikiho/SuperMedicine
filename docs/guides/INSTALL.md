@@ -54,7 +54,7 @@ source .venv/bin/activate
 Run a focused local gate:
 
 ```bash
-python -m pytest tests/test_repo_hygiene.py tests/test_release.py tests/test_maintainer_markdown_links.py
+python -m pytest tests/test_repository_policy.py tests/test_release.py tests/test_docs_contract.py
 ```
 
 ## LLM Provider Setup

@@ -41,8 +41,10 @@ source .venv/bin/activate
 Run targeted checks while developing, then run the relevant gate before commit:
 
 ```bash
-python -m pytest tests/test_repo_hygiene.py tests/test_release.py tests/test_maintainer_markdown_links.py
-ruff check --select=E,F,W --ignore=E501 .
+python scripts/maintainers/check_docs.py
+python scripts/maintainers/sync_release_metadata.py --check
+python -m pytest tests/test_repository_policy.py tests/test_release.py tests/test_docs_contract.py
+python -m ruff check .
 ```
 
 For release or broad changes:
@@ -57,17 +59,17 @@ expects `pytest`, `ruff`, and `mypy` paths to remain usable.
 ## Documentation
 
 - Keep root docs concise and current.
-- Keep `README.md` and `README.zh-CN.md` aligned on release label
-  `Beta0.4.2` and package fallback version `0.4.2b0`.
+- Keep `README.md` and `README.zh-CN.md` aligned through the generated release
+  metadata block.
 - Keep release-package references to `SuperMedicineInstaller.exe`,
-  `dist/SuperMedicine.exe`, `@opentui/core@0.4.1`, and
+  `dist/SuperMedicine.exe`, `@opentui/core@0.4.3`, and
   `npm run opentui:smoke` when those contracts still apply.
 - Do not add new tracked archive notes under `docs/archive/`; use ignored
   `Temp/` for local archive material.
 - Run the markdown link checker after doc changes:
 
 ```bash
-python scripts/maintainers/check_markdown_links.py docs
+python scripts/maintainers/check_docs.py
 ```
 
 ## Pull Requests
