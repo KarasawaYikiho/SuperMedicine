@@ -104,7 +104,9 @@ CRITICAL_RELEASE_FILES = {
     "docs/guides/INSTALL.md",
 }
 CRITICAL_RELEASE_DIRS = {
+    "cli",
     "core",
+    "desktop",
     "permission",
     "agents",
     "plugins",
@@ -585,8 +587,8 @@ def test_release_packaging_contract_includes_critical_modules_and_high_risk_surf
         assert relative_path in tracked, relative_path
         assert f'"{relative_path}"' in packaging_common, relative_path
 
-    expected_include_dirs = 'INCLUDE_DIRS = ["core", "permission", "agents", "plugins", "adapters", "installer"]'
-    assert expected_include_dirs in packaging_common
+    for package_dir in CRITICAL_RELEASE_DIRS:
+        assert f'"{package_dir}"' in packaging_common
     for directory in CRITICAL_RELEASE_DIRS:
         assert any(
             path == directory or path.startswith(f"{directory}/") for path in tracked

@@ -35,7 +35,16 @@ INCLUDE_FILES = [
     "docs/guides/INSTALL.md",
     "assets/logo.ico",
 ]
-INCLUDE_DIRS = ["core", "permission", "agents", "plugins", "adapters", "installer"]
+INCLUDE_DIRS = [
+    "cli",
+    "core",
+    "desktop",
+    "permission",
+    "agents",
+    "plugins",
+    "adapters",
+    "installer",
+]
 
 
 def should_exclude(path: Path) -> bool:
