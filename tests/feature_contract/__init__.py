@@ -1,1 +1,0 @@
-"""Feature-preservation contract tests."""

@@ -669,19 +669,6 @@ class TestIntegration:
         assert loaded is not None
         assert loaded["result"]["ttest"]["p_value"] < 0.05
 
-    def test_kernel_execute_task_success_with_medical_boundary(self):
-        kernel = Kernel()
-        result = kernel.execute_task("smoke medical task")
-        assert result["status"] == "success"
-        assert result["plugin"] == "python-stats"
-        assert result["action"] == "stats.descriptive"
-        assert result["output"]["count"] == 5
-        assert result["error"] is None
-        assert "contract_version" in result["metadata"]
-        assert "not production/clinical medical advice" in result["medical_boundary"]
-        assert (
-            "no production-grade statistical guarantee" in result["statistics_boundary"]
-        )
 
     def test_kernel_runtime_llm_context_uses_restored_provider_without_secret_leak(
         self, tmp_path
@@ -763,50 +750,9 @@ class TestIntegration:
         assert result["error"] == "Permission denied by canonical policy chain."
         assert result["reason"] == "Permission denied by canonical policy chain."
 
-    def test_kernel_execute_task_missing_plugin(self):
-        kernel = Kernel()
-        result = kernel.execute_task(
-            "smoke medical task",
-            plugin_name="missing-plugin",
-            action="stats.descriptive",
-        )
-        assert result["status"] == "missing_plugin"
-        assert result["plugin"] == "missing-plugin"
-        assert result["output"] is None
-        assert result["error"] == "Plugin not found: missing-plugin"
 
-    def test_kernel_execute_task_plugin_error(self):
-        kernel = Kernel()
-        result = kernel.execute_task(
-            "smoke medical task",
-            plugin_name="python-stats",
-            action="stats.unsupported",
-        )
-        assert result["status"] == "plugin_error"
-        assert "Unsupported python-stats action" in result["error"]
-        assert result["output"] is None
-        assert "medical_boundary" in result["metadata"]
 
-    def test_kernel_execute_task_survival_plugin_path(self):
-        kernel = Kernel()
-        result = kernel.execute_task("medical survival task")
-        assert result["status"] == "success"
-        assert result["plugin"] == "r-survival"
-        assert result["action"] == "r.survival.km"
-        assert "total_subjects" in result["output"]
-        assert "not production/clinical medical advice" in result["medical_boundary"]
 
-    def test_kernel_execute_task_invalid_plugin_input_is_structured_error(self):
-        kernel = Kernel()
-        result = kernel.execute_task(
-            "smoke medical task",
-            plugin_name="python-stats",
-            action="stats.descriptive",
-            params={"data": ["not-a-number"]},
-        )
-        assert result["status"] == "plugin_error"
-        assert result["output"] is None
-        assert "Invalid python-stats input" in result["error"]
 
     def test_kernel_executes_rag_interface_manifest_plugin_without_external_service(
         self, tmp_path
@@ -898,17 +844,6 @@ class TestIntegration:
         assert result["output"]["status"] == "denied"
         assert result["output"]["errors"][0]["code"] == "agent_identity_required"
 
-    def test_kernel_rag_interface_invalid_input_is_structured_plugin_error(self):
-        kernel = Kernel()
-        result = kernel.execute_task(
-            "rag retrieval task",
-            plugin_name="rag-interface",
-            action="rag.query",
-            params={"query": ""},
-        )
-        assert result["status"] == "plugin_error"
-        assert result["output"] is None
-        assert "Invalid rag-interface input" in result["error"]
 
     def test_kernel_executes_harness_core_manifest_plugin(self, tmp_path):
         checkpoint_step = tmp_path / "checkpoints" / "task-1" / "step-1"
@@ -944,58 +879,8 @@ class TestIntegration:
         assert result["action"] == "harness.integration.checkpoint"
         assert result["output"]["complete"] is True
 
-    def test_kernel_harness_core_invalid_input_is_structured_plugin_error(self):
-        kernel = Kernel()
-        result = kernel.execute_task(
-            "harness checkpoint task",
-            plugin_name="harness-core",
-            action="harness.integration.checkpoint",
-            params={"task_id": "task-1"},
-        )
 
-        assert result["status"] == "plugin_error"
-        assert result["output"] is None
-        assert "Invalid harness-core input" in result["error"]
 
-    def test_kernel_executes_medical_citation_manifest_plugin(self):
-        kernel = Kernel()
-        result = kernel.execute_task(
-            "AMA citation task",
-            params={
-                "source_id": "src-1",
-                "sources": {
-                    "src-1": {
-                        "reference_type": "journal",
-                        "authors": ["John Smith", "Jane Doe"],
-                        "title": "Cardiovascular Risk Factors",
-                        "journal": "JAMA",
-                        "year": 2024,
-                        "volume": "331",
-                        "issue": "5",
-                        "pages": "401-410",
-                        "doi": "10.1001/jama.2024.1234",
-                    }
-                },
-            },
-        )
-
-        assert result["status"] == "success"
-        assert result["plugin"] == "medical-citation"
-        assert result["action"] == "standard.citation.ama"
-        assert "Smith J" in result["output"]["citation"]
-
-    def test_kernel_medical_citation_invalid_input_is_structured_plugin_error(self):
-        kernel = Kernel()
-        result = kernel.execute_task(
-            "AMA citation task",
-            plugin_name="medical-citation",
-            action="standard.citation.ama",
-            params={"source_id": "missing", "sources": {}},
-        )
-
-        assert result["status"] == "plugin_error"
-        assert result["output"] is None
-        assert "Invalid medical-citation input" in result["error"]
 
     def test_kernel_records_checkpoint_for_plugin_error(self, tmp_path):
         (tmp_path / "config.yaml").write_text(

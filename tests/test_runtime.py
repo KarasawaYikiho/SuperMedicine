@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -7,9 +8,18 @@ from agents.roles import ROLE_SPECS, AlphaAgent, BetaAgent, DeltaAgent, GammaAge
 from core.plugin_registry import PluginRegistry
 
 
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _manifest() -> dict[str, Any]:
+    return json.loads(
+        (REPOSITORY_ROOT / "feature_manifest.json").read_text(encoding="utf-8")
+    )
+
+
 def test_required_plugins_name_their_runtime_contract(
-    manifest: dict[str, Any],
 ) -> None:
+    manifest = _manifest()
     required_plugins = [
         record
         for record in manifest["features"]
@@ -22,8 +32,8 @@ def test_required_plugins_name_their_runtime_contract(
     }
 
 
-def test_required_plugins_are_discovered(repository_root: Path) -> None:
-    registry = PluginRegistry(repository_root / "plugins")
+def test_required_plugins_are_discovered() -> None:
+    registry = PluginRegistry(REPOSITORY_ROOT / "plugins")
     discovered = {meta.name for meta in registry.discover()}
     assert {"rag-interface", "harness-core"} <= discovered
 

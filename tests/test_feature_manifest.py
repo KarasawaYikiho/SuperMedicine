@@ -1,0 +1,42 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any
+
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _manifest() -> dict[str, Any]:
+    return json.loads(
+        (REPOSITORY_ROOT / "feature_manifest.json").read_text(encoding="utf-8")
+    )
+
+
+def test_feature_manifest_preserves_unique_baseline_capabilities() -> None:
+    manifest = _manifest()
+    records = manifest["features"]
+    feature_ids = [record["feature_id"] for record in records]
+
+    assert feature_ids
+    assert len(feature_ids) == len(set(feature_ids))
+    assert set(manifest["baseline_feature_ids"]) <= set(feature_ids)
+    assert all(
+        {"feature_id", "category", "entrypoint", "expected_result"} <= set(record)
+        for record in records
+    )
+    assert all("contract_test" not in record for record in records)
+
+
+def test_feature_manifest_preserves_mandatory_and_optional_runtime_contracts() -> None:
+    records = {record["feature_id"]: record for record in _manifest()["features"]}
+
+    assert records["plugin:rag-interface"]["required"] is True
+    assert records["plugin:rag-interface"]["runtime_contract"] == "rag_local_query"
+    assert records["plugin:harness-core"]["required"] is True
+    assert (
+        records["plugin:harness-core"]["runtime_contract"] == "harness_checkpoint"
+    )
+    for role in ("alpha", "beta", "gamma", "delta"):
+        assert records[f"agent:{role}"]["optional_enabled"] is True

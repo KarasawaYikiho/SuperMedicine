@@ -388,7 +388,7 @@ def test_cli_release_exe_missing_optional_module_reports_actionable_error(tmp_pa
 def test_install_defaults_to_interactive_question_answer_when_args_are_absent(
     tmp_path, monkeypatch
 ):
-    """Regression baseline: bare installer should be usable as an interactive flow."""
+    """Bare installer should be usable as an interactive flow."""
 
     from installer import entrypoint as Install
 
@@ -397,16 +397,6 @@ def test_install_defaults_to_interactive_question_answer_when_args_are_absent(
     def fake_input(prompt: str) -> str:
         prompts.append(prompt)
         prompt_text = prompt.lower()
-        if "provider" in prompt_text:
-            return "openai"
-        if "base" in prompt_text:
-            return "https://openai.local.test/v1"
-        if "model" in prompt_text:
-            return "gpt-test"
-        if "api key" in prompt_text:
-            return "sk-test-interactive-installer"
-        if "重试安装向导" in prompt:
-            raise AssertionError(f"installer unexpectedly requested retry: {prompts!r}")
         if any(
             expected in prompt
             for expected in (
@@ -421,6 +411,16 @@ def test_install_defaults_to_interactive_question_answer_when_args_are_absent(
             )
         ):
             return ""
+        if "provider" in prompt_text:
+            return "openai"
+        if "base" in prompt_text:
+            return "https://openai.local.test/v1"
+        if "model" in prompt_text:
+            return "gpt-test"
+        if "api key" in prompt_text:
+            return "sk-test-interactive-installer"
+        if "重试安装向导" in prompt:
+            raise AssertionError(f"installer unexpectedly requested retry: {prompts!r}")
         raise AssertionError(f"unexpected installer prompt: {prompt!r}")
 
     def fake_getpass(prompt: str) -> str:
