@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import re
 import shutil
@@ -183,13 +184,24 @@ def build_application(root: Path) -> Path | None:
 
 
 def verify_application_executable(output: Path) -> None:
-    """Exercise packaged OpenTUI mouse and Enter paths from a clean directory."""
+    """Exercise the packaged bridge plus OpenTUI mouse and Enter paths."""
 
     with tempfile.TemporaryDirectory(prefix="supermedicine-opentui-self-test-") as temp:
         test_root = Path(temp)
         environment = dict(os.environ)
         environment["SM_CONFIG"] = str(test_root / "config.yaml")
-        result = subprocess.run(
+        bridge_result = subprocess.run(
+            [str(output), "--bridge-self-test"],
+            cwd=test_root,
+            env=environment,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=45,
+        )
+        interaction_result = subprocess.run(
             [str(output), "--opentui-self-test"],
             cwd=test_root,
             env=environment,
@@ -200,15 +212,33 @@ def verify_application_executable(output: Path) -> None:
             stderr=subprocess.PIPE,
             timeout=45,
         )
+    try:
+        bridge_report = json.loads(bridge_result.stdout)
+    except json.JSONDecodeError:
+        bridge_report = {}
+    if (
+        bridge_result.returncode
+        or bridge_result.stderr.strip()
+        or bridge_report.get("ok") is not True
+    ):
+        raise SystemExit(
+            "Packaged bridge self-test failed "
+            f"(exit={bridge_result.returncode}):\n"
+            f"{bridge_result.stdout}{bridge_result.stderr}"
+        )
     expected = (
         "SUPERMEDICINE_OPENTUI_NAV_OK",
         "SUPERMEDICINE_OPENTUI_FULL_PAGE_OK",
     )
-    combined = result.stdout + result.stderr
-    if result.returncode or not all(signal in combined for signal in expected):
+    combined = interaction_result.stdout + interaction_result.stderr
+    if (
+        interaction_result.returncode
+        or interaction_result.stderr.strip()
+        or not all(signal in combined for signal in expected)
+    ):
         raise SystemExit(
             "Packaged OpenTUI interaction self-test failed "
-            f"(exit={result.returncode}):\n{combined}"
+            f"(exit={interaction_result.returncode}):\n{combined}"
         )
 
 

@@ -332,6 +332,7 @@ def test_frozen_spawn_command_and_real_bridge_worker_self_test(
     )
     assert completed.returncode == 0, completed.stderr
     report = json.loads(completed.stdout)
+    assert report["ok"] is True
     assert report["topology"] == "python-parent-managed-isolated-worker"
     assert report["request"] == "ok"
     assert report["cancel"] == "cancelled"

@@ -911,7 +911,7 @@ def bridge_worker_self_test(project_root: str | Path | None = None) -> dict[str,
         server.close()
         if temporary is not None:
             temporary.cleanup()
-    return {
+    report = {
         "topology": BRIDGE_TOPOLOGY,
         "request": request_result,
         "cancel": cancel_result,
@@ -920,6 +920,13 @@ def bridge_worker_self_test(project_root: str | Path | None = None) -> dict[str,
         "bun_spawns_python": False,
         "worker_start_method": server._mp.get_start_method(),
     }
+    report["ok"] = (
+        report["request"] == "ok"
+        and report["cancel"] == "cancelled"
+        and report["workers_after_exit"] == 0
+        and report["connections_after_exit"] == 0
+    )
+    return report
 
 
 __all__ = [

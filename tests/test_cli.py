@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from cli_entry import CLI
 
 
@@ -108,3 +110,37 @@ def test_cli_test_refuses_recursive_pytest_execution(monkeypatch):
     assert result == captured
     assert result["status"] == "unavailable"
     assert result["reason"] == "source_test_run_already_active"
+
+
+def test_cli_main_calls_freeze_support_before_argument_dispatch(monkeypatch):
+    from cli import facade
+
+    calls = []
+    monkeypatch.setattr(
+        facade.multiprocessing, "freeze_support", lambda: calls.append("freeze")
+    )
+    monkeypatch.setattr(
+        facade, "_cli_main", lambda arguments: calls.append(("dispatch", arguments))
+    )
+
+    facade.main(["status"])
+
+    assert calls == ["freeze", ("dispatch", ["status"])]
+
+
+def test_bridge_self_test_failure_exits_nonzero(monkeypatch, capsys):
+    from cli import facade
+    from core.tui import bridge
+
+    monkeypatch.setattr(facade.multiprocessing, "freeze_support", lambda: None)
+    monkeypatch.setattr(
+        bridge,
+        "bridge_worker_self_test",
+        lambda: {"ok": False, "request": "failed"},
+    )
+
+    with pytest.raises(SystemExit) as raised:
+        facade.main(["--bridge-self-test"])
+
+    assert raised.value.code == 1
+    assert '"ok": false' in capsys.readouterr().out

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import multiprocessing
 import sys
 from pathlib import Path
 
@@ -13,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 def main(argv: list[str] | None = None) -> int:
     """Run desktop self-test or launch the native pywebview application."""
+    multiprocessing.freeze_support()
     args = list(sys.argv[1:] if argv is None else argv)
     from core.web.desktop import desktop_self_test, launch_desktop
 

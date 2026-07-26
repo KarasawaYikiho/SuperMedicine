@@ -417,11 +417,15 @@ from cli.parser import main as _cli_main  # noqa: E402
 def main(argv: list[str] | None = None) -> None:
     """Run the CLI or the packaged bridge worker lifecycle self-test."""
 
+    multiprocessing.freeze_support()
     arguments = list(sys.argv[1:] if argv is None else argv)
     if arguments == ["--bridge-self-test"]:
         from core.tui.bridge import bridge_worker_self_test
 
-        print(json.dumps(bridge_worker_self_test(), sort_keys=True))
+        report = bridge_worker_self_test()
+        print(json.dumps(report, sort_keys=True))
+        if not report["ok"]:
+            raise SystemExit(1)
         return
     if arguments == ["--opentui-self-test"]:
         from core.tui.opentui_runtime import (
@@ -442,5 +446,4 @@ def main(argv: list[str] | None = None) -> None:
     _cli_main(arguments)
 
 if __name__ == "__main__":
-    multiprocessing.freeze_support()
     main()

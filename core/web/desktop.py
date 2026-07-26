@@ -13,6 +13,7 @@ import threading
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 
 
@@ -90,6 +91,39 @@ def wait_for_url(url: str, *, timeout: float = 10.0) -> bytes:
     raise TimeoutError(f"Desktop backend did not become healthy at {url}: {last_error}")
 
 
+def request_json(
+    url: str,
+    *,
+    method: str = "GET",
+    payload: dict[str, Any] | None = None,
+    timeout: float = 5.0,
+) -> Any:
+    """Issue one loopback JSON request for packaged desktop verification."""
+    from urllib.parse import urlsplit
+
+    parsed = urlsplit(url)
+    if parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost"}:
+        raise ValueError("Desktop API verification requires loopback HTTP")
+    encoded = (
+        json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        if payload is not None
+        else None
+    )
+    headers = {"Content-Type": "application/json"} if encoded is not None else {}
+    connection = http.client.HTTPConnection(
+        parsed.hostname, parsed.port, timeout=timeout
+    )
+    try:
+        connection.request(method, parsed.path or "/", body=encoded, headers=headers)
+        response = connection.getresponse()
+        body = response.read()
+        if not 200 <= response.status < 300:
+            raise RuntimeError("Desktop API operation failed")
+        return json.loads(body.decode("utf-8"))
+    finally:
+        connection.close()
+
+
 class DesktopServer:
     """Run Uvicorn on one pre-bound socket and expose deterministic shutdown."""
 
@@ -153,18 +187,26 @@ def desktop_self_test(*, timeout: float = 10.0) -> dict[str, Any]:
         "frontend": False,
         "health": False,
         "logs": paths.log_dir.is_dir(),
+        "operations": False,
         "resources": False,
         "user_data": paths.data_dir.is_dir(),
         "webview": bool(webview_diagnostics()["available"]),
     }
     error = ""
     server: DesktopServer | None = None
+    operation_root: TemporaryDirectory[str] | None = None
     try:
         frontend = frontend_directory()
         checks["resources"] = True
+        from core.runtime_paths import RuntimePaths
         from core.web.server import create_app
 
-        server = DesktopServer(create_app())
+        operation_root = TemporaryDirectory(prefix="supermedicine-desktop-operations-")
+        operation_paths = RuntimePaths.resolve(
+            project_root=operation_root.name,
+            source_root=operation_root.name,
+        )
+        server = DesktopServer(create_app(paths=operation_paths))
         server.start(timeout=timeout)
         checks["backend"] = True
         health = json.loads(
@@ -173,11 +215,31 @@ def desktop_self_test(*, timeout: float = 10.0) -> dict[str, Any]:
         checks["health"] = health.get("status") == "ok"
         page = wait_for_url(f"{server.url}/", timeout=timeout).decode("utf-8")
         checks["frontend"] = "SuperMedicine" in page and frontend.is_dir()
+        workspace_id = "desktop-self-test"
+        created = request_json(
+            f"{server.url}/api/v1/workspaces",
+            method="POST",
+            payload={"id": workspace_id, "name": "Desktop self-test"},
+        )
+        listed = request_json(f"{server.url}/api/v1/workspaces")
+        request_json(
+            f"{server.url}/api/v1/workspaces/{workspace_id}",
+            method="DELETE",
+            payload={"confirm": workspace_id},
+        )
+        remaining = request_json(f"{server.url}/api/v1/workspaces")
+        checks["operations"] = (
+            created.get("id") == workspace_id
+            and any(item.get("id") == workspace_id for item in listed)
+            and not any(item.get("id") == workspace_id for item in remaining)
+        )
     except Exception as exc:  # report every self-test failure in one stable payload
         error = str(exc)
     finally:
         if server is not None:
             server.stop()
+        if operation_root is not None:
+            operation_root.cleanup()
     report: dict[str, Any] = {
         "ok": all(checks.values()),
         "checks": checks,

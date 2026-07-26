@@ -81,12 +81,18 @@ def test_packaged_application_gate_uses_clean_cwd_and_real_opentui_modes(
 ):
     output = tmp_path / "SuperMedicine.exe"
     output.write_bytes(b"exe")
-    captured = {}
+    captured = {"commands": []}
 
     def fake_run(command, **kwargs):
-        captured["command"] = command
+        captured["commands"].append(command)
         captured["cwd"] = kwargs["cwd"]
         captured["env"] = kwargs["env"]
+        if command[-1] == "--bridge-self-test":
+            return SimpleNamespace(
+                returncode=0,
+                stdout='{"ok": true, "request": "ok", "cancel": "cancelled"}\n',
+                stderr="",
+            )
         return SimpleNamespace(
             returncode=0,
             stdout=(
@@ -100,7 +106,10 @@ def test_packaged_application_gate_uses_clean_cwd_and_real_opentui_modes(
 
     builder.verify_application_executable(output)
 
-    assert captured["command"] == [str(output), "--opentui-self-test"]
+    assert captured["commands"] == [
+        [str(output), "--bridge-self-test"],
+        [str(output), "--opentui-self-test"],
+    ]
     assert captured["cwd"] != tmp_path
     assert captured["env"]["SM_CONFIG"].endswith("config.yaml")
 

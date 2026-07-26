@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import importlib
+import sys
 from pathlib import Path
 
 import pytest
 
-from core.tui.app import TUIStatus, launch_tui, main
+from core.tui.app import TUIStatus, _project_root, launch_tui, main
 from core.tui.opentui_runtime import OpenTUIRuntimeError
 
 
@@ -66,6 +67,20 @@ def test_tui_main_accepts_dry_run(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
 
     assert main(["--dry-run"]).interactive is False
+
+
+def test_frozen_tui_uses_shared_user_data_root_not_executable_dist(
+    tmp_path, monkeypatch
+):
+    local_app_data = tmp_path / "LocalAppData"
+    executable = tmp_path / "Programs" / "SuperMedicine" / "dist" / "SuperMedicine.exe"
+    executable.parent.mkdir(parents=True)
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "executable", str(executable))
+    monkeypatch.setenv("LOCALAPPDATA", str(local_app_data))
+    monkeypatch.delenv("SM_PROJECT_ROOT", raising=False)
+
+    assert _project_root(None) == (local_app_data / "SuperMedicine").resolve()
 
 
 @pytest.mark.parametrize(

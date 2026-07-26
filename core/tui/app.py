@@ -8,6 +8,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from core.runtime_paths import RuntimePaths
 from core.tui.i18n import LABELS, t
 from core.tui.opentui_runtime import (
     OpenTUIRuntimeError,
@@ -34,7 +35,7 @@ def _project_root(project_root: Path | str | None) -> Path:
     if project_root is not None:
         return Path(project_root).expanduser().resolve()
     if getattr(sys, "frozen", False):
-        return Path(sys.executable).resolve().parent
+        return RuntimePaths.resolve().project_root
     return Path.cwd().resolve()
 
 
