@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 from tests.conftest import _cp1252_stdio_env
+from tests.ci_workflow_contract import combined_workflow_source
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -292,9 +293,7 @@ def test_extracted_release_directory_installer_entrypoint_smoke(tmp_path):
 def test_ci_release_artifacts_include_standalone_installer_exe_and_shared_payload():
     """Published CI artifacts must include usable app, installer, and payload paths."""
 
-    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
-        encoding="utf-8"
-    )
+    workflow = combined_workflow_source()
     build_installer_exe = (REPO_ROOT / "scripts" / "ci" / "build_installer_exe.py").read_text(
         encoding="utf-8"
     )
@@ -365,9 +364,7 @@ def test_ci_release_artifacts_include_standalone_installer_exe_and_shared_payloa
 def test_cur_dbg_010_release_icon_contract_is_packaged_and_documented():
     """Released Exes and desktop helpers must share the logo/icon contract."""
 
-    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
-        encoding="utf-8"
-    )
+    workflow = combined_workflow_source()
     build_gui_exe = (REPO_ROOT / "scripts" / "ci" / "build_gui_exe.py").read_text(
         encoding="utf-8"
     )
@@ -428,9 +425,7 @@ def test_desktop_and_installer_exe_builders_share_one_parameterized_engine():
 def test_ci_standalone_installer_uses_shared_absolute_add_data_contract():
     """Regression: bundled installer data must resolve independently of spec paths."""
 
-    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
-        encoding="utf-8"
-    )
+    workflow = combined_workflow_source()
     build_installer_exe = (REPO_ROOT / "scripts" / "ci" / "build_installer_exe.py").read_text(
         encoding="utf-8"
     )
@@ -448,9 +443,7 @@ def test_ci_standalone_installer_uses_shared_absolute_add_data_contract():
 def test_ci_packaging_smoke_installs_runtime_dependencies_before_installer_entrypoints():
     """Packaging smoke must install runtime deps, including PyYAML, before installer entrypoints."""
 
-    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
-        encoding="utf-8"
-    )
+    workflow = combined_workflow_source()
     packaging_job = workflow[workflow.index("  packaging-smoke:") :]
 
     installer_smoke_markers = ["python scripts/ci/build_installer_exe.py"]
@@ -549,9 +542,7 @@ def test_opentui_release_runtime_dependency_and_notice_are_packaged():
     packaging_common = (REPO_ROOT / "scripts" / "ci" / "_packaging_common.py").read_text(
         encoding="utf-8"
     )
-    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
-        encoding="utf-8"
-    )
+    workflow = combined_workflow_source()
     notice = (REPO_ROOT / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     install = (REPO_ROOT / "docs" / "guides" / "INSTALL.md").read_text(encoding="utf-8")
@@ -623,9 +614,7 @@ def test_dev_extra_runs_web_api_tests_in_release_gate(read_pyproject):
 def test_release_verification_scripts_use_runner_temp_for_pytest_temp_exhaustion_risk():
     """Regression guard for the Step 3/4 environment-only temp filesystem blocker."""
 
-    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
-        encoding="utf-8"
-    )
+    workflow = combined_workflow_source()
     pytest_invocations = re.findall(r"python -m pytest[^\n]+", workflow)
 
     assert pytest_invocations, "CI must keep explicit pytest release gates"
