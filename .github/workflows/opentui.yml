@@ -1,0 +1,61 @@
+name: OpenTUI
+
+on:
+  pull_request:
+    branches: [master, main]
+  push:
+    branches: [master, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  runtime-smoke:
+    name: OpenTUI (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: |
+          python -m pip install -e ".[dev]"
+          npm ci
+      - name: Real Bun runtime smoke
+        run: |
+          bun --version
+          npm run opentui:smoke
+      - name: Bridge regression tests
+        shell: pwsh
+        run: |
+          $pytestTemp = Join-Path $env:RUNNER_TEMP "pytest-opentui"
+          python -m pytest tests/test_tui.py tests/test_tui_runtime.py tests/test_tui_bridge.py -q --tb=short --override-ini addopts= -p no:cacheprovider --basetemp $pytestTemp
+
+  required-gate:
+    name: OpenTUI / Required Gate
+    if: always()
+    needs: [runtime-smoke]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: test "${{ needs.runtime-smoke.result }}" = "success"

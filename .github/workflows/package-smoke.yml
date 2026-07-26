@@ -1,0 +1,34 @@
+name: Package Smoke
+
+on:
+  pull_request:
+    branches: [master, main]
+    paths:
+      - "installer/**"
+      - "install.py"
+      - "install_entry.py"
+      - "uninstall_entry.py"
+      - "scripts/ci/**"
+      - "setup.py"
+      - "pyproject.toml"
+      - "MANIFEST.in"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/package-smoke.yml"
+      - ".github/workflows/_reusable-windows-package.yml"
+  push:
+    branches: [master, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-windows-artifacts:
+    uses: ./.github/workflows/_reusable-windows-package.yml
+    with:
+      artifact-name: package-smoke-${{ github.sha }}

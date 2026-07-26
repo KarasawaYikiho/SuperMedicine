@@ -1,0 +1,140 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Validate the complete release without publishing
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate-tag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      release_label: ${{ steps.validate.outputs.release_label }}
+      release_title: ${{ steps.validate.outputs.release_title }}
+      archive_name: ${{ steps.validate.outputs.archive_name }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Validate version, tag, commit, and immutability
+        id: validate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $arguments = @(
+            "scripts/ci/validate_release_tag.py",
+            "--tag", "${{ github.ref_name }}",
+            "--sha", "${{ github.sha }}"
+          )
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $arguments += "--allow-non-tag"
+          }
+          if ("${{ github.event_name }}" -eq "workflow_dispatch" -and "${{ inputs.dry_run }}" -eq "true") {
+            $arguments += "--dry-run"
+          }
+          python @arguments
+
+  release-tests:
+    needs: [validate-tag]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: python -m pip install -e ".[dev]"
+      - name: Release behavior gate
+        shell: pwsh
+        run: |
+          $pytestTemp = Join-Path $env:RUNNER_TEMP "pytest-release"
+          python -m pytest tests -q --tb=short --override-ini addopts= -p no:cacheprovider --basetemp $pytestTemp
+
+  build-windows-artifacts:
+    needs: [validate-tag, release-tests]
+    uses: ./.github/workflows/_reusable-windows-package.yml
+    with:
+      artifact-name: release-${{ needs.validate-tag.outputs.release_label }}
+
+  verify-artifacts:
+    needs: [validate-tag, build-windows-artifacts]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v7
+        with:
+          name: release-${{ needs.validate-tag.outputs.release_label }}
+          path: release-artifacts
+      - name: Verify exact built archive
+        run: |
+          python scripts/ci/verify_release_artifacts.py \
+            --archive "release-artifacts/${{ needs.validate-tag.outputs.archive_name }}" \
+            --checksum "release-artifacts/${{ needs.validate-tag.outputs.archive_name }}.sha256" \
+            --report release-artifacts/verification.json
+      - uses: actions/upload-artifact@v7
+        with:
+          name: verified-release-${{ needs.validate-tag.outputs.release_label }}
+          path: release-artifacts/verification.json
+          if-no-files-found: error
+
+  release-dry-run:
+    if: github.event_name == 'workflow_dispatch' && inputs.dry_run
+    needs: [validate-tag, verify-artifacts]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: |
+          echo "Validated ${{ needs.validate-tag.outputs.release_label }}"
+          echo "No Release was created because dry_run=true."
+
+  publish-release:
+    if: github.event_name == 'push' || !inputs.dry_run
+    needs: [validate-tag, verify-artifacts]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: release
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v7
+        with:
+          name: release-${{ needs.validate-tag.outputs.release_label }}
+          path: release-artifacts
+      - name: Generate release notes
+        run: |
+          python scripts/ci/generate_release_notes.py \
+            --tag "${{ needs.validate-tag.outputs.release_label }}" \
+            --output release-notes.md
+      - name: Publish verified assets through a draft Release
+        run: |
+          python scripts/ci/publish_release.py \
+            --tag "${{ needs.validate-tag.outputs.release_label }}" \
+            --title "${{ needs.validate-tag.outputs.release_title }}" \
+            --notes release-notes.md \
+            --archive "release-artifacts/${{ needs.validate-tag.outputs.archive_name }}" \
+            --checksum "release-artifacts/${{ needs.validate-tag.outputs.archive_name }}.sha256"

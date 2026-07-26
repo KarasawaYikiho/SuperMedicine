@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from tests.ci_workflow_contract import (
+    REPOSITORY_ROOT,
     combined_workflow_source,
     jobs_with_write_permission,
     load_workflow,
@@ -19,10 +20,34 @@ def test_workflows_are_valid_yaml_with_read_only_defaults() -> None:
 
 
 def test_only_the_release_publication_job_can_write_repository_contents() -> None:
-    assert jobs_with_write_permission() <= {
-        ("ci.yml", "publish-release"),
-        ("release.yml", "publish-release"),
+    assert jobs_with_write_permission() == {("release.yml", "publish-release")}
+
+
+def test_workflow_set_has_stable_triggers_concurrency_and_timeouts() -> None:
+    assert set(workflow_sources()) == {
+        "_reusable-python.yml",
+        "_reusable-windows-package.yml",
+        "ci.yml",
+        "nightly.yml",
+        "opentui.yml",
+        "package-smoke.yml",
+        "release.yml",
     }
+    ci = load_workflow("ci.yml")
+    release = load_workflow("release.yml")
+    assert set(ci["on"]) == {"pull_request", "push", "workflow_dispatch"}
+    assert "tags" not in ci["on"]["push"]
+    assert set(release["on"]) == {"push", "workflow_dispatch"}
+    assert release["on"]["push"]["tags"] == ["v*"]
+
+    for name in ("ci.yml", "nightly.yml", "opentui.yml", "package-smoke.yml", "release.yml"):
+        assert "concurrency" in load_workflow(name)
+    for name in workflow_sources():
+        for job_name, definition in load_workflow(name)["jobs"].items():
+            assert "uses" in definition or "timeout-minutes" in definition, (
+                name,
+                job_name,
+            )
 
 
 def test_workflow_set_preserves_runtime_and_packaging_commands() -> None:
@@ -48,6 +73,37 @@ def test_workflow_set_preserves_runtime_and_packaging_commands() -> None:
 def test_publication_consumes_packaged_artifacts_and_refuses_overwrite() -> None:
     source = combined_workflow_source()
     assert "actions/download-artifact" in source
-    assert "gh release view" in source
-    assert "gh release create" in source
-    assert "gh release upload" in source
+    assert "scripts/ci/validate_release_tag.py" in source
+    assert "scripts/ci/verify_release_artifacts.py" in source
+    assert "scripts/ci/publish_release.py" in source
+
+    validator = (
+        REPOSITORY_ROOT / "scripts" / "ci" / "validate_release_tag.py"
+    ).read_text(encoding="utf-8")
+    publisher = (
+        REPOSITORY_ROOT / "scripts" / "ci" / "publish_release.py"
+    ).read_text(encoding="utf-8")
+    assert '"gh", "release", "view"' in validator
+    assert '"release", "view"' in publisher
+    assert '"release",\n        "create"' in publisher
+    assert '"release", "upload"' in publisher
+    assert "--draft" in publisher
+    assert '"release", "edit"' in publisher
+
+
+def test_release_jobs_form_a_validate_build_verify_publish_chain() -> None:
+    release = load_workflow("release.yml")
+    jobs = release["jobs"]
+    assert jobs["release-tests"]["needs"] == ["validate-tag"]
+    assert set(jobs["build-windows-artifacts"]["needs"]) == {
+        "validate-tag",
+        "release-tests",
+    }
+    assert set(jobs["verify-artifacts"]["needs"]) == {
+        "validate-tag",
+        "build-windows-artifacts",
+    }
+    assert set(jobs["publish-release"]["needs"]) == {
+        "validate-tag",
+        "verify-artifacts",
+    }

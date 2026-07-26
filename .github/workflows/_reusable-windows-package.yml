@@ -1,0 +1,122 @@
+name: Reusable Windows Package
+
+on:
+  workflow_call:
+    inputs:
+      artifact-name:
+        required: true
+        type: string
+    outputs:
+      release_label:
+        value: ${{ jobs.packaging-smoke.outputs.release_label }}
+      release_title:
+        value: ${{ jobs.packaging-smoke.outputs.release_title }}
+      archive_name:
+        value: ${{ jobs.packaging-smoke.outputs.archive_name }}
+
+permissions:
+  contents: read
+
+jobs:
+  packaging-smoke:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    outputs:
+      release_label: ${{ steps.source_zip.outputs.release_label }}
+      release_title: ${{ steps.source_zip.outputs.release_title }}
+      archive_name: ${{ steps.source_zip.outputs.archive_name }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install runtime and packaging dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -e . build pyinstaller
+          npm ci
+          bun --version
+          npm run opentui:smoke
+
+      - name: Build source distribution
+        shell: pwsh
+        run: python -m build --sdist --outdir source-dist
+
+      - name: Build and smoke application executable
+        shell: pwsh
+        run: |
+          python scripts/ci/_pyinstaller_builder.py application
+          if (!(Test-Path -LiteralPath "dist/SuperMedicine.exe")) { throw "Application EXE missing" }
+          & ./dist/SuperMedicine.exe tui --dry-run
+          python install_entry.py --release-exe dist/SuperMedicine.exe --desktop-dir (Join-Path $env:RUNNER_TEMP "Desktop") --exe-dry-run
+
+      - name: Build and smoke GUI executable
+        shell: pwsh
+        run: |
+          python scripts/ci/build_gui_exe.py
+          if (!(Test-Path -LiteralPath "dist/SuperMedicineGUI.exe")) { throw "GUI EXE missing" }
+          & ./dist/SuperMedicineGUI.exe --self-test
+
+      - name: Build and smoke installer executable
+        shell: pwsh
+        run: |
+          python scripts/ci/build_installer_exe.py
+          if (!(Test-Path -LiteralPath "dist/SuperMedicineInstaller.exe")) { throw "Installer EXE missing" }
+          & ./dist/SuperMedicineInstaller.exe --self-test
+
+      - name: Build release archive
+        id: source_zip
+        shell: pwsh
+        run: python scripts/ci/build_release_zip.py
+
+      - name: Self-test GUI from release archive
+        shell: pwsh
+        run: |
+          $archive = Get-ChildItem -LiteralPath . -Filter "SuperMedicine v*.zip" | Select-Object -First 1
+          if (-not $archive) { throw "Release Zip was not created" }
+          $extractRoot = Join-Path $env:RUNNER_TEMP "supermedicine-release"
+          Expand-Archive -LiteralPath $archive.FullName -DestinationPath $extractRoot
+          $gui = Get-ChildItem -LiteralPath $extractRoot -Recurse -Filter SuperMedicineGUI.exe | Select-Object -First 1
+          if (-not $gui) { throw "GUI EXE missing from release Zip" }
+          $report = Join-Path $env:RUNNER_TEMP "zip-gui-self-test.json"
+          $process = Start-Process -FilePath $gui.FullName -ArgumentList "--self-test", "--self-test-report", $report -WindowStyle Hidden -Wait -PassThru
+          if ($process.ExitCode -ne 0) {
+            if (Test-Path -LiteralPath $report) { Get-Content -LiteralPath $report -Raw }
+            throw "Extracted GUI self-test failed with exit code $($process.ExitCode)"
+          }
+          $result = Get-Content -LiteralPath $report -Raw | ConvertFrom-Json
+          if (-not $result.ok) { throw ($result | ConvertTo-Json -Depth 8) }
+
+      - name: Create checksum
+        id: checksum
+        shell: pwsh
+        run: |
+          $archive = Get-ChildItem -LiteralPath . -Filter "SuperMedicine v*.zip" | Select-Object -First 1
+          $digest = (Get-FileHash -LiteralPath $archive.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$digest  $($archive.Name)" | Set-Content -LiteralPath "$($archive.FullName).sha256" -Encoding ascii
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: |
+            ${{ steps.source_zip.outputs.archive_name }}
+            ${{ steps.source_zip.outputs.archive_name }}.sha256
+          if-no-files-found: error

@@ -1,0 +1,76 @@
+name: Nightly
+
+on:
+  schedule:
+    - cron: "17 18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python-matrix:
+    name: ${{ matrix.os }} / Python ${{ matrix.python-version }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    uses: ./.github/workflows/_reusable-python.yml
+    with:
+      os: ${{ matrix.os }}
+      python-version: ${{ matrix.python-version }}
+      test-target: tests
+
+  opentui-matrix:
+    name: OpenTUI / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: |
+          python -m pip install -e ".[dev]"
+          npm ci
+          bun --version
+          npm run opentui:smoke
+      - name: Full OpenTUI regression
+        shell: pwsh
+        run: |
+          $pytestTemp = Join-Path $env:RUNNER_TEMP "pytest-nightly-opentui"
+          python -m pytest tests/test_tui.py tests/test_tui_runtime.py tests/test_tui_bridge.py -q --tb=short --override-ini addopts= -p no:cacheprovider --basetemp $pytestTemp
+
+  docs-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: python -m pip install -e ".[dev]"
+      - run: |
+          python scripts/maintainers/check_docs.py
+          python scripts/maintainers/sync_release_metadata.py --check
+          python -m build
