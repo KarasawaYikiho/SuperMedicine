@@ -30,7 +30,7 @@ def test_interactive_launch_delegates_terminal_ownership_to_opentui(
 ):
     launched: list[Path] = []
     monkeypatch.setattr(
-        "core.log_report_handler.configure_tui_log_storage", lambda root: None
+        "core.logs.handler.configure_tui_log_storage", lambda root: None
     )
     monkeypatch.setattr(
         "core.tui.app.launch_opentui_runtime",
@@ -48,7 +48,7 @@ def test_missing_opentui_runtime_returns_actionable_noninteractive_status(
     tmp_path, monkeypatch
 ):
     monkeypatch.setattr(
-        "core.log_report_handler.configure_tui_log_storage", lambda root: None
+        "core.logs.handler.configure_tui_log_storage", lambda root: None
     )
 
     def fail(**_kwargs):

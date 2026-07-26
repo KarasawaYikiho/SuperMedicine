@@ -18,7 +18,7 @@ from core.services import (
     ServiceResult,
     WorkspaceService,
 )
-from core.redaction import redact_sensitive
+from permission.redaction import redact_sensitive
 
 
 _CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f]")

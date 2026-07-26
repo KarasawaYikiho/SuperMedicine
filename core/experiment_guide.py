@@ -19,7 +19,7 @@ from core.experiment_protocols import (
     get_protocol,
     list_protocols,
 )
-from core.redaction import redact_sensitive
+from permission.redaction import redact_sensitive
 from core.time_utils import utc_now
 
 

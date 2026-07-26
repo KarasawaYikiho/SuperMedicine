@@ -13,7 +13,7 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any
 
-from core.redaction import redact_sensitive
+from permission.redaction import redact_sensitive
 
 
 @dataclass(frozen=True)

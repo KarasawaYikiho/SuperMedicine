@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from typing import Any, Generic, TypeVar
 from uuid import uuid4
 
-from core.database.database import Database
+from core.database.store import Database
 
 T = TypeVar("T")
 

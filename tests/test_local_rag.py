@@ -9,7 +9,7 @@ import pytest
 import yaml
 
 from core.config_center import ConfigCenter
-from core.rag_service import RAGService
+from core.services.rag import RAGService
 from plugins.rag import main as rag_main
 from plugins.rag.providers import RAGProviderConfig
 from plugins.rag.providers import LocalRAGProvider, MockExternalVectorStoreProvider

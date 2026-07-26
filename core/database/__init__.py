@@ -17,7 +17,7 @@ Usage:
         agent = agents.create({"name": "my_agent", "state": {"active": True}})
 """
 
-from core.database.database import Database
+from core.database.store import Database
 from core.database.repository import AgentRepository, Repository, SessionRepository
 from core.database.migrations import Migration, MigrationManager
 

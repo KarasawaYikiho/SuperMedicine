@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from core.log_report_models import (
+from core.logs.models import (
     _SEVERITY_ORDER,
     _display_message,
     TUI_LOG_SESSION_ID,
@@ -18,7 +18,7 @@ from core.log_report_models import (
     normalize_log_severity,
     resolve_log_storage_locations,
 )
-from core.redaction import redact_path_for_display, redact_sensitive
+from permission.redaction import redact_path_for_display, redact_sensitive
 from core.time_utils import utc_now
 
 

@@ -13,7 +13,7 @@ from plugins.standards.medical_citation.utils import (
     citation_state_from_validation,
     validate_source_id,
 )
-from plugins.standards.medical_citation.vancouver_format import VancouverFormatter
+from plugins.standards.medical_citation.ama_format import VancouverFormatter
 from plugins.tools._common import required_str
 
 

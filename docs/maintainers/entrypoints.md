@@ -17,27 +17,30 @@ Prefer the canonical commands below in new documentation and tests.
 Console script:
 
 ```text
-supermedicine = "cli_entry:main"
+supermedicine = "cli.__main__:main"
 ```
 
 ## Python Entrypoint Files
 
 | File | Role |
 | --- | --- |
-| `cli_entry.py` | Console-script target and CLI facade. |
+| `cli/__main__.py` | Console-script and `python -m cli` target. |
+| `cli/facade.py` | CLI application facade. |
+| `cli_entry.py` | Compatibility wrapper retained for packaged launchers. |
 | `cli/parser.py` | Argument parser and dispatch. |
 | `install.py` | Compatibility installer entry. |
 | `install_entry.py` | Installer implementation entry. |
 | `uninstall_entry.py` | Uninstaller entry. |
-| `gui_entry.py` | GUI launcher. |
+| `desktop/__main__.py` | Desktop package and `python -m desktop` target. |
+| `gui_entry.py` | Compatibility wrapper retained for packaged launchers. |
 | `gui_standalone.py` | Standalone GUI executable source. |
 
 ## Runtime Surfaces
 
 | Surface | Primary files |
 | --- | --- |
-| CLI | `cli/parser.py`, `cli_entry.py`, `cli/commands/` |
-| Kernel | `core/kernel.py` |
+| CLI | `cli/__main__.py`, `cli/parser.py`, `cli/facade.py`, `cli/commands/` |
+| Kernel | `core/kernel/` |
 | TUI | `core/tui/app.py`, `core/tui/opentui_runtime.mjs` |
 | Web | `core/web/server.py`, `core/web/frontend/` |
 | Installer | `install_entry.py`, `installer/`, `setup.py`, `scripts/ci/` |

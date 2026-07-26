@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from typing import Any, Generic, TypeVar
 from uuid import uuid4
 
-from core.redaction import redact_sensitive
+from permission.redaction import redact_sensitive
 
 
 T = TypeVar("T")

@@ -15,10 +15,10 @@ from core.config_center import ConfigCenter
 from core.experiment_protocols import build_experiment_llm_context
 from core.llm_client import LLMClient
 from core.llm_manager import LLMConfigManager
-from core.redaction import redact_sensitive
+from permission.redaction import redact_sensitive
 from core.workspace_tools import WorkspaceToolService, build_tool_authoring_llm_context
 
-from core.kernel_constants import MEDICAL_BOUNDARY, SUPERMEDICINE_SYSTEM_PROMPT
+from core.kernel.constants import MEDICAL_BOUNDARY, SUPERMEDICINE_SYSTEM_PROMPT
 
 
 def workspace_tool_runtime_context(workspace_id: str, config_path) -> dict[str, Any]:

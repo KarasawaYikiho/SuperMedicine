@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from core.database.database import Database
+from core.database.store import Database
 
 
 class Migration:

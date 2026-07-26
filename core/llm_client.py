@@ -7,7 +7,7 @@ import logging
 from collections.abc import Generator
 from typing import Any, Mapping
 
-from core.redaction import redact_sensitive
+from permission.redaction import redact_sensitive
 
 
 logger = logging.getLogger(__name__)
@@ -218,7 +218,7 @@ def create_llm_client(provider: str, **kwargs: Any) -> LLMClient:
 
         return AnthropicClient(**kwargs)
     if api_format == "openrouter" or normalized_provider == "openrouter":
-        from core.llm_providers.openrouter import OpenRouterClient
+        from core.llm_providers.base import OpenRouterClient
 
         return OpenRouterClient(**kwargs)
     raise ValueError(f"Unsupported api_format: {redact_sensitive(api_format)}")

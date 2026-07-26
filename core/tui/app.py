@@ -58,7 +58,7 @@ def launch_tui(
         print(status.message)
         return status
 
-    from core.log_report_handler import configure_tui_log_storage
+    from core.logs.handler import configure_tui_log_storage
 
     configure_tui_log_storage(root)
     try:

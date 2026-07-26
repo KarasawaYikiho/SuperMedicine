@@ -224,7 +224,7 @@ def test_websocket_chat_accepts_real_connection_and_validates_empty_message(clie
 
 def test_unexpected_api_failure_returns_http_server_error(monkeypatch):
     monkeypatch.setattr(
-        "core.services.workspace.WorkspaceManager.list_workspaces",
+        "core.services.research.WorkspaceManager.list_workspaces",
         lambda self: (_ for _ in ()).throw(RuntimeError("workspace backend failed")),
     )
     from core.web.server import create_app

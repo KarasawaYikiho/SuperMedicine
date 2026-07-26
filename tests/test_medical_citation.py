@@ -6,7 +6,7 @@ from plugins.standards.medical_citation.ama_format import (
     Book,
 )
 from plugins.standards.medical_citation.main import execute
-from plugins.standards.medical_citation.vancouver_format import VancouverFormatter
+from plugins.standards.medical_citation.ama_format import VancouverFormatter
 from plugins.standards.medical_citation.utils import (
     CitationSource,
     citation_provenance_from_source,

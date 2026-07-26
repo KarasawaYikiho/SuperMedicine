@@ -10,7 +10,7 @@ from typing import Any
 
 import yaml
 
-from core.redaction import redact_sensitive
+from permission.redaction import redact_sensitive
 from core.llm_providers.config import LLMProviderConfig, sanitized_headers
 from core.secure_files import secure_config_permissions
 from permission.access_mode import AccessMode, AccessModePolicy, normalize_access_mode

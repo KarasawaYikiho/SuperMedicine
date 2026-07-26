@@ -79,7 +79,7 @@ figure = [
 platform-adapters = []
 
 [project.scripts]
-supermedicine = "cli_entry:main"
+supermedicine = "cli.__main__:main"
 
 [tool.setuptools]
 py-modules = ["cli_entry", "uninstall_entry"]

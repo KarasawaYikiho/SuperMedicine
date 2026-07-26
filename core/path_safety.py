@@ -12,7 +12,7 @@ import re
 from pathlib import Path
 from typing import Iterable
 
-from core.redaction import redact_sensitive
+from permission.redaction import redact_sensitive
 
 
 DEFAULT_PROTECTED_DIRECTORIES: tuple[str, ...] = (

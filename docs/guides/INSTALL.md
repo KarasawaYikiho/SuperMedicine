@@ -195,7 +195,7 @@ artifacts.
 
 | Problem | Fix |
 | --- | --- |
-| `supermedicine` is not found | Add Python Scripts to `PATH`, or run commands through `python -m cli_entry`. |
+| `supermedicine` is not found | Add Python Scripts to `PATH`, or run commands through `python -m cli`. |
 | `No module named 'yaml'` | Run `python -m pip install -e .`. |
 | TUI fails before launch | Run `npm ci`, confirm Bun is installed, then run `supermedicine tui --dry-run`. |
 | Release installer cannot import `installer` | Use a complete extracted release archive. |

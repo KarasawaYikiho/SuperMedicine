@@ -174,7 +174,7 @@ def _project_version() -> str:
     try:
         import tomllib
     except ModuleNotFoundError:  # pragma: no cover - Python 3.10
-        import tomli as tomllib  # type: ignore[no-redef]
+        import tomli as tomllib  # type: ignore[import-not-found,no-redef]
 
     with (REPOSITORY_ROOT / "pyproject.toml").open("rb") as stream:
         return str(tomllib.load(stream)["project"]["version"])

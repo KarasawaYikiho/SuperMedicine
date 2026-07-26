@@ -28,7 +28,7 @@ from urllib.parse import urlparse
 import yaml
 
 from core.llm_providers.config import LLMProviderConfig
-from core.redaction import redact_sensitive
+from permission.redaction import redact_sensitive
 from core.secure_files import secure_config_permissions
 from permission.policy import ensure_default_policy
 from installer.component_installer import (

@@ -1,0 +1,417 @@
+#!/usr/bin/env python3
+"""Application facade and command-line entrypoint."""
+
+from __future__ import annotations
+
+import json
+import logging
+import multiprocessing
+import os
+import sys
+from importlib import import_module
+from pathlib import Path
+from typing import Any
+
+logger = logging.getLogger(__name__)
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
+def required_runtime_snapshot(project_dir: Path) -> dict[str, Any]:
+    """Load runtime diagnostics lazily so lightweight CLI commands stay usable."""
+    from core.runtime_capabilities import required_runtime_snapshot as snapshot
+
+    return snapshot(project_dir)
+
+# Source and frozen entrypoints resolve imports from the repository/package root.
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from cli.logging_setup import (  # noqa: E402
+    _log_json,
+)
+
+
+def _load_release_exe_to_desktop():
+    """Lazily load optional Exe release support only when explicitly requested."""
+
+    entrypoint_dir = PROJECT_ROOT
+    installer_dir = PROJECT_ROOT / "installer"
+    release_module = installer_dir / "exe_release.py"
+    if not installer_dir.is_dir() or not release_module.is_file():
+        raise ValueError(
+            "桌面 Exe 释放功能不可用: --release-exe requires a complete release package "
+            "with installer/exe_release.py. "
+            "请重新下载完整发布包，或从包含 installer/ 目录的完整源码/发布目录运行。"
+        ) from None
+
+    entrypoint_path = str(entrypoint_dir)
+    if entrypoint_path not in sys.path:
+        sys.path.insert(0, entrypoint_path)
+
+    try:
+        from installer.exe_release import release_exe_to_desktop
+    except ModuleNotFoundError as exc:
+        missing_module = exc.name or "installer.exe_release"
+        raise ValueError(
+            "桌面 Exe 释放功能不可用: release package is incomplete "
+            f"(missing Python module: {missing_module}). "
+            "请重新下载完整发布包，或从包含 installer/ 目录的完整源码/发布目录运行。"
+        ) from None
+    return release_exe_to_desktop
+
+
+_FORWARDED_COMMAND_GROUPS = {
+    "cli.commands.research": (
+        "workspace_init",
+        "workspace_list",
+        "workspace_show",
+        "workspace_delete",
+        "paper_import",
+        "paper_list",
+        "paper_show",
+        "paper_edit",
+        "paper_enrich",
+        "experience_suggest",
+        "experience_add",
+        "experience_list",
+        "experience_view",
+        "experience_edit",
+        "experience_delete",
+        "experience_export",
+    ),
+    "cli.commands.tools": (
+        "tool_init",
+        "tool_list",
+        "tool_scan",
+        "tool_add",
+        "tool_show",
+        "tool_run",
+        "experiment_start",
+        "experiment_list",
+        "experiment_context",
+        "experiment_add_config",
+        "experiment_show",
+        "experiment_submit",
+        "log_write",
+        "log_list",
+        "log_show",
+        "log_location",
+        "log_follow",
+    ),
+    "cli.commands.execution": ("llm_add", "llm_list", "llm_show", "llm_switch"),
+    "cli.commands.system": (
+        "permission_status",
+        "permission_set_mode",
+        "permission_authorize",
+        "permission_revoke",
+        "multi_agent_status",
+        "multi_agent_set",
+        "self_evolve",
+    ),
+}
+
+_FORWARDED_COMMANDS = {
+    command: (module, command)
+    for module, commands in _FORWARDED_COMMAND_GROUPS.items()
+    for command in commands
+}
+
+
+class CLI:
+    """SuperMedicine CLI"""
+
+    def __init__(self, *, paths=None, application=None) -> None:
+        from core.application import ApplicationFacade
+        from core.runtime_paths import RuntimePaths
+
+        self.paths = paths or RuntimePaths.resolve(project_root=Path.cwd())
+        self.application = application or ApplicationFacade(self.paths)
+
+    def __getattr__(self, name: str):
+        try:
+            module_name, function_name = _FORWARDED_COMMANDS[name]
+        except KeyError as exc:
+            raise AttributeError(name) from exc
+
+        def forwarded(*args, **kwargs):
+            return getattr(import_module(module_name), function_name)(
+                self, *args, **kwargs
+            )
+
+        return forwarded
+
+    def init(
+        self,
+        project_dir: Path,
+        *,
+        provider: str | None = None,
+        base_url: str | None = None,
+        api_key: str | None = None,
+        model: str | None = None,
+        release_exe: Path | None = None,
+        desktop_dir: Path | None = None,
+        exe_target_name: str | None = None,
+        exe_overwrite: bool = False,
+        exe_dry_run: bool = False,
+    ) -> None:
+        """初始化项目"""
+        try:
+            from installer.entrypoint import init_config
+        except ModuleNotFoundError as exc:
+            if exc.name not in {"installer", "installer.entrypoint"}:
+                raise
+            from install_entry import init_config
+
+        init_config(
+            project_dir,
+            provider=provider,
+            base_url=base_url,
+            api_key=api_key,
+            model=model,
+        )
+        logger.info("项目已初始化: %s", project_dir / ".supermedicine")
+        if release_exe is not None:
+            release_exe_to_desktop = _load_release_exe_to_desktop()
+            result = release_exe_to_desktop(
+                exe_path=release_exe,
+                desktop_dir=desktop_dir,
+                target_filename=exe_target_name,
+                overwrite=exe_overwrite,
+                dry_run=exe_dry_run,
+            )
+            logger.info(
+                "桌面 Exe 释放结果: status=%s target=%s",
+                result["status"],
+                result["target_path"],
+            )
+
+    def status(self) -> None:
+        """显示项目状态"""
+        from core.runtime_capabilities import required_runtime_snapshot
+
+        logger.info("SuperMedicine Beta0.4.2")
+        logger.info("=" * 40)
+        runtime = required_runtime_snapshot(Path.cwd())
+        logger.info(
+            "[RUNTIME] Harness %s | RAG %s | Agents %s",
+            "OK" if runtime["harness"]["healthy"] else "FAIL",
+            "OK" if runtime["rag"]["healthy"] else "FAIL",
+            runtime["agents"]["mode"],
+        )
+
+        # 检查配置
+        config_dir = Path.cwd() / ".supermedicine"
+        if config_dir.exists():
+            from core.config_center import ConfigCenter
+
+            logger.info("[OK] 项目配置已初始化")
+            config = ConfigCenter(config_dir / "config.yaml")
+            logger.info(
+                "[OK] 权限模式: %s (%s)",
+                config.get_permission_mode_label(),
+                config.get_file_access_config().get("mode"),
+            )
+            if config.diagnostics().get("load_error"):
+                logger.info(
+                    "[WARN] 配置读取异常，已使用安全默认值: %s",
+                    config.diagnostics().get("load_error"),
+                )
+        else:
+            logger.info("[FAIL] 项目配置未初始化 (运行 'supermedicine init')")
+
+        # 检查插件
+        plugins_dir = PROJECT_ROOT / "plugins"
+        if plugins_dir.exists():
+            plugin_count = len(list(plugins_dir.rglob("plugin.yaml")))
+            logger.info("[OK] 发现 %s 个插件", plugin_count)
+
+        # 检查测试
+        tests_dir = PROJECT_ROOT / "tests"
+        if tests_dir.exists():
+            test_count = len(list(tests_dir.glob("test_*.py")))
+            logger.info("[OK] 发现 %s 个测试模块", test_count)
+
+    def test(self) -> dict[str, Any]:
+        """Run maintainer tests when source assets exist; degrade cleanly in Wheels."""
+        import subprocess
+        from importlib.util import find_spec
+
+        source_root = Path(__file__).resolve().parent
+        if source_root.name == "cli":
+            source_root = source_root.parent
+        tests_dir = source_root / "tests"
+        if not tests_dir.is_dir() or find_spec("pytest") is None:
+            result: dict[str, Any] = {
+                "status": "unavailable",
+                "reason": (
+                    "source_tests_not_installed"
+                    if not tests_dir.is_dir()
+                    else "pytest_not_installed"
+                ),
+                "message": "The test command is for source maintainers.",
+                "self_check_command": "supermedicine diagnose",
+            }
+            _log_json(result)
+            return result
+        if os.environ.get("PYTEST_CURRENT_TEST"):
+            result = {
+                "status": "unavailable",
+                "reason": "source_test_run_already_active",
+                "message": "Refusing to start a recursive pytest run.",
+                "self_check_command": "supermedicine diagnose",
+            }
+            _log_json(result)
+            return result
+
+        completed = subprocess.run(
+            [sys.executable, "-m", "pytest", str(tests_dir), "-v"],
+            cwd=source_root,
+            check=False,
+        )
+        result = {
+            "status": "passed" if completed.returncode == 0 else "failed",
+            "returncode": completed.returncode,
+            "tests_dir": str(tests_dir),
+        }
+        _log_json(result)
+        if completed.returncode:
+            raise SystemExit(completed.returncode)
+        return result
+
+    def run(
+        self,
+        task: str,
+        verbose: bool = False,
+        plugin: str | None = None,
+        action: str | None = None,
+        params: dict | None = None,
+        workspace: str | None = None,
+        agents: str | None = None,
+    ) -> dict:
+        """执行任务 — 真实执行用户任务与医疗插件"""
+        from core.kernel import Kernel
+        from permission.redaction import redact_sensitive
+        from permission.policy import ensure_default_policy
+        from core.workspace import WorkspaceManager
+
+        # 确定项目根目录
+        project_dir = Path.cwd()
+
+        logger.info("SuperMedicine Beta0.4.2 — 任务执行")
+        logger.info("任务: %s", redact_sensitive(task))
+        logger.info("=" * 50)
+
+        execution_params = params
+        if workspace is not None:
+            workspace_info = WorkspaceManager(project_dir).get_workspace(workspace)
+            workspace_context = {
+                "id": workspace_info.id,
+                "path": str(workspace_info.path),
+                "metadata": workspace_info.metadata.to_dict(),
+            }
+            execution_params = dict(params or {})
+            execution_params["_workspace"] = workspace_context
+            logger.info("Workspace: %s", workspace_info.id)
+
+        # 初始化 Kernel（集成 PermissionEngine）
+        policies_dir = project_dir / ".supermedicine" / "policies"
+        ensure_default_policy(project_dir)
+
+        kernel = Kernel(
+            config_path=project_dir / ".supermedicine" / "config.yaml",
+            plugins_dir=project_dir / "plugins",
+            policies_dir=policies_dir,
+        )
+
+        if verbose:
+            logger.info("[OK] Kernel 已初始化")
+            logger.info("     Config: %s", kernel._config_path)
+            logger.info("     Plugins: %s", kernel._plugins_dir)
+            logger.info("     Policies: %s", kernel._policies_dir)
+            logger.info("     PermissionEngine: 已激活")
+            logger.info("     Checkpoints: %s", kernel.checkpoint_manager.base_dir)
+
+        # 发现插件
+        plugins = kernel.plugin_registry.discover()
+        logger.info("[OK] 已发现 %d 个插件", len(plugins))
+        if verbose:
+            for p in plugins:
+                logger.info("     - %s (%s)", p.name, p.type)
+
+        execute_kwargs: dict[str, Any] = {
+            "plugin_name": plugin,
+            "action": action,
+            "params": execution_params,
+        }
+        if agents is not None:
+            execute_kwargs["use_agent_chain"] = agents == "multi"
+        result = kernel.execute_task(task, **execute_kwargs)
+        if verbose:
+            logger.info(
+                "[STATE] agent=%s task=%s plugin=%s action=%s status=%s",
+                result.get("agent", "alpha"),
+                result.get("task", task),
+                result.get("plugin"),
+                result.get("action"),
+                result.get("status"),
+            )
+        _log_json(result)
+        return result
+
+    def diagnose(self) -> dict:
+        """Print secret-safe diagnostics for config, LLM, install artifacts, and audit log."""
+        from core.services import PermissionLogSystemService
+
+        service = PermissionLogSystemService(Path.cwd())
+        result = service.require_data(service.system_diagnostics())
+        _log_json(result)
+        return result
+
+    def tui(self, dry_run: bool = False):
+        """启动中文 TUI 工作台；不会改变 CLI 默认工作区行为。"""
+        from core.tui.app import launch_tui
+
+        # In frozen mode, let launch_tui resolve the project root by
+        # checking the executable's directory first (for .supermedicine
+        # config), falling back to cwd.  In development mode, always use cwd.
+        if getattr(sys, "frozen", False):
+            return launch_tui(dry_run=dry_run)
+        return launch_tui(dry_run=dry_run, project_root=Path.cwd())
+
+    def web(
+        self,
+        host: str = "127.0.0.1",
+        port: int = 8000,
+        reload: bool = False,
+        auth_token_file: str | Path | None = None,
+    ):
+        """Start web interface.
+
+        Requires optional web dependencies: ``pip install supermedicine[web]``
+        """
+        from core.web.server import start_server
+
+        start_server(
+            host,
+            port,
+            reload=reload,
+            auth_token_file=auth_token_file,
+        )
+
+
+from cli.parser import main as _cli_main  # noqa: E402
+
+
+def main(argv: list[str] | None = None) -> None:
+    """Run the CLI or the packaged bridge worker lifecycle self-test."""
+
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments == ["--bridge-self-test"]:
+        from core.tui.bridge import bridge_worker_self_test
+
+        print(json.dumps(bridge_worker_self_test(), sort_keys=True))
+        return
+    _cli_main(arguments)
+
+if __name__ == "__main__":
+    multiprocessing.freeze_support()
+    main()

@@ -5,12 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from core.redaction import redact_sensitive
+from permission.redaction import redact_sensitive
 from core.runtime_paths import RuntimePaths
 
 if TYPE_CHECKING:
     from core.services.result import ServiceResult
-    from core.services.workspace import WorkspaceService
+    from core.services.research import WorkspaceService
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,7 +37,7 @@ class ApplicationFacade:
 
     def _workspace_service(self) -> WorkspaceService:
         if self._workspaces is None:
-            from core.services.workspace import WorkspaceService
+            from core.services.research import WorkspaceService
 
             self._workspaces = WorkspaceService(self.paths.project_root)
         return self._workspaces

@@ -16,8 +16,8 @@ import re
 from typing import Any, Literal, Sequence
 
 from core.experience import ExperienceRecord, ExperienceStore
-from core.log_report import LogReportStore
-from core.log_report_models import TUI_LOG_SESSION_ID
+from core.logs.models import TUI_LOG_SESSION_ID
+from core.logs.report import LogReportStore
 from core.operation_guard import authorize_dangerous_operation
 from core.path_safety import (
     DangerousOverwriteError,
@@ -27,7 +27,7 @@ from core.path_safety import (
     validate_path_in_project_root,
     validate_sandbox_write_path,
 )
-from core.redaction import redact_sensitive
+from permission.redaction import redact_sensitive
 from core.serialization import json_ready
 from core.time_utils import utc_now
 from permission.access_mode import AccessModePolicy, FileAccessOperation

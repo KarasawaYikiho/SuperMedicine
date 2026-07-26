@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Callable
 from uuid import uuid4
 
 if TYPE_CHECKING:
-    from core.database.database import Database
+    from core.database import Database
     from core.database.repository import SessionRepository
 
 

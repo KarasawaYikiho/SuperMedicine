@@ -10,7 +10,7 @@ import yaml
 from cli_entry import CLI, main
 from core.paper_import import PaperImporter
 from core.paper_import.enrichment import PaperEnricher
-from core.paper_import.errors import (
+from core.paper_import.contracts import (
     MissingPaperSourceError,
     UnsupportedPaperFormatError,
 )
@@ -20,7 +20,7 @@ from permission.audit import AuditLogger
 from permission.engine import PermissionEngine
 from permission.policy import ensure_default_policy
 from plugins.rag.providers import LocalRAGProvider
-from core.rag_service import RAGService
+from core.services.rag import RAGService
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]

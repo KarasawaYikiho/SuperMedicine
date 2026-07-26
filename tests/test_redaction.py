@@ -4,7 +4,7 @@ import json
 import logging
 
 from cli import _RedactingFormatter
-from core.redaction import redact_sensitive
+from permission.redaction import redact_sensitive
 
 
 def test_redact_sensitive_covers_headers_cloud_keys_private_keys_and_query_values():

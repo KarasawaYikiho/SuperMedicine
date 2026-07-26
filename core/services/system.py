@@ -9,7 +9,7 @@ from typing import Any, Callable, Protocol
 
 from core.config_center import ConfigCenter
 from core.llm_manager import LLMConfigManager
-from core.log_report import (
+from core.logs.report import (
     LogReportError,
     LogReportStore,
     resolve_log_storage_locations,
@@ -117,7 +117,7 @@ class PermissionLogSystemService:
         """Return the shared lightweight status used by Web and desktop clients."""
 
         def action() -> dict[str, Any]:
-            from core.services.llm import LLMService
+            from core.services.execution import LLMService
 
             provider_result = LLMService(self.project_root).show_provider()
             provider = (

@@ -25,11 +25,11 @@ from core.experiment_protocols import (
     save_experiment_config,
 )
 from core.kernel import Kernel
-from core.log_report import LogReportStore
-from core.redaction import redact_sensitive
+from core.logs.report import LogReportStore
+from permission.redaction import redact_sensitive
 from core.serialization import json_ready
 from core.workspace import InvalidWorkspaceId, WorkspaceError, WorkspaceNotFoundError
-from core.workspace_tool_models import (
+from core.workspace_tools.models import (
     InvalidToolId,
     InvalidToolLanguage,
     ToolCandidateError,

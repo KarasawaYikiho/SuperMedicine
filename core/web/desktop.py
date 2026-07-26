@@ -193,7 +193,7 @@ def launch_desktop(*, timeout: float = 15.0) -> None:
     """Start the shared backend, verify health, then open the native window."""
     paths = ensure_desktop_paths()
     os.chdir(paths.data_dir)
-    from core.log_report_handler import (
+    from core.logs.handler import (
         configure_application_log_storage,
         install_log_report_streams,
     )

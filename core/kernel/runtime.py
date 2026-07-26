@@ -15,7 +15,7 @@ from agents.roles import BetaAgent
 from agents.roles import GammaAgent
 from agents.roles import DeltaAgent
 from core.config_center import ConfigCenter
-from core.database.database import Database
+from core.database import Database
 from core.database.migrations import MigrationManager
 from core.database.repository import AgentRepository
 from core.event_bus import EventBus
@@ -27,7 +27,7 @@ from core.runtime_capabilities import (
     validate_required_plugins,
 )
 from core.runtime_pipeline import HarnessRuntime
-from core.rag_service import RAGService
+from core.services.rag import RAGService
 from plugins.harness.monitor import AgentPerformanceMonitor
 from core.session_manager import SessionManager
 from permission.engine import PermissionEngine
@@ -37,14 +37,14 @@ from permission.policy import (
     ensure_default_policy,
 )
 
-from core.kernel_constants import MEDICAL_BOUNDARY
-from core.kernel_llm_chat import (
+from core.kernel.constants import MEDICAL_BOUNDARY
+from core.kernel.llm import (
     execute_llm_chat as _execute_llm_chat_fn,
     llm_chat_messages as _llm_chat_messages_fn,
     llm_runtime_context as _llm_runtime_context_fn,
     workspace_tool_runtime_context as _workspace_tool_runtime_context_fn,
 )
-from core.kernel_plugin_select import select_plugin_action
+from core.kernel.plugins import select_plugin_action
 
 logger = logging.getLogger(__name__)
 

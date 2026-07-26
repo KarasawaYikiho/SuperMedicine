@@ -32,7 +32,7 @@ from core.workspace_tools import (
     validate_language,
     validate_tool_id,
 )
-from core.workspace_tool_models import InvalidToolLanguage
+from core.workspace_tools.models import InvalidToolLanguage
 from permission.audit import AuditLogger
 from permission.engine import PermissionEngine
 from permission.policy import PermissionResult, ensure_default_policy
@@ -1525,7 +1525,8 @@ def test_runner_templates_report_missing_dependency_messages_without_heavy_impor
 
 def test_prepare_invocation_is_permission_guarded_and_audited(tmp_path, monkeypatch):
     monkeypatch.setattr(
-        "core.workspace_tools.shutil.which", lambda executable: f"/bin/{executable}"
+        "core.workspace_tools.service.shutil.which",
+        lambda executable: f"/bin/{executable}",
     )
     service = WorkspaceToolService(tmp_path)
     service.initialize_tools("trial-1")

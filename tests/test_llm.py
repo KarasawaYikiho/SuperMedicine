@@ -24,7 +24,7 @@ from core.llm_providers.config import (
     _default_api_key_env,
     _infer_api_format,
 )
-from core.llm_providers.openrouter import OpenRouterClient
+from core.llm_providers.base import OpenRouterClient
 from permission.engine import PermissionEngine
 
 

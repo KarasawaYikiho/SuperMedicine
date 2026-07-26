@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 from typing import Any, cast
 
-from core.redaction import redact_sensitive
+from permission.redaction import redact_sensitive
 
 logger = logging.getLogger(__name__)
 

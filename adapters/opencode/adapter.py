@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from adapters.base_adapter import ADAPTER_HOST_CONFIGS, BaseAdapter
-from core.redaction import redact_sensitive
+from permission.redaction import redact_sensitive
 
 
 class OpenCodeAdapter(BaseAdapter):

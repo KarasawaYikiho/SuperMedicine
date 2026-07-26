@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""PyInstaller-compatible alias for the shared native desktop launcher."""
+"""PyInstaller-compatible alias for the standard desktop package entrypoint."""
 
 from __future__ import annotations
 
-from gui_entry import main
+from desktop.__main__ import main
 
 
 if __name__ == "__main__":

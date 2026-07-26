@@ -16,7 +16,7 @@ from core.llm_providers.config import (
     sanitize_error_message,
     sanitized_headers,
 )
-from core.redaction import redact_sensitive
+from permission.redaction import redact_sensitive
 
 
 logger = logging.getLogger(__name__)

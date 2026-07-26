@@ -4,20 +4,20 @@ from cli_entry import CLI
 
 
 def test_cli_facade_keeps_forwarded_commands_out_of_class_dict(monkeypatch):
-    from cli.commands import workspace
+    from cli.commands import research
 
     def fake_workspace_list(cli):
         assert isinstance(cli, CLI)
         return [{"id": "demo"}]
 
-    monkeypatch.setattr(workspace, "workspace_list", fake_workspace_list)
+    monkeypatch.setattr(research, "workspace_list", fake_workspace_list)
 
     assert "workspace_list" not in CLI.__dict__
     assert CLI().workspace_list() == [{"id": "demo"}]
 
 
 def test_cli_facade_forwards_keyword_arguments(monkeypatch):
-    from cli.commands import tool
+    from cli.commands import tools
 
     def fake_tool_add(cli, workspace_id, selections=None, *, language=None, overwrite=False):
         assert isinstance(cli, CLI)
@@ -28,7 +28,7 @@ def test_cli_facade_forwards_keyword_arguments(monkeypatch):
             "overwrite": overwrite,
         }
 
-    monkeypatch.setattr(tool, "tool_add", fake_tool_add)
+    monkeypatch.setattr(tools, "tool_add", fake_tool_add)
 
     assert "tool_add" not in CLI.__dict__
     assert CLI().tool_add(
@@ -45,13 +45,13 @@ def test_cli_facade_forwards_keyword_arguments(monkeypatch):
 
 
 def test_cli_facade_forwards_llm_commands(monkeypatch):
-    from cli.commands import llm
+    from cli.commands import execution
 
     def fake_llm_list(cli):
         assert isinstance(cli, CLI)
         return {"providers": []}
 
-    monkeypatch.setattr(llm, "llm_list", fake_llm_list)
+    monkeypatch.setattr(execution, "llm_list", fake_llm_list)
 
     assert "llm_list" not in CLI.__dict__
     assert CLI().llm_list() == {"providers": []}

@@ -6,7 +6,7 @@ import json
 import logging
 import sys
 
-from core.redaction import redact_sensitive
+from permission.redaction import redact_sensitive
 
 logger = logging.getLogger(__name__)
 

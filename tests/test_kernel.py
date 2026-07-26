@@ -10,8 +10,8 @@ import pytest
 
 from core.kernel import Kernel
 from core.runtime_capabilities import RuntimeInvariantError
-from core.kernel_constants import SUPERMEDICINE_SYSTEM_PROMPT
-from core.kernel_llm_chat import execute_llm_chat
+from core.kernel.constants import SUPERMEDICINE_SYSTEM_PROMPT
+from core.kernel.llm import execute_llm_chat
 from core.llm_client import LLMClient
 from core.llm_manager import LLMConfigManager
 from plugins.rag.providers import LocalRAGProvider
@@ -740,7 +740,7 @@ def _run_execute(
     checkpoint_calls: list[dict[str, Any]] = []
 
     with patch(
-        "core.kernel_llm_chat.llm_chat_messages",
+        "core.kernel.llm.llm_chat_messages",
         return_value=[{"role": "user", "content": "hello"}],
     ):
         result = execute_llm_chat(
@@ -996,7 +996,7 @@ class TestExecuteLLMChatNoStream:
         events, cb = _collect_events()
 
         with patch(
-            "core.kernel_llm_chat.llm_chat_messages",
+            "core.kernel.llm.llm_chat_messages",
             return_value=[{"role": "user", "content": "hi"}],
         ):
             result = execute_llm_chat(
@@ -1027,7 +1027,7 @@ class TestExecuteLLMChatNoStream:
         events, cb = _collect_events()
 
         with patch(
-            "core.kernel_llm_chat.llm_chat_messages",
+            "core.kernel.llm.llm_chat_messages",
             return_value=[{"role": "user", "content": "hi"}],
         ):
             result = execute_llm_chat(

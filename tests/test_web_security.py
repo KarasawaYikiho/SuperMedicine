@@ -227,7 +227,7 @@ def test_unexpected_api_failure_is_redacted(monkeypatch):
 
     secret = "must-not-leak-in-http-response"
     monkeypatch.setattr(
-        "core.services.workspace.WorkspaceManager.list_workspaces",
+        "core.services.research.WorkspaceManager.list_workspaces",
         lambda self: (_ for _ in ()).throw(RuntimeError(secret)),
     )
 

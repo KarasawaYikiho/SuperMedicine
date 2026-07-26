@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 
 from cli.logging_setup import _log_json
-from core.redaction import redact_sensitive
+from permission.redaction import redact_sensitive
 from core.services import ExperienceEvolutionService, PaperRAGService
 
 logger = logging.getLogger(__name__)

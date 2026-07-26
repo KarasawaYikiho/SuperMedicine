@@ -27,7 +27,7 @@ from typing import Any, Iterable
 
 from installer.component_installer import load_install_manifest
 
-from core.redaction import redact_sensitive
+from permission.redaction import redact_sensitive
 
 
 logger = logging.getLogger(__name__)

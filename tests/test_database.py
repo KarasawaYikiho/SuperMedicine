@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from core.database.database import Database
+from core.database import Database
 from core.database.repository import AgentRepository, SessionRepository
 from core.database.migrations import Migration, MigrationManager
 from core.kernel import Kernel

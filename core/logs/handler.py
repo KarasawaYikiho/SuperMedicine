@@ -6,8 +6,8 @@ import logging
 import sys
 from pathlib import Path
 
-from core.log_report import LogReportStore, DEFAULT_MAX_MESSAGE_LENGTH
-from core.log_report_models import TUI_LOG_SESSION_ID, new_application_log_session_id
+from core.logs.models import TUI_LOG_SESSION_ID, new_application_log_session_id
+from core.logs.report import DEFAULT_MAX_MESSAGE_LENGTH, LogReportStore
 
 
 class LogReportLoggingHandler(logging.Handler):

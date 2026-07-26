@@ -19,7 +19,7 @@ from typing import Any
 
 import yaml
 
-from core.redaction import redact_sensitive
+from permission.redaction import redact_sensitive
 
 
 PLUGIN_CONTRACT_VERSION = "2026-05-p0"

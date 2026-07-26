@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 import os
 from typing import Any, Mapping
 
-from core.redaction import redact_sensitive
+from permission.redaction import redact_sensitive
 
 
 _SECRET_KEYS = ("api_key", "authorization", "x-api-key", "key", "token")

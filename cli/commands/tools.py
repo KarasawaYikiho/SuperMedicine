@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from cli.logging_setup import _log_json
-from core.redaction import redact_sensitive
+from permission.redaction import redact_sensitive
 from core.services import ExperimentToolService, PermissionLogSystemService
 
 logger = logging.getLogger(__name__)

@@ -8,7 +8,7 @@ from typing import Any
 from core.config_center import ConfigCenter
 from core.llm_client import LLMClient, TrackedLLMClient, create_llm_client
 from core.llm_providers.config import LLMProviderConfig
-from core.redaction import redact_sensitive
+from permission.redaction import redact_sensitive
 from core.token_tracker import TokenTracker
 
 

@@ -18,8 +18,8 @@ This directory is the starting point for repository maintenance.
 | --- | --- |
 | Package metadata | `pyproject.toml` |
 | CLI parser | `cli/parser.py` |
-| CLI facade | `cli_entry.py` |
-| Kernel | `core/kernel.py` |
+| CLI facade | `cli/facade.py` |
+| Kernel | `core/kernel/` |
 | Permissions | `permission/` |
 | Plugin contract | `plugins/base_plugin.py` and manifests |
 | TUI launcher/runtime | `core/tui/` |

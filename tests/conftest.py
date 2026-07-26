@@ -91,7 +91,7 @@ def database(tmp_path):
     (connect / disconnect / context manager) can be exercised without
     polluting the real ``.supermedicine`` directory.
     """
-    from core.database.database import Database
+    from core.database import Database
 
     db_path = tmp_path / "test.db"
     db = Database(db_path=db_path)

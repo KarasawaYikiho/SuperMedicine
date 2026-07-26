@@ -18,7 +18,7 @@ from core.paper_import.contracts import (
     UnsupportedPaperFormatError,
 )
 from core.path_safety import _is_relative_to, validate_path_in_project_root
-from core.rag_service import RAGService
+from core.services.rag import RAGService
 from core.serialization import json_ready
 from core.time_utils import utc_now_datetime
 from core.workspace import WorkspaceInfo, WorkspaceManager

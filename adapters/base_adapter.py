@@ -9,8 +9,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol, cast, runtime_checkable
 
-from core.redaction import redact_sensitive
-from core.services.adapter import AdapterService, PermissionChecker
+from permission.redaction import redact_sensitive
+from core.services.system import AdapterService, PermissionChecker
 
 
 @runtime_checkable

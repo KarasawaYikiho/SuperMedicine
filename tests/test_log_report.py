@@ -7,19 +7,18 @@ import sys
 
 import pytest
 
-from core.log_report import (
+from core.logs.report import (
     DEFAULT_MAX_MESSAGE_LENGTH,
     LogReportError,
     LogReportStore,
 )
-from core.log_report_handler import (
+from core.logs.handler import (
     LogReportStream,
     LogReportLoggingHandler,
     append_tui_stream_output,
     configure_tui_log_storage,
 )
-from core.log_report_models import TUI_LOG_SESSION_ID
-from core.log_severity import format_log_message
+from core.logs.models import TUI_LOG_SESSION_ID, format_log_message
 
 
 def test_log_directory_is_created_and_isolated_log_is_redacted(tmp_path):

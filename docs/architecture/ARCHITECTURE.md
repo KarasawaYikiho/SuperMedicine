@@ -39,7 +39,7 @@ parallel top-level lifecycle.
 
 | Area | Owner | Rule |
 | --- | --- | --- |
-| CLI | `cli/`, `cli_entry.py` | Parser and facade should delegate feature logic. |
+| CLI | `cli/` | Parser and facade should delegate feature logic. |
 | Runtime | `core/` | Shared services used by CLI, TUI, Web, and tests. |
 | Permissions | `permission/` | Runtime enforcement happens here, not in prompt text. |
 | Plugins | `plugins/` | Capabilities are manifest-discovered and action-based. |

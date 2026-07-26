@@ -22,7 +22,7 @@ import yaml
 from core.operation_guard import authorize_dangerous_operation
 from core.path_safety import validate_path_in_project_root
 from core.workspace import WorkspaceManager
-from core.workspace_tool_models import (
+from core.workspace_tools.models import (
     InvalidToolId,
     MANIFEST_FILE,
     SUPPORTED_LANGUAGES,
@@ -40,8 +40,11 @@ from core.workspace_tool_models import (
     validate_language,
     validate_tool_id,
 )
-from core.workspace_tool_spec import TOOL_AUTHORING_SPEC, build_tool_authoring_llm_context  # noqa: F401
-from core.workspace_tool_spec import BUILTIN_TEMPLATES
+from core.workspace_tools.spec import (  # noqa: F401
+    BUILTIN_TEMPLATES,
+    TOOL_AUTHORING_SPEC,
+    build_tool_authoring_llm_context,
+)
 from permission.audit import AuditLogger
 from permission.engine import PermissionEngine
 

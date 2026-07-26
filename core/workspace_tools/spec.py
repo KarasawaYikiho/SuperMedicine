@@ -10,7 +10,7 @@ from typing import Any
 
 import yaml
 
-from core.workspace_tool_models import (
+from core.workspace_tools.models import (
     MANIFEST_FILE,
     PYTHON_TOOL_STORAGE,
     R_TOOL_STORAGE,
