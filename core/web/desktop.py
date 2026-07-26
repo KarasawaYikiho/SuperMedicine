@@ -189,6 +189,7 @@ def desktop_self_test(*, timeout: float = 10.0) -> dict[str, Any]:
         "logs": paths.log_dir.is_dir(),
         "operations": False,
         "resources": False,
+        "runtime": False,
         "user_data": paths.data_dir.is_dir(),
         "webview": bool(webview_diagnostics()["available"]),
     }
@@ -204,7 +205,7 @@ def desktop_self_test(*, timeout: float = 10.0) -> dict[str, Any]:
         operation_root = TemporaryDirectory(prefix="supermedicine-desktop-operations-")
         operation_paths = RuntimePaths.resolve(
             project_root=operation_root.name,
-            source_root=operation_root.name,
+            source_root=Path(__file__).resolve().parents[2],
         )
         server = DesktopServer(create_app(paths=operation_paths))
         server.start(timeout=timeout)
@@ -232,6 +233,16 @@ def desktop_self_test(*, timeout: float = 10.0) -> dict[str, Any]:
             created.get("id") == workspace_id
             and any(item.get("id") == workspace_id for item in listed)
             and not any(item.get("id") == workspace_id for item in remaining)
+        )
+        chat = request_json(
+            f"{server.url}/api/v1/chat",
+            method="POST",
+            payload={"message": "desktop runtime self-test"},
+        )
+        chat_error = chat.get("error") if isinstance(chat, dict) else None
+        checks["runtime"] = not (
+            isinstance(chat_error, dict)
+            and chat_error.get("code") == "internal_error"
         )
     except Exception as exc:  # report every self-test failure in one stable payload
         error = str(exc)

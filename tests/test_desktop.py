@@ -60,6 +60,7 @@ def test_desktop_self_test_checks_backend_health_frontend_and_storage(tmp_path, 
         "logs": True,
         "operations": True,
         "resources": True,
+        "runtime": True,
         "user_data": True,
         "webview": True,
     }

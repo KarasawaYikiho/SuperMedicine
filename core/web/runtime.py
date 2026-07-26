@@ -135,6 +135,7 @@ class WebRuntime:
         service_factories: dict[str, Callable[[Path], Any]],
         *,
         project_root: str | Path | None = None,
+        resource_root: str | Path | None = None,
         application: Any = None,
         auth_token: str | None = None,
         shutdown_callback: Callable[[], None] | None = None,
@@ -142,6 +143,9 @@ class WebRuntime:
         self._instances: dict[str, Any] = {}
         self._service_factories = service_factories
         self.project_root = Path(project_root).resolve() if project_root is not None else None
+        self.resource_root = (
+            Path(resource_root).resolve() if resource_root is not None else None
+        )
         self.application = application
         self.auth_token = auth_token
         self.shutdown_callback = shutdown_callback
@@ -156,14 +160,21 @@ class WebRuntime:
             from permission.policy import ensure_default_policy
 
             project_dir = self.project_root or Path.cwd()
+            resource_dir = self.resource_root or project_dir
             policies_dir = project_dir / ".supermedicine" / "policies"
             ensure_default_policy(project_dir)
             self._instances["kernel"] = Kernel(
                 config_path=project_dir / ".supermedicine" / "config.yaml",
-                plugins_dir=project_dir / "plugins",
+                plugins_dir=resource_dir / "plugins",
                 policies_dir=policies_dir,
             )
         return self._instances["kernel"]
+
+    def close(self) -> None:
+        """Release lazily created process resources during server shutdown."""
+        kernel = self._instances.pop("kernel", None)
+        if kernel is not None:
+            kernel.close()
 
     def workspace_context(self, workspace_id: str | None) -> dict[str, Any] | None:
         if not workspace_id:

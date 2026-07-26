@@ -69,10 +69,13 @@ def create_app(*, auth_token: str | None = None, shutdown_callback: Any = None, 
     runtime = WebRuntime(
         {"agent_harness": AgentHarnessService, "experiment_tool": ExperimentToolService, "experience_evolution": ExperienceEvolutionService, "llm": LLMService, "paper_rag": PaperRAGService, "permission_log_system": PermissionLogSystemService, "workspace": WorkspaceService},
         project_root=resolved_paths.project_root if paths is not None else None,
+        resource_root=resolved_paths.resource_root,
         application=resolved_application,
         auth_token=auth_token,
         shutdown_callback=shutdown_callback,
     )
+    app.state.runtime = runtime
+    app.router.add_event_handler("shutdown", runtime.close)
     registrars = (
         routes.register_status_routes,
         routes.register_workspace_paper_routes,

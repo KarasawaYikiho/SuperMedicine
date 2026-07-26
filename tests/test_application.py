@@ -60,6 +60,42 @@ def test_cli_facade_and_web_endpoint_share_core_workspace_data(tmp_path) -> None
     assert cli_result.data == web_response.json() == [created.data]
 
 
+def test_web_kernel_reads_plugins_from_resource_root(tmp_path, monkeypatch) -> None:
+    project_root = tmp_path / "user-data"
+    resource_root = tmp_path / "bundle"
+    project_root.mkdir()
+    resource_root.mkdir()
+    paths = RuntimePaths.resolve(
+        project_root=project_root,
+        source_root=resource_root,
+    )
+    captured: dict[str, Path] = {}
+
+    class FakeConfig:
+        def set_runtime_state_value(self, *_args, **_kwargs) -> None:
+            return None
+
+    class FakeKernel:
+        def __init__(self, **kwargs) -> None:
+            captured.update(kwargs)
+            self._config = FakeConfig()
+
+        def execute_task(self, message, **_kwargs):
+            return {"output": message}
+
+    monkeypatch.setattr("core.kernel.Kernel", FakeKernel)
+
+    response = TestClient(create_app(paths=paths)).post(
+        "/api/v1/chat", json={"message": "hello"}
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"output": "hello"}
+    assert captured["config_path"] == project_root / ".supermedicine" / "config.yaml"
+    assert captured["plugins_dir"] == resource_root / "plugins"
+    assert captured["policies_dir"] == project_root / ".supermedicine" / "policies"
+
+
 def test_web_workspace_endpoint_consumes_injected_application_directly(
     tmp_path, monkeypatch
 ) -> None:
