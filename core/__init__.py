@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+__version__ = "0.5.0b0"
+PUBLIC_VERSION = "Beta0.5.0"
+API_VERSION = "0.5.0"
+
 if TYPE_CHECKING:
     from core.config_center import ConfigCenter
     from core.database import Database, SessionRepository, AgentRepository
@@ -48,6 +52,9 @@ def __getattr__(name: str) -> Any:
 
 
 __all__ = [
+    "__version__",
+    "PUBLIC_VERSION",
+    "API_VERSION",
     "Kernel",
     "ConfigCenter",
     "Database",

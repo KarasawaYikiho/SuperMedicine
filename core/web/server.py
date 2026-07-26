@@ -7,7 +7,15 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from core.services import AgentHarnessService, ExperimentToolService, ExperienceEvolutionService, LLMService, PaperRAGService, PermissionLogSystemService, WorkspaceService
+from core.services import (
+    AgentHarnessService,
+    ExperimentToolService,
+    ExperienceEvolutionService,
+    LLMService,
+    PaperRAGService,
+    PermissionLogSystemService,
+    WorkspaceService,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +63,7 @@ def create_app(*, auth_token: str | None = None, shutdown_callback: Any = None, 
     """Create the FastAPI application and register domain route adapters."""
     _ensure_fastapi()
     from fastapi import FastAPI
+    from core import API_VERSION
     from core.application import ApplicationFacade
     from core.runtime_paths import RuntimePaths
     from core.web import routes
@@ -62,12 +71,24 @@ def create_app(*, auth_token: str | None = None, shutdown_callback: Any = None, 
 
     resolved_paths = paths or RuntimePaths.resolve(project_root=Path.cwd())
     resolved_application = application or ApplicationFacade(resolved_paths)
-    app = FastAPI(title="SuperMedicine Web API", version="0.4.2", description="SuperMedicine browser and desktop GUI API")
+    app = FastAPI(
+        title="SuperMedicine Web API",
+        version=API_VERSION,
+        description="SuperMedicine browser and desktop GUI API",
+    )
     app.state.paths = resolved_paths
     app.state.application = resolved_application
     _install_web_security(app, auth_token)
     runtime = WebRuntime(
-        {"agent_harness": AgentHarnessService, "experiment_tool": ExperimentToolService, "experience_evolution": ExperienceEvolutionService, "llm": LLMService, "paper_rag": PaperRAGService, "permission_log_system": PermissionLogSystemService, "workspace": WorkspaceService},
+        {
+            "agent_harness": AgentHarnessService,
+            "experiment_tool": ExperimentToolService,
+            "experience_evolution": ExperienceEvolutionService,
+            "llm": LLMService,
+            "paper_rag": PaperRAGService,
+            "permission_log_system": PermissionLogSystemService,
+            "workspace": WorkspaceService,
+        },
         project_root=resolved_paths.project_root if paths is not None else None,
         resource_root=resolved_paths.resource_root,
         application=resolved_application,

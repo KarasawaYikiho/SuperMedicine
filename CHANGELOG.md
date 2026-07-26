@@ -5,10 +5,12 @@ All notable changes to SuperMedicine are documented here. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html) for package metadata.
 
 Public release labels and Python package versions may differ when the public label
-is not PEP 440-compatible. Current public/release label: **Beta0.4.2**. Current
-Python package fallback version: **0.4.2b0**.
+is not PEP 440-compatible. Current public/release label: **Beta0.5.0**. Current
+Python package fallback version: **0.5.0b0**.
 
 ## [Unreleased]
+
+## [Beta0.5.0] - 2026-07-26
 
 ### Added
 
@@ -18,6 +20,9 @@ Python package fallback version: **0.4.2b0**.
 - Added mandatory runtime capability validation, a UUID-based Harness lifecycle,
   local-first RAG orchestration, workspace paper indexing, PDF page extraction,
   and shared CLI/TUI/Web health reporting.
+- Added a documentation-style Web/GUI workspace, complete Chinese interface
+  copy, safe progress rendering, shared Kernel-backed TUI chat, and missing
+  experience, tool, and experiment service routes.
 
 ### Changed
 
@@ -30,6 +35,8 @@ Python package fallback version: **0.4.2b0**.
 - Multi-agent execution now defaults to single mode, supports explicit CLI/Web
   selection, and remains inside the same permission, audit, RAG, and Harness
   envelope.
+- Consolidated runtime version presentation and normalized maintained
+  documentation names without changing user-facing capabilities.
 
 ## [Beta0.4.2] - 2026-06-07
 

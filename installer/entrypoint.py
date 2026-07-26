@@ -27,6 +27,7 @@ from urllib.parse import urlparse
 
 import yaml
 
+from core import PUBLIC_VERSION
 from core.llm_providers.config import LLMProviderConfig
 from permission.redaction import redact_sensitive
 from core.secure_files import secure_config_permissions
@@ -60,7 +61,7 @@ def _configure_stdio_errors() -> None:
 
 DEFAULT_CONFIG: dict[str, Any] = {
     "project_name": "supermedicine",
-    "version": "Beta0.4.2",
+    "version": PUBLIC_VERSION,
     "llm": {
         "provider": "",
         "providers": {},

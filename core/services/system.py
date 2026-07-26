@@ -117,6 +117,7 @@ class PermissionLogSystemService:
         """Return the shared lightweight status used by Web and desktop clients."""
 
         def action() -> dict[str, Any]:
+            from core import API_VERSION
             from core.services.execution import LLMService
 
             provider_result = LLMService(self.project_root).show_provider()
@@ -127,7 +128,7 @@ class PermissionLogSystemService:
             )
             runtime = required_runtime_snapshot(self.project_root)
             return {
-                "version": "0.4.2",
+                "version": API_VERSION,
                 "project_dir": str(self.project_root),
                 "config_initialized": (self.project_root / ".supermedicine").exists(),
                 "plugin_count": len(

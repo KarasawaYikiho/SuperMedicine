@@ -7,10 +7,10 @@ analysis, standards checks, figure workflows, permissions, and auditable
 execution.
 
 <!-- BEGIN GENERATED: release-metadata -->
-Current release: **0.4.2b0**
+Current release: **0.5.0b0**
 <!-- END GENERATED: release-metadata -->
 
-Release series: **Beta0.4.2**
+Release series: **Beta0.5.0**
 
 中文说明：[README.zh-CN.md](README.zh-CN.md)
 

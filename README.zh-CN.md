@@ -5,10 +5,10 @@ Web、Desktop、可选平台适配器与科研插件，覆盖证据检索、论�
 绘图、权限和可审计执行。
 
 <!-- BEGIN GENERATED: release-metadata -->
-当前版本：**0.4.2b0**
+当前版本：**0.5.0b0**
 <!-- END GENERATED: release-metadata -->
 
-发布系列：**Beta0.4.2**
+发布系列：**Beta0.5.0**
 
 English: [README.md](README.md)
 

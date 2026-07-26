@@ -201,7 +201,9 @@ class CLI:
         """显示项目状态"""
         from core.runtime_capabilities import required_runtime_snapshot
 
-        logger.info("SuperMedicine Beta0.4.2")
+        from core import PUBLIC_VERSION
+
+        logger.info("SuperMedicine %s", PUBLIC_VERSION)
         logger.info("=" * 40)
         runtime = required_runtime_snapshot(Path.cwd())
         logger.info(
@@ -309,7 +311,9 @@ class CLI:
         # 确定项目根目录
         project_dir = Path.cwd()
 
-        logger.info("SuperMedicine Beta0.4.2 — 任务执行")
+        from core import PUBLIC_VERSION
+
+        logger.info("SuperMedicine %s — 任务执行", PUBLIC_VERSION)
         logger.info("任务: %s", redact_sensitive(task))
         logger.info("=" * 50)
 

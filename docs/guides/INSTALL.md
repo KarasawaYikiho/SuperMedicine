@@ -2,7 +2,7 @@
 
 This guide covers source installs, development installs, release archive layout,
 OpenTUI setup, LLM provider configuration, and uninstall behavior for
-SuperMedicine **Beta0.4.2**.
+SuperMedicine **Beta0.5.0**.
 
 For a short overview, see [README.md](../../README.md). For security boundaries,
 see [SECURITY.md](../../SECURITY.md).

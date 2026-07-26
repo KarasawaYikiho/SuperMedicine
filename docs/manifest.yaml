@@ -15,6 +15,7 @@ documents:
   - {path: docs/examples/README.md, audience: user, role: examples-index}
   - {path: docs/guides/getting-started.md, audience: user, role: getting-started}
   - {path: docs/guides/INSTALL.md, audience: user, role: canonical-installation, release_critical: true}
+  - {path: docs/guides/WEB.md, audience: user, role: web-desktop-guide}
   - {path: docs/maintainers/README.md, audience: maintainer, role: maintainer-index}
   - {path: docs/maintainers/entrypoints.md, audience: maintainer, role: entrypoint-reference}
   - {path: docs/maintainers/feature-parity.md, audience: maintainer, role: capability-contract}

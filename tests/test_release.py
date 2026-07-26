@@ -10,10 +10,11 @@ from pathlib import Path
 
 from tests.conftest import _cp1252_stdio_env
 from tests.ci_workflow_contract import combined_workflow_source
+from core import API_VERSION, PUBLIC_VERSION, __version__
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-RELEASE_DIR_NAME = "SuperMedicine v0.4.2b0"
+RELEASE_DIR_NAME = f"SuperMedicine v{__version__}"
 CRITICAL_RELEASE_PATHS = (
     "install.py",
     "install_entry.py",
@@ -86,8 +87,8 @@ PAYLOAD_DRY_RUN_SIGNALS = (
     PAYLOAD_DRY_RUN_ESCAPED_SIGNAL,
 )
 
-RELEASE_LABEL = "v0.4.2b0"
-PACKAGE_VERSION = "0.4.2b0"
+RELEASE_LABEL = f"v{__version__}"
+PACKAGE_VERSION = __version__
 CRITICAL_RELEASE_FILES = {
     "cli_entry.py",
     "install.py",
@@ -504,10 +505,10 @@ def test_release_docs_describe_ci_artifact_layout_and_install_py_roles():
     assert "`SuperMedicineInstaller.exe` defaults to yes" in install
 
 
-# ═══ Beta0.4.2 Release Validation ═══
+# ═══ Release Version Validation ═══
 
 
-def test_beta042_version_contract_is_single_source_consistent_across_release_surfaces(read_pyproject):
+def test_version_contract_is_single_source_consistent_across_release_surfaces(read_pyproject):
     """The immutable release tag must retain the complete PEP 440 version."""
 
     pyproject = read_pyproject
@@ -526,10 +527,12 @@ def test_beta042_version_contract_is_single_source_consistent_across_release_sur
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
 
     assert pyproject["project"]["version"] == PACKAGE_VERSION
+    assert __version__ == PACKAGE_VERSION
+    assert PUBLIC_VERSION == f"Beta{API_VERSION}"
     assert install_manifest["version"] == PACKAGE_VERSION
     assert opencode_plugin["version"] == PACKAGE_VERSION
-    assert "Beta0.4.2" in changelog
-    assert "Beta0.4.2" in readme
+    assert PUBLIC_VERSION in changelog
+    assert PUBLIC_VERSION in readme
     assert 'release_label = f"v{version}"' in build_release_zip
     assert 'archive_name = f"SuperMedicine {release_label}.zip"' in build_release_zip
 

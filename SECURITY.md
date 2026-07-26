@@ -4,7 +4,7 @@ SuperMedicine is local-first research-support software. It is not a clinical
 decision system, a regulated medical device, or a replacement for qualified human
 review.
 
-This policy applies to **Beta0.4.2**.
+This policy applies to **Beta0.5.0**.
 
 ## Supported Boundary
 
