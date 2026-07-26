@@ -1427,7 +1427,14 @@
                     break;
 
                 case "progress":
-                    addMessage("progress", data.data.message || JSON.stringify(data.data), "progress");
+                    if (
+                        data.data &&
+                        data.data.kind === "status" &&
+                        typeof data.data.message === "string" &&
+                        data.data.message.trim()
+                    ) {
+                        addMessage("progress", data.data.message, "progress");
+                    }
                     break;
 
                 case "result": {
@@ -1435,17 +1442,21 @@
                     var result = data.data;
                     var text = "";
                     if (result.output && typeof result.output === "object") {
-                        text = result.output.message || result.output.text || JSON.stringify(result.output, null, 2);
+                        text = typeof result.output.message === "string"
+                            ? result.output.message
+                            : (typeof result.output.text === "string" ? result.output.text : "");
                     } else if (result.output) {
                         text = String(result.output);
                     } else if (result.error) {
-                        text = "错误: " + String(result.error);
+                        text = result.error && typeof result.error.message === "string"
+                            ? result.error.message
+                            : "Operation could not be completed. Please retry.";
                         addMessage("assistant", text, "error");
                         return;
                     } else {
-                        text = JSON.stringify(result, null, 2);
+                        text = "操作未完成，请重试。";
                     }
-                    addMessage("assistant", text);
+                    addMessage("assistant", text || "Operation completed.");
                     break;
                 }
 
@@ -1455,7 +1466,7 @@
                     break;
 
                 default:
-                    addMessage("assistant", JSON.stringify(data, null, 2));
+                    addMessage("system", "Unrecognized service response. Please retry.", "error");
             }
         };
     }

@@ -163,6 +163,29 @@ def test_remote_websocket_authenticates_before_chat(monkeypatch):
     assert executions == ["safe to run"]
 
 
+def test_websocket_chat_redacts_unexpected_runtime_errors(monkeypatch):
+    from core.web.server import create_app
+
+    secret = "must-not-leak-from-runtime"
+
+    class FakeKernel:
+        def __init__(self, **kwargs):
+            raise RuntimeError(secret)
+
+    monkeypatch.setattr("core.kernel.Kernel", FakeKernel)
+    client = TestClient(create_app())
+
+    with client.websocket_connect("/ws/chat") as websocket:
+        websocket.send_json({"message": "hello"})
+        response = websocket.receive_json()
+
+    assert response == {
+        "type": "error",
+        "content": "Chat service is temporarily unavailable; please retry.",
+    }
+    assert secret not in str(response)
+
+
 def test_frontend_uses_session_only_bearer_authentication():
     root = Path(__file__).resolve().parents[1]
     app_js = (root / "core/web/frontend/app.js").read_text(encoding="utf-8")
@@ -177,6 +200,9 @@ def test_frontend_uses_session_only_bearer_authentication():
     assert 'opts.headers.Authorization = "Bearer " + webAuthToken' in app_js
     assert 'type: "auth", token: webAuthToken' in app_js
     assert "token=" not in app_js
+    assert 'data.data.kind === "status"' in app_js
+    assert "JSON.stringify(data.data)" not in app_js
+    assert "JSON.stringify(result.output" not in app_js
     assert "#web-auth-controls" in style_css
     assert "#web-auth-token" in style_css
 

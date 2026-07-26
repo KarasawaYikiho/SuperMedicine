@@ -614,10 +614,13 @@ def register_websocket_routes(app: Any, runtime: WebRuntime) -> None:
                             ),
                         )
                         await websocket.send_json({"type": "result", "data": result})
-                    except Exception as exc:
+                    except Exception:
                         logger.exception("WebSocket chat error")
                         await websocket.send_json(
-                            {"type": "error", "content": str(exc)}
+                            {
+                                "type": "error",
+                                "content": "Chat service is temporarily unavailable; please retry.",
+                            }
                         )
 
                 await _stream_result()
