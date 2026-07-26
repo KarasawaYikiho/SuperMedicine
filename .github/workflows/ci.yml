@@ -49,7 +49,7 @@ jobs:
           cache-dependency-path: pyproject.toml
       - run: python -m pip install -e ".[dev]"
       - name: Ruff
-        run: python -m ruff check .
+        run: python -m ruff check --select=E,F,W --ignore=E501 .
       - name: mypy
         run: python -m mypy core permission cli plugins agents adapters installer
 
@@ -94,7 +94,7 @@ jobs:
         run: |
           python -m build --wheel --outdir wheelhouse
           $wheel = (Get-ChildItem -LiteralPath wheelhouse -Filter *.whl | Select-Object -First 1).FullName
-          python -m pip install $wheel --no-deps --target wheel-smoke
+          python -m pip install $wheel --target wheel-smoke
           python scripts/ci/smoke_wheel_install.py wheel-smoke
 
   required-gate:

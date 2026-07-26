@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from core import PUBLIC_VERSION
 from tests.conftest import _cp1252_stdio_env, _has_exact_child_name, _supports_case_distinct_names
 from uninstall_entry import collect_removal_candidates, uninstall
 
@@ -63,7 +64,9 @@ def _write_minimal_import_stubs(workspace: Path) -> None:
 
     core_llm_dir = workspace / "core" / "llm_providers"
     core_llm_dir.mkdir(parents=True)
-    (workspace / "core" / "__init__.py").write_text("", encoding="utf-8")
+    (workspace / "core" / "__init__.py").write_text(
+        f"PUBLIC_VERSION = {PUBLIC_VERSION!r}\n", encoding="utf-8"
+    )
     (core_llm_dir / "__init__.py").write_text("", encoding="utf-8")
     (core_llm_dir / "config.py").write_text(
         textwrap.dedent(

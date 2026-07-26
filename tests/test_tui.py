@@ -72,15 +72,19 @@ def test_tui_main_accepts_dry_run(tmp_path, monkeypatch):
 def test_frozen_tui_uses_shared_user_data_root_not_executable_dist(
     tmp_path, monkeypatch
 ):
-    local_app_data = tmp_path / "LocalAppData"
     executable = tmp_path / "Programs" / "SuperMedicine" / "dist" / "SuperMedicine.exe"
     executable.parent.mkdir(parents=True)
     monkeypatch.setattr(sys, "frozen", True, raising=False)
     monkeypatch.setattr(sys, "executable", str(executable))
-    monkeypatch.setenv("LOCALAPPDATA", str(local_app_data))
     monkeypatch.delenv("SM_PROJECT_ROOT", raising=False)
 
-    assert _project_root(None) == (local_app_data / "SuperMedicine").resolve()
+    if sys.platform == "win32":
+        user_data_root = tmp_path / "LocalAppData"
+        monkeypatch.setenv("LOCALAPPDATA", str(user_data_root))
+    else:
+        user_data_root = Path.home() / ".local" / "share"
+
+    assert _project_root(None) == (user_data_root / "SuperMedicine").resolve()
 
 
 @pytest.mark.parametrize(
