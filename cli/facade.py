@@ -120,11 +120,24 @@ class CLI:
     """SuperMedicine CLI"""
 
     def __init__(self, *, paths=None, application=None) -> None:
-        from core.application import ApplicationFacade
-        from core.runtime_paths import RuntimePaths
+        self._paths = paths
+        self._application = application
 
-        self.paths = paths or RuntimePaths.resolve(project_root=Path.cwd())
-        self.application = application or ApplicationFacade(self.paths)
+    @property
+    def paths(self):
+        if self._paths is None:
+            from core.runtime_paths import RuntimePaths
+
+            self._paths = RuntimePaths.resolve(project_root=Path.cwd())
+        return self._paths
+
+    @property
+    def application(self):
+        if self._application is None:
+            from core.application import ApplicationFacade
+
+            self._application = ApplicationFacade(self.paths)
+        return self._application
 
     def __getattr__(self, name: str):
         try:
@@ -409,6 +422,22 @@ def main(argv: list[str] | None = None) -> None:
         from core.tui.bridge import bridge_worker_self_test
 
         print(json.dumps(bridge_worker_self_test(), sort_keys=True))
+        return
+    if arguments == ["--opentui-self-test"]:
+        from core.tui.opentui_runtime import (
+            automated_nav_opentui_runtime,
+            full_page_interactions_opentui_runtime,
+        )
+
+        checks = (
+            automated_nav_opentui_runtime(),
+            full_page_interactions_opentui_runtime(),
+        )
+        for check in checks:
+            sys.stdout.write(check.stdout)
+            sys.stderr.write(check.stderr)
+            if check.returncode:
+                raise SystemExit(check.returncode)
         return
     _cli_main(arguments)
 

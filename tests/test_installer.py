@@ -94,6 +94,10 @@ def _write_minimal_import_stubs(workspace: Path) -> None:
     permission_dir = workspace / "permission"
     permission_dir.mkdir()
     (permission_dir / "__init__.py").write_text("", encoding="utf-8")
+    (permission_dir / "redaction.py").write_text(
+        "def redact_sensitive(value):\n    return value\n",
+        encoding="utf-8",
+    )
     (permission_dir / "policy.py").write_text(
         "def ensure_default_policy(project_dir, repo_root):\n    return None\n",
         encoding="utf-8",

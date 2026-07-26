@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -171,6 +173,7 @@ def build_application(root: Path) -> Path | None:
                 "agents",
                 "adapters",
                 "assets",
+                ("node_modules", "node_modules"),
             ),
             hidden_imports=("core", "permission", "plugins", "agents", "adapters"),
             icon=root / "assets" / "logo.ico",
@@ -179,7 +182,40 @@ def build_application(root: Path) -> Path | None:
     )
 
 
+def verify_application_executable(output: Path) -> None:
+    """Exercise packaged OpenTUI mouse and Enter paths from a clean directory."""
+
+    with tempfile.TemporaryDirectory(prefix="supermedicine-opentui-self-test-") as temp:
+        test_root = Path(temp)
+        environment = dict(os.environ)
+        environment["SM_CONFIG"] = str(test_root / "config.yaml")
+        result = subprocess.run(
+            [str(output), "--opentui-self-test"],
+            cwd=test_root,
+            env=environment,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=45,
+        )
+    expected = (
+        "SUPERMEDICINE_OPENTUI_NAV_OK",
+        "SUPERMEDICINE_OPENTUI_FULL_PAGE_OK",
+    )
+    combined = result.stdout + result.stderr
+    if result.returncode or not all(signal in combined for signal in expected):
+        raise SystemExit(
+            "Packaged OpenTUI interaction self-test failed "
+            f"(exit={result.returncode}):\n{combined}"
+        )
+
+
 if __name__ == "__main__":
     if sys.argv[1:] != ["application"]:
         raise SystemExit("usage: _pyinstaller_builder.py application")
-    build_application(Path.cwd())
+    application = build_application(Path.cwd())
+    if application is None:
+        raise SystemExit("Application build did not produce SuperMedicine.exe")
+    verify_application_executable(application)

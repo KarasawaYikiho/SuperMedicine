@@ -73,6 +73,36 @@ def test_application_executable_preserves_console_mode(tmp_path, monkeypatch):
 
     assert captured["root"] == tmp_path
     assert captured["target"].windowed is False
+    assert ("node_modules", "node_modules") in captured["target"].data_items
+
+
+def test_packaged_application_gate_uses_clean_cwd_and_real_opentui_modes(
+    tmp_path, monkeypatch
+):
+    output = tmp_path / "SuperMedicine.exe"
+    output.write_bytes(b"exe")
+    captured = {}
+
+    def fake_run(command, **kwargs):
+        captured["command"] = command
+        captured["cwd"] = kwargs["cwd"]
+        captured["env"] = kwargs["env"]
+        return SimpleNamespace(
+            returncode=0,
+            stdout=(
+                "SUPERMEDICINE_OPENTUI_NAV_OK route=workspace\n"
+                "SUPERMEDICINE_OPENTUI_FULL_PAGE_OK route=dashboard\n"
+            ),
+            stderr="",
+        )
+
+    monkeypatch.setattr(builder.subprocess, "run", fake_run)
+
+    builder.verify_application_executable(output)
+
+    assert captured["command"] == [str(output), "--opentui-self-test"]
+    assert captured["cwd"] != tmp_path
+    assert captured["env"]["SM_CONFIG"].endswith("config.yaml")
 
 
 def test_windows_version_info_comes_from_pyproject(tmp_path):
