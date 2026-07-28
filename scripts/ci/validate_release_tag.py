@@ -7,8 +7,12 @@ import argparse
 import os
 import subprocess
 import sys
-import tomllib
 from pathlib import Path
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - Python 3.10
+    import tomli as tomllib  # type: ignore[import-not-found,no-redef]
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]

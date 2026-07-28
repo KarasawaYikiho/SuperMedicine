@@ -8,6 +8,17 @@ import pytest
 from scripts.ci import publish_release, validate_release_tag
 
 
+def test_release_toml_readers_support_python_310():
+    root = validate_release_tag.REPOSITORY_ROOT
+    for relative in (
+        "scripts/ci/validate_release_tag.py",
+        "scripts/ci/build_release_zip.py",
+    ):
+        source = (root / relative).read_text(encoding="utf-8")
+        assert "except ModuleNotFoundError" in source
+        assert "import tomli as tomllib" in source
+
+
 def _completed(
     args: tuple[str, ...],
     *,

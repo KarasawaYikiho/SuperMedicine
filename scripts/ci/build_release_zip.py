@@ -17,9 +17,13 @@ import os
 import shutil
 import subprocess
 import sys
-import tomllib
 import zipfile
 from pathlib import Path
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - Python 3.10
+    import tomli as tomllib  # type: ignore[import-not-found,no-redef]
 
 # Ensure repo root is on sys.path so that "scripts.ci" resolves when
 # invoked as ``python scripts/ci/build_release_zip.py``.
