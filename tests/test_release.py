@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import json
 import re
 import shlex
@@ -7,6 +8,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from runpy import run_path
 
 from tests.conftest import _cp1252_stdio_env
 from tests.ci_workflow_contract import combined_workflow_source
@@ -549,6 +551,22 @@ def test_release_metadata_uses_spdx_license_contract(read_pyproject):
     )
     assert "setuptools>=77.0.3" in build_requirements
     assert "wheel" not in build_requirements
+
+
+def test_packaging_hook_uses_setuptools_integrated_wheel_command():
+    hook_path = REPO_ROOT / "scripts" / "packaging_hooks.py"
+    tree = ast.parse(hook_path.read_text(encoding="utf-8"))
+    imports = {
+        (node.module, alias.name)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom)
+        for alias in node.names
+    }
+    namespace = run_path(str(hook_path))
+
+    assert ("setuptools.command.bdist_wheel", "bdist_wheel") in imports
+    assert ("wheel.bdist_wheel", "bdist_wheel") not in imports
+    assert namespace["cmdclass"]["bdist_wheel"] is namespace["bdist_wheel"]
 
 
 def test_opentui_release_runtime_dependency_and_notice_are_packaged():

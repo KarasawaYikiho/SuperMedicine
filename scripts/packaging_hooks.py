@@ -8,13 +8,11 @@ import tarfile
 import zipfile
 from pathlib import Path
 
+from setuptools.command.bdist_wheel import (  # type: ignore[import-untyped]
+    bdist_wheel as _bdist_wheel,
+)
 from setuptools.command.build_py import build_py as _build_py  # type: ignore[import-untyped]
 from setuptools.command.sdist import sdist as _sdist  # type: ignore[import-untyped]
-
-try:
-    from wheel.bdist_wheel import bdist_wheel as _bdist_wheel  # type: ignore[import-not-found,import-untyped]
-except Exception:  # pragma: no cover - wheel is a build dependency in pyproject
-    _bdist_wheel = None  # type: ignore[assignment]
 
 
 LOWERCASE_INSTALL_NAME = "install.py"
@@ -294,22 +292,23 @@ class sdist(_sdist):
                 _ensure_tar_gz_members(archive_path, payloads)
 
 
-cmdclass = {"build_py": build_py, "sdist": sdist}
+class bdist_wheel(_bdist_wheel):  # type: ignore[misc, valid-type]
+    """Post-process wheel archives as a safety net for case-insensitive builds."""
 
-if _bdist_wheel is not None:
+    def run(self) -> None:
+        super().run()
+        payloads = _install_payloads()
+        for wheel_path in Path(self.dist_dir).glob("*.whl"):
+            if wheel_path.is_file():
+                _ensure_wheel_members(
+                    wheel_path,
+                    payloads,
+                    remove_members=STALE_DISTRIBUTION_MEMBERS,
+                )
 
-    class bdist_wheel(_bdist_wheel):  # type: ignore[misc, valid-type]
-        """Post-process wheel archives as a safety net for case-insensitive builds."""
 
-        def run(self) -> None:
-            super().run()
-            payloads = _install_payloads()
-            for wheel_path in Path(self.dist_dir).glob("*.whl"):
-                if wheel_path.is_file():
-                    _ensure_wheel_members(
-                        wheel_path,
-                        payloads,
-                        remove_members=STALE_DISTRIBUTION_MEMBERS,
-                    )
-
-    cmdclass["bdist_wheel"] = bdist_wheel
+cmdclass = {
+    "build_py": build_py,
+    "sdist": sdist,
+    "bdist_wheel": bdist_wheel,
+}

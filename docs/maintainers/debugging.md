@@ -160,3 +160,66 @@ The release metadata contract therefore failed with `KeyError: build-system`
 even though the artifact build itself succeeded. The fixture now uses the
 installed `tomli` backport on Python 3.10 and retains the small regex parser only
 as a last-resort fallback.
+
+## Follow-up Debug Pass at `073b076`
+
+The follow-up repository-wide pass re-ran the full Python suite, strict warning
+checks, static analysis, documentation and metadata checks, OpenTUI interaction
+tests, clean-process imports, the sdist/Wheel build, a dependency-aware clean
+Wheel install, and the npm vulnerability audit.
+
+The zero-change baseline passed all functional gates:
+
+| Gate | Baseline result |
+| --- | --- |
+| Full Python suite | 1200 passed, 4 skipped |
+| Deprecation warnings treated as errors | 1200 passed, 4 skipped |
+| Ruff and mypy | passed |
+| Documentation, metadata, bytecode, and installed dependencies | passed |
+| OpenTUI smoke, navigation, and interaction suite | 26 passed |
+| npm high-severity audit | 0 vulnerabilities |
+| sdist, Wheel, and clean Wheel smoke | functionally passed |
+
+The four pytest skips remain the environment-bound filesystem cases documented
+above. One release-build compatibility defect was confirmed despite the
+functional success.
+
+### DBG-004: packaging hook imports the retiring Wheel command location
+
+Severity: medium.
+
+The isolated sdist/Wheel build repeatedly emitted a `FutureWarning` from
+`wheel.bdist_wheel`: that compatibility module is no longer the canonical
+location of the command and is scheduled for removal. The project already
+requires a setuptools version with an integrated `bdist_wheel`, but
+`scripts/packaging_hooks.py` still imports the older Wheel-owned location. A
+future packaging-tool update can therefore turn a warning-only build into a
+release failure.
+
+Repair:
+
+- subclass the setuptools-integrated `bdist_wheel` command directly;
+- remove the optional fallback that silently disables Wheel post-processing;
+- add a release contract that prevents the retired import path from returning.
+
+Acceptance:
+
+- the packaging hook always registers its Wheel post-processor;
+- the sdist and Wheel build complete without the `wheel.bdist_wheel`
+  `FutureWarning`;
+- clean Wheel installation still discovers all 15 packaged plugin manifests.
+
+Result: repaired and closed.
+
+The final strict-warning full suite passed with 1201 tests and the same four
+environment-bound skips. Ruff, mypy, documentation and metadata checks,
+bytecode compilation, installed dependency consistency, and all 26 OpenTUI
+tests passed. The rebuilt sdist and Wheel emitted no `wheel.bdist_wheel`
+`FutureWarning`, and a dependency-aware clean Wheel install discovered all 15
+plugin manifests.
+
+Clean-process imports of the Kernel, CLI, Web, Desktop, and Installer entry
+surfaces also passed. The local `diagnose` command correctly reported an
+unconfigured LLM provider; that is an actionable machine configuration state,
+not a source defect, and no credential or user configuration was changed during
+this pass.
