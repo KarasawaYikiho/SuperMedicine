@@ -13,6 +13,16 @@ from core.runtime_capabilities import (
 )
 
 
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_required_plugins_are_discovered() -> None:
+    registry = PluginRegistry(REPOSITORY_ROOT / "plugins")
+    discovered = {meta.name for meta in registry.discover()}
+
+    assert {"rag-interface", "harness-core"} <= discovered
+
+
 def test_required_runtime_plugin_missing_fails_closed(tmp_path):
     registry = PluginRegistry(tmp_path / "plugins", allow_package_fallback=False)
     registry.discover()

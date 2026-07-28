@@ -29,7 +29,7 @@ python -m pytest tests/ -q --tb=short
 ## Architecture and Capability Contract
 
 ```powershell
-python -m pytest tests/test_architecture.py tests/test_feature_manifest.py tests/test_runtime.py -q
+python -m pytest tests/test_architecture.py tests/test_feature_manifest.py tests/test_runtime_capabilities.py -q
 ```
 
 Feature IDs may be added but baseline IDs may not be removed. These tests protect
@@ -64,7 +64,7 @@ python -m mypy core permission cli plugins agents adapters installer
 python -m ruff check .
 python -m build
 npm run opentui:smoke
-python -m pip install <wheel> --no-deps --target <clean-target>
+python -m pip install <wheel> --target <clean-target>
 python scripts/ci/smoke_wheel_install.py <clean-target>
 ```
 

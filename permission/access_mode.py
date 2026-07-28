@@ -201,7 +201,7 @@ class AccessModePolicy:
             raise AccessModeError(
                 f"Authorized external path must be a directory: {root}"
             )
-        if self._is_relative_to(root, self.project_root):
+        if root.is_relative_to(self.project_root):
             return root
         roots = list(self.authorized_external_roots)
         if not any(existing == root for existing in roots):
@@ -230,7 +230,7 @@ class AccessModePolicy:
             )
 
         if self.mode == AccessMode.SANDBOX:
-            if not self._is_relative_to(resolved_path, self.project_root):
+            if not resolved_path.is_relative_to(self.project_root):
                 return AccessDecision(
                     status=AccessDecisionStatus.DENIED,
                     path=resolved_path,
@@ -266,7 +266,7 @@ class AccessModePolicy:
                     prompt="Sandbox mode only writes approved Markdown/text/tool source files.",
                 )
             if not any(
-                self._is_relative_to(resolved_path, root)
+                resolved_path.is_relative_to(root)
                 for root in self.sandbox_writable_roots
             ):
                 return AccessDecision(
@@ -285,7 +285,7 @@ class AccessModePolicy:
                 reason="sandbox_write_scope_and_file_type_allowed",
             )
 
-        if self._is_relative_to(resolved_path, self.project_root):
+        if resolved_path.is_relative_to(self.project_root):
             return AccessDecision(
                 status=AccessDecisionStatus.ALLOWED,
                 path=resolved_path,
@@ -295,7 +295,7 @@ class AccessModePolicy:
             )
 
         if any(
-            self._is_relative_to(resolved_path, root)
+            resolved_path.is_relative_to(root)
             for root in self.authorized_external_roots
         ):
             return AccessDecision(
@@ -343,15 +343,6 @@ class AccessModePolicy:
             message = decision.prompt or decision.reason
             raise PermissionError(message)
         return decision
-
-    @staticmethod
-    def _is_relative_to(path: Path, root: Path) -> bool:
-        try:
-            path.relative_to(root)
-        except ValueError:
-            return False
-        return True
-
 
 def normalize_access_mode(mode: AccessMode | str) -> AccessMode:
     """Normalize external mode strings to :class:`AccessMode`."""

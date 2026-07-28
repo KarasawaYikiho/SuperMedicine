@@ -29,3 +29,16 @@ def test_release_metadata_mirrors_are_current() -> None:
         if path.read_text(encoding="utf-8") != desired
     ]
     assert stale == []
+
+
+def test_maintainer_gates_preserve_runtime_and_clean_wheel_contracts() -> None:
+    quality_gates = (
+        REPOSITORY_ROOT / "docs" / "maintainers" / "quality-gates.md"
+    ).read_text(encoding="utf-8")
+    feature_parity = (
+        REPOSITORY_ROOT / "docs" / "maintainers" / "feature-parity.md"
+    ).read_text(encoding="utf-8")
+
+    assert "tests/test_runtime_capabilities.py" in quality_gates
+    assert "tests/test_runtime_capabilities.py" in feature_parity
+    assert "--no-deps" not in quality_gates

@@ -40,3 +40,17 @@ def test_feature_manifest_preserves_mandatory_and_optional_runtime_contracts() -
     )
     for role in ("alpha", "beta", "gamma", "delta"):
         assert records[f"agent:{role}"]["optional_enabled"] is True
+
+
+def test_required_plugins_name_their_runtime_contract() -> None:
+    manifest = _manifest()
+    required_plugins = [
+        record
+        for record in manifest["features"]
+        if record["category"] == "plugin" and record.get("required")
+    ]
+    assert required_plugins
+    assert {record["runtime_contract"] for record in required_plugins} == {
+        "rag_local_query",
+        "harness_checkpoint",
+    }

@@ -31,7 +31,7 @@ to those tests because file layout is not a product capability.
 ## Validation
 
 ```powershell
-python -m pytest tests/test_feature_manifest.py tests/test_runtime.py tests/test_agents.py -q
+python -m pytest tests/test_feature_manifest.py tests/test_runtime_capabilities.py tests/test_agents.py -q
 ```
 
 For a broad rebuild, also run the complete quality gate from

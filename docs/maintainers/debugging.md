@@ -223,3 +223,114 @@ surfaces also passed. The local `diagnose` command correctly reported an
 unconfigured LLM provider; that is an actionable machine configuration state,
 not a source defect, and no credential or user configuration was changed during
 this pass.
+
+## Repository-Wide Debug Pass at `32f76aa`
+
+The next pass started from the current working tree at `32f76aa`. It combined
+the full functional gates with one-process-per-module import probes so that test
+collection order could not hide package initialization cycles.
+
+| Gate | Baseline result |
+| --- | --- |
+| Full Python suite | 1201 passed, 4 skipped |
+| Deprecation and future warnings treated as errors | 1201 passed, 4 skipped |
+| Ruff and mypy | passed |
+| Documentation and repository policy | 5 passed |
+| OpenTUI smoke, navigation, and interaction suite | 26 passed |
+| sdist, Wheel, and dependency-aware clean Wheel smoke | passed; 15 manifests |
+| npm high-severity audit | 0 vulnerabilities |
+| Independent clean-process module imports | 143 passed, 4 failed |
+
+The four module failures had one shared root cause.
+
+### DBG-005: clean-process paper import package fails
+
+Severity: high.
+
+Importing `core.paper_import`, or any of its submodules, in a fresh Python
+process fails with a partially initialized module error. The dependency chain
+is `core.paper_import.importer` -> `core.services.rag` ->
+`core.services.__init__` -> `core.services.research` ->
+`core.paper_import.importer`.
+
+The aggregate suite missed the defect because its collection order imports
+`core.services.rag` before `core.paper_import`. The paper importer only needs
+the RAG service while indexing or deleting a paper, so loading that service at
+module initialization time is unnecessary.
+
+Repair:
+
+- defer the RAG service import until the indexing or deletion operation that
+  uses it;
+- add a clean-subprocess import contract for the public paper import package.
+
+Acceptance:
+
+```powershell
+python -c "from core.paper_import import PaperImporter; print(PaperImporter.__name__)"
+```
+
+must succeed in a new process, and all independently probed project modules
+must import successfully.
+
+### DBG-006: documented Wheel smoke can produce a false clean-install result
+
+Severity: medium.
+
+The CI workflow installs Wheel dependencies before running
+`smoke_wheel_install.py`, but the maintainer quality gate still instructs users
+to install the Wheel with `--no-deps`. Because the smoke script runs under the
+maintainer's Python interpreter, globally installed dependencies such as
+PyYAML can make that check pass even though the target is not a usable clean
+installation.
+
+Repair:
+
+- make the documented packaging gate dependency-aware, matching CI;
+- keep the clean target and plugin-manifest smoke check unchanged.
+
+### DBG-007: capability gate lost migrated runtime coverage
+
+Severity: low.
+
+The duplicated `tests/test_runtime.py` contracts were moved to their owning
+feature, agent, and runtime-capability test modules. The documented focused
+gates removed the old filename but did not include
+`tests/test_runtime_capabilities.py`, weakening the command that maintainers use
+to validate required Harness and RAG discovery.
+
+Repair:
+
+- include `tests/test_runtime_capabilities.py` in the architecture and
+  feature-parity focused gates.
+
+## Final Result for the `32f76aa` Pass
+
+DBG-005, DBG-006, and DBG-007 are repaired and closed. The same change set also
+validated the in-progress maintenance consolidation: project path checks now
+use the Python 3.10 baseline's `Path.is_relative_to`, duplicated runtime
+contracts live with their owning feature modules, and the isolated installer
+test uses one subprocess helper without changing the lowercase compatibility
+entrypoint.
+
+| Gate | Final result |
+| --- | --- |
+| Independent clean-process module imports | 147 passed, 0 failed |
+| Affected architecture, paper, service, docs, feature, runtime, and agent contracts | 137 passed |
+| Full suite with deprecation and future warnings as errors | 1203 passed, 4 skipped |
+| Ruff | passed |
+| mypy | passed for 145 source files |
+| Documentation, repository, release, feature, and runtime contracts | 32 passed |
+| OpenTUI smoke, navigation, and interaction suite | 26 passed |
+| sdist and Wheel build | passed with 0 deprecation or future warnings |
+| Dependency-aware clean Wheel smoke | passed; 15 plugin manifests discovered |
+| Public imports, CLI, Desktop self-test, and installer help | passed |
+| Python installed dependency consistency | passed |
+| npm high-severity audit | 0 vulnerabilities |
+| `git diff --check` | passed |
+
+The four skipped tests are the same environment-bound Windows filesystem cases
+documented earlier in this record. No test was skipped, deleted, or weakened to
+hide a failing behavior: the removed duplicate test module's three contracts
+were moved to the feature, runtime-capability, and agent suites and remained
+part of the final aggregate count.

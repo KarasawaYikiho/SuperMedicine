@@ -147,24 +147,6 @@ def _run_isolated_install(
     )
 
 
-def _run_isolated_lowercase_install(
-    workspace: Path,
-    *args: str,
-    input_text: str | None = None,
-) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [sys.executable, "install_entry.py", *args],
-        cwd=workspace,
-        env=_cp1252_stdio_env(),
-        text=True,
-        encoding="cp1252",
-        input=input_text,
-        capture_output=True,
-        check=False,
-        timeout=INSTALLER_SUBPROCESS_TIMEOUT_SECONDS,
-    )
-
-
 def _run_isolated_cli(workspace: Path, *args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, "cli_entry.py", *args],
@@ -248,7 +230,7 @@ def test_lowercase_install_help_works_when_optional_installer_package_is_absent(
 
     _copy_install_entrypoint_without_installer_package(tmp_path)
 
-    result = _run_isolated_lowercase_install(tmp_path, "--help")
+    result = _run_isolated_install(tmp_path, "--help")
 
     output = result.stdout + result.stderr
     assert result.returncode == 0

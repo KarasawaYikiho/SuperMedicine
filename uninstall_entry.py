@@ -125,11 +125,7 @@ def _safe_display(path: Path, project_dir: Path) -> str:
 
 
 def _is_within(path: Path, root: Path) -> bool:
-    try:
-        path.resolve().relative_to(root.resolve())
-        return True
-    except ValueError:
-        return False
+    return path.resolve().is_relative_to(root.resolve())
 
 
 def _load_install_record(project_dir: Path) -> dict[str, Any]:

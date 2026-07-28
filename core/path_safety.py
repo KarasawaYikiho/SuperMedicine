@@ -106,14 +106,6 @@ def _resolve_candidate(path: str | Path, project_root: Path) -> Path:
     return candidate.resolve()
 
 
-def _is_relative_to(path: Path, root: Path) -> bool:
-    try:
-        path.relative_to(root)
-    except ValueError:
-        return False
-    return True
-
-
 def validate_path_in_project_root(
     path: str | Path,
     project_root: str | Path | None = None,
@@ -127,7 +119,7 @@ def validate_path_in_project_root(
 
     root = resolve_project_root(project_root)
     resolved_path = _resolve_candidate(path, root)
-    if not _is_relative_to(resolved_path, root):
+    if not resolved_path.is_relative_to(root):
         raise PathOutsideProjectRootError(
             f"Path resolves outside project root: {resolved_path} (root: {root})"
         )
@@ -207,7 +199,7 @@ def validate_sandbox_write_path(
         for writable_root in writable_roots
     )
     if not any(
-        _is_relative_to(resolved_path, writable_root)
+        resolved_path.is_relative_to(writable_root)
         for writable_root in candidate_roots
     ):
         raise SandboxWriteScopeError(

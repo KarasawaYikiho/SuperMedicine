@@ -17,8 +17,7 @@ from core.paper_import.contracts import (
     PaperMetadata,
     UnsupportedPaperFormatError,
 )
-from core.path_safety import _is_relative_to, validate_path_in_project_root
-from core.services.rag import RAGService
+from core.path_safety import validate_path_in_project_root
 from core.serialization import json_ready
 from core.time_utils import utc_now_datetime
 from core.workspace import WorkspaceInfo, WorkspaceManager
@@ -211,6 +210,8 @@ class PaperImporter:
         import_warnings: list[str] = []
         if extension in {".md", ".txt", ".pdf"}:
             try:
+                from core.services.rag import RAGService
+
                 page_texts = None
                 text = source_bytes.decode("utf-8") if extension != ".pdf" else ""
                 if extension == ".pdf":
@@ -315,6 +316,8 @@ class PaperImporter:
 
     def delete_paper(self, workspace_id: str, paper_id: str) -> dict[str, Any]:
         """Delete one imported paper and synchronously remove its RAG chunks."""
+        from core.services.rag import RAGService
+
         workspace = self.workspace_manager.get_workspace(workspace_id)
         metadata_path = self._metadata_path_for_paper(workspace_id, paper_id)
         if not metadata_path.is_file():
@@ -344,7 +347,7 @@ class PaperImporter:
         workspace_root = validate_path_in_project_root(
             workspace.path, self.project_root
         )
-        if not _is_relative_to(path, workspace_root):
+        if not path.is_relative_to(workspace_root):
             raise MissingPaperSourceError(
                 f"Import destination escapes workspace: {path}"
             )

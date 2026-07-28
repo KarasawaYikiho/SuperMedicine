@@ -5,10 +5,7 @@ from __future__ import annotations
 import pytest
 from typing import Any
 
-from agents.roles import AlphaAgent
-from agents.roles import BetaAgent
-from agents.roles import GammaAgent
-from agents.roles import DeltaAgent
+from agents.roles import ROLE_SPECS, AlphaAgent, BetaAgent, DeltaAgent, GammaAgent
 from agents.orchestrator import Orchestrator
 from agents.roles import BaseAgent
 from agents.checkpoint import CheckpointManager
@@ -16,6 +13,25 @@ from agents.orchestrator import StateMachine, TaskState
 
 
 # ═══ Agent Unit Tests ═══
+
+
+def test_four_agent_roles_are_preserved() -> None:
+    agents = [AlphaAgent(), BetaAgent(), GammaAgent(), DeltaAgent()]
+
+    assert {(agent.agent_id, agent.role) for agent in agents} == {
+        ("alpha", "analyst"),
+        ("beta", "reviewer"),
+        ("gamma", "writer"),
+        ("delta", "orchestrator"),
+    }
+    assert tuple(ROLE_SPECS) == ("alpha", "beta", "gamma", "delta")
+    assert ROLE_SPECS["alpha"].next_role == "beta"
+    assert ROLE_SPECS["beta"].next_role == "gamma"
+    assert ROLE_SPECS["gamma"].next_role is None
+    assert all(
+        spec.prompt and spec.input_keys and spec.output_keys
+        for spec in ROLE_SPECS.values()
+    )
 
 
 class TestAlphaAgent:

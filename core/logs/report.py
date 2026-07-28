@@ -384,17 +384,9 @@ class LogReportStore:
         path = (self.log_dir / file_name).resolve()
         project_root = self.project_dir.resolve()
         log_root = self.log_dir.resolve()
-        if path.parent != log_root or not self._is_relative_to(path, project_root):
+        if path.parent != log_root or not path.is_relative_to(project_root):
             raise LogReportError("unsafe log report path")
         return path
-
-    @staticmethod
-    def _is_relative_to(path: Path, parent: Path) -> bool:
-        try:
-            path.relative_to(parent)
-        except ValueError:
-            return False
-        return True
 
     def _write_payload(
         self, path: Path, payload: dict[str, Any], *, allow_existing: bool

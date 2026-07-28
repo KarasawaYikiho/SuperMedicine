@@ -41,6 +41,26 @@ def test_kernel_import_succeeds_in_a_clean_python_process() -> None:
     assert completed.stdout.strip() == "Kernel"
 
 
+def test_paper_import_succeeds_in_a_clean_python_process() -> None:
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "from core.paper_import import PaperImporter; "
+                "print(PaperImporter.__name__)"
+            ),
+        ],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert completed.stdout.strip() == "PaperImporter"
+
+
 def _python_files(path: Path) -> list[Path]:
     return sorted(path.rglob("*.py")) if path.is_dir() else [path]
 
