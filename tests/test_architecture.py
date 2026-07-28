@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
+import subprocess
+import sys
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -20,6 +22,23 @@ FORBIDDEN_CONSTRUCTORS = {
     "PermissionEngine",
     "PluginRegistry",
 }
+
+
+def test_kernel_import_succeeds_in_a_clean_python_process() -> None:
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from core.kernel import Kernel; print(Kernel.__name__)",
+        ],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert completed.stdout.strip() == "Kernel"
 
 
 def _python_files(path: Path) -> list[Path]:

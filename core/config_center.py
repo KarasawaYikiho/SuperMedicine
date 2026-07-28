@@ -18,6 +18,23 @@ from permission.access_mode import AccessMode, AccessModePolicy, normalize_acces
 
 logger = logging.getLogger(__name__)
 
+CONFIG_PATH_ENV = "SM_CONFIG"
+
+
+def resolve_config_path(
+    project_root: str | Path | None = None,
+    *,
+    environ: dict[str, str] | None = None,
+) -> Path:
+    """Resolve the runtime config path without changing explicitly injected paths."""
+
+    env = os.environ if environ is None else environ
+    override = env.get(CONFIG_PATH_ENV, "").strip()
+    if override:
+        return Path(override).expanduser()
+    root = Path.cwd() if project_root is None else Path(project_root)
+    return root / ".supermedicine" / "config.yaml"
+
 
 DEFAULT_EXPERIMENT_GUIDE_CONFIG: dict[str, Any] = {
     "enabled": True,
@@ -128,7 +145,7 @@ class ConfigCenter:
         """获取配置值，SM_* 环境变量优先"""
         # 检查环境变量覆盖
         env_key = "SM_" + key.upper().replace("-", "_")
-        env_value = os.environ.get(env_key)
+        env_value = None if env_key == CONFIG_PATH_ENV else os.environ.get(env_key)
         if env_value is not None:
             return env_value
         return self._config.get(key, default)
@@ -190,7 +207,7 @@ class ConfigCenter:
         """获取全部配置（合并环境变量覆盖）"""
         result = dict(self._config)
         for env_key, env_val in os.environ.items():
-            if env_key.startswith("SM_"):
+            if env_key.startswith("SM_") and env_key != CONFIG_PATH_ENV:
                 config_key = env_key[3:].lower().replace("_", "-")
                 result[config_key] = env_val
         return result

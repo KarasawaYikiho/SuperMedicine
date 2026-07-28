@@ -537,6 +537,20 @@ def test_version_contract_is_single_source_consistent_across_release_surfaces(re
     assert 'archive_name = f"SuperMedicine {release_label}.zip"' in build_release_zip
 
 
+def test_release_metadata_uses_spdx_license_contract(read_pyproject):
+    project = read_pyproject["project"]
+    build_requirements = read_pyproject["build-system"]["requires"]
+
+    assert project["license"] == "MIT"
+    assert project["license-files"] == ["LICENSE"]
+    assert not any(
+        classifier.startswith("License ::")
+        for classifier in project.get("classifiers", [])
+    )
+    assert "setuptools>=77.0.3" in build_requirements
+    assert "wheel" not in build_requirements
+
+
 def test_opentui_release_runtime_dependency_and_notice_are_packaged():
     """Release packaging must carry OpenTUI manifests, bridge, and MIT notices."""
 

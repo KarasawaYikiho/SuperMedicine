@@ -8,9 +8,10 @@ This directory is the starting point for repository maintenance.
 2. [entrypoints.md](entrypoints.md)
 3. [quality-gates.md](quality-gates.md)
 4. [ci-workflows.md](ci-workflows.md)
-5. [maintenance-backlog.md](maintenance-backlog.md)
-6. [feature-parity.md](feature-parity.md)
-7. [rebuild-0.4.2.md](history/rebuild-0.4.2.md) (frozen history)
+5. [debugging.md](debugging.md)
+6. [maintenance-backlog.md](maintenance-backlog.md)
+7. [feature-parity.md](feature-parity.md)
+8. [rebuild-0.4.2.md](history/rebuild-0.4.2.md) (frozen history)
 
 ## Sources of Truth
 

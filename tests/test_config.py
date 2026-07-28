@@ -6,11 +6,26 @@ from core.config_center import (
     ConfigCenter,
     DEFAULT_EXPERIMENT_GUIDE_CONFIG,
     DEFAULT_LOG_REPORT_CONFIG,
+    resolve_config_path,
 )
 from permission.access_mode import AccessDecisionStatus, FullAccessConfirmationRequired
 
 
 class TestConfigCenter:
+    def test_sm_config_selects_default_path_without_overriding_explicit_instances(
+        self, tmp_path, monkeypatch
+    ):
+        override = tmp_path / "isolated" / "config.yaml"
+        explicit = tmp_path / "explicit.yaml"
+        monkeypatch.setenv("SM_CONFIG", str(override))
+
+        assert resolve_config_path(tmp_path / "project") == override
+
+        config = ConfigCenter(explicit)
+        assert config.config_path == explicit
+        assert "config" not in config.all()
+        assert "SM_CONFIG" in config.diagnostics()["env_override_keys"]
+
     def test_rag_config_has_required_local_first_defaults(self, tmp_path):
         config = ConfigCenter(tmp_path / "config.yaml")
 

@@ -24,7 +24,6 @@ from core.experiment_protocols import (
     list_protocols,
     save_experiment_config,
 )
-from core.kernel import Kernel
 from core.logs.report import LogReportStore
 from permission.redaction import redact_sensitive
 from core.serialization import json_ready
@@ -232,6 +231,8 @@ class ExperimentToolService:
             if not requests:
                 return {"status": "no_calculation"}
             ensure_default_policy(self.project_root)
+            from core.kernel import Kernel
+
             kernel = Kernel(
                 config_path=self.project_root / ".supermedicine" / "config.yaml",
                 policies_dir=self.project_root / ".supermedicine" / "policies",

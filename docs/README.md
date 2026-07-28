@@ -28,6 +28,7 @@ Use this page as the entry point for maintained documentation.
 - [Repository map](maintainers/repository-map.md)
 - [Quality gates](maintainers/quality-gates.md)
 - [CI workflows](maintainers/ci-workflows.md)
+- [Project debug and repair record](maintainers/debugging.md)
 - [Feature parity](maintainers/feature-parity.md)
 
 Formal documents are indexed by `manifest.yaml`. Adapter skill and agent

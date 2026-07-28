@@ -22,6 +22,7 @@ documents:
   - {path: docs/maintainers/maintenance-backlog.md, audience: maintainer, role: backlog}
   - {path: docs/maintainers/quality-gates.md, audience: maintainer, role: canonical-quality-gates}
   - {path: docs/maintainers/ci-workflows.md, audience: maintainer, role: canonical-ci}
+  - {path: docs/maintainers/debugging.md, audience: maintainer, role: debug-record}
   - {path: docs/maintainers/repository-map.md, audience: maintainer, role: canonical-repository-map}
   - {path: docs/maintainers/history/rebuild-0.4.2.md, audience: maintainer, role: immutable-history, frozen: true}
   - {path: docs/references/README.md, audience: user, role: reference-index}

@@ -14,7 +14,7 @@ from agents.roles import AlphaAgent
 from agents.roles import BetaAgent
 from agents.roles import GammaAgent
 from agents.roles import DeltaAgent
-from core.config_center import ConfigCenter
+from core.config_center import ConfigCenter, resolve_config_path
 from core.database import Database
 from core.database.migrations import MigrationManager
 from core.database.repository import AgentRepository
@@ -60,13 +60,8 @@ class Kernel:
         *,
         allow_ephemeral: bool = False,
     ):
-        import os
-
-        # SM_CONFIG 环境变量覆盖配置路径
         if config_path is None:
-            env_config = os.environ.get("SM_CONFIG")
-            if env_config:
-                config_path = Path(env_config)
+            config_path = resolve_config_path()
 
         self._config_path = config_path or Path(".supermedicine/config.yaml")
         self._plugins_dir = plugins_dir or Path("plugins")
