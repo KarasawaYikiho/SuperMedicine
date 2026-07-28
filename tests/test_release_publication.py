@@ -6,6 +6,7 @@ import subprocess
 import pytest
 
 from scripts.ci import publish_release, validate_release_tag
+from scripts.ci.release_version import release_names
 
 
 def test_release_toml_readers_support_python_310():
@@ -17,6 +18,14 @@ def test_release_toml_readers_support_python_310():
         source = (root / relative).read_text(encoding="utf-8")
         assert "except ModuleNotFoundError" in source
         assert "import tomli as tomllib" in source
+
+
+def test_release_names_match_historical_github_release_format():
+    assert release_names("0.5.0b0") == (
+        "Beta0.5.0",
+        "Beta 0.5.0",
+        "SuperMedicine.Beta0.5.0.zip",
+    )
 
 
 def _completed(
@@ -50,9 +59,9 @@ def test_automatic_release_uses_expected_version_and_exact_source_sha(monkeypatc
     )
 
     assert result == {
-        "release_label": "v0.5.0b0",
-        "release_title": "SuperMedicine 0.5.0b0",
-        "archive_name": "SuperMedicine v0.5.0b0.zip",
+        "release_label": "Beta0.5.0",
+        "release_title": "Beta 0.5.0",
+        "archive_name": "SuperMedicine.Beta0.5.0.zip",
         "source_sha": source_sha,
     }
     assert calls == [("git", "rev-parse", "HEAD")]
@@ -80,8 +89,8 @@ def test_publish_release_creates_or_refreshes_through_verified_draft(
     tmp_path, monkeypatch, existing
 ):
     notes = tmp_path / "release-notes.md"
-    archive = tmp_path / "SuperMedicine v0.5.0b0.zip"
-    checksum = tmp_path / "SuperMedicine v0.5.0b0.zip.sha256"
+    archive = tmp_path / "SuperMedicine.Beta0.5.0.zip"
+    checksum = tmp_path / "SuperMedicine.Beta0.5.0.zip.sha256"
     notes.write_text("notes", encoding="utf-8")
     archive.write_bytes(b"archive")
     checksum.write_text("digest", encoding="ascii")
@@ -102,8 +111,8 @@ def test_publish_release_creates_or_refreshes_through_verified_draft(
     monkeypatch.setattr(publish_release, "_gh", fake_gh)
 
     publish_release.publish(
-        "v0.5.0b0",
-        "SuperMedicine 0.5.0b0",
+        "Beta0.5.0",
+        "Beta 0.5.0",
         notes,
         archive,
         checksum,
@@ -114,4 +123,4 @@ def test_publish_release_creates_or_refreshes_through_verified_draft(
     assert calls[1][0][:2] == ("release", action)
     upload = next(args for args, _ in calls if args[:2] == ("release", "upload"))
     assert upload[-1] == "--clobber"
-    assert calls[-1][0] == ("release", "edit", "v0.5.0b0", "--draft=false")
+    assert calls[-1][0] == ("release", "edit", "Beta0.5.0", "--draft=false")

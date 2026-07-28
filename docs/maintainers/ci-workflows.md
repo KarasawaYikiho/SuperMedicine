@@ -25,8 +25,8 @@ publication logic belongs in `scripts/ci/`.
 
 All workflows default to `contents: read`, set explicit timeouts, and use
 concurrency cancellation for replaceable PR runs. The publication job alone
-receives write permission. It synchronizes the version tag to the verified
-source commit. A same-version retry returns the existing Release to draft,
+receives write permission. It synchronizes the historical `Beta{version}` tag
+to the verified source commit. A same-version retry returns the existing Release to draft,
 replaces its archive and checksum, verifies both assets, and publishes it
 again. Clean-install smoke uses an isolated target while normal dependency
 installs may use lockfile-backed caches.

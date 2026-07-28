@@ -35,6 +35,7 @@ from scripts.ci._packaging_common import (  # noqa: E402
     copy_include_dirs,
     copy_include_files,
 )
+from scripts.ci.release_version import release_names  # noqa: E402
 
 
 def main() -> None:
@@ -44,12 +45,11 @@ def main() -> None:
     version = tomllib.loads(
         (root / "pyproject.toml").read_text(encoding="utf-8")
     )["project"]["version"]
-    release_label = f"v{version}"
-    release_title = f"SuperMedicine {version}"
-    archive_name = f"SuperMedicine {release_label}.zip"
+    release_label, release_title, archive_name = release_names(version)
+    release_dir_name = f"SuperMedicine v{version}"
 
     # --- Prepare staging directory ---
-    stage = root / ".release-zip-stage" / f"SuperMedicine {release_label}"
+    stage = root / ".release-zip-stage" / release_dir_name
     if stage.parent.exists():
         shutil.rmtree(stage.parent)
     stage.mkdir(parents=True)
@@ -99,7 +99,7 @@ def main() -> None:
         # in the staging directory, but release archives must keep the
         # canonical lowercase entry alongside the legacy uppercase entry
         # for case-sensitive extraction targets.
-        lowercase_entry = f"SuperMedicine {release_label}/install.py"
+        lowercase_entry = f"{release_dir_name}/install.py"
         if lowercase_entry not in archive.namelist():
             lowercase_source = subprocess.check_output(
                 ["git", "show", ":install.py"], cwd=root, text=True

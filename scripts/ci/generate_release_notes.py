@@ -25,7 +25,7 @@ def _git(*args: str) -> str:
 def release_notes(tag: str) -> str:
     tags = [
         item
-        for item in _git("tag", "--list", "v*", "--sort=-v:refname").splitlines()
+        for item in _git("tag", "--list", "Beta*", "--sort=-v:refname").splitlines()
         if item and item != tag
     ]
     revision = f"{tags[0]}..{tag}" if tags else tag

@@ -95,7 +95,7 @@ jobs:
       - name: Self-test GUI from release archive
         shell: pwsh
         run: |
-          $archive = Get-ChildItem -LiteralPath . -Filter "SuperMedicine v*.zip" | Select-Object -First 1
+          $archive = Get-ChildItem -LiteralPath . -Filter "SuperMedicine.Beta*.zip" | Select-Object -First 1
           if (-not $archive) { throw "Release Zip was not created" }
           $extractRoot = Join-Path $env:RUNNER_TEMP "supermedicine-release"
           Expand-Archive -LiteralPath $archive.FullName -DestinationPath $extractRoot
@@ -114,7 +114,7 @@ jobs:
         id: checksum
         shell: pwsh
         run: |
-          $archive = Get-ChildItem -LiteralPath . -Filter "SuperMedicine v*.zip" | Select-Object -First 1
+          $archive = Get-ChildItem -LiteralPath . -Filter "SuperMedicine.Beta*.zip" | Select-Object -First 1
           $digest = (Get-FileHash -LiteralPath $archive.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
           "$digest  $($archive.Name)" | Set-Content -LiteralPath "$($archive.FullName).sha256" -Encoding ascii
 

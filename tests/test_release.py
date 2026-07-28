@@ -359,7 +359,7 @@ def test_ci_release_artifacts_include_standalone_installer_exe_and_shared_payloa
 
     # Release zip must expose the documented lowercase installer alias.
     assert '["git", "show", ":install.py"]' in build_release_zip
-    assert f"SuperMedicine {{release_label}}/{CANONICAL_LOWERCASE_INSTALL}" in build_release_zip
+    assert f"{{release_dir_name}}/{CANONICAL_LOWERCASE_INSTALL}" in build_release_zip
     assert "archive.writestr(lowercase_entry" in build_release_zip
 
     # No git archive HEAD
@@ -511,7 +511,7 @@ def test_release_docs_describe_ci_artifact_layout_and_install_py_roles():
 
 
 def test_version_contract_is_single_source_consistent_across_release_surfaces(read_pyproject):
-    """The immutable release tag must retain the complete PEP 440 version."""
+    """Public names follow release history while the ZIP root keeps PEP 440."""
 
     pyproject = read_pyproject
     install_manifest = json.loads(
@@ -535,8 +535,8 @@ def test_version_contract_is_single_source_consistent_across_release_surfaces(re
     assert opencode_plugin["version"] == PACKAGE_VERSION
     assert PUBLIC_VERSION in changelog
     assert PUBLIC_VERSION in readme
-    assert 'release_label = f"v{version}"' in build_release_zip
-    assert 'archive_name = f"SuperMedicine {release_label}.zip"' in build_release_zip
+    assert "release_label, release_title, archive_name = release_names(version)" in build_release_zip
+    assert 'release_dir_name = f"SuperMedicine v{version}"' in build_release_zip
 
 
 def test_release_metadata_uses_spdx_license_contract(read_pyproject):

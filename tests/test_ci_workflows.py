@@ -38,7 +38,7 @@ def test_workflow_set_has_stable_triggers_concurrency_and_timeouts() -> None:
     assert set(ci["on"]) == {"pull_request", "push", "workflow_dispatch"}
     assert "tags" not in ci["on"]["push"]
     assert set(release["on"]) == {"push", "workflow_dispatch", "workflow_run"}
-    assert release["on"]["push"]["tags"] == ["v*"]
+    assert release["on"]["push"]["tags"] == ["Beta*"]
     assert release["on"]["workflow_run"] == {
         "workflows": ["CI"],
         "types": ["completed"],

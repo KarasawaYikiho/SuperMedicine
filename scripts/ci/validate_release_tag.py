@@ -9,13 +9,16 @@ import subprocess
 import sys
 from pathlib import Path
 
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+if str(REPOSITORY_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPOSITORY_ROOT))
+
 try:
     import tomllib
 except ModuleNotFoundError:  # pragma: no cover - Python 3.10
     import tomli as tomllib  # type: ignore[import-not-found,no-redef]
 
-
-REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+from scripts.ci.release_version import release_names  # noqa: E402
 
 
 def package_version() -> str:
@@ -35,7 +38,7 @@ def _run(*command: str, check: bool = True) -> subprocess.CompletedProcess[str]:
 
 def validate(tag: str, sha: str, *, dry_run: bool, allow_non_tag: bool) -> dict[str, str]:
     version = package_version()
-    expected_tag = f"v{version}"
+    expected_tag, release_title, archive_name = release_names(version)
     effective_tag = expected_tag if allow_non_tag else tag
     if effective_tag != expected_tag:
         raise ValueError(f"release tag {effective_tag!r} must equal {expected_tag!r}")
@@ -55,8 +58,8 @@ def validate(tag: str, sha: str, *, dry_run: bool, allow_non_tag: bool) -> dict[
 
     return {
         "release_label": expected_tag,
-        "release_title": f"SuperMedicine {version}",
-        "archive_name": f"SuperMedicine {expected_tag}.zip",
+        "release_title": release_title,
+        "archive_name": archive_name,
         "source_sha": sha,
     }
 

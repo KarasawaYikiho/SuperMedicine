@@ -9,7 +9,7 @@ checks.
 ## Windows artifacts
 
 Windows packaging produces `SuperMedicine.exe`, `SuperMedicineGUI.exe`,
-`SuperMedicineInstaller.exe`, `SuperMedicine v{version}.zip`, and SHA-256
+`SuperMedicineInstaller.exe`, `SuperMedicine.Beta{version}.zip`, and SHA-256
 checksums. Each executable runs its dry-run or self-test before the archive is
 accepted. The Release ZIP keeps its established root layout and includes the
 installer package needed by the thin source entrypoints.
