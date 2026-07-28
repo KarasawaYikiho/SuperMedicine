@@ -81,6 +81,20 @@ def _write_minimal_import_stubs(workspace: Path) -> None:
 
                 def missing_fields(self):
                     return []
+
+            _PROVIDER_ENV_MAP = {
+                'openai': 'OPENAI_API_KEY',
+                'anthropic': 'ANTHROPIC_API_KEY',
+                'openrouter': 'OPENROUTER_API_KEY',
+            }
+
+            def _infer_api_format(provider):
+                normalized = provider.strip().lower()
+                return (
+                    'anthropic'
+                    if 'anthropic' in normalized or 'claude' in normalized
+                    else 'openai'
+                )
             """
         ),
         encoding="utf-8",

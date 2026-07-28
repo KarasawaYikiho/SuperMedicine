@@ -32,3 +32,4 @@ jobs:
     uses: ./.github/workflows/_reusable-windows-package.yml
     with:
       artifact-name: package-smoke-${{ github.sha }}
+      source-sha: ${{ github.sha }}

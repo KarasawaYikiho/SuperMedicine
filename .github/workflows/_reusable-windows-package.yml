@@ -6,6 +6,10 @@ on:
       artifact-name:
         required: true
         type: string
+      source-sha:
+        required: false
+        type: string
+        default: ""
     outputs:
       release_label:
         value: ${{ jobs.packaging-smoke.outputs.release_label }}
@@ -27,6 +31,8 @@ jobs:
       archive_name: ${{ steps.source_zip.outputs.archive_name }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source-sha || github.sha }}
 
       - name: Set up Python
         uses: actions/setup-python@v6

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate release tag, commit identity, and no-overwrite policy."""
+"""Validate release version and source commit identity."""
 
 from __future__ import annotations
 
@@ -32,28 +32,28 @@ def _run(*command: str, check: bool = True) -> subprocess.CompletedProcess[str]:
 def validate(tag: str, sha: str, *, dry_run: bool, allow_non_tag: bool) -> dict[str, str]:
     version = package_version()
     expected_tag = f"v{version}"
-    effective_tag = expected_tag if allow_non_tag and dry_run else tag
+    effective_tag = expected_tag if allow_non_tag else tag
     if effective_tag != expected_tag:
         raise ValueError(f"release tag {effective_tag!r} must equal {expected_tag!r}")
 
-    if not (allow_non_tag and dry_run):
+    source_commit = _run("git", "rev-parse", "HEAD").stdout.strip()
+    if source_commit != sha:
+        raise ValueError(
+            f"checked-out commit {source_commit!r} does not match source commit {sha!r}"
+        )
+
+    if not allow_non_tag:
         tag_commit = _run("git", "rev-list", "-n", "1", effective_tag).stdout.strip()
         if tag_commit != sha:
             raise ValueError(
                 f"tag commit {tag_commit!r} does not match build commit {sha!r}"
             )
 
-    if not dry_run:
-        existing = _run("gh", "release", "view", effective_tag, check=False)
-        if existing.returncode == 0:
-            raise ValueError(
-                f"release {effective_tag!r} already exists; refusing to overwrite"
-            )
-
     return {
         "release_label": expected_tag,
         "release_title": f"SuperMedicine {version}",
         "archive_name": f"SuperMedicine {expected_tag}.zip",
+        "source_sha": sha,
     }
 
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Publish verified assets through a draft GitHub Release."""
+"""Create or safely refresh a verified GitHub Release."""
 
 from __future__ import annotations
 
@@ -34,20 +34,30 @@ def publish(
     if dry_run:
         print(f"dry-run: would publish {tag} with {archive.name} and {checksum.name}")
         return
-    if _gh("release", "view", tag, check=False).returncode == 0:
-        raise ValueError(f"release {tag!r} already exists; refusing to overwrite")
-
-    _gh(
-        "release",
-        "create",
-        tag,
-        "--draft",
-        "--title",
-        title,
-        "--notes-file",
-        str(notes),
-    )
-    _gh("release", "upload", tag, str(archive), str(checksum))
+    existing = _gh("release", "view", tag, check=False).returncode == 0
+    if existing:
+        _gh(
+            "release",
+            "edit",
+            tag,
+            "--draft",
+            "--title",
+            title,
+            "--notes-file",
+            str(notes),
+        )
+    else:
+        _gh(
+            "release",
+            "create",
+            tag,
+            "--draft",
+            "--title",
+            title,
+            "--notes-file",
+            str(notes),
+        )
+    _gh("release", "upload", tag, str(archive), str(checksum), "--clobber")
     view = json.loads(_gh("release", "view", tag, "--json", "isDraft,assets").stdout)
     asset_names = {asset["name"] for asset in view.get("assets", [])}
     if not view.get("isDraft") or {archive.name, checksum.name} - asset_names:

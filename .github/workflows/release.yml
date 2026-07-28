@@ -1,6 +1,10 @@
 name: Release
 
 on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [master]
   push:
     tags: ["v*"]
   workflow_dispatch:
@@ -14,21 +18,28 @@ permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.repository }}
   cancel-in-progress: false
 
 jobs:
   validate-tag:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
       release_label: ${{ steps.validate.outputs.release_label }}
       release_title: ${{ steps.validate.outputs.release_title }}
       archive_name: ${{ steps.validate.outputs.archive_name }}
+      source_sha: ${{ steps.validate.outputs.source_sha }}
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
@@ -41,9 +52,9 @@ jobs:
           $arguments = @(
             "scripts/ci/validate_release_tag.py",
             "--tag", "${{ github.ref_name }}",
-            "--sha", "${{ github.sha }}"
+            "--sha", "${{ github.event.workflow_run.head_sha || github.sha }}"
           )
-          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+          if ("${{ github.event_name }}" -eq "workflow_dispatch" -or "${{ github.event_name }}" -eq "workflow_run") {
             $arguments += "--allow-non-tag"
           }
           if ("${{ github.event_name }}" -eq "workflow_dispatch" -and "${{ inputs.dry_run }}" -eq "true") {
@@ -57,6 +68,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.validate-tag.outputs.source_sha }}
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
@@ -74,6 +87,7 @@ jobs:
     uses: ./.github/workflows/_reusable-windows-package.yml
     with:
       artifact-name: release-${{ needs.validate-tag.outputs.release_label }}
+      source-sha: ${{ needs.validate-tag.outputs.source_sha }}
 
   verify-artifacts:
     needs: [validate-tag, build-windows-artifacts]
@@ -81,6 +95,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.validate-tag.outputs.source_sha }}
       - uses: actions/download-artifact@v7
         with:
           name: release-${{ needs.validate-tag.outputs.release_label }}
@@ -108,11 +124,10 @@ jobs:
           echo "No Release was created because dry_run=true."
 
   publish-release:
-    if: github.event_name == 'push' || !inputs.dry_run
+    if: github.event_name == 'push' || github.event_name == 'workflow_run' || !inputs.dry_run
     needs: [validate-tag, verify-artifacts]
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment: release
     permissions:
       contents: write
     env:
@@ -121,10 +136,16 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          ref: ${{ needs.validate-tag.outputs.source_sha }}
       - uses: actions/download-artifact@v7
         with:
           name: release-${{ needs.validate-tag.outputs.release_label }}
           path: release-artifacts
+      - name: Synchronize version tag to verified source
+        shell: pwsh
+        run: |
+          git tag --force "${{ needs.validate-tag.outputs.release_label }}" "${{ needs.validate-tag.outputs.source_sha }}"
+          git push origin "refs/tags/${{ needs.validate-tag.outputs.release_label }}" --force
       - name: Generate release notes
         run: |
           python scripts/ci/generate_release_notes.py \

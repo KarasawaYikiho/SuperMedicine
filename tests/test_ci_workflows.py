@@ -37,8 +37,13 @@ def test_workflow_set_has_stable_triggers_concurrency_and_timeouts() -> None:
     release = load_workflow("release.yml")
     assert set(ci["on"]) == {"pull_request", "push", "workflow_dispatch"}
     assert "tags" not in ci["on"]["push"]
-    assert set(release["on"]) == {"push", "workflow_dispatch"}
+    assert set(release["on"]) == {"push", "workflow_dispatch", "workflow_run"}
     assert release["on"]["push"]["tags"] == ["v*"]
+    assert release["on"]["workflow_run"] == {
+        "workflows": ["CI"],
+        "types": ["completed"],
+        "branches": ["master"],
+    }
 
     for name in ("ci.yml", "nightly.yml", "opentui.yml", "package-smoke.yml", "release.yml"):
         assert "concurrency" in load_workflow(name)
@@ -70,7 +75,7 @@ def test_workflow_set_preserves_runtime_and_packaging_commands() -> None:
         assert command in source
 
 
-def test_publication_consumes_packaged_artifacts_and_refuses_overwrite() -> None:
+def test_publication_consumes_packaged_artifacts_and_refreshes_same_version() -> None:
     source = combined_workflow_source()
     assert "actions/download-artifact" in source
     assert "scripts/ci/validate_release_tag.py" in source
@@ -83,12 +88,32 @@ def test_publication_consumes_packaged_artifacts_and_refuses_overwrite() -> None
     publisher = (
         REPOSITORY_ROOT / "scripts" / "ci" / "publish_release.py"
     ).read_text(encoding="utf-8")
-    assert '"gh", "release", "view"' in validator
+    assert '"git", "rev-parse", "HEAD"' in validator
+    assert "refusing to overwrite" not in validator
     assert '"release", "view"' in publisher
-    assert '"release",\n        "create"' in publisher
+    assert '"create",' in publisher
     assert '"release", "upload"' in publisher
+    assert "--clobber" in publisher
     assert "--draft" in publisher
     assert '"release", "edit"' in publisher
+    assert "refusing to overwrite" not in publisher
+    assert "git tag --force" in source
+    assert "git push origin" in source
+
+
+def test_release_builds_the_exact_successful_ci_source_commit() -> None:
+    source = workflow_sources()["release.yml"]
+    reusable = load_workflow("_reusable-windows-package.yml")
+
+    assert "github.event.workflow_run.head_sha || github.sha" in source
+    assert "github.event.workflow_run.conclusion == 'success'" in source
+    assert "github.event.workflow_run.event == 'push'" in source
+    assert "github.event.workflow_run.head_repository.full_name == github.repository" in source
+    assert reusable["on"]["workflow_call"]["inputs"]["source-sha"]["default"] == ""
+    assert (
+        reusable["jobs"]["packaging-smoke"]["steps"][0]["with"]["ref"]
+        == "${{ inputs.source-sha || github.sha }}"
+    )
 
 
 def test_release_jobs_form_a_validate_build_verify_publish_chain() -> None:
