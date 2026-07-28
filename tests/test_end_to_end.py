@@ -328,6 +328,9 @@ class TestIntegration:
     def test_cli_diagnose_returns_actionable_secret_safe_config_llm_and_audit_snapshot(
         self, tmp_path, monkeypatch
     ):
+        monkeypatch.setenv(
+            "SM_CONFIG", str(tmp_path / ".supermedicine" / "config.yaml")
+        )
         secret = "sk-cli-diagnose-secret"
         env_secret = "cli-diagnose-env-api-key-value-not-real"
         init_config(
@@ -376,6 +379,9 @@ class TestIntegration:
     def test_cli_diagnose_reports_unconfigured_llm_template_as_actionable_failure(
         self, tmp_path, monkeypatch
     ):
+        monkeypatch.setenv(
+            "SM_CONFIG", str(tmp_path / ".supermedicine" / "config.yaml")
+        )
         secret = "sk-unconfigured-diagnose-secret"
         config_dir = tmp_path / ".supermedicine"
         config_dir.mkdir()

@@ -14,6 +14,7 @@ from typing import Mapping, cast
 class RuntimePaths:
     project_root: Path
     data_root: Path
+    config_path: Path
     resource_root: Path
     executable_root: Path
 
@@ -50,18 +51,25 @@ class RuntimePaths:
         )
 
         record = Path(install_record) if install_record else executable_root / ".supermedicine" / "install-record.json"
-        config = Path(config_path) if config_path else executable_root / ".supermedicine" / "config.yaml"
+        config_override = config_path or env.get("SM_CONFIG")
+        discovery_config = (
+            Path(config_override)
+            if config_override
+            else executable_root / ".supermedicine" / "config.yaml"
+        )
         selected = (
             project_root
             or env.get("SM_PROJECT_ROOT")
             or _project_from_record(record)
-            or _project_from_config(config)
+            or _project_from_config(discovery_config)
             or _default_project_root(is_frozen, platform or sys.platform, env, source)
         )
         project = _absolute(cast(str | Path, selected))
+        config = _absolute(config_override) if config_override else project / ".supermedicine" / "config.yaml"
         return cls(
             project_root=project,
-            data_root=project / ".supermedicine",
+            data_root=config.parent,
+            config_path=config,
             resource_root=resource_root,
             executable_root=executable_root,
         )

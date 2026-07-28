@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -9,6 +10,12 @@ import yaml
 
 from cli_entry import CLI, main
 from core.paper_import import PaperImporter
+from core.paper_import.online import (
+    MAX_RESPONSE_BYTES,
+    OnlinePaper,
+    OnlinePaperClient,
+    OnlinePaperError,
+)
 from core.paper_import.enrichment import PaperEnricher
 from core.paper_import.contracts import (
     MissingPaperSourceError,
@@ -20,6 +27,7 @@ from permission.audit import AuditLogger
 from permission.engine import PermissionEngine
 from plugins.rag.providers import LocalRAGProvider
 from core.services.rag import RAGService
+from core.services.research import PaperRAGService
 from tests import KernelDouble, copy_default_policy as _copy_default_policy
 
 
@@ -747,3 +755,189 @@ def test_import_preserves_copied_paper_and_reports_retryable_index_failure(
     assert result.status == "imported_with_index_error"
     assert result.metadata.stored_path.is_file()
     assert result.warnings == ["rag_index_failed: retry paper indexing"]
+
+
+def test_online_crossref_search_normalizes_results_without_optional_dependencies():
+    def get_json(url: str) -> dict:
+        assert "api.crossref.org/works?" in url
+        return {
+            "message": {
+                "items": [
+                    {
+                        "DOI": "10.1000/example",
+                        "title": ["Evidence review"],
+                        "author": [{"given": "Ada", "family": "Lovelace"}],
+                        "container-title": ["Medical Journal"],
+                        "published-online": {"date-parts": [[2026, 7, 1]]},
+                        "URL": "https://doi.org/10.1000/example",
+                    }
+                ]
+            }
+        }
+
+    results = OnlinePaperClient(json_getter=get_json).search(
+        "evidence review", source="crossref"
+    )
+
+    assert [item.external_id for item in results] == ["10.1000/example"]
+    assert results[0].authors == ("Ada Lovelace",)
+    assert results[0].published == "2026-7-1"
+
+
+def test_online_pubmed_search_and_fetch_are_normalized():
+    def get_json(url: str) -> dict:
+        if "esearch.fcgi" in url:
+            return {"esearchresult": {"idlist": ["123", "not-an-id", "456"]}}
+        assert "esummary.fcgi" in url
+        return {
+            "result": {
+                "123": {
+                    "title": "Evidence A",
+                    "authors": [{"name": "Author One"}],
+                    "articleids": [{"idtype": "doi", "value": "10.1000/a"}],
+                    "source": "Journal A",
+                    "pubdate": "2026",
+                },
+                "456": {"title": "Evidence B"},
+            }
+        }
+
+    xml = """
+    <PubmedArticleSet><PubmedArticle><MedlineCitation><Article>
+      <ArticleTitle>Evidence A</ArticleTitle>
+      <Abstract><AbstractText>Bounded abstract.</AbstractText></Abstract>
+      <AuthorList><Author><ForeName>Author</ForeName><LastName>One</LastName></Author></AuthorList>
+      <Journal><Title>Journal A</Title></Journal>
+    </Article></MedlineCitation><PubmedData><ArticleIdList>
+      <ArticleId IdType="doi">10.1000/a</ArticleId>
+    </ArticleIdList></PubmedData></PubmedArticle></PubmedArticleSet>
+    """
+    client = OnlinePaperClient(json_getter=get_json, text_getter=lambda _url: xml)
+
+    results = client.search("evidence", source="pubmed", limit=2)
+    fetched = client.get("pubmed", "123")
+
+    assert [record.external_id for record in results] == ["123", "456"]
+    assert results[0].doi == "10.1000/a"
+    assert fetched.abstract == "Bounded abstract."
+    assert fetched.authors == ("Author One",)
+
+
+@pytest.mark.parametrize(
+    ("operation", "message"),
+    [
+        (lambda client: client.search("", source="pubmed"), "query"),
+        (lambda client: client.search("x", source="unknown"), "source"),
+        (lambda client: client.search("x", limit=0), "limit"),
+        (lambda client: client.get("pubmed", "not-numeric"), "PMID"),
+        (lambda client: client.get("crossref", "not-a-doi"), "DOI"),
+    ],
+)
+def test_online_paper_inputs_are_bounded(operation, message):
+    with pytest.raises(ValueError, match=message):
+        operation(OnlinePaperClient())
+
+
+def test_online_paper_rejects_invalid_json_xml_and_oversized_response(monkeypatch):
+    import core.paper_import.online as online
+
+    with pytest.raises(OnlinePaperError):
+        OnlinePaperClient(json_getter=lambda _url: {"message": []}).get(
+            "crossref", "10.1000/example"
+        )
+    with pytest.raises(OnlinePaperError):
+        OnlinePaperClient(text_getter=lambda _url: "<broken").get("pubmed", "123")
+
+    class Response:
+        headers = {"Content-Length": str(MAX_RESPONSE_BYTES + 1)}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def read(self, _amount):
+            return b""
+
+    captured = {}
+
+    def urlopen(request, timeout):
+        captured["user_agent"] = request.get_header("User-agent")
+        captured["timeout"] = timeout
+        return Response()
+
+    monkeypatch.setattr(online.urllib.request, "urlopen", urlopen)
+    with pytest.raises(OnlinePaperError, match="size limit"):
+        online._default_text_getter("https://example.invalid")
+    assert captured["user_agent"].startswith("SuperMedicine/")
+    assert captured["timeout"] == 20
+
+
+def test_online_paper_import_creates_workspace_record_and_rag_chunks(tmp_path):
+    class StubOnlineClient(OnlinePaperClient):
+        def get(self, source: str, external_id: str) -> OnlinePaper:
+            assert (source, external_id) == ("pubmed", "12345678")
+            return OnlinePaper(
+                source="pubmed",
+                external_id=external_id,
+                title="Hypertension evidence",
+                authors=("Researcher One",),
+                abstract="ACE inhibitor evidence for hypertension.",
+                pmid=external_id,
+                url=f"https://pubmed.ncbi.nlm.nih.gov/{external_id}/",
+            )
+
+    workspace = WorkspaceManager(tmp_path).initialize_workspace("online-paper")
+    service = PaperRAGService(tmp_path, online_client=StubOnlineClient())
+
+    result = service.import_online(workspace.id, "pubmed", "12345678")
+
+    assert result.ok is True
+    assert result.data["online_source"]["pmid"] == "12345678"
+    assert service.list_papers(workspace.id).data[0]["title"] == "Hypertension evidence"
+    items = LocalRAGProvider(
+        workspace.path / ".supermedicine" / "rag" / "local"
+    ).query("ACE inhibitor")["items"]
+    assert items[0]["document_id"] == result.data["metadata"]["id"]
+
+
+def test_online_import_cache_uses_hash_and_cleans_failed_import(tmp_path, monkeypatch):
+    class StubOnlineClient(OnlinePaperClient):
+        def __init__(self, external_id: str):
+            self.external_id = external_id
+
+        def get(self, source: str, external_id: str) -> OnlinePaper:
+            return OnlinePaper(
+                source=source,
+                external_id=self.external_id,
+                title="Evidence",
+            )
+
+    workspace = WorkspaceManager(tmp_path).initialize_workspace("cache-test")
+    first = PaperRAGService(
+        tmp_path, online_client=StubOnlineClient("10.1000/a:b")
+    )
+    second = PaperRAGService(
+        tmp_path, online_client=StubOnlineClient("10.1000/a?b")
+    )
+
+    assert first.import_online(workspace.id, "crossref", "10.1000/a:b").ok
+    assert second.import_online(workspace.id, "crossref", "10.1000/a?b").ok
+
+    config_cache = Path(os.environ["SM_CONFIG"]).parent / "paper-import-cache"
+    assert len(list(config_cache.glob("crossref-*.md"))) == 2
+
+    failing = PaperRAGService(
+        tmp_path, online_client=StubOnlineClient("10.1000/failure")
+    )
+    monkeypatch.setattr(
+        failing.importer,
+        "import_file",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("import failed")),
+    )
+    assert failing.import_online(
+        workspace.id, "crossref", "10.1000/failure"
+    ).ok is False
+    assert not list(config_cache.glob("*.tmp"))
+    assert len(list(config_cache.glob("crossref-*.md"))) == 2

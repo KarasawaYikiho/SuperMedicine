@@ -45,11 +45,21 @@ class RAGService:
         config: ConfigCenter,
         config_path: Path,
         *,
+        project_root: str | Path | None = None,
         permission_engine: PermissionEngine | None = None,
         agent_id: str = "alpha",
     ) -> None:
         self._config = config
         self._config_path = Path(config_path)
+        self._project_root = (
+            Path(project_root).resolve()
+            if project_root is not None
+            else (
+                self._config_path.parent.parent.resolve()
+                if self._config_path.parent.name == ".supermedicine"
+                else self._config_path.parent.resolve()
+            )
+        )
         self._permission_engine = permission_engine
         self._agent_id = agent_id
         self._default_storage_dir = self._storage_dir()
@@ -72,14 +82,11 @@ class RAGService:
             ) from exc
 
     def _storage_dir(self, workspace_path: Path | None = None) -> Path:
-        project_root = (
-            self._config_path.parent.parent
-            if self._config_path.parent.name == ".supermedicine"
-            else self._config_path.parent
+        if workspace_path is None:
+            return self._config_path.parent / "rag" / "local"
+        storage_root = validate_path_in_project_root(
+            Path(workspace_path), self._project_root
         )
-        storage_root = project_root
-        if workspace_path is not None:
-            storage_root = validate_path_in_project_root(Path(workspace_path), project_root)
         return storage_root / ".supermedicine" / "rag" / "local"
 
     @staticmethod

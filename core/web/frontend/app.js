@@ -21,25 +21,14 @@
     const drawerOverlay = document.getElementById("drawer-overlay");
     const drawerCloseBtn = document.getElementById("drawer-close-btn");
     const chatWsSelect = document.getElementById("chat-ws-select");
+    const chatAgentMode = document.getElementById("chat-agent-mode");
     const webAuthTokenInput = document.getElementById("web-auth-token");
     const webAuthSave = document.getElementById("web-auth-save");
+    let thinkingMessage = null;
+    let assistantStreamMessage = null;
 
     function installDocumentationShell() {
         document.documentElement.classList.add("docs-shell");
-
-        const notice = document.createElement("div");
-        notice.className = "product-notice";
-        notice.textContent = "本地优先 · 医学研究数据由你掌控";
-        document.body.prepend(notice);
-
-        const brand = document.querySelector("header h1");
-        if (brand) {
-            brand.textContent = "SuperMedicine";
-            const subtitle = document.createElement("span");
-            subtitle.className = "brand-subtitle";
-            subtitle.textContent = "医学研究工作台";
-            brand.after(subtitle);
-        }
 
         const drawerHeader = document.querySelector(".drawer-header");
         if (drawerHeader) {
@@ -58,31 +47,6 @@
             });
         }
 
-        document.querySelectorAll(".tab-content").forEach(function (section) {
-            const title = section.querySelector(":scope > h2");
-            if (!title) return;
-            const eyebrow = document.createElement("div");
-            eyebrow.className = "section-eyebrow";
-            eyebrow.textContent = "SUPERMEDICINE / " + title.textContent.trim();
-            title.before(eyebrow);
-        });
-
-        const dashboard = document.getElementById("tab-dashboard");
-        if (dashboard) {
-            const hero = document.createElement("div");
-            hero.className = "dashboard-hero";
-            hero.innerHTML =
-                '<div><span class="hero-kicker">研究从这里开始</span>' +
-                '<h3>把论文、经验、实验与模型放进同一条可信工作流</h3>' +
-                '<p>所有界面共用同一服务层；Web、TUI 与 CLI 的结果保持一致，错误信息经过脱敏后再展示。</p></div>' +
-                '<button type="button" class="btn btn-primary" data-open-tab="chat">开始对话</button>';
-            const status = document.getElementById("project-status");
-            dashboard.insertBefore(hero, status);
-            hero.querySelector("[data-open-tab]").addEventListener("click", function () {
-                const button = document.querySelector('.tab-btn[data-tab="chat"]');
-                if (button) button.click();
-            });
-        }
     }
 
     // ---- 状态 -------------------------------------------------------------
@@ -92,6 +56,7 @@
     const RECONNECT_DELAY = 3000;
     let currentWorkspaceId = null;
     let chatProcessing = false;
+    let latestDiagnostics = {};
     let webAuthToken = sessionStorage.getItem("supermedicine.webAuthToken") || "";
 
     // ---- 辅助函数 ---------------------------------------------------------
@@ -132,9 +97,19 @@
         const title = document.createElement("h3");
         title.id = "app-dialog-title";
         title.textContent = options.title || "SuperMedicine";
-        const body = document.createElement(options.preformatted ? "pre" : "p");
+        const body = document.createElement(
+            options.inputValue !== undefined
+                ? (options.multiline ? "textarea" : "input")
+                : (options.preformatted ? "pre" : "p")
+        );
         body.className = "app-dialog-body";
-        body.textContent = options.message || "";
+        if (options.inputValue !== undefined) {
+            body.value = options.inputValue || "";
+            if (options.multiline) body.rows = options.rows || 6;
+            body.setAttribute("aria-label", options.inputLabel || options.title || "输入");
+        } else {
+            body.textContent = options.message || "";
+        }
         const actions = document.createElement("div");
         actions.className = "app-dialog-actions";
         const cancel = document.createElement("button");
@@ -145,7 +120,8 @@
         accept.type = "button";
         accept.className = options.danger ? "btn btn-danger" : "btn btn-primary";
         accept.textContent = options.acceptLabel || "确定";
-        actions.append(cancel, accept);
+        if (options.showCancel !== false) actions.appendChild(cancel);
+        actions.appendChild(accept);
         panel.append(title, body, actions);
         dialog.appendChild(panel);
         document.body.appendChild(dialog);
@@ -156,8 +132,12 @@
                 dialog.remove();
                 resolve(value);
             }
-            cancel.addEventListener("click", function () { finish(false); });
-            accept.addEventListener("click", function () { finish(true); });
+            if (options.showCancel !== false) {
+                cancel.addEventListener("click", function () { finish(false); });
+            }
+            accept.addEventListener("click", function () {
+                finish(options.inputValue !== undefined ? body.value : true);
+            });
             dialog.addEventListener("cancel", function (event) {
                 event.preventDefault();
                 finish(false);
@@ -166,7 +146,24 @@
                 if (event.target === dialog) finish(false);
             });
             dialog.showModal();
-            (options.focusCancel ? cancel : accept).focus();
+            (
+                options.inputValue !== undefined
+                    ? body
+                    : (options.focusCancel && options.showCancel !== false ? cancel : accept)
+            ).focus();
+        });
+    }
+
+    function requestTextInput(title, value, options) {
+        options = options || {};
+        return openAppDialog({
+            title: title,
+            inputValue: value == null ? "" : String(value),
+            inputLabel: options.label || title,
+            multiline: Boolean(options.multiline),
+            rows: options.rows,
+            acceptLabel: options.acceptLabel || "保存",
+            cancelLabel: "取消"
         });
     }
 
@@ -194,7 +191,8 @@
             message: "说明",
             tags: "标签",
             current_provider: "当前提供方",
-            selected_protocol: "当前实验协议"
+            selected_protocol: "当前实验协议",
+            available_protocol_count: "可用方案"
         };
         const blockedKey = /(token|secret|password|api.?key|trace|stack|path|directory|command|headers?)/i;
         function lines(value, prefix, depth) {
@@ -219,12 +217,12 @@
             title: title,
             message: message,
             preformatted: true,
-            cancelLabel: "关闭",
-            acceptLabel: "关闭"
+            acceptLabel: "关闭",
+            showCancel: false
         });
     }
 
-    function addMessage(role, content, extraClass) {
+    function addMessage(role, content, extraClass, displayRole) {
         const div = document.createElement("div");
         let cls = "message " + role;
         if (extraClass) cls += " " + extraClass;
@@ -238,16 +236,40 @@
             progress: "处理进度",
             system: "系统提示"
         };
-        roleLabel.textContent = roleLabels[role] || "系统提示";
+        roleLabel.textContent = displayRole || roleLabels[role] || "系统提示";
         div.appendChild(roleLabel);
 
         const body = document.createElement("div");
+        body.className = "message-body";
         body.textContent = content;
         div.appendChild(body);
 
         messagesEl.appendChild(div);
         messagesEl.scrollTop = messagesEl.scrollHeight;
         return div;
+    }
+
+    function appendStreamingMessage(kind, content, agent) {
+        if (!content) return;
+        var label = agent ? "Agent · " + agent : "SuperMedicine";
+        var target;
+        if (kind === "thinking_content") {
+            if (!thinkingMessage) {
+                thinkingMessage = addMessage(
+                    "progress", "", "thinking", "思考过程 · " + (agent || "Agent")
+                );
+            }
+            target = thinkingMessage;
+        } else {
+            if (!assistantStreamMessage) {
+                assistantStreamMessage = addMessage(
+                    "assistant", "", "streaming", label
+                );
+            }
+            target = assistantStreamMessage;
+        }
+        target.querySelector(".message-body").textContent += content;
+        messagesEl.scrollTop = messagesEl.scrollHeight;
     }
 
     function setConnected(connected) {
@@ -260,6 +282,7 @@
         if (chatInput) chatInput.disabled = chatProcessing;
         if (sendBtn) sendBtn.disabled = chatProcessing;
         if (chatWsSelect) chatWsSelect.disabled = chatProcessing;
+        if (chatAgentMode) chatAgentMode.disabled = chatProcessing;
     }
 
     function selectedChatWorkspace() {
@@ -657,10 +680,88 @@
             var wsId = document.getElementById("paper-ws-select").value;
             if (wsId) loadPapers(wsId);
         });
+        document.getElementById("btn-search-papers").addEventListener("click", function () {
+            document.getElementById("paper-search-form").classList.toggle("hidden");
+        });
+        document.getElementById("btn-close-paper-search").addEventListener("click", function () {
+            document.getElementById("paper-search-form").classList.add("hidden");
+        });
+        document.getElementById("btn-run-paper-search").addEventListener(
+            "click", searchPapersOnline
+        );
         document.getElementById("paper-ws-select").addEventListener("change", function () {
             handleWorkspaceSelection(this.value);
             if (this.value) loadPapers(this.value);
         });
+    }
+
+    async function searchPapersOnline() {
+        var workspaceId = document.getElementById("paper-ws-select").value;
+        var query = document.getElementById("paper-search-query").value.trim();
+        var source = document.getElementById("paper-search-source").value;
+        var container = document.getElementById("paper-search-results");
+        if (!workspaceId) {
+            showToast("请先选择工作区", "warning");
+            return;
+        }
+        if (!query) {
+            showToast("请输入论文检索词", "warning");
+            return;
+        }
+        container.textContent = "正在检索…";
+        try {
+            var data = await apiCall(
+                "GET",
+                "/api/v1/papers/search?q=" + encodeURIComponent(query) +
+                "&source=" + encodeURIComponent(source) + "&limit=20"
+            );
+            renderOnlinePaperResults(Array.isArray(data) ? data : []);
+        } catch (error) {
+            container.textContent = "";
+            showToast("互联网论文检索失败：" + error.message, "error");
+        }
+    }
+
+    function renderOnlinePaperResults(records) {
+        var container = document.getElementById("paper-search-results");
+        if (!records.length) {
+            container.innerHTML = '<p class="empty-state">没有找到匹配论文</p>';
+            return;
+        }
+        container.innerHTML = records.map(function (record) {
+            var details = [
+                record.journal,
+                record.published,
+                record.doi || record.pmid
+            ].filter(Boolean).join(" · ");
+            return '<article class="search-result-card">' +
+                '<div class="search-result-main"><strong>' +
+                escapeHtml(record.title || "未命名论文") + '</strong>' +
+                '<div class="text-muted">' +
+                escapeHtml((record.authors || []).join(", ") || "作者未知") +
+                '</div><div class="text-dim">' + escapeHtml(details) +
+                '</div></div><button class="btn btn-primary btn-sm" ' +
+                'data-action="import-online-paper" data-source="' +
+                escapeAttribute(record.source) + '" data-id="' +
+                escapeAttribute(record.external_id) + '">导入</button></article>';
+        }).join("");
+    }
+
+    async function importOnlinePaper(source, externalId) {
+        var workspaceId = document.getElementById("paper-ws-select").value;
+        if (!workspaceId) return;
+        try {
+            await apiCall(
+                "POST",
+                "/api/v1/workspaces/" + encodeURIComponent(workspaceId) +
+                "/papers/import-online",
+                { source: source, external_id: externalId }
+            );
+            showToast("论文已从互联网导入并加入本地检索", "success");
+            await loadPapers(workspaceId);
+        } catch (error) {
+            showToast("导入在线论文失败：" + error.message, "error");
+        }
     }
 
     async function loadPapers(wsId) {
@@ -684,9 +785,55 @@
                 "<td>" + escapeHtml(p.title || p.metadata?.title || "-") + "</td>" +
                 "<td>" + escapeHtml(p.authors || p.metadata?.authors || "-") + "</td>" +
                 "<td><span class=\"status-badge " + (p.enriched ? "success" : "info") + "\">" + (p.enriched ? "已充实" : "已导入") + "</span></td>" +
-                "<td><button class=\"btn btn-secondary btn-sm\" data-action=\"enrich-paper\" data-workspace=\"" + escapeAttribute(currentWorkspaceId || "") + "\" data-id=\"" + escapeAttribute(p.id || "") + "\">充实</button></td>" +
+                "<td>" +
+                "<button class=\"btn btn-secondary btn-sm\" data-action=\"view-paper\" data-workspace=\"" + escapeAttribute(currentWorkspaceId || "") + "\" data-id=\"" + escapeAttribute(p.id || "") + "\">查看</button> " +
+                "<button class=\"btn btn-secondary btn-sm\" data-action=\"edit-paper\" data-workspace=\"" + escapeAttribute(currentWorkspaceId || "") + "\" data-id=\"" + escapeAttribute(p.id || "") + "\">编辑</button> " +
+                "<button class=\"btn btn-secondary btn-sm\" data-action=\"enrich-paper\" data-workspace=\"" + escapeAttribute(currentWorkspaceId || "") + "\" data-id=\"" + escapeAttribute(p.id || "") + "\">充实</button> " +
+                "<button class=\"btn btn-danger btn-sm\" data-action=\"delete-paper\" data-workspace=\"" + escapeAttribute(currentWorkspaceId || "") + "\" data-id=\"" + escapeAttribute(p.id || "") + "\">删除</button>" +
+                "</td>" +
                 "</tr>";
         }).join("");
+    }
+
+    async function viewPaper(wsId, paperId) {
+        try {
+            const paper = await apiCall("GET", "/api/v1/workspaces/" + encodeURIComponent(wsId) + "/papers/" + encodeURIComponent(paperId));
+            await showJsonDetails("论文详情", paper);
+        } catch (error) {
+            showToast("读取论文失败：" + error.message, "error");
+        }
+    }
+
+    async function editPaper(wsId, paperId) {
+        try {
+            const paper = await apiCall("GET", "/api/v1/workspaces/" + encodeURIComponent(wsId) + "/papers/" + encodeURIComponent(paperId));
+            const title = await requestTextInput("编辑论文标题", paper.title || "");
+            if (title === false || title === null) return;
+            await apiCall(
+                "PATCH",
+                "/api/v1/workspaces/" + encodeURIComponent(wsId) + "/papers/" + encodeURIComponent(paperId),
+                { metadata: { title: String(title).trim() } }
+            );
+            showToast("论文已更新", "success");
+            await loadPapers(wsId);
+        } catch (error) {
+            showToast("更新论文失败：" + error.message, "error");
+        }
+    }
+
+    async function deletePaper(wsId, paperId) {
+        if (!await requestConfirmation("删除该论文？", "删除论文")) return;
+        try {
+            await apiCall(
+                "DELETE",
+                "/api/v1/workspaces/" + encodeURIComponent(wsId) + "/papers/" + encodeURIComponent(paperId),
+                { confirm: paperId }
+            );
+            showToast("论文已删除", "success");
+            await loadPapers(wsId);
+        } catch (error) {
+            showToast("删除论文失败：" + error.message, "error");
+        }
     }
 
     async function enrichPaper(wsId, paperId) {
@@ -772,9 +919,43 @@
                 "<td>" + escapeHtml(e.title || "-") + "</td>" +
                 "<td>" + escapeHtml(localizeStatus(e.scope || "-")) + "</td>" +
                 "<td>" + escapeHtml(tags) + "</td>" +
-                "<td><button class=\"btn btn-danger btn-sm\" data-action=\"delete-experience\" data-workspace=\"" + escapeAttribute(currentWorkspaceId || "") + "\" data-id=\"" + escapeAttribute(e.id || "") + "\" data-scope=\"" + escapeAttribute(e.scope || "") + "\">删除</button></td>" +
+                "<td>" +
+                "<button class=\"btn btn-secondary btn-sm\" data-action=\"view-experience\" data-workspace=\"" + escapeAttribute(currentWorkspaceId || "") + "\" data-id=\"" + escapeAttribute(e.id || "") + "\">查看</button> " +
+                "<button class=\"btn btn-secondary btn-sm\" data-action=\"edit-experience\" data-workspace=\"" + escapeAttribute(currentWorkspaceId || "") + "\" data-id=\"" + escapeAttribute(e.id || "") + "\" data-scope=\"" + escapeAttribute(e.scope || "") + "\">编辑</button> " +
+                "<button class=\"btn btn-danger btn-sm\" data-action=\"delete-experience\" data-workspace=\"" + escapeAttribute(currentWorkspaceId || "") + "\" data-id=\"" + escapeAttribute(e.id || "") + "\" data-scope=\"" + escapeAttribute(e.scope || "") + "\">删除</button>" +
+                "</td>" +
                 "</tr>";
         }).join("");
+    }
+
+    async function viewExperience(wsId, experienceId) {
+        try {
+            const item = await apiCall("GET", "/api/v1/workspaces/" + encodeURIComponent(wsId) + "/experiences/" + encodeURIComponent(experienceId));
+            await showJsonDetails("经验详情", item);
+        } catch (error) {
+            showToast("读取经验失败：" + error.message, "error");
+        }
+    }
+
+    async function editExperience(wsId, experienceId, scope) {
+        try {
+            const item = await apiCall("GET", "/api/v1/workspaces/" + encodeURIComponent(wsId) + "/experiences/" + encodeURIComponent(experienceId));
+            const summary = await requestTextInput(
+                "编辑经验摘要",
+                item.summary || "",
+                { multiline: true, rows: 7 }
+            );
+            if (summary === false || summary === null) return;
+            await apiCall(
+                "PATCH",
+                "/api/v1/workspaces/" + encodeURIComponent(wsId) + "/experiences/" + encodeURIComponent(experienceId),
+                { scope: scope, summary: String(summary).trim() }
+            );
+            showToast("经验已更新", "success");
+            await loadExperiences(wsId);
+        } catch (error) {
+            showToast("更新经验失败：" + error.message, "error");
+        }
     }
 
     async function deleteExperience(wsId, expId, scope) {
@@ -857,9 +1038,34 @@
                 "<td>" + escapeHtml(t.language || "-") + "</td>" +
                 "<td>" + escapeHtml(t.version || "-") + "</td>" +
                 "<td><span class=\"status-badge success\">已安装</span></td>" +
-                "<td>-</td>" +
+                "<td>" +
+                "<button class=\"btn btn-secondary btn-sm\" data-action=\"view-tool\" data-workspace=\"" + escapeAttribute(currentWorkspaceId || "") + "\" data-language=\"" + escapeAttribute(t.language || "") + "\" data-id=\"" + escapeAttribute(t.id || t.tool_id || t.name || "") + "\">查看</button> " +
+                "<button class=\"btn btn-primary btn-sm\" data-action=\"prepare-tool\" data-workspace=\"" + escapeAttribute(currentWorkspaceId || "") + "\" data-language=\"" + escapeAttribute(t.language || "") + "\" data-id=\"" + escapeAttribute(t.id || t.tool_id || t.name || "") + "\">检查</button>" +
+                "</td>" +
                 "</tr>";
         }).join("");
+    }
+
+    async function viewTool(wsId, language, toolId) {
+        try {
+            const tool = await apiCall("GET", "/api/v1/workspaces/" + encodeURIComponent(wsId) + "/tools/" + encodeURIComponent(language) + "/" + encodeURIComponent(toolId));
+            await showJsonDetails("工具详情", tool);
+        } catch (error) {
+            showToast("读取工具失败：" + error.message, "error");
+        }
+    }
+
+    async function prepareTool(wsId, language, toolId) {
+        try {
+            const result = await apiCall(
+                "POST",
+                "/api/v1/workspaces/" + encodeURIComponent(wsId) + "/tools/" + encodeURIComponent(language) + "/" + encodeURIComponent(toolId) + "/prepare",
+                { dry_run: true }
+            );
+            await showJsonDetails("工具检查结果", result);
+        } catch (error) {
+            showToast("检查工具失败：" + error.message, "error");
+        }
     }
 
     async function scanTools() {
@@ -934,7 +1140,6 @@
                 showExperimentDetails(started);
                 showToast("实验已启动", "success");
                 form.classList.add("hidden");
-                document.getElementById("exp-protocol").value = "";
                 document.getElementById("exp-session-id").value = "";
                 loadExperiments();
             } catch (err) {
@@ -942,6 +1147,13 @@
             }
         });
         document.getElementById("btn-refresh-experiments").addEventListener("click", loadExperiments);
+        document.getElementById("exp-protocol").addEventListener("change", function () {
+            var option = this.options[this.selectedIndex];
+            document.getElementById("exp-protocol-description").textContent =
+                option && option.dataset.description
+                    ? option.dataset.description
+                    : "请选择实验方案。";
+        });
     }
 
     async function loadExperiments() {
@@ -955,19 +1167,44 @@
 
     function renderExperiments(experiments) {
         var tbody = document.getElementById("experiment-tbody");
+        var select = document.getElementById("exp-protocol");
+        var selected = select.value;
+        select.innerHTML = '<option value="">选择已导入的实验方案</option>';
+        experiments.forEach(function (protocol) {
+            var option = document.createElement("option");
+            option.value = protocol.protocol_id || "";
+            option.textContent = protocol.title || protocol.protocol_id || "未命名方案";
+            option.dataset.description = protocol.description || "";
+            select.appendChild(option);
+        });
+        if (selected && Array.from(select.options).some(function (option) {
+            return option.value === selected;
+        })) {
+            select.value = selected;
+        }
         if (!experiments.length) {
-            tbody.innerHTML = '<tr><td colspan="5" class="empty-state">未找到实验</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="empty-state">未找到已导入的实验方案</td></tr>';
             return;
         }
         tbody.innerHTML = experiments.map(function (e) {
             return "<tr>" +
-                "<td>" + escapeHtml(e.session_id || e.session_file || "-") + "</td>" +
-                "<td>" + escapeHtml((e.protocol || "").substring(0, 50)) + "</td>" +
-                "<td><span class=\"status-badge " + (e.status === "completed" ? "success" : e.status === "error" ? "error" : "info") + "\">" + escapeHtml(localizeStatus(e.status || "running")) + "</span></td>" +
-                "<td>" + escapeHtml(e.current_step || "-") + "</td>" +
-                "<td><button class=\"btn btn-secondary btn-sm\" data-action=\"view-experiment\" data-id=\"" + escapeAttribute(e.session_file || e.session_id || "") + "\">查看</button></td>" +
+                "<td><strong>" + escapeHtml(e.title || e.protocol_id || "-") + "</strong>" +
+                '<div class="text-dim">' + escapeHtml(e.protocol_id || "") + "</div></td>" +
+                "<td>" + escapeHtml(e.description || "-") + "</td>" +
+                "<td>" + escapeHtml(e.step_count || 0) + "</td>" +
+                "<td>" + escapeHtml(e.version || "-") + "</td>" +
+                '<td><button class="btn btn-primary btn-sm" data-action="select-experiment" data-id="' +
+                escapeAttribute(e.protocol_id || "") + '">选择</button></td>' +
                 "</tr>";
         }).join("");
+    }
+
+    function selectExperiment(protocolId) {
+        var select = document.getElementById("exp-protocol");
+        select.value = protocolId || "";
+        select.dispatchEvent(new Event("change"));
+        document.getElementById("experiment-form").classList.remove("hidden");
+        select.focus();
     }
 
     function showExperimentDetails(data) {
@@ -1044,8 +1281,9 @@
             try {
                 const status = await apiCall("GET", "/api/v1/status");
                 document.getElementById("llm-current-info").innerHTML =
-                    '<div><span class="text-muted">提供商：</span> ' + escapeHtml(status.llm_provider || data.current_provider || "无") + "</div>" +
-                    '<div><span class="text-muted">上一提供商：</span> ' + escapeHtml(data.last_provider || "无") + "</div>";
+                    '<div><span class="text-muted">提供商：</span> ' +
+                    escapeHtml(status.llm_provider || data.current_provider || "无") +
+                    "</div>";
             } catch (e) {
                 document.getElementById("llm-current-info").innerHTML = '<span class="text-muted">无法加载当前提供商</span>';
             }
@@ -1068,7 +1306,8 @@
                 "<td><span class=\"status-badge " + (p.active || p.current ? "success" : "info") + "\">" + (p.active || p.current ? "当前" : "可用") + "</span></td>" +
                 "<td>" +
                 "<button class=\"btn btn-secondary btn-sm\" data-action=\"show-llm\" data-provider=\"" + escapeAttribute(providerName) + "\">详情</button> " +
-                "<button class=\"btn btn-primary btn-sm\" data-action=\"switch-llm\" data-provider=\"" + escapeAttribute(providerName) + "\">切换</button>" +
+                "<button class=\"btn btn-primary btn-sm\" data-action=\"switch-llm\" data-provider=\"" + escapeAttribute(providerName) + "\">切换</button> " +
+                "<button class=\"btn btn-danger btn-sm\" data-action=\"delete-llm\" data-provider=\"" + escapeAttribute(providerName) + "\">删除</button>" +
                 "</td>" +
                 "</tr>";
         }).join("");
@@ -1091,6 +1330,17 @@
             loadLLMProviders();
         } catch (err) {
             showToast("切换提供商失败: " + err.message, "error");
+        }
+    }
+
+    async function deleteLLM(provider) {
+        if (!await requestConfirmation("删除提供商 " + provider + "？", "删除提供商")) return;
+        try {
+            await apiCall("DELETE", "/api/v1/llm/providers/" + encodeURIComponent(provider));
+            showToast("提供商已删除", "success");
+            await loadLLMProviders();
+        } catch (error) {
+            showToast("删除提供商失败：" + error.message, "error");
         }
     }
 
@@ -1164,19 +1414,17 @@
             '<div><span class="text-muted">模式:</span> <strong>' + escapeHtml(data.mode || "未知") + "</strong></div>" +
             '<div><span class="text-muted">状态:</span> ' + escapeHtml(data.status || "无") + "</div>";
 
-        var tbody = document.getElementById("permission-tbody");
-        var policies = data.policies || [];
-        if (!policies.length) {
-            tbody.innerHTML = '<tr><td colspan="3" class="empty-state">未配置策略</td></tr>';
-            return;
-        }
-        tbody.innerHTML = policies.map(function (p) {
-            return "<tr>" +
-                "<td>" + escapeHtml(p.rule || p.action || "-") + "</td>" +
-                "<td>" + escapeHtml(p.scope || "-") + "</td>" +
-                "<td><span class=\"status-badge " + (p.allowed ? "success" : "warning") + "\">" + (p.allowed ? "允许" : "拒绝") + "</span></td>" +
-                "</tr>";
-        }).join("");
+        var roots = data.authorized_external_roots || [];
+        var rootsContainer = document.getElementById("permission-authorized-roots");
+        rootsContainer.innerHTML = roots.length
+            ? roots.map(function (root) {
+                return '<div class="authorized-root"><code>' +
+                    escapeHtml(root) +
+                    '</code><button class="btn btn-danger btn-sm" ' +
+                    'data-action="revoke-authorized-root" data-path="' +
+                    escapeAttribute(root) + '">撤销</button></div>';
+            }).join("")
+            : '<p class="text-muted">尚未授权外部目录。</p>';
     }
 
     function setupPermissionForm() {
@@ -1231,6 +1479,24 @@
                 showToast("撤销路径授权失败: " + err.message, "error");
             }
         });
+        document.getElementById("btn-check-path").addEventListener("click", async function () {
+            var path = document.getElementById("permission-path").value.trim();
+            if (!path) {
+                showToast("路径为必填项", "warning");
+                return;
+            }
+            try {
+                var decision = await apiCall("POST", "/api/v1/permissions/check", {
+                    path: path,
+                    operation: "read"
+                });
+                document.getElementById("permission-check-result").textContent =
+                    (decision.status === "allowed" ? "允许读取" : "不允许读取") +
+                    (decision.reason ? "：" + decision.reason : "");
+            } catch (err) {
+                showToast("检查权限失败：" + err.message, "error");
+            }
+        });
         document.getElementById("btn-refresh-permissions").addEventListener("click", loadPermissions);
     }
 
@@ -1245,8 +1511,8 @@
             sel.innerHTML = '<option value="">选择日志</option>';
             logs.forEach(function (l) {
                 var opt = document.createElement("option");
-                opt.value = l.name || l.id || l;
-                opt.textContent = l.name || l.id || l;
+                opt.value = l.file || l.name || l.id || l;
+                opt.textContent = l.file || l.name || l.id || l;
                 sel.appendChild(opt);
             });
             if (current) sel.value = current;
@@ -1321,6 +1587,9 @@
                 "<td>" + escapeHtml(item.instruction || "-") + "</td>" +
                 "<td><span class=\"status-badge " + (item.status === "success" ? "success" : item.status === "error" ? "error" : "info") + "\">" + escapeHtml(localizeStatus(item.status || "pending")) + "</span></td>" +
                 "<td>" +
+                (item.status === "pending"
+                    ? "<button class=\"btn btn-sm btn-primary\" data-action=\"confirm-artifact\" data-id=\"" + escapeAttribute(item.id) + "\">确认生成</button> "
+                    : "") +
                 "<button class=\"btn btn-sm btn-secondary\" data-action=\"view-artifact\" data-id=\"" + escapeAttribute(item.id) + "\">查看</button> " +
                 "<button class=\"btn btn-sm btn-danger\" data-action=\"delete-artifact\" data-id=\"" + escapeAttribute(item.id) + "\">删除</button>" +
                 "</td>" +
@@ -1331,10 +1600,9 @@
     async function generateArtifact() {
         var instruction = document.getElementById("se-instruction").value;
         var artifactType = document.getElementById("se-artifact-type").value;
-        var output = document.getElementById("se-output").value;
 
-        if (!instruction || !output) {
-            showToast("请填写所有必填字段", "error");
+        if (!instruction.trim()) {
+            showToast("请填写候选经验", "error");
             return;
         }
 
@@ -1342,15 +1610,12 @@
             var data = await apiCall("POST", "/api/v1/self-evolution/generate", {
                 instruction: instruction,
                 type: artifactType,
-                output: output
+                workspace_id: currentWorkspaceId
             });
-            if (data.success) {
-                showToast("制品生成成功", "success");
-                loadSelfEvolution();
-                document.getElementById("self-evolution-form").classList.add("hidden");
-            } else {
-                showToast(data.error || "生成制品失败", "error");
-            }
+            showToast("已加入待人工确认列表", "success");
+            loadSelfEvolution();
+            document.getElementById("self-evolution-form").classList.add("hidden");
+            document.getElementById("se-instruction").value = "";
         } catch (err) {
             showToast("生成制品失败: " + err.message, "error");
         }
@@ -1380,6 +1645,26 @@
         }
     }
 
+    async function confirmArtifact(id) {
+        if (!await requestConfirmation(
+            "确认后将按沙箱权限生成该经验制品，是否继续？",
+            "确认自进化候选"
+        )) return;
+        try {
+            var data = await apiCall(
+                "POST",
+                "/api/v1/self-evolution/" + encodeURIComponent(id) + "/confirm"
+            );
+            showToast(
+                data.status === "success" ? "自进化制品已生成" : "生成未完成，请查看详情",
+                data.status === "success" ? "success" : "warning"
+            );
+            loadSelfEvolution();
+        } catch (error) {
+            showToast("确认生成失败：" + error.message, "error");
+        }
+    }
+
     function setupSelfEvolutionForm() {
         var refreshBtn = document.getElementById("btn-refresh-self-evolution");
         if (refreshBtn) refreshBtn.addEventListener("click", loadSelfEvolution);
@@ -1400,16 +1685,14 @@
 
     // ---- 诊断 -------------------------------------------------------------
 
-    function loadDiagnostics() {
-        authorizedFetch('/api/v1/diagnose')
-            .then(function (response) { return response.json(); })
-            .then(function (data) {
-                renderDiagnostics(data);
-            })
-            .catch(function (error) {
-                console.error('加载诊断出错:', error);
-                showToast('加载诊断失败', 'error');
-            });
+    async function loadDiagnostics() {
+        try {
+            var data = await apiCall("GET", "/api/v1/diagnose");
+            latestDiagnostics = data;
+            renderDiagnostics(data);
+        } catch (error) {
+            showToast("加载诊断失败：" + error.message, "error");
+        }
     }
 
     function renderDiagnostics(data) {
@@ -1432,64 +1715,66 @@
         }
 
         if (installInfo) {
-            installInfo.innerHTML = data.install ? (
-                '<p><strong>状态:</strong> ' + (data.install.ok ? '✓ 有效' : '✗ 无效') + '</p>' +
-                '<p><strong>版本:</strong> ' + escapeHtml(data.install.version || '-') + '</p>'
-            ) : '<p>无安装数据</p>';
+            var runtime = data.required_runtime || {};
+            var harness = runtime.harness || {};
+            var rag = runtime.rag || {};
+            installInfo.innerHTML =
+                '<p><strong>Harness:</strong> ' +
+                (harness.healthy ? '✓ 正常（强制）' : '✗ 异常') + '</p>' +
+                '<p><strong>RAG:</strong> ' +
+                (rag.healthy ? '✓ 正常（强制）' : '✗ 异常') + '</p>' +
+                '<p><strong>日志:</strong> ' +
+                ((data.log_storage || {}).log_dir_exists ? '✓ 可用' : '✗ 不可用') +
+                '</p>';
         }
     }
 
-    function runConfigDiagnostics() {
-        authorizedFetch('/api/v1/diagnose/config')
-            .then(function (response) { return response.json(); })
-            .then(function (data) {
-                document.getElementById('diagnose-content').textContent = JSON.stringify(data, null, 2);
-                showToast('配置诊断完成', 'success');
-            })
-            .catch(function (error) {
-                console.error('运行配置诊断出错:', error);
-                showToast('运行配置诊断失败', 'error');
-            });
+    function formatDiagnosticSummary(data) {
+        var runtime = data.required_runtime || {};
+        return [
+            "总体状态：" + (data.ok ? "正常" : "需要处理"),
+            "配置：" + ((data.config || {}).exists ? "已初始化" : "未初始化"),
+            "LLM：" + ((data.llm || {}).ok ? "可用" : "未就绪"),
+            "Harness：" +
+                ((runtime.harness || {}).healthy ? "正常（强制启用）" : "异常"),
+            "RAG：" + ((runtime.rag || {}).healthy ? "正常（强制启用）" : "异常")
+        ].join("\n");
     }
 
-    function runLLMDiagnostics() {
-        authorizedFetch('/api/v1/diagnose/llm')
-            .then(function (response) { return response.json(); })
-            .then(function (data) {
-                document.getElementById('diagnose-content').textContent = JSON.stringify(data, null, 2);
-                showToast('LLM 诊断完成', 'success');
-            })
-            .catch(function (error) {
-                console.error('运行 LLM 诊断出错:', error);
-                showToast('运行 LLM 诊断失败', 'error');
-            });
+    async function runConfigDiagnostics() {
+        try {
+            latestDiagnostics.config = await apiCall("GET", "/api/v1/diagnose/config");
+            renderDiagnostics(latestDiagnostics);
+            showToast("配置诊断已刷新", "success");
+        } catch (error) {
+            showToast("运行配置诊断失败：" + error.message, "error");
+        }
     }
 
-    function runInstallDiagnostics() {
-        authorizedFetch('/api/v1/diagnose/install')
-            .then(function (response) { return response.json(); })
-            .then(function (data) {
-                document.getElementById('diagnose-content').textContent = JSON.stringify(data, null, 2);
-                showToast('安装诊断完成', 'success');
-            })
-            .catch(function (error) {
-                console.error('运行安装诊断出错:', error);
-                showToast('运行安装诊断失败', 'error');
-            });
+    async function runLLMDiagnostics() {
+        try {
+            latestDiagnostics.llm = await apiCall("GET", "/api/v1/diagnose/llm");
+            renderDiagnostics(latestDiagnostics);
+            showToast("LLM 诊断已刷新", "success");
+        } catch (error) {
+            showToast("运行 LLM 诊断失败：" + error.message, "error");
+        }
     }
 
-    function runAllDiagnostics() {
-        authorizedFetch('/api/v1/diagnose')
-            .then(function (response) { return response.json(); })
-            .then(function (data) {
-                document.getElementById('diagnose-content').textContent = JSON.stringify(data, null, 2);
-                renderDiagnostics(data);
-                showToast('全部诊断完成', 'success');
-            })
-            .catch(function (error) {
-                console.error('运行全部诊断出错:', error);
-                showToast('运行全部诊断失败', 'error');
-            });
+    async function runInstallDiagnostics() {
+        try {
+            var data = await apiCall("GET", "/api/v1/diagnose/install");
+            latestDiagnostics = Object.assign(latestDiagnostics, data);
+            renderDiagnostics(latestDiagnostics);
+            showToast("运行时诊断已刷新", "success");
+        } catch (error) {
+            showToast("运行安装诊断失败：" + error.message, "error");
+        }
+    }
+
+    async function runAllDiagnostics() {
+        await loadDiagnostics();
+        showToast("全部诊断已刷新", "success");
     }
 
     function setupDiagnoseForm() {
@@ -1554,13 +1839,32 @@
                     break;
 
                 case "progress":
-                    if (
-                        data.data &&
+                    if (!data.data) break;
+                    if (data.data.kind === "thinking_content") {
+                        appendStreamingMessage(
+                            "thinking_content",
+                            data.data.content || data.data.message || "",
+                            data.data.agent
+                        );
+                    } else if (data.data.kind === "assistant_delta") {
+                        appendStreamingMessage(
+                            "assistant_delta",
+                            data.data.content || data.data.message || "",
+                            data.data.agent
+                        );
+                    } else if (
                         data.data.kind === "status" &&
                         typeof data.data.message === "string" &&
                         data.data.message.trim()
                     ) {
-                        addMessage("progress", data.data.message, "progress");
+                        addMessage(
+                            "progress",
+                            data.data.message,
+                            "progress",
+                            data.data.agent
+                                ? "Agent · " + data.data.agent
+                                : "处理进度"
+                        );
                     }
                     break;
 
@@ -1583,7 +1887,21 @@
                     } else {
                         text = "操作未完成，请重试。";
                     }
-                    addMessage("assistant", text || "操作已完成。");
+                    if (assistantStreamMessage) {
+                        var streamBody =
+                            assistantStreamMessage.querySelector(".message-body");
+                        if (text) streamBody.textContent = text;
+                        assistantStreamMessage.classList.remove("streaming");
+                    } else {
+                        addMessage(
+                            "assistant",
+                            text || "操作已完成。",
+                            "",
+                            result.agent ? "Agent · " + result.agent : undefined
+                        );
+                    }
+                    thinkingMessage = null;
+                    assistantStreamMessage = null;
                     break;
                 }
 
@@ -1613,12 +1931,17 @@
         if (chatProcessing) return;
 
         addMessage("user", text);
+        thinkingMessage = null;
+        assistantStreamMessage = null;
         setChatProcessing(true);
 
         var selectedWorkspace = selectedChatWorkspace();
         var payload = { message: text };
         if (selectedWorkspace) {
             payload.workspace_id = selectedWorkspace;
+        }
+        if (chatAgentMode && chatAgentMode.value) {
+            payload.agent_mode = chatAgentMode.value;
         }
 
         if (ws && ws.readyState === WebSocket.OPEN) {
@@ -1710,13 +2033,31 @@
         if (!actionTarget) return;
         var action = actionTarget.dataset.action;
         if (action === "delete-workspace") deleteWorkspace(actionTarget.dataset.id);
+        if (action === "view-paper") viewPaper(actionTarget.dataset.workspace, actionTarget.dataset.id);
+        if (action === "edit-paper") editPaper(actionTarget.dataset.workspace, actionTarget.dataset.id);
+        if (action === "delete-paper") deletePaper(actionTarget.dataset.workspace, actionTarget.dataset.id);
         if (action === "enrich-paper") enrichPaper(actionTarget.dataset.workspace, actionTarget.dataset.id);
+        if (action === "view-experience") viewExperience(actionTarget.dataset.workspace, actionTarget.dataset.id);
+        if (action === "edit-experience") editExperience(actionTarget.dataset.workspace, actionTarget.dataset.id, actionTarget.dataset.scope);
         if (action === "delete-experience") deleteExperience(actionTarget.dataset.workspace, actionTarget.dataset.id, actionTarget.dataset.scope);
+        if (action === "view-tool") viewTool(actionTarget.dataset.workspace, actionTarget.dataset.language, actionTarget.dataset.id);
+        if (action === "prepare-tool") prepareTool(actionTarget.dataset.workspace, actionTarget.dataset.language, actionTarget.dataset.id);
         if (action === "view-experiment") viewExperiment(actionTarget.dataset.id);
+        if (action === "select-experiment") selectExperiment(actionTarget.dataset.id);
         if (action === "show-llm") showLLM(actionTarget.dataset.provider);
         if (action === "switch-llm") switchLLM(actionTarget.dataset.provider);
+        if (action === "delete-llm") deleteLLM(actionTarget.dataset.provider);
         if (action === "view-artifact") viewArtifact(actionTarget.dataset.id);
         if (action === "delete-artifact") deleteArtifact(actionTarget.dataset.id);
+        if (action === "confirm-artifact") confirmArtifact(actionTarget.dataset.id);
+        if (action === "import-online-paper") {
+            importOnlinePaper(actionTarget.dataset.source, actionTarget.dataset.id);
+        }
+        if (action === "revoke-authorized-root") {
+            document.getElementById("permission-path").value =
+                actionTarget.dataset.path;
+            document.getElementById("btn-revoke-path").click();
+        }
     });
 
     // ---- 键盘快捷键 -------------------------------------------------------
@@ -1834,7 +2175,10 @@
             const suffix = protocol ? "?protocol=" + encodeURIComponent(protocol) : "";
             try {
                 const result = await apiCall("GET", "/api/v1/experiments/context" + suffix);
-                showJsonDetails("模型使用的实验上下文", result);
+                showJsonDetails("实验上下文", {
+                    status: result.selection_state === "selected" ? "已选择方案" : "未选择方案",
+                    available_protocol_count: result.available_protocol_count
+                });
             } catch (error) {
                 showToast("读取实验上下文失败：" + error.message, "error");
             }

@@ -155,7 +155,7 @@ def _add_shell_commands(subparsers):
     web_parser = subparsers.add_parser(
         "web",
         help="启动 Web 可视化界面",
-        description="启动基于 FastAPI 的 Web 界面；需要安装可选依赖：pip install supermedicine[web]",
+        description="启动随 SuperMedicine 默认安装提供的 FastAPI Web/GUI 界面。",
     )
     web_parser.add_argument(
         "--host",
@@ -632,6 +632,26 @@ def _add_paper_commands(subparsers):
         help="显式确认允许发起补全授权检查、网络/API 限制检查与审计",
     )
 
+    paper_search_parser = paper_subparsers.add_parser(
+        "search", help="从 PubMed 或 Crossref 检索论文"
+    )
+    paper_search_parser.add_argument("query", help="标题、作者、主题或 DOI")
+    paper_search_parser.add_argument(
+        "--source", choices=("pubmed", "crossref"), default="pubmed"
+    )
+    paper_search_parser.add_argument("--limit", type=int, default=10)
+
+    paper_online_parser = paper_subparsers.add_parser(
+        "import-online", help="把检索结果导入工作区和本地 RAG"
+    )
+    paper_online_parser.add_argument("external_id", help="PMID 或 DOI")
+    paper_online_parser.add_argument(
+        "--source", choices=("pubmed", "crossref"), required=True
+    )
+    paper_online_parser.add_argument(
+        "--workspace", required=True, type=str, help="工作区 ID"
+    )
+
     paper_list_parser = paper_subparsers.add_parser("list", help="列出工作区论文")
     paper_list_parser.add_argument(
         "--workspace", required=True, type=str, help="工作区 ID"
@@ -1106,6 +1126,12 @@ def _dispatch_paper_command(args, cli, parsers) -> bool:
                 metadata=_paper_metadata_options(args),
                 enrich=args.enrich,
                 confirm_enrich=args.confirm_enrich,
+            ),
+            "search": lambda: cli.paper_search(
+                args.query, source=args.source, limit=args.limit
+            ),
+            "import-online": lambda: cli.paper_import_online(
+                args.workspace, args.source, args.external_id
             ),
             "list": lambda: cli.paper_list(args.workspace),
             "show": lambda: cli.paper_show(args.workspace, args.paper_id),

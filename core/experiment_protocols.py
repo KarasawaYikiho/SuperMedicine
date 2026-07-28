@@ -390,36 +390,25 @@ def summarize_experiment_protocol(protocol: ExperimentProtocol) -> dict[str, Any
 
 
 def build_experiment_llm_context(protocol_id: str | None = None) -> dict[str, Any]:
-    """Build the secret-free experiment configuration context for LLM prompts."""
+    """Build modular experiment capabilities without leaking concrete protocol names."""
 
     protocols = list_protocols()
-    selected = None
     if protocol_id:
-        selected = get_protocol(protocol_id)
-    elif protocols:
-        selected = next(
-            (
-                protocol
-                for protocol in protocols
-                if protocol.protocol_id == "western_blot_basic"
-            ),
-            protocols[0],
-        )
+        get_protocol(protocol_id)
     return {
-        "config_directory": str(default_experiment_config_dir()),
-        "authoring_rules": EXPERIMENT_CONFIG_AUTHORING_RULES.strip(),
-        "available_protocols": [
-            {
-                "protocol_id": protocol.protocol_id,
-                "title": protocol.title,
-                "aliases": protocol.metadata.get("aliases", []),
-                "step_count": len(protocol.steps),
-            }
-            for protocol in protocols
+        "management": "tool_registry",
+        "selection_state": "selected" if protocol_id else "not_selected",
+        "available_protocol_count": len(protocols),
+        "capabilities": [
+            "discover modular experiment configurations",
+            "validate required inputs",
+            "prepare permission-checked tool calculations",
+            "record auditable step outputs",
         ],
-        "selected_protocol": summarize_experiment_protocol(selected)
-        if selected
-        else None,
+        "context_rule": (
+            "Concrete experiment names and protocol contents are loaded only by "
+            "the experiment tool handling an explicit user selection."
+        ),
     }
 
 

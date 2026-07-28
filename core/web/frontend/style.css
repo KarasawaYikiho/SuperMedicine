@@ -50,6 +50,15 @@
     margin: 0;
 }
 
+input.app-dialog-body,
+textarea.app-dialog-body {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: min(32rem, 75vw);
+    padding: 0.75rem;
+    resize: vertical;
+}
+
 pre.app-dialog-body {
     max-height: 55vh;
     overflow: auto;
@@ -91,10 +100,8 @@ header {
     align-items: center;
     justify-content: space-between;
     border-bottom: 1px solid var(--color-border);
-    position: sticky;
-    top: 0;
+    position: relative;
     z-index: 100;
-    backdrop-filter: blur(10px);
 }
 
 header h1 {
@@ -273,7 +280,7 @@ header h1 {
     cursor: pointer;
     font-size: 0.85rem;
     font-weight: 500;
-    text-align: left;
+    text-align: center;
     transition: var(--transition);
     white-space: nowrap;
     position: relative;
@@ -959,8 +966,17 @@ section h2 {
 
 /* 选中文本颜色 */
 ::selection {
-    background: rgba(255, 255, 255, 0.2);
-    color: var(--color-text);
+    background: #cce4ff;
+    color: #111111;
+}
+
+body,
+.message,
+.log-viewer,
+.data-table,
+.info-card {
+    user-select: text;
+    -webkit-user-select: text;
 }
 
 /* 焦点可见性 */
@@ -1175,7 +1191,6 @@ body {
 }
 
 .docs-shell header {
-    top: 30px;
     min-height: 66px;
     background: rgba(255, 255, 255, 0.96);
     border-bottom: 1px solid var(--docs-border);
@@ -1194,7 +1209,7 @@ body {
 }
 
 .docs-shell .drawer-menu {
-    top: 96px;
+    top: 0;
     width: 268px;
     background: #f7f7f4;
     border-right: 1px solid var(--docs-border);
@@ -1220,6 +1235,82 @@ body {
     border-radius: 8px;
     color: #555650;
     font-weight: 500;
+    text-align: center;
+}
+
+.required-runtime-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.25rem;
+    padding: 0.45rem 0.75rem;
+    border: 1px solid #a9d5ae;
+    border-radius: 999px;
+    background: #edf8ee;
+    color: #24652b;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.form-row {
+    display: flex;
+    gap: 1rem;
+    align-items: end;
+}
+
+.form-group-grow {
+    flex: 1;
+}
+
+.field-help {
+    margin-top: 0.4rem;
+    color: var(--color-text-muted);
+    font-size: 0.8rem;
+}
+
+.search-results {
+    display: grid;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+.search-result-card,
+.authorized-root {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg);
+}
+
+.search-result-main {
+    min-width: 0;
+}
+
+.authorized-root + .authorized-root {
+    margin-top: 0.6rem;
+}
+
+.authorized-root code {
+    overflow-wrap: anywhere;
+}
+
+.message.thinking {
+    max-width: 100%;
+    border-style: dotted;
+    background: #f7f7f4;
+}
+
+.message.streaming .message-body::after {
+    content: "▋";
+    margin-left: 0.15rem;
+    animation: stream-caret 0.8s step-end infinite;
+}
+
+@keyframes stream-caret {
+    50% { opacity: 0; }
 }
 
 .docs-shell .drawer-nav .tab-btn:hover {

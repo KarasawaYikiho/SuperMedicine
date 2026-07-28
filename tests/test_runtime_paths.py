@@ -35,6 +35,34 @@ def test_explicit_project_root_overrides_environment_and_install_evidence(tmp_pa
     assert paths.project_root == explicit.resolve()
 
 
+def test_explicit_config_path_precedes_environment_and_owns_runtime_state(tmp_path):
+    explicit = tmp_path / "explicit-state" / "config.yaml"
+    environment = tmp_path / "environment-state" / "config.yaml"
+
+    paths = RuntimePaths.resolve(
+        project_root=tmp_path / "project",
+        config_path=explicit,
+        environ={"SM_CONFIG": str(environment)},
+    )
+
+    assert paths.config_path == explicit.resolve()
+    assert paths.data_root == explicit.parent.resolve()
+
+
+def test_sm_config_precedes_project_fallback_and_owns_runtime_state(tmp_path):
+    override = tmp_path / "external-state" / "config.yaml"
+    project = tmp_path / "project"
+
+    paths = RuntimePaths.resolve(
+        project_root=project,
+        environ={"SM_CONFIG": str(override)},
+    )
+
+    assert paths.project_root == project.resolve()
+    assert paths.config_path == override.resolve()
+    assert paths.data_root == override.parent.resolve()
+
+
 def test_environment_overrides_install_record(tmp_path):
     environment = tmp_path / "environment project"
     installed = tmp_path / "installed project"

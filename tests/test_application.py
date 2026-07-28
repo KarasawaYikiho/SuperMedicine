@@ -91,9 +91,47 @@ def test_web_kernel_reads_plugins_from_resource_root(tmp_path, monkeypatch) -> N
 
     assert response.status_code == 200
     assert response.json() == {"output": "hello"}
-    assert captured["config_path"] == project_root / ".supermedicine" / "config.yaml"
+    assert captured["config_path"] == paths.config_path
     assert captured["plugins_dir"] == resource_root / "plugins"
-    assert captured["policies_dir"] == project_root / ".supermedicine" / "policies"
+    assert captured["policies_dir"] == paths.data_root / "policies"
+    assert captured["project_root"] == project_root
+
+
+def test_chat_success_survives_recommendation_queue_failure(
+    tmp_path, monkeypatch, caplog
+) -> None:
+    from core.services import ServiceResult
+    from core.web.runtime import WebRuntime
+
+    class FakeConfig:
+        def set_runtime_state_value(self, *_args, **_kwargs) -> None:
+            return None
+
+    class FakeKernel:
+        _config = FakeConfig()
+        _config_path = tmp_path / "runtime-state" / "config.yaml"
+
+        def execute_task(self, *_args, **_kwargs):
+            return {"status": "success", "output": "answer", "task_id": "task-1"}
+
+    class FailingEvolution:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def recommend_evolution(self, *_args, **_kwargs):
+            return ServiceResult.failure("queue_unavailable", "disk unavailable")
+
+    runtime = WebRuntime({}, project_root=tmp_path)
+    monkeypatch.setattr(runtime, "get_kernel", lambda: FakeKernel())
+    monkeypatch.setattr(
+        "core.services.ExperienceEvolutionService", FailingEvolution
+    )
+
+    result = runtime.execute_chat_message("question")
+
+    assert result["status"] == "success"
+    assert result["output"] == "answer"
+    assert "disk unavailable" in caplog.text
 
 
 def test_web_workspace_endpoint_consumes_injected_application_directly(

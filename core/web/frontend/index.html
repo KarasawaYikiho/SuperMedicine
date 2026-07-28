@@ -16,7 +16,6 @@
 <body>
     <header>
         <button id="hamburger-btn" class="hamburger" aria-label="切换菜单" aria-controls="drawer-menu" aria-expanded="false" title="切换菜单">&#9776;</button>
-        <h1>SuperMedicine</h1>
         <div id="web-auth-controls">
             <label for="web-auth-token">访问令牌</label>
             <input id="web-auth-token" type="password" autocomplete="off" placeholder="仅远程访问时需要">
@@ -31,7 +30,7 @@
     <div id="drawer-overlay" class="drawer-overlay" aria-hidden="true"></div>
     <aside id="drawer-menu" class="drawer-menu" aria-label="主菜单" aria-hidden="true">
         <div class="drawer-header">
-            <span class="drawer-title">菜单</span>
+            <span class="drawer-title">SuperMedicine</span>
             <button id="drawer-close-btn" class="drawer-close-btn" aria-label="关闭菜单">&times;</button>
         </div>
         <nav class="drawer-nav">
@@ -66,6 +65,12 @@
                 <select id="chat-ws-select" class="select-input">
                     <option value="">无工作区（全局）</option>
                 </select>
+                <select id="chat-agent-mode" class="select-input" aria-label="Agent 模式">
+                    <option value="">跟随全局 Agent 设置</option>
+                    <option value="single">单 Agent</option>
+                    <option value="multi">多 Agent 链</option>
+                </select>
+                <span class="required-runtime-badge">Harness + RAG 强制启用</span>
             </div>
             <div id="messages" role="log" aria-live="polite"></div>
             <form id="chat-form" autocomplete="off">
@@ -126,7 +131,29 @@
                     <option value="">选择工作区</option>
                 </select>
                 <button id="btn-refresh-papers" class="btn btn-secondary">刷新</button>
+                <button id="btn-search-papers" class="btn btn-secondary">互联网检索</button>
                 <button id="btn-add-paper" class="btn btn-primary">+ 导入论文</button>
+            </div>
+            <div id="paper-search-form" class="form-container hidden">
+                <h3>从互联网检索论文</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="paper-search-source">数据源</label>
+                        <select id="paper-search-source" class="select-input">
+                            <option value="pubmed">PubMed</option>
+                            <option value="crossref">Crossref</option>
+                        </select>
+                    </div>
+                    <div class="form-group form-group-grow">
+                        <label for="paper-search-query">检索词</label>
+                        <input type="search" id="paper-search-query" placeholder="标题、作者、主题或 DOI">
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button id="btn-run-paper-search" class="btn btn-primary">检索</button>
+                    <button id="btn-close-paper-search" class="btn btn-secondary">关闭</button>
+                </div>
+                <div id="paper-search-results" class="search-results" aria-live="polite"></div>
             </div>
             <div id="paper-form" class="form-container hidden">
                 <h3>导入论文</h3>
@@ -278,7 +305,10 @@
                 <h3>开始新实验</h3>
                 <div class="form-group">
                     <label for="exp-protocol">实验方案</label>
-                    <textarea id="exp-protocol" rows="6" placeholder="粘贴实验方案..."></textarea>
+                    <select id="exp-protocol" class="select-input">
+                        <option value="">选择已导入的实验方案</option>
+                    </select>
+                    <p id="exp-protocol-description" class="field-help">请选择实验方案。</p>
                 </div>
                 <div class="form-group">
                     <label for="exp-session-id">会话ID（可选）</label>
@@ -293,10 +323,10 @@
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>会话</th>
                             <th>方案</th>
-                            <th>状态</th>
-                            <th>当前步骤</th>
+                            <th>说明</th>
+                            <th>步骤</th>
+                            <th>版本</th>
                             <th>操作</th>
                         </tr>
                     </thead>
@@ -320,7 +350,7 @@
                 </select>
                 <button id="btn-refresh-dialog" class="btn btn-secondary">刷新</button>
             </div>
-            <p class="text-muted">选择工作区后可查看审计友好的对话事件摘要；敏感内容会在展示前隐藏。</p>
+            <p class="text-muted">选择工作区后查看对话事件。</p>
             <div id="dialog-list" class="data-table-container" style="margin-top: 1rem;">
                 <table class="data-table">
                     <thead>
@@ -455,22 +485,13 @@
                 <div class="form-actions">
                     <button id="btn-authorize-path" class="btn btn-primary">授权</button>
                     <button id="btn-revoke-path" class="btn btn-danger">撤销授权</button>
+                    <button id="btn-check-path" class="btn btn-secondary">检查读取权限</button>
                 </div>
+                <div id="permission-check-result" class="field-help" aria-live="polite"></div>
             </div>
-            <div id="permission-policies" class="data-table-container">
-                <h3>策略</h3>
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>规则</th>
-                            <th>范围</th>
-                            <th>状态</th>
-                        </tr>
-                    </thead>
-                    <tbody id="permission-tbody">
-                        <tr><td colspan="3" class="empty-state">加载中...</td></tr>
-                    </tbody>
-                </table>
+            <div class="info-card">
+                <h3>已授权外部目录</h3>
+                <div id="permission-authorized-roots">加载中...</div>
             </div>
         </section>
 
@@ -505,6 +526,7 @@
         <!-- Self Evolution Tab -->
         <section id="tab-self-evolution" class="tab-content">
             <h2>自进化</h2>
+            <p class="section-intro">查看、添加和确认待生成项目。</p>
             <div class="toolbar">
                 <button id="btn-refresh-self-evolution" class="btn btn-secondary">刷新</button>
                 <button id="btn-generate-artifacts" class="btn btn-primary">生成制品</button>
@@ -518,15 +540,10 @@
                 <div class="form-group">
                     <label for="se-artifact-type">制品类型</label>
                     <select id="se-artifact-type" class="select-input">
-                        <option value="code">代码</option>
-                        <option value="config">配置</option>
-                        <option value="documentation">文档</option>
-                        <option value="test">测试</option>
+                        <option value="markdown">经验文档</option>
+                        <option value="python_tool">Python 工具</option>
+                        <option value="r_tool">R 工具</option>
                     </select>
-                </div>
-                <div class="form-group">
-                    <label for="se-output">输出路径</label>
-                    <input type="text" id="se-output" placeholder="/path/to/output">
                 </div>
                 <div class="form-actions">
                     <button id="btn-save-artifact" class="btn btn-primary">生成</button>
@@ -574,9 +591,6 @@
                     <div id="diagnose-install-info">加载中...</div>
                     <button id="btn-diagnose-install" class="btn btn-secondary btn-sm" style="margin-top: 0.5rem;">运行安装</button>
                 </div>
-            </div>
-            <div id="diagnose-results" class="log-viewer" style="margin-top: 1rem;">
-                <pre id="diagnose-content">点击诊断按钮以运行诊断。</pre>
             </div>
         </section>
     </main>

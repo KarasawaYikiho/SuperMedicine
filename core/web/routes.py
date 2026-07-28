@@ -78,6 +78,17 @@ def register_status_routes(app: Any, runtime: WebRuntime) -> None:
 
 
 def register_workspace_paper_routes(app: Any, runtime: WebRuntime) -> None:
+    @app.get("/api/v1/papers/search")
+    async def paper_search(
+        q: str, source: str = "pubmed", limit: int = 10
+    ) -> Any:
+        """Search user-selected public literature metadata providers."""
+        return service_data(
+            runtime.service("paper_rag").search_online(
+                q, source=source, limit=limit
+            )
+        )
+
 
     @app.get("/api/v1/workspaces")
     async def workspace_list() -> Any:
@@ -135,6 +146,21 @@ def register_workspace_paper_routes(app: Any, runtime: WebRuntime) -> None:
             )
         )
 
+    @app.post("/api/v1/workspaces/{workspace_id}/papers/import-online")
+    async def paper_import_online(
+        workspace_id: str, request: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Import a selected online record as a managed Markdown paper."""
+        source = str(request.get("source") or "")
+        external_id = str(request.get("external_id") or "")
+        if not source or not external_id:
+            return web_error("source and external_id are required", 400)
+        return service_data(
+            runtime.service("paper_rag").import_online(
+                workspace_id, source, external_id
+            )
+        )
+
     @app.get("/api/v1/workspaces/{workspace_id}/papers/{paper_id}")
     async def paper_get(workspace_id: str, paper_id: str) -> dict[str, Any]:
         """Show one paper by id."""
@@ -150,6 +176,19 @@ def register_workspace_paper_routes(app: Any, runtime: WebRuntime) -> None:
         metadata = request.get("metadata", {})
         return service_data(
             runtime.service("paper_rag").edit_metadata(workspace_id, paper_id, metadata)
+        )
+
+    @app.delete("/api/v1/workspaces/{workspace_id}/papers/{paper_id}")
+    async def paper_delete(
+        workspace_id: str, paper_id: str, request: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Delete a paper and its local RAG records after confirmation."""
+        return service_data(
+            runtime.service("paper_rag").delete_paper(
+                workspace_id,
+                paper_id,
+                confirm=str(request.get("confirm") or ""),
+            )
         )
 
     @app.post("/api/v1/workspaces/{workspace_id}/papers/{paper_id}/enrich")
@@ -376,6 +415,11 @@ def register_llm_permission_routes(app: Any, runtime: WebRuntime) -> None:
         """Show one LLM provider."""
         return service_data(runtime.service("llm").show_provider(name))
 
+    @app.delete("/api/v1/llm/providers/{name}")
+    async def llm_provider_delete(name: str) -> dict[str, Any]:
+        """Delete one configured provider."""
+        return service_data(runtime.service("llm").delete_provider(name))
+
     @app.post("/api/v1/llm/switch")
     async def llm_switch(request: dict[str, Any]) -> dict[str, Any]:
         """Switch the active LLM provider."""
@@ -423,6 +467,18 @@ def register_llm_permission_routes(app: Any, runtime: WebRuntime) -> None:
             return web_error("No path specified", 400)
         return service_data(
             runtime.service("permission_log_system").revoke_directory(path)
+        )
+
+    @app.post("/api/v1/permissions/check")
+    async def permission_check(request: dict[str, Any]) -> dict[str, Any]:
+        """Check whether the current mode allows one path operation."""
+        path = request.get("path", "")
+        if not path:
+            return web_error("No path specified", 400)
+        return service_data(
+            runtime.service("permission_log_system").access_decision(
+                path, str(request.get("operation") or "read")
+            )
         )
 
 
@@ -475,7 +531,7 @@ def register_log_experiment_routes(app: Any, runtime: WebRuntime) -> None:
         """List protocols or show one persisted experiment session in full."""
         try:
             if session_file:
-                path = experiment_session_path(session_file)
+                path = experiment_session_path(session_file, runtime.project_root)
                 return service_data(
                     runtime.service("experiment_tool").show_experiment(path)
                 )
@@ -524,7 +580,7 @@ def register_log_experiment_routes(app: Any, runtime: WebRuntime) -> None:
         if not all([step_id, input_json]):
             return web_error("step_id and input_json are required", 400)
         try:
-            path = experiment_session_path(session_file)
+            path = experiment_session_path(session_file, runtime.project_root)
         except ValueError as exc:
             return web_error(str(exc), 400)
         return service_data(
@@ -560,18 +616,23 @@ def register_agent_evolution_routes(app: Any, runtime: WebRuntime) -> None:
     async def self_evolution_generate(request: dict[str, Any]) -> dict[str, Any]:
         """Generate a self evolution artifact."""
         instruction = request.get("instruction", "")
-        artifact_type = request.get("type", "code")
-        output = request.get("output", "")
-        if not all([instruction, output]):
-            return web_error("instruction and output are required", 400)
+        artifact_type = request.get("type", "markdown")
+        if not instruction:
+            return web_error("instruction is required", 400)
         return service_data(
-            runtime.service("experience_evolution").generate_evolution(
-                instruction=instruction,
+            runtime.service("experience_evolution").recommend_evolution(
+                instruction,
                 artifact_type=artifact_type,
-                output=output,
-                confirmed=False,
-                metadata={"web_endpoint": "self_evolution_generate"},
+                workspace_id=request.get("workspace_id"),
+                source={"kind": "manual"},
             )
+        )
+
+    @app.post("/api/v1/self-evolution/{artifact_id}/confirm")
+    async def self_evolution_confirm(artifact_id: str) -> dict[str, Any]:
+        """Confirm and generate one queued recommendation."""
+        return service_data(
+            runtime.service("experience_evolution").confirm_evolution(artifact_id)
         )
 
     @app.get("/api/v1/self-evolution/{artifact_id}")
@@ -628,6 +689,8 @@ def register_diagnostic_routes(app: Any, runtime: WebRuntime) -> None:
             "audit": result.data.get("audit", {}),
             "database": result.data.get("database", {}),
             "log_storage": result.data.get("log_storage", {}),
+            "required_runtime": result.data.get("required_runtime", {}),
+            "ok": result.data.get("ok", False),
         }
 
 
@@ -693,6 +756,7 @@ def register_websocket_routes(app: Any, runtime: WebRuntime) -> None:
 
                 message = data.get("message", "")
                 workspace_id = data.get("workspace_id") or None
+                agent_mode = data.get("agent_mode") or None
                 if not message:
                     await websocket.send_json(
                         {"type": "error", "content": "No message provided"}
@@ -717,6 +781,7 @@ def register_websocket_routes(app: Any, runtime: WebRuntime) -> None:
                             lambda: runtime.execute_chat_message(
                                 message,
                                 workspace_id=workspace_id,
+                                agent_mode=agent_mode,
                                 progress_callback=progress_callback,
                             ),
                         )

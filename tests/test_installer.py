@@ -391,7 +391,7 @@ def test_cli_release_exe_missing_optional_module_reports_actionable_error(tmp_pa
 def test_install_defaults_to_interactive_question_answer_when_args_are_absent(
     tmp_path, monkeypatch
 ):
-    """Bare installer should be usable as an interactive flow."""
+    """Bare installer asks only for the installation directory."""
 
     from installer import entrypoint as Install
 
@@ -399,81 +399,34 @@ def test_install_defaults_to_interactive_question_answer_when_args_are_absent(
 
     def fake_input(prompt: str) -> str:
         prompts.append(prompt)
-        prompt_text = prompt.lower()
-        if any(
-            expected in prompt
-            for expected in (
-                "安装/项目路径",
-                "释放完整程序文件到该目录",
-                "组件选择",
-                "初始化 .supermedicine 配置",
-                "记录创建快捷方式意向",
-                "显示 PATH 手动配置提示",
-                "复制 SuperMedicine.exe 到桌面",
-                "开始安装",
-            )
-        ):
+        if "安装目录" in prompt:
             return ""
-        if "provider" in prompt_text:
-            return "openai"
-        if "base" in prompt_text:
-            return "https://openai.local.test/v1"
-        if "model" in prompt_text:
-            return "gpt-test"
-        if "api key" in prompt_text:
-            return "sk-test-interactive-installer"
-        if "重试安装向导" in prompt:
-            raise AssertionError(f"installer unexpectedly requested retry: {prompts!r}")
         raise AssertionError(f"unexpected installer prompt: {prompt!r}")
-
-    def fake_getpass(prompt: str) -> str:
-        prompts.append(prompt)
-        return "sk-test-interactive-installer"
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr("builtins.input", fake_input)
-    monkeypatch.setattr(Install.getpass, "getpass", fake_getpass)
 
     Install.main([])
 
     config_file = tmp_path / ".supermedicine" / "config.yaml"
-    assert config_file.exists()
-    assert "sk-test-interactive-installer" in config_file.read_text(encoding="utf-8")
-    assert any("provider" in prompt.lower() for prompt in prompts)
-    assert any("base" in prompt.lower() for prompt in prompts)
-    assert any("api key" in prompt.lower() for prompt in prompts)
+    assert not config_file.exists()
+    assert len(prompts) == 1
+    assert "安装目录" in prompts[0]
 
 
-def test_python_install_py_bare_interactive_flow_creates_config_without_optional_installer_package(
+def test_python_install_py_bare_flow_needs_only_install_directory_without_optional_installer_package(
     tmp_path,
 ):
-    """Regression: the exact user command `python install_entry.py` must work as a wizard."""
+    """The dependency-light entrypoint keeps the one-question install flow."""
 
     _copy_install_entrypoint_without_installer_package(tmp_path)
-    input_text = (
-        "\n".join(
-            [
-                "",  # installation/project path: current directory
-                "",  # full payload extraction: default no
-                "",  # initialize .supermedicine: default yes
-                "openai",
-                "https://openai.local.test/v1",
-                "gpt-test",
-                "sk-test-python-install-interactive",
-                "",  # shortcut preference: default no
-                "",  # PATH preference: default no
-                "",  # desktop Exe release: default no
-                "",  # confirmation summary: default yes
-            ]
-        )
-        + "\n"
-    )
+    input_text = "\n"
 
     result = _run_isolated_install(tmp_path, input_text=input_text)
 
     output = result.stdout + result.stderr
     assert result.returncode == 0
-    assert (tmp_path / ".supermedicine" / "config.yaml").exists()
+    assert not (tmp_path / ".supermedicine" / "config.yaml").exists()
     assert "SuperMedicine" in output
     assert "ModuleNotFoundError" not in output
     assert "No module named 'installer'" not in output
@@ -835,7 +788,7 @@ def test_update_policy_preserves_existing_config_secret_and_writes_secret_free_r
     assert record["mode"] == "update"
 
 
-def test_interactive_existing_install_update_branch_prompts_two_main_choices(
+def test_default_existing_install_updates_without_extra_questions(
     tmp_path, monkeypatch
 ):
     install = importlib.import_module("installer.entrypoint")
@@ -843,7 +796,7 @@ def test_interactive_existing_install_update_branch_prompts_two_main_choices(
     config.parent.mkdir()
     config.write_text("project_name: supermedicine\n", encoding="utf-8")
     prompts: list[str] = []
-    answers = iter([str(tmp_path), "2", "n", "", "n", "n", "n", "n", ""])
+    answers = iter([str(tmp_path)])
 
     def fake_input(prompt):
         prompts.append(prompt)
@@ -853,11 +806,12 @@ def test_interactive_existing_install_update_branch_prompts_two_main_choices(
 
     install.main([])
 
-    assert any("已有安装处理" in prompt for prompt in prompts)
+    assert len(prompts) == 1
+    assert "安装目录" in prompts[0]
     assert config.exists()
 
 
-def test_interactive_uninstall_branch_asks_second_user_data_confirmation(
+def test_default_existing_install_never_uninstalls_user_data(
     tmp_path, monkeypatch
 ):
     install = importlib.import_module("installer.entrypoint")
@@ -865,7 +819,7 @@ def test_interactive_uninstall_branch_asks_second_user_data_confirmation(
     config.parent.mkdir()
     config.write_text("project_name: supermedicine\n", encoding="utf-8")
     prompts: list[str] = []
-    answers = iter([str(tmp_path), "1", "1", "n", "", "n", "n", "n", "n", ""])
+    answers = iter([str(tmp_path)])
 
     def fake_input(prompt):
         prompts.append(prompt)
@@ -875,16 +829,15 @@ def test_interactive_uninstall_branch_asks_second_user_data_confirmation(
     monkeypatch.setattr(
         install,
         "_uninstall_existing_install",
-        lambda project_dir, *, preserve_user_data: {
-            "status": "removed",
-            "preserve": preserve_user_data,
-        },
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("default install must not uninstall user data")
+        ),
     )
 
     install.main([])
 
-    assert any("已有安装处理" in prompt for prompt in prompts)
-    assert any("用户数据处理" in prompt for prompt in prompts)
+    assert len(prompts) == 1
+    assert config.exists()
 
 
 def test_unified_install_dry_run_initializes_project_without_real_desktop_write(
@@ -1244,11 +1197,31 @@ def test_uninstall_reports_residuals_and_repair_suggestions_when_delete_fails(
     assert result["repair_suggestions"]
 
 
+def test_uninstall_entrypoint_runs_without_confirmation_prompt(tmp_path, monkeypatch):
+    import uninstall_entry
+
+    runtime_dir = tmp_path / ".supermedicine" / "cache"
+    runtime_dir.mkdir(parents=True)
+    (runtime_dir / "state.json").write_text("{}", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "builtins.input",
+        lambda prompt: (_ for _ in ()).throw(
+            AssertionError("one-command uninstall must not prompt")
+        ),
+    )
+    monkeypatch.setattr("sys.argv", ["uninstall_entry.py"])
+
+    uninstall_entry.main()
+
+    assert not (tmp_path / ".supermedicine").exists()
+
+
 # ═══ Component Integration Tests ═══════════════════════════════════════════════
 
 
-def test_interactive_installer_component_selection_step(tmp_path, monkeypatch, caplog):
-    """Interactive installer prompts for component selection when install.json defines components."""
+def test_default_installer_uses_default_component_selection(tmp_path, monkeypatch, caplog):
+    """Default installer installs required/default components without another prompt."""
     import logging
 
     from installer import entrypoint as Install
@@ -1258,6 +1231,8 @@ def test_interactive_installer_component_selection_step(tmp_path, monkeypatch, c
     # Create a minimal install.json with components in the workspace
     source_root = tmp_path / "source"
     source_root.mkdir()
+    (source_root / "cli").mkdir()
+    (source_root / "cli" / "main.py").write_text("# cli\n", encoding="utf-8")
     install_json = source_root / "install.json"
     install_json.write_text(
         json.dumps(
@@ -1288,45 +1263,23 @@ def test_interactive_installer_component_selection_step(tmp_path, monkeypatch, c
     )
 
     prompts: list[str] = []
-    # Sequence: path, extract, components toggle (confirm default), init, llm config, shortcuts, PATH, desktop exe, confirm
-    answers = iter(
-        [
-            str(tmp_path),  # install path
-            "",  # extract release: no
-            "",  # component selection: accept default (cli only)
-            "",  # init config: yes
-            "openai",  # provider
-            "https://openai.local.test/v1",  # base url
-            "gpt-test",  # model
-            "sk-test-component-interactive",  # api key
-            "",  # shortcut: no
-            "",  # PATH: no
-            "",  # desktop exe: no
-            "",  # confirm: yes
-        ]
-    )
+    answers = iter([str(tmp_path)])
 
     def fake_input(prompt: str) -> str:
         prompts.append(prompt)
         return next(answers)
 
-    def fake_getpass(prompt: str) -> str:
-        prompts.append(prompt)
-        return "sk-test-component-interactive"
-
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr("builtins.input", fake_input)
-    monkeypatch.setattr(Install.getpass, "getpass", fake_getpass)
 
     # Patch the source root resolution to point to our test source
     monkeypatch.setattr(Install, "_release_entrypoint_dir", lambda: source_root)
 
     Install.main([])
 
-    assert (tmp_path / ".supermedicine" / "config.yaml").exists()
-    # Verify the component selection prompt appeared
-    assert any("组件选择" in prompt for prompt in prompts)
-    # Verify component info was displayed via logger.info (not input prompts)
+    assert not (tmp_path / ".supermedicine" / "config.yaml").exists()
+    assert len(prompts) == 1
+    assert (tmp_path / "cli").is_dir()
     assert "cli" in caplog.text
 
 

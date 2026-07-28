@@ -85,7 +85,7 @@ LABELS: dict[str, str] = {
     "workspace_delete_requires_confirm": "危险操作：删除工作区前，请在输入框输入完全一致的工作区 ID。此操作会硬删除工作区且不可恢复。",
     "workspace_no_workspaces": "暂无工作区，请先创建",
     "workspace_manual_create_hint": "手动创建：在“工作区 ID”输入框输入小写 slug，按 Enter 或点击“创建工作区”。快捷键 Ctrl+N 聚焦输入框；可用鼠标点击输入框、按钮或列表。",
-    "workspace_action_hint": "操作提示：创建/选择工作区不会调用 Kernel 或 LLM；删除必须手动输入 delete:<工作区ID> 并经过权限策略确认。",
+    "workspace_action_hint": "创建：输入工作区 ID；删除：输入 delete:<工作区ID>。",
     "workspace_create_placeholder": "工作区 ID（小写字母、数字、连字符；例如 study-a）",
     "workspace_created": "工作区已创建",
     "workspace_selected": "已选择工作区",
@@ -112,7 +112,7 @@ LABELS: dict[str, str] = {
     "paper_enrich": "在线补全",
     "paper_enrich_confirm": "在线补全将发起网络请求。请在 DOI 输入框输入选中论文 ID 后再点击在线补全。",
     "paper_refreshed": "论文列表已刷新",
-    "paper_action_hint": "操作提示：先选择工作区，再填写文件路径导入；在线补全会发起网络请求，必须在 DOI 输入框输入选中论文 ID。",
+    "paper_action_hint": "本地导入：输入文件路径；检索：search:<检索词>；在线导入：pubmed:<PMID> 或 crossref:<DOI>。",
     # Experience
     "experience_title": "经验",
     "experience_suggest": "建议分类",
@@ -132,7 +132,7 @@ LABELS: dict[str, str] = {
     "experience_confirm_delete": "输入经验 ID 确认删除",
     "experience_delete_requires_confirm": "危险操作：删除经验前，请在经验标题输入框输入完全一致的经验 ID。此操作不可恢复。",
     "experience_refreshed": "经验列表已刷新",
-    "experience_action_hint": "操作提示：建议分类不会写入经验库；确认写入需填写标题和摘要；删除需在标题输入框输入完全一致的经验 ID。",
+    "experience_action_hint": "添加：填写标题和摘要；删除：输入完整经验 ID。",
     # Tool
     "tool_title": "工具",
     "tool_init": "初始化工具目录",
@@ -148,7 +148,7 @@ LABELS: dict[str, str] = {
     "tool_added": "工具已添加",
     "tool_run": "运行工具",
     "tool_refreshed": "工具列表已刷新",
-    "tool_action_hint": "操作提示：先选择工作区；点击“扫描候选”自动读取 plugins/tools 下 Python/R 工具，选中候选行后点击“添加工具”，无需输入或知道工具 ID；运行真实工具仍需权限与沙箱边界。",
+    "tool_action_hint": "先选择工作区；扫描候选后选择并添加工具。",
     # Dialog
     "dialog_title": "对话历史",
     "dialog_no_history": "暂无对话历史",
@@ -156,7 +156,7 @@ LABELS: dict[str, str] = {
     "dialog_summary": "摘要",
     "dialog_time": "时间",
     "dialog_refreshed": "对话历史已刷新",
-    "dialog_action_hint": "操作提示：选择工作区后可查看审计友好的对话事件摘要；敏感内容会在展示前隐藏。",
+    "dialog_action_hint": "选择工作区后查看对话事件。",
     # LLM
     "llm_title": "LLM 配置",
     "llm_current": "LLM",
@@ -184,7 +184,7 @@ LABELS: dict[str, str] = {
     "llm_secret_hidden": "密钥已隐藏，不会显示在状态栏或通知中",
     "llm_refreshed": "LLM Provider 列表已刷新",
     "safe_error_hint": "操作失败，敏感信息已隐藏。请检查输入、配置与权限后重试。",
-    "llm_action_hint": "操作提示：API Key 输入框会隐藏内容，保存后状态栏和通知不会显示密钥；切换 Provider 前请确认配置完整。",
+    "llm_action_hint": "填写并保存 Provider；选择已保存的 Provider 后可切换。",
     # Common
     "confirm": "确认",
     "cancel": "取消",
@@ -274,7 +274,7 @@ LABELS: dict[str, str] = {
     "experiment_missing_required": "缺少必填输入",
     "experiment_parse_error": "输入格式无法解析。请使用 JSON 或 key=value 格式（每行一项），空行和 # 注释行会被忽略。",
     "experiment_boundary": "仅供科研记录与实验辅助，不构成临床或生产建议；使用前需专家复核。",
-    "experiment_action_hint": "操作提示：按步骤填写 JSON 或 key=value 输入；计算会通过权限引擎和插件沙箱；保存日志前会自动脱敏。",
+    "experiment_action_hint": "按步骤填写 JSON 或 key=value 输入；可计算、保存步骤和保存日志。",
     # Log reports
     "log_title": "Log 报告",
     "log_message": "消息",
@@ -288,7 +288,7 @@ LABELS: dict[str, str] = {
     "log_empty_message": "请输入日志内容",
     "log_redaction_hint": "敏感信息会在保存前自动脱敏。",
     "log_refreshed": "Log 报告列表已刷新",
-    "log_action_hint": "操作提示：输入日志内容后保存，可刷新列表并查看选中报告；报告详情展示时继续脱敏。",
+    "log_action_hint": "输入日志内容后保存；刷新列表后可查看报告。",
 }
 
 

@@ -61,6 +61,8 @@ def test_add_data_supports_an_explicit_bundle_destination(tmp_path):
 
 
 def test_application_executable_preserves_console_mode(tmp_path, monkeypatch):
+    from cli.facade import _FORWARDED_COMMAND_GROUPS
+
     captured = {}
 
     def fake_build(root, target):
@@ -74,6 +76,21 @@ def test_application_executable_preserves_console_mode(tmp_path, monkeypatch):
     assert captured["root"] == tmp_path
     assert captured["target"].windowed is False
     assert ("node_modules", "node_modules") in captured["target"].data_items
+    assert captured["target"].build_extras == ".[web]"
+    assert set(captured["target"].required_modules) == {
+        "fastapi",
+        "uvicorn",
+        "websockets",
+    }
+    assert set(captured["target"].collect_submodules) == {
+        "fastapi",
+        "uvicorn",
+        "websockets",
+    }
+    assert set(_FORWARDED_COMMAND_GROUPS).issubset(
+        captured["target"].hidden_imports
+    )
+    assert "core.web.server" in captured["target"].hidden_imports
 
 
 def test_packaged_application_gate_uses_clean_cwd_and_real_opentui_modes(

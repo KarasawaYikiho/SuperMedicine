@@ -7,7 +7,7 @@ from functools import partial
 from pathlib import Path
 from typing import Any, Callable, Protocol
 
-from core.config_center import ConfigCenter
+from core.config_center import ConfigCenter, resolve_config_path
 from core.llm_manager import LLMConfigManager
 from core.logs.report import (
     LogReportError,
@@ -41,10 +41,19 @@ class PermissionLogSystemService:
     )
     _meta = staticmethod(partial(_result._service_meta, "permission_log_system"))
 
-    def __init__(self, project_root: str | Path | None = None) -> None:
+    def __init__(
+        self,
+        project_root: str | Path | None = None,
+        *,
+        config_path: str | Path | None = None,
+    ) -> None:
         self.project_root = Path(project_root or Path.cwd()).resolve()
-        self.config = ConfigCenter(self.project_root / ".supermedicine" / "config.yaml")
-        self.logs = LogReportStore(self.project_root)
+        self.config = ConfigCenter(
+            Path(config_path) if config_path else resolve_config_path(self.project_root)
+        )
+        self.logs = LogReportStore(
+            self.project_root, data_root=self.config.config_path.parent
+        )
 
     def permission_status(self) -> ServiceResult[dict[str, Any]]:
         def action() -> dict[str, Any]:
@@ -120,7 +129,9 @@ class PermissionLogSystemService:
             from core import API_VERSION
             from core.services.execution import LLMService
 
-            provider_result = LLMService(self.project_root).show_provider()
+            provider_result = LLMService(
+                self.project_root, config_path=self.config.config_path
+            ).show_provider()
             provider = (
                 provider_result.data
                 if provider_result.ok and isinstance(provider_result.data, dict)
@@ -130,7 +141,7 @@ class PermissionLogSystemService:
             return {
                 "version": API_VERSION,
                 "project_dir": str(self.project_root),
-                "config_initialized": (self.project_root / ".supermedicine").exists(),
+                "config_initialized": self.config.config_path.exists(),
                 "plugin_count": len(
                     PluginRegistry(
                         self.project_root / "plugins", allow_package_fallback=True
@@ -149,7 +160,9 @@ class PermissionLogSystemService:
 
         def action() -> dict[str, Any]:
             manager = LLMConfigManager(self.config, restore_on_startup=False)
-            storage = resolve_log_storage_locations(self.project_root)
+            storage = resolve_log_storage_locations(
+                self.project_root, data_root=self.config.config_path.parent
+            )
             config_diag = self.config.diagnostics()
             llm_diag = manager.diagnostics()
             runtime = required_runtime_snapshot(self.project_root)

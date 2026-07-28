@@ -121,30 +121,10 @@ def _fallback_parser() -> argparse.ArgumentParser:
 
 
 def _fallback_interactive() -> None:
-    project_text = input("Project directory [current]: ").strip()
+    project_text = input("Installation directory [current]: ").strip()
     project_dir = Path(project_text) if project_text else Path.cwd()
-    input("Extract full payload [no]: ")
-    initialize = input("Initialize configuration [yes]: ").strip().lower() not in {
-        "n",
-        "no",
-    }
-    provider = input("Provider: ").strip()
-    base_url = input("Base URL: ").strip()
-    model = input("Model: ").strip()
-    api_key = input("API key: ").strip()
-    input("Create shortcut [no]: ")
-    input("Add to PATH [no]: ")
-    input("Release desktop executable [no]: ")
-    confirmed = input("Proceed [yes]: ").strip().lower() not in {"n", "no"}
-    if confirmed and initialize:
-        _fallback_init_config(
-            project_dir,
-            provider=provider or None,
-            base_url=base_url or None,
-            api_key=api_key or None,
-            model=model or None,
-        )
-        print(f"SuperMedicine initialized: {project_dir / '.supermedicine'}")
+    print(f"SuperMedicine installation directory: {project_dir.resolve()}")
+    print("Configure the LLM later in the GUI or TUI.")
 
 
 def _fallback_main(argv: list[str] | None = None) -> None:

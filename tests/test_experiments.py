@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -34,6 +36,9 @@ def test_experiment_start_persists_session_and_show_returns_current_step(
     tmp_path, monkeypatch
 ):
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(
+        "SM_CONFIG", str(tmp_path / ".supermedicine" / "config.yaml")
+    )
 
     started = CLI().experiment_start("wb", session_id="wb-session")
     session_file = tmp_path / ".supermedicine" / "experiments" / "wb-session.json"
@@ -51,6 +56,9 @@ def test_experiment_submit_advances_step_and_records_submitted_data(
     tmp_path, monkeypatch
 ):
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(
+        "SM_CONFIG", str(tmp_path / ".supermedicine" / "config.yaml")
+    )
     session_file = tmp_path / ".supermedicine" / "experiments" / "wb-session.json"
     CLI().experiment_start("wb", session_id="wb-session")
 
@@ -79,6 +87,9 @@ def test_experiment_submit_with_calculate_returns_wb_calculation_output(
     tmp_path, monkeypatch
 ):
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(
+        "SM_CONFIG", str(tmp_path / ".supermedicine" / "config.yaml")
+    )
     session_file = tmp_path / ".supermedicine" / "experiments" / "calc-session.json"
     CLI().experiment_start("wb", session_id="calc-session")
 
@@ -115,6 +126,9 @@ def test_experiment_submit_calculate_rejects_step_without_supported_calculation(
     tmp_path, monkeypatch
 ):
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(
+        "SM_CONFIG", str(tmp_path / ".supermedicine" / "config.yaml")
+    )
     session_file = tmp_path / ".supermedicine" / "experiments" / "no-calc-session.json"
     CLI().experiment_start("wb", session_id="no-calc-session")
     CLI().experiment_submit(
@@ -145,7 +159,7 @@ def test_log_write_list_show_create_redacted_reports(tmp_path, monkeypatch):
     listed = CLI().log_list()
     shown = CLI().log_show(written["file"])
 
-    assert (tmp_path / ".supermedicine" / "logs" / written["file"]).is_file()
+    assert Path(written["path"]).is_file()
     assert written["session_id"] == "wb-session"
     assert "secret-token" not in written["message"]
     assert "[REDACTED]" in written["message"]
@@ -300,24 +314,19 @@ def test_experiment_config_loader_scans_unified_directory_and_alias_switches(tmp
     assert sources["cell"] == config_dir / "cell_assay.yaml"
 
 
-def test_experiment_llm_context_reflects_selected_protocol_switch():
+def test_experiment_llm_context_keeps_protocol_content_out_of_the_model_prompt():
     available = {protocol.protocol_id: protocol for protocol in list_protocols()}
     assert "western_blot_basic" in available
     assert "cell_culture_basic" in available
 
     context = build_experiment_llm_context("cell_culture_basic")
 
-    assert context["selected_protocol"]["protocol_id"] == "cell_culture_basic"
-    assert context["selected_protocol"]["protocol_id"] != "western_blot_basic"
-    assert any(
-        item["protocol_id"] == "western_blot_basic"
-        for item in context["available_protocols"]
-    )
-    assert any(
-        item["protocol_id"] == "cell_culture_basic"
-        for item in context["available_protocols"]
-    )
-    assert "plugins/experiments/" in context["authoring_rules"]
+    serialized = json.dumps(context, ensure_ascii=False)
+    assert context["selection_state"] == "selected"
+    assert context["available_protocol_count"] == len(available)
+    assert "cell_culture_basic" not in serialized
+    assert "western_blot_basic" not in serialized
+    assert context["available_protocol_count"] >= 2
 
 
 def test_create_experiment_session_and_read_current_step():
@@ -649,7 +658,9 @@ def test_complete_wb_cli_flow_writes_structured_session_log(tmp_path, monkeypatc
             calculate=bool(payload.get("calculation_params")),
         )
 
-    log_files = list((tmp_path / ".supermedicine" / "logs").glob("session-*.json"))
+    log_files = list(
+        (Path(os.environ["SM_CONFIG"]).parent / "logs").glob("session-*.json")
+    )
     assert [path.name for path in log_files] == [f"session-{session_id}.json"]
 
     report = json.loads(log_files[0].read_text(encoding="utf-8"))

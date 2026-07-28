@@ -32,9 +32,9 @@ supermedicine status
 Use `python install.py` for new source checkouts. Use `python install_entry.py`
 when invoking the dependency-light module entry directly.
 
-The installer creates or updates local `.supermedicine/` state. It asks for the
-target project root, optional LLM provider settings, and confirmation before
-writing installer-owned files.
+The installer asks only for the installation directory, then installs the
+default components automatically. Configure the LLM later from the GUI, TUI,
+environment variables, or the CLI.
 
 ## Development Install
 
@@ -133,12 +133,16 @@ Use `--exe-dry-run` when validating installer behavior without copying files.
 Do not copy only `install.py` or `SuperMedicineInstaller.exe` out of the release
 directory.
 
-## What the interactive questions mean
+## Default install and automation
 
 Ordinary users should run `python install.py` with no flags from a source checkout
-or run `SuperMedicineInstaller.exe` from a complete release archive. Source `python install.py` usually defaults to no for release payload extraction because
-source checkouts normally do not contain `dist/SuperMedicine.exe`.
-`SuperMedicineInstaller.exe` defaults to yes when it is run from a staged release payload.
+or run `SuperMedicineInstaller.exe` from a complete release archive. The only
+question is the installation directory. Existing installs are updated while
+preserving user data and configuration.
+
+Run `python uninstall_entry.py` from the installed directory for one-command
+removal of installer-owned files. Use `--project-dir` only for a different
+installation.
 
 Advanced automation / CI may use explicit flags such as:
 

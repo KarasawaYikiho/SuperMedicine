@@ -182,7 +182,7 @@ def test_rag_service_truncates_sources_to_configured_context_budget(tmp_path):
         "rag:\n  top_k: 5\n  min_score: 0\n  max_context_chars: 40\n",
         encoding="utf-8",
     )
-    provider = LocalRAGProvider(tmp_path / ".supermedicine" / "rag" / "local")
+    provider = LocalRAGProvider(tmp_path / "rag" / "local")
     provider.add_document("hypertension " + "evidence " * 20)
 
     context = RAGService(ConfigCenter(config_path), config_path).retrieve(
@@ -200,7 +200,7 @@ def test_medical_writing_and_citation_are_classified_as_knowledge_generation():
 def test_pubmed_denial_uses_local_results_as_degraded_without_http(tmp_path, monkeypatch):
     config_path = tmp_path / "config.yaml"
     config_path.write_text("rag:\n  provider: hybrid\n  min_score: 0\n", encoding="utf-8")
-    LocalRAGProvider(tmp_path / ".supermedicine" / "rag" / "local").add_document(
+    LocalRAGProvider(tmp_path / "rag" / "local").add_document(
         "local hypertension evidence", {"source": "local-paper"}
     )
     monkeypatch.setattr(

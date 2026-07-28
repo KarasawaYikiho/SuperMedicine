@@ -107,12 +107,15 @@ def test_workspace_service_owns_create_list_and_show(tmp_path):
 
 
 def test_workspace_service_delete_confirmation_failure_is_stable_and_audited(
-    tmp_path,
+    tmp_path, monkeypatch
 ):
     from core.services import WorkspaceService
     from permission.engine import PermissionEngine
 
     policies = tmp_path / ".supermedicine" / "policies"
+    monkeypatch.setenv(
+        "SM_CONFIG", str(tmp_path / ".supermedicine" / "config.yaml")
+    )
     policies.mkdir(parents=True)
     policies.joinpath(PermissionEngine.DEFAULT_POLICY_FILENAME).write_text(
         yaml.safe_dump(
@@ -360,6 +363,50 @@ def test_permission_log_system_service_owns_multi_agent_switch(tmp_path):
     assert PermissionLogSystemService(tmp_path).multi_agent_status().data == {
         "enabled": True
     }
+
+
+def test_services_share_sm_config_outside_project_tree(tmp_path, monkeypatch):
+    from core.services import (
+        ExperimentToolService,
+        LLMService,
+        PermissionLogSystemService,
+    )
+
+    project = tmp_path / "project"
+    external_config = tmp_path / "runtime-state" / "config.yaml"
+    monkeypatch.setenv("SM_CONFIG", str(external_config))
+
+    PermissionLogSystemService(project).set_multi_agent_enabled(True)
+    assert LLMService(project).config.config_path == external_config
+    assert ExperimentToolService(project).config_path == external_config
+    assert PermissionLogSystemService(project).multi_agent_status().data == {
+        "enabled": True
+    }
+    assert not (project / ".supermedicine" / "config.yaml").exists()
+
+
+def test_evolution_recommendations_use_config_state_but_outputs_stay_in_project(
+    tmp_path, monkeypatch
+):
+    from core.services import ExperienceEvolutionService
+
+    project = tmp_path / "project"
+    external_config = tmp_path / "runtime-state" / "config.yaml"
+    monkeypatch.setenv("SM_CONFIG", str(external_config))
+    service = ExperienceEvolutionService(project)
+
+    queued = service.recommend_evolution("Summarize reusable workflow")
+
+    assert queued.ok is True
+    queue_path = (
+        external_config.parent
+        / "self-evolution"
+        / "recommendations"
+        / f"{queued.data['id']}.json"
+    )
+    assert queue_path.is_file()
+    assert queued.data["output"].startswith("self_evolution/generated/")
+    assert not (project / "self_evolution" / f"{queued.data['id']}.json").exists()
 
 
 def test_agent_harness_service_owns_dialog_history(tmp_path):

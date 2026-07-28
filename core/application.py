@@ -39,7 +39,10 @@ class ApplicationFacade:
         if self._workspaces is None:
             from core.services.research import WorkspaceService
 
-            self._workspaces = WorkspaceService(self.paths.project_root)
+            self._workspaces = WorkspaceService(
+                self.paths.project_root,
+                config_path=self.paths.config_path,
+            )
         return self._workspaces
 
     def create_workspace(self, workspace_id: str, name: str | None = None) -> AppResult:

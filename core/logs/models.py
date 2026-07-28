@@ -72,17 +72,26 @@ class LogStorageLocations:
         }
 
 
-def resolve_log_storage_locations(project_dir: str | Path) -> LogStorageLocations:
+def resolve_log_storage_locations(
+    project_dir: str | Path,
+    *,
+    data_root: str | Path | None = None,
+) -> LogStorageLocations:
     """Return canonical project-local storage paths for logs, reports, and audit."""
 
     root = Path(project_dir).resolve()
-    log_dir = root / ".supermedicine" / "logs"
+    state = (
+        Path(data_root).resolve()
+        if data_root is not None
+        else root / ".supermedicine"
+    )
+    log_dir = state / "logs"
     return LogStorageLocations(
         project_dir=root,
         log_dir=log_dir,
         report_dir=log_dir,
         tui_log_file=log_dir / f"session-{TUI_LOG_SESSION_ID}.json",
-        audit_file=root / ".supermedicine" / "policies" / "audit.jsonl",
+        audit_file=state / "policies" / "audit.jsonl",
     )
 
 

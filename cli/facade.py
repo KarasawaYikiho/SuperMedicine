@@ -66,6 +66,8 @@ _FORWARDED_COMMAND_GROUPS = {
         "workspace_show",
         "workspace_delete",
         "paper_import",
+        "paper_search",
+        "paper_import_online",
         "paper_list",
         "paper_show",
         "paper_edit",
@@ -214,12 +216,12 @@ class CLI:
         )
 
         # 检查配置
-        config_dir = Path.cwd() / ".supermedicine"
-        if config_dir.exists():
+        config_path = self.paths.config_path
+        if config_path.parent.exists():
             from core.config_center import ConfigCenter
 
             logger.info("[OK] 项目配置已初始化")
-            config = ConfigCenter(config_dir / "config.yaml")
+            config = ConfigCenter(config_path)
             logger.info(
                 "[OK] 权限模式: %s (%s)",
                 config.get_permission_mode_label(),
@@ -305,7 +307,7 @@ class CLI:
         """执行任务 — 真实执行用户任务与医疗插件"""
         from core.kernel import Kernel
         from permission.redaction import redact_sensitive
-        from permission.policy import ensure_default_policy
+        from permission.policy import ensure_default_policy_in
         from core.workspace import WorkspaceManager
 
         # 确定项目根目录
@@ -330,13 +332,14 @@ class CLI:
             logger.info("Workspace: %s", workspace_info.id)
 
         # 初始化 Kernel（集成 PermissionEngine）
-        policies_dir = project_dir / ".supermedicine" / "policies"
-        ensure_default_policy(project_dir)
+        policies_dir = self.paths.data_root / "policies"
+        ensure_default_policy_in(policies_dir, source_root=self.paths.resource_root)
 
         kernel = Kernel(
-            config_path=project_dir / ".supermedicine" / "config.yaml",
+            config_path=self.paths.config_path,
             plugins_dir=project_dir / "plugins",
             policies_dir=policies_dir,
+            project_root=project_dir,
         )
 
         if verbose:

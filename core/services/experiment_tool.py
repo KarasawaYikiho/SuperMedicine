@@ -7,7 +7,7 @@ from functools import partial
 from pathlib import Path
 from typing import Any, Callable, Sequence, cast
 
-from core.config_center import ConfigCenter
+from core.config_center import ConfigCenter, resolve_config_path
 from core.experiment_guide import (
     CalculationResult,
     ExperimentGuide,
@@ -56,9 +56,22 @@ class ExperimentToolService:
     )
     _meta = staticmethod(partial(_result._service_meta, "experiment_tool"))
 
-    def __init__(self, project_root: str | Path | None = None) -> None:
-        self.tools = WorkspaceToolService(project_root)
+    def __init__(
+        self,
+        project_root: str | Path | None = None,
+        *,
+        resource_root: str | Path | None = None,
+        config_path: str | Path | None = None,
+    ) -> None:
+        self.tools = WorkspaceToolService(project_root, resource_root=resource_root)
         self.project_root = self.tools.project_root
+        self.config_path = (
+            Path(config_path)
+            if config_path
+            else resolve_config_path(self.project_root)
+        )
+        self.data_root = self.config_path.parent
+        self.logs = LogReportStore(self.project_root, data_root=self.data_root)
 
     def start_experiment(
         self,
@@ -73,7 +86,7 @@ class ExperimentToolService:
             path = self._session_path(session.session_id)
             self._save_session(path, session.to_dict())
             append_experiment_log_event(
-                LogReportStore(self.project_root),
+                self.logs,
                 "experiment_started",
                 session,
                 message="experiment guide session started",
@@ -109,13 +122,11 @@ class ExperimentToolService:
     ) -> ServiceResult[dict[str, Any]]:
         def action() -> dict[str, Any]:
             result = build_experiment_llm_context(protocol)
-            selected = result.get("selected_protocol")
-            if protocol and isinstance(selected, dict) and selected.get("protocol_id"):
-                protocol_id = str(selected["protocol_id"])
-                self._select_protocol(protocol_id)
+            if protocol:
+                self._select_protocol(protocol)
                 result["runtime_sync"] = {
-                    "selected_experiment_protocol": protocol_id,
-                    "message": "实验配置选择已同步到统一配置；后续 LLM 上下文会读取该协议。",
+                    "selected_experiment_protocol": "managed",
+                    "message": "已选择实验方案。",
                 }
             return result
 
@@ -148,7 +159,7 @@ class ExperimentToolService:
                 self._select_protocol(protocol_id)
                 result["runtime_sync"] = {
                     "selected_experiment_protocol": protocol_id,
-                    "message": "新增实验配置已同步为后续 LLM 上下文的当前实验。",
+                    "message": "已添加并选择实验方案。",
                 }
             return result
 
@@ -215,9 +226,7 @@ class ExperimentToolService:
         return self._experiment_call(
             "selected_experiment_protocol",
             None,
-            lambda: ConfigCenter(
-                self.project_root / ".supermedicine" / "config.yaml"
-            ).get_selected_experiment_protocol(),
+            lambda: ConfigCenter(self.config_path).get_selected_experiment_protocol(),
         )
 
     def calculate_live_step(
@@ -234,8 +243,9 @@ class ExperimentToolService:
             from core.kernel import Kernel
 
             kernel = Kernel(
-                config_path=self.project_root / ".supermedicine" / "config.yaml",
-                policies_dir=self.project_root / ".supermedicine" / "policies",
+                config_path=self.config_path,
+                policies_dir=self.data_root / "policies",
+                project_root=self.project_root,
             )
             params = self._calculation_params(requests[0], user_input)
             calculation = ExperimentGuide().execute_step_calculation(
@@ -247,7 +257,7 @@ class ExperimentToolService:
                 advance=False,
             )
             append_experiment_log_event(
-                LogReportStore(self.project_root),
+                self.logs,
                 "plugin_result",
                 session,
                 step_id=step.step_id,
@@ -291,7 +301,7 @@ class ExperimentToolService:
     ) -> ServiceResult[dict[str, Any]]:
         def action() -> dict[str, Any]:
             return append_experiment_log_event(
-                LogReportStore(self.project_root), event_type, session, **kwargs
+                self.logs, event_type, session, **kwargs
             )
 
         return self._experiment_call("append_live_event", None, action)
@@ -316,7 +326,7 @@ class ExperimentToolService:
                     "medical_boundary": MEDICAL_BOUNDARY,
                 }
             )
-            return LogReportStore(self.project_root).append(
+            return self.logs.append(
                 json.dumps(payload, ensure_ascii=False, sort_keys=True),
                 session_id=session.session_id,
             )
@@ -518,7 +528,7 @@ class ExperimentToolService:
         if result.get("status") != "success":
             raise ValueError(str(result.get("error") or "WB calculation failed"))
         append_experiment_log_event(
-            LogReportStore(self.project_root),
+            self.logs,
             "plugin_result",
             session,
             step_id=step_id,
@@ -535,7 +545,7 @@ class ExperimentToolService:
         outputs: dict[str, Any],
         record: dict[str, Any],
     ) -> None:
-        store = LogReportStore(self.project_root)
+        store = self.logs
         append_experiment_log_event(
             store,
             "step_input_submitted",
@@ -648,12 +658,12 @@ class ExperimentToolService:
         )
 
     def _select_protocol(self, protocol_id: str) -> None:
-        ConfigCenter(
-            self.project_root / ".supermedicine" / "config.yaml"
-        ).set_selected_experiment_protocol(protocol_id, save=True)
+        ConfigCenter(self.config_path).set_selected_experiment_protocol(
+            protocol_id, save=True
+        )
 
     def _session_path(self, session_id: str) -> Path:
-        return self.project_root / ".supermedicine" / "experiments" / f"{session_id}.json"
+        return self.data_root / "experiments" / f"{session_id}.json"
 
     @staticmethod
     def _load_session(path: Path) -> dict[str, Any]:
@@ -719,7 +729,7 @@ class ExperimentToolService:
     def _record_tool_import(
         self, workspace_id: str, imported: list[dict[str, Any]]
     ) -> None:
-        config = ConfigCenter(self.project_root / ".supermedicine" / "config.yaml")
+        config = ConfigCenter(self.config_path)
         config.set_runtime_state_value("last_workspace_id", workspace_id)
         config.record_tool_import_state(
             workspace_id=workspace_id, imported=imported, save=True

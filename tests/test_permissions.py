@@ -391,6 +391,9 @@ def test_cli_permission_mode_requires_confirmation_and_persists_runtime_policy(
     project_root.mkdir()
     external_root.mkdir()
     monkeypatch.chdir(project_root)
+    monkeypatch.setenv(
+        "SM_CONFIG", str(project_root / ".supermedicine" / "config.yaml")
+    )
     cli = CLI()
 
     status = cli.permission_status()
@@ -422,6 +425,9 @@ def test_cli_permission_authorize_and_revoke_external_directory_updates_policy(
     project_root.mkdir()
     external_root.mkdir()
     monkeypatch.chdir(project_root)
+    monkeypatch.setenv(
+        "SM_CONFIG", str(project_root / ".supermedicine" / "config.yaml")
+    )
     cli = CLI()
 
     authorized = cli.permission_authorize(external_root)

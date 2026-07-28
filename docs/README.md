@@ -2,6 +2,10 @@
 
 Use this page as the entry point for maintained documentation.
 
+Desktop GUI and OpenTUI are the primary interactive interfaces. Maintained
+functions are available from both interfaces. Harness and RAG run continuously;
+Multi-Agent and other extensions can be enabled or disabled.
+
 ## User guides
 
 - [Installation](guides/INSTALL.md) is the canonical source for source installs,

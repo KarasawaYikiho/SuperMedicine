@@ -6,7 +6,7 @@ from functools import partial
 from pathlib import Path
 from typing import Any, Callable
 
-from core.config_center import ConfigCenter
+from core.config_center import ConfigCenter, resolve_config_path
 from core.dialog_history import DialogHistoryPrivacyError, DialogHistoryStore
 from core.llm_manager import LLMConfigManager
 from core.workspace import WorkspaceError
@@ -22,11 +22,12 @@ class LLMService:
         self,
         project_root: str | Path | None = None,
         *,
+        config_path: str | Path | None = None,
         restore_on_startup: bool = False,
     ) -> None:
         self.project_root = Path(project_root) if project_root else Path.cwd()
         self.config = ConfigCenter(
-            self.project_root / ".supermedicine" / "config.yaml"
+            Path(config_path) if config_path else resolve_config_path(self.project_root)
         )
         self.manager = LLMConfigManager(
             self.config, restore_on_startup=restore_on_startup

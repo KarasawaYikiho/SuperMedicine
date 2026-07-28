@@ -342,7 +342,9 @@ def test_ci_release_artifacts_include_standalone_installer_exe_and_shared_payloa
     assert "npm ci" in workflow
     assert "oven-sh/setup-bun" in workflow
     assert "_pyinstaller_builder.py application" in workflow
-    assert "./dist/SuperMedicine.exe tui --dry-run" in workflow
+    assert 'SuperMedicine.exe" tui --dry-run' in workflow
+    assert "/api/v1/health" in workflow
+    assert "taskkill.exe /PID $web.Id /T /F" in workflow
     assert "zip-gui-self-test.json" in workflow
 
     # CUR-DBG-010: release payload/zip must carry the logo resource used for
@@ -502,9 +504,10 @@ def test_release_docs_describe_ci_artifact_layout_and_install_py_roles():
     assert "Bun" in combined
     assert "--release-payload-root . " not in combined
     assert "--release-payload-root .\\" not in combined
-    assert "What the interactive questions mean" in install
-    assert "Source `python install.py` usually defaults to no" in install
-    assert "`SuperMedicineInstaller.exe` defaults to yes" in install
+    assert "Default install and automation" in install
+    assert "The only" in install
+    assert "question is the installation directory" in install
+    assert "Existing installs are updated" in install
 
 
 # ═══ Release Version Validation ═══

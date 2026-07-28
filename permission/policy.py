@@ -36,7 +36,18 @@ def ensure_default_policy(project_dir: Path, source_root: Path | None = None) ->
     the repository/package canonical policy so all initialization entry points
     stay aligned.
     """
-    target_policy = default_policy_path(project_dir)
+    return ensure_default_policy_in(
+        Path(project_dir) / DEFAULT_POLICY_RELATIVE_PATH.parent,
+        source_root=source_root,
+    )
+
+
+def ensure_default_policy_in(
+    policies_dir: Path, source_root: Path | None = None
+) -> Path:
+    """Ensure an explicit runtime policy directory has the default policy."""
+
+    target_policy = Path(policies_dir) / DEFAULT_POLICY_RELATIVE_PATH.name
     target_policy.parent.mkdir(parents=True, exist_ok=True)
     if target_policy.exists():
         return target_policy

@@ -754,6 +754,9 @@ def test_cli_add_switch_and_list_are_secret_safe_and_persist_current(
 
     secret = "sk-cli-manager-secret"
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(
+        "SM_CONFIG", str(tmp_path / ".supermedicine" / "config.yaml")
+    )
     caplog.set_level("INFO", logger="Cli")
 
     add_result = CLI().llm_add(

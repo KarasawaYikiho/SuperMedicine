@@ -165,10 +165,10 @@ def validate_required_plugins(
 
 def required_runtime_snapshot(project_dir: Path) -> dict[str, Any]:
     """Build the shared mandatory runtime health snapshot for every interface."""
-    from core.config_center import ConfigCenter
+    from core.config_center import ConfigCenter, resolve_config_path
 
     root = Path(project_dir).resolve()
-    config_path = root / ".supermedicine" / "config.yaml"
+    config_path = resolve_config_path(root)
     config = ConfigCenter(config_path)
     registry = PluginRegistry(root / "plugins", allow_package_fallback=True)
     registry.discover()
@@ -195,6 +195,6 @@ def required_runtime_snapshot(project_dir: Path) -> dict[str, Any]:
         agent_mode=(
             "multi" if config.get_multi_agent_config()["enabled"] else "single"
         ),
-        rag_index=str(root / ".supermedicine" / "rag" / "local"),
+        rag_index=str(config_path.parent / "rag" / "local"),
     )
     return capabilities.to_dict()

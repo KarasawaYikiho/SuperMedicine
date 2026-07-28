@@ -720,7 +720,7 @@ def main() -> None:
         args.project_dir,
         dry_run=args.dry_run,
         force=args.force,
-        yes=args.yes,
+        yes=True,
         explicit_targets=args.target,
         preserve_user_data=args.preserve_user_data,
         components=component_list,

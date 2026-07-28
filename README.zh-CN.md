@@ -1,8 +1,8 @@
 # SuperMedicine
 
-SuperMedicine 是模块化医学科研助手，包含独立 Python 运行时、CLI、OpenTUI、
-Web、Desktop、可选平台适配器与科研插件，覆盖证据检索、论文、统计、规范核查、
-绘图、权限和可审计执行。
+SuperMedicine 是医学科研助手，主要交互产品是桌面 GUI 与 OpenTUI。两者均须
+提供完整、清晰、可操作的稳定功能；CLI 与 Web API 用于自动化、集成和一致性
+验证。
 
 <!-- BEGIN GENERATED: release-metadata -->
 当前版本：**0.5.0b0**
@@ -15,8 +15,8 @@ English: [README.md](README.md)
 <a id="product"></a>
 ## 产品
 
-独立核心是默认产品；OpenCode 与 Claude Code 适配器是可选层，不会重新定义核心
-行为。
+本项目注重桌面 GUI 与 OpenTUI。稳定的用户功能只有在两个界面均可见、可用时才
+算完成。OpenCode、Claude Code 和 Multi-Agent 等能力保持可选。
 
 稳定能力包括：
 
@@ -58,9 +58,12 @@ python -m pip install -e .
 python install.py
 ```
 
-普通用户直接运行无参数 `python install.py` 并使用交互向导。自动化、Release
-归档、三个 EXE、payload、失败恢复与卸载说明统一见
+普通用户直接运行无参数 `python install.py`，只需选择安装目录，随后自动完成
+安装；LLM 设置可稍后在 GUI 或 TUI 中配置。自动化、Release 归档、三个 EXE、
+payload、失败恢复与卸载说明统一见
 [安装指南](docs/guides/INSTALL.md)。
+
+在安装目录运行 `python uninstall_entry.py` 即可一键卸载。
 
 OpenTUI 使用 `@opentui/core@0.4.3`：
 

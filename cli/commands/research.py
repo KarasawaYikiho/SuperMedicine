@@ -75,6 +75,30 @@ def paper_import(
     return result
 
 
+def paper_search(
+    cli, query: str, *, source: str = "pubmed", limit: int = 10
+) -> list[dict]:
+    """Search public paper metadata without importing it."""
+    service = PaperRAGService(cli.paths.project_root)
+    result = service.require_data(
+        service.search_online(query, source=source, limit=limit)
+    )
+    _log_json(result)
+    return result
+
+
+def paper_import_online(
+    cli, workspace_id: str, source: str, external_id: str
+) -> dict:
+    """Import one selected public record into a workspace and local RAG."""
+    service = PaperRAGService(cli.paths.project_root)
+    result = service.require_data(
+        service.import_online(workspace_id, source, external_id)
+    )
+    _log_json(result)
+    return result
+
+
 def paper_list(cli, workspace_id: str) -> list[dict]:
     """List papers from an explicitly selected workspace."""
     service = PaperRAGService(Path.cwd())

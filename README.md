@@ -1,10 +1,9 @@
 # SuperMedicine
 
-SuperMedicine is a modular medical-research assistant with a standalone Python
-runtime, CLI, OpenTUI, Web and Desktop surfaces, optional platform adapters, and
-research plugins. It supports evidence retrieval, paper workflows, statistical
-analysis, standards checks, figure workflows, permissions, and auditable
-execution.
+SuperMedicine is a medical-research assistant whose primary interactive
+products are the Desktop GUI and OpenTUI. Both interfaces expose the stable
+research workflows; CLI and Web endpoints remain supported for automation,
+integration, and parity testing.
 
 <!-- BEGIN GENERATED: release-metadata -->
 Current release: **0.5.0b0**
@@ -17,8 +16,9 @@ Release series: **Beta0.5.0**
 <a id="product"></a>
 ## Product
 
-The standalone core is the default product. OpenCode and Claude Code adapters
-are optional layers and do not redefine core behavior.
+Desktop GUI and OpenTUI are the product focus. A stable user-facing capability
+is complete only when it is usable and visible in both interfaces. OpenCode,
+Claude Code, and Multi-Agent execution remain optional.
 
 Stable capabilities include:
 
@@ -64,12 +64,16 @@ python -m pip install -e .
 python install.py
 ```
 
-Ordinary users run `python install.py` with no flags and follow the interactive
-wizard. Advanced automation / CI can use explicit flags and a staged release
-payload. Full source, release archive, `SuperMedicineInstaller.exe`,
+Ordinary users run `python install.py` with no flags, choose the installation
+directory, and installation continues automatically. LLM settings are
+configured later in the GUI or TUI. Advanced automation / CI can use explicit
+flags and a staged release payload. Full source, release archive, `SuperMedicineInstaller.exe`,
 `dist/SuperMedicine.exe`, `--extract-release-to`, `--release-exe`,
 `--exe-dry-run`, and failure recovery are documented in the
 [installation guide](docs/guides/INSTALL.md).
+
+Run `python uninstall_entry.py` from the installed directory for one-command
+uninstall.
 
 OpenTUI uses `@opentui/core@0.4.3`:
 

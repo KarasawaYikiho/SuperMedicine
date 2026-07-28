@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 from pathlib import Path
+import logging
 from typing import Any, Callable, Iterable
 
 from core.services import ServiceResult
+from permission.redaction import redact_sensitive
+
+logger = logging.getLogger(__name__)
 
 
 def web_error(message: str, status_code: int, *, code: str | None = None) -> Any:
@@ -23,7 +27,8 @@ def web_error(message: str, status_code: int, *, code: str | None = None) -> Any
         "No path specified": "path_required",
         "No protocol specified": "protocol_required",
         "step_id and input_json are required": "experiment_step_input_required",
-        "instruction and output are required": "invalid_self_evolution_request",
+        "instruction is required": "invalid_self_evolution_request",
+        "source and external_id are required": "online_paper_fields_required",
         "agent_mode must be 'single' or 'multi'": "invalid_agent_mode",
         "enabled must be a boolean": "invalid_multi_agent_state",
     }
@@ -64,6 +69,8 @@ def service_data(result: ServiceResult[Any]) -> Any:
         "incomplete_provider_config": 422,
         "paper_source_missing": 404,
         "paper_not_found": 404,
+        "online_paper_unavailable": 503,
+        "invalid_paper_request": 400,
         "unsupported_paper_format": 422,
         "invalid_tool_language": 422,
         "invalid_tool_id": 422,
@@ -113,14 +120,17 @@ def llm_provider_list_response(result: Any) -> Any:
     return {**result, "providers": providers}
 
 
-def experiment_session_path(session_file: str) -> Path:
+def experiment_session_path(
+    session_file: str, project_root: str | Path | None = None
+) -> Path:
     """Resolve a Web-selected experiment only inside managed storage."""
-    storage = (Path.cwd() / ".supermedicine" / "experiments").resolve()
+    root = Path(project_root or Path.cwd()).resolve()
+    storage = (root / ".supermedicine" / "experiments").resolve()
     requested = Path(session_file)
     candidate = (
         requested.resolve()
         if requested.is_absolute()
-        else (Path.cwd() / requested).resolve()
+        else (root / requested).resolve()
     )
     try:
         candidate.relative_to(storage)
@@ -161,16 +171,22 @@ class WebRuntime:
     def get_kernel(self) -> Any:
         if "kernel" not in self._instances:
             from core.kernel import Kernel
-            from permission.policy import ensure_default_policy
+            from permission.policy import ensure_default_policy_in
 
             project_dir = self.project_root or Path.cwd()
             resource_dir = self.resource_root or project_dir
-            policies_dir = project_dir / ".supermedicine" / "policies"
-            ensure_default_policy(project_dir)
+            config_path = (
+                self.application.paths.config_path
+                if self.application is not None
+                else project_dir / ".supermedicine" / "config.yaml"
+            )
+            policies_dir = config_path.parent / "policies"
+            ensure_default_policy_in(policies_dir, source_root=resource_dir)
             self._instances["kernel"] = Kernel(
-                config_path=project_dir / ".supermedicine" / "config.yaml",
+                config_path=config_path,
                 plugins_dir=resource_dir / "plugins",
                 policies_dir=policies_dir,
+                project_root=project_dir,
             )
         return self._instances["kernel"]
 
@@ -199,6 +215,7 @@ class WebRuntime:
         agent_mode: str | None = None,
         progress_callback: Any = None,
     ) -> dict[str, Any]:
+        project_dir = self.project_root or Path.cwd()
         kernel = self.get_kernel()
         workspace_context = self.workspace_context(workspace_id)
         params: dict[str, Any] | None = None
@@ -216,6 +233,29 @@ class WebRuntime:
             progress_callback=progress_callback,
             use_agent_chain=None if agent_mode is None else agent_mode == "multi",
         )
+        if result.get("status") == "success":
+            from core.services import ExperienceEvolutionService
+
+            safe_message = str(redact_sensitive(message[:500]))
+            recommendation = ExperienceEvolutionService(
+                project_dir,
+                config_path=kernel._config_path,
+            ).recommend_evolution(
+                "复盘本次 Agent 执行并提炼可复用经验：" + safe_message,
+                workspace_id=workspace_id,
+                source={
+                    "kind": "agent_discovery",
+                    "agent": str(result.get("agent") or "alpha"),
+                    "task_id": str(result.get("task_id") or ""),
+                },
+            )
+            if not recommendation.ok:
+                logger.warning(
+                    "Self-evolution recommendation was not queued: %s",
+                    recommendation.error.message
+                    if recommendation.error is not None
+                    else "unknown error",
+                )
         if workspace_context is not None:
             metadata = result.setdefault("metadata", {})
             if isinstance(metadata, dict):

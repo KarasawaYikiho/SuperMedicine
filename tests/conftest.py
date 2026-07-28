@@ -23,6 +23,16 @@ def block_real_network(monkeypatch):
     monkeypatch.setattr(urllib.request, "urlopen", _blocked_urlopen)
 
 
+@pytest.fixture(autouse=True)
+def isolate_runtime_config(tmp_path, monkeypatch):
+    """Give every test its own writable runtime state root."""
+
+    monkeypatch.setenv(
+        "SM_CONFIG",
+        str(tmp_path / "runtime-state" / "config.yaml"),
+    )
+
+
 @pytest.fixture
 def sample_config_yaml(tmp_path) -> Path:
     """创建含基本配置的 Config.YAML，返回文件路径"""

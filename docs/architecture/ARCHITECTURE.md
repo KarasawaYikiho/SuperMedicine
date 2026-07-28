@@ -1,8 +1,8 @@
 # Architecture
 
-SuperMedicine is a local-first Python framework for medical research assistance.
-The default supported product is the standalone Python runtime: CLI, Kernel,
-permission engine, plugins, workspace state, installer, and TUI launcher.
+SuperMedicine is a medical-research assistant centered on Desktop GUI and
+OpenTUI. Both interfaces provide the same research, configuration, permission,
+and diagnostic functions. CLI and Web endpoints provide automation access.
 
 ## System Shape
 
@@ -42,10 +42,10 @@ parallel top-level lifecycle.
 | CLI | `cli/` | Parser and facade should delegate feature logic. |
 | Runtime | `core/` | Shared services used by CLI, TUI, Web, and tests. |
 | Permissions | `permission/` | Runtime enforcement happens here, not in prompt text. |
-| Plugins | `plugins/` | Capabilities are manifest-discovered and action-based. |
+| Plugins | `plugins/` | Provides research, analysis, figure, and runtime actions. |
 | Workspaces | `core/workspace*.py`, `core/paper_import/`, `core/experience.py` | Workspace ids are explicit and project-local. |
 | TUI | `core/tui/` | Python launcher plus OpenTUI JavaScript runtime. |
-| Web | `core/web/` | Optional FastAPI/browser surface. |
+| GUI / Web | `core/web/` | Primary desktop UI and its FastAPI/browser transport. |
 | Installer | `installer/`, `install*.py`, `uninstall*.py` | Release-critical behavior. |
 | Adapters | `adapters/` | Optional platform metadata and bridge code. |
 

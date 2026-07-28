@@ -722,35 +722,28 @@ def _prompt_interactive_llm_config(
 def _prompt_interactive_plan(
     args: argparse.Namespace, components: dict[str, ComponentDef]
 ) -> _InteractiveInstallPlan | None:
-    step_total = 5 if components else 4
-    logger.info("\n[1/%d] 选择安装位置", step_total)
-    install_path, action, preserve, extract = _prompt_install_target()
-    if action == "cancel":
-        return None
-    step = 1
-    selected = None
-    if components:
-        step += 1
-        logger.info("\n[%d/%d] 选择安装组件", step, step_total)
-        selected = _prompt_component_selection(components)
-    step += 1
-    logger.info("\n[%d/%d] 初始化项目配置", step, step_total)
-    init_enabled, llm_config = _prompt_interactive_llm_config(
-        args, install_path, action
-    )
-    step += 1
-    logger.info("\n[%d/%d] 可选快捷入口", step, step_total)
-    shortcut = _prompt_yes_no("记录创建快捷方式意向", False)
-    add_to_path = _prompt_yes_no("显示 PATH 手动配置提示", False)
-    release_exe = None
-    if _prompt_yes_no("复制 SuperMedicine.exe 到桌面", bool(args.release_exe)):
-        release_exe = _prompt_path(
-            "Exe 路径", args.release_exe or Path("dist") / "SuperMedicine.exe"
-        )
-    logger.info("\n[%d/%d] 确认安装", step + 1, step_total)
+    install_path = _prompt_path("安装目录", Path.cwd())
+    detection = detect_existing_install(install_path, include_payload=False)
+    action = "update" if detection.installed else "ignore"
+    extract = bool(getattr(sys, "frozen", False))
+    selected = sorted(get_default_selection(components)) if components else None
+    llm_config: dict[str, str | None] = {
+        "provider": None,
+        "base_url": None,
+        "api_key": None,
+        "model": None,
+    }
     return _InteractiveInstallPlan(
-        install_path, action, preserve, extract, selected, init_enabled,
-        llm_config, shortcut, add_to_path, release_exe,
+        install_path=install_path,
+        existing_action=action,
+        preserve_user_data=True,
+        extract_release=extract,
+        selected_components=selected,
+        init_config_enabled=False,
+        llm_config=llm_config,
+        create_shortcut=False,
+        add_to_path=False,
+        release_exe=Path(args.release_exe).resolve() if args.release_exe else None,
     )
 
 
@@ -847,31 +840,14 @@ def _run_interactive_installer(args: argparse.Namespace) -> None:
     logger.info("%s", INSTALLER_RULE)
     logger.info("%s", INSTALLER_TITLE)
     logger.info("%s", INSTALLER_RULE)
-    logger.info("回车使用默认值；API key 不会显示在屏幕上。")
-    logger.info("准备: 建议先执行 pip install -e .；命令不可用时可用 python cli_entry.py。")
+    logger.info("选择安装目录后自动安装；LLM 可在 GUI 或 TUI 中配置。")
 
     install_service, components = _load_interactive_components()
-    while True:
-        try:
-            plan = _prompt_interactive_plan(args, components)
-        except KeyboardInterrupt:
-            continue
-        if plan is None:
-            logger.info("安装已取消。")
-            return
-        if not _confirm_interactive_plan(plan):
-            if _prompt_yes_no("返回重新填写", True):
-                continue
-            logger.info("安装已取消。")
-            return
-        try:
-            logger.info("\n正在安装...")
-            _execute_interactive_plan(args, plan, install_service)
-            return
-        except (ValueError, OSError, SystemExit) as exc:
-            logger.error("安装失败: %s", redact_sensitive(str(exc)))
-            if not _prompt_yes_no("重试安装向导", True):
-                raise
+    plan = _prompt_interactive_plan(args, components)
+    if plan is None:
+        return
+    logger.info("正在安装...")
+    _execute_interactive_plan(args, plan, install_service)
 
 
 def _apply_llm_config(

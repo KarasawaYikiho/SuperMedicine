@@ -158,7 +158,14 @@ class _ChatExecution:
 
     def emit(self, kind: str, message: str = "", **payload: Any) -> None:
         if self.progress is not None:
-            self.progress({"kind": kind, "message": message, **payload})
+            self.progress(
+                {
+                    "kind": kind,
+                    "message": message,
+                    "agent": self.agent_id,
+                    **payload,
+                }
+            )
 
     def metadata(self) -> dict[str, Any]:
         return {

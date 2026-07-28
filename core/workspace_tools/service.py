@@ -58,8 +58,18 @@ def _slug_from_name(value: str) -> str:
 class WorkspaceToolService:
     """Manage modular tools inside explicit workspace directories."""
 
-    def __init__(self, project_root: str | Path | None = None) -> None:
+    def __init__(
+        self,
+        project_root: str | Path | None = None,
+        *,
+        resource_root: str | Path | None = None,
+    ) -> None:
         self.project_root = self._resolve_service_project_root(project_root)
+        self.resource_root = (
+            self._resolve_service_project_root(resource_root)
+            if resource_root is not None
+            else self.project_root
+        )
         self.workspace_manager = WorkspaceManager(self.project_root)
 
     @classmethod
@@ -92,7 +102,7 @@ class WorkspaceToolService:
         """Return the project directory scanned for importable Python/R tools."""
 
         return validate_path_in_project_root(
-            self.project_root / "plugins" / TOOLS_DIR, self.project_root
+            self.resource_root / "plugins" / TOOLS_DIR, self.resource_root
         )
 
     def initialize_tools(self, workspace_id: str) -> dict[str, Any]:
@@ -329,7 +339,7 @@ class WorkspaceToolService:
         return manifest
 
     def _candidate_from_source(self, source_path: Path) -> ToolImportCandidate | None:
-        source_path = validate_path_in_project_root(source_path, self.project_root)
+        source_path = validate_path_in_project_root(source_path, self.resource_root)
         plugin_manifest = source_path / "plugin.yaml"
         workspace_manifest = source_path / MANIFEST_FILE
         data: dict[str, Any] = {}
@@ -390,7 +400,7 @@ class WorkspaceToolService:
             if Path(entrypoint).is_absolute() or ".." in Path(entrypoint).parts:
                 raise ToolManifestError("entrypoint must stay inside source folder")
             entrypoint_path = validate_path_in_project_root(
-                source_path / entrypoint, self.project_root
+                source_path / entrypoint, self.resource_root
             )
             entrypoint_path.relative_to(source_path)
             if not entrypoint_path.is_file():

@@ -174,7 +174,7 @@ class TestKernel:
     def test_llm_chat_retrieves_local_rag_context_without_retrieval_keywords(
         self, tmp_path, monkeypatch
     ):
-        LocalRAGProvider(tmp_path / ".supermedicine" / "rag" / "local").add_document(
+        LocalRAGProvider(tmp_path / "rag" / "local").add_document(
             "Hypertension evidence supports lifestyle and pharmacologic treatment.",
             {"source": "local-fixture", "title": "Evidence note"},
         )
@@ -261,7 +261,7 @@ class TestKernel:
     def test_llm_chat_fails_closed_when_local_rag_index_is_corrupt(
         self, tmp_path, monkeypatch
     ):
-        index_dir = tmp_path / ".supermedicine" / "rag" / "local"
+        index_dir = tmp_path / "rag" / "local"
         index_dir.mkdir(parents=True)
         (index_dir / "documents.json").write_text("{not json", encoding="utf-8")
         with pytest.raises(RuntimeInvariantError) as captured:
@@ -302,7 +302,7 @@ class TestKernel:
         assert any("do not invent" in message.lower() for message in evidence_messages)
 
     def test_multi_agent_execution_uses_same_rag_and_harness_pipeline(self, tmp_path):
-        LocalRAGProvider(tmp_path / ".supermedicine" / "rag" / "local").add_document(
+        LocalRAGProvider(tmp_path / "rag" / "local").add_document(
             "Hypertension cohort evidence.",
             {"source": "local-fixture", "title": "Cohort note"},
         )
@@ -552,8 +552,10 @@ class TestKernel:
         runtime_context = messages[2]["content"]
         tool_context = messages[3]["content"]
 
-        assert "cell_culture_basic" in experiment_context
-        assert "western_blot_basic" in experiment_context
+        assert "cell_culture_basic" not in experiment_context
+        assert "western_blot_basic" not in experiment_context
+        assert '"selection_state": "selected"' in experiment_context
+        assert '"available_protocol_count": 2' in experiment_context
         assert "full" in runtime_context
         assert "完全访问" in runtime_context
         assert "permission" in runtime_context

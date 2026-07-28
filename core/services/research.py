@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from hashlib import sha256
 from functools import partial
 from pathlib import Path
 from typing import Any, Callable, cast
@@ -15,6 +16,7 @@ from core.experience import (
     ExperienceStore,
     ExportFormat,
 )
+from core.config_center import resolve_config_path
 from core.operation_guard import authorize_dangerous_operation
 from core.paper_import.contracts import (
     MissingPaperSourceError,
@@ -25,8 +27,10 @@ from core.paper_import.contracts import (
 )
 from core.paper_import.enrichment import PaperEnricher, PaperEnrichmentResult
 from core.paper_import.importer import PaperImporter
+from core.paper_import.online import OnlinePaperClient, OnlinePaperError
 from core.path_safety import validate_destructive_path
-from core.self_evolution import SelfEvolutionService
+from core.self_evolution import ARTIFACT_TYPE_WHITELIST, SelfEvolutionService
+from core.time_utils import utc_now
 from core.workspace import (
     InvalidWorkspaceId,
     WorkspaceError,
@@ -37,7 +41,7 @@ from core.workspace import (
 )
 from permission.audit import AuditLogger
 from permission.engine import PermissionEngine
-from permission.policy import ensure_default_policy
+from permission.policy import ensure_default_policy, ensure_default_policy_in
 
 from . import result as _result
 from .result import ServiceResult
@@ -59,9 +63,20 @@ class WorkspaceService:
     )
     _meta = staticmethod(partial(_result._service_meta, "workspace"))
 
-    def __init__(self, project_root: str | Path | None = None) -> None:
+    def __init__(
+        self,
+        project_root: str | Path | None = None,
+        *,
+        config_path: str | Path | None = None,
+    ) -> None:
         self.manager = WorkspaceManager(project_root)
         self.project_root = self.manager.project_root
+        self.config_path = (
+            Path(config_path)
+            if config_path
+            else resolve_config_path(self.project_root)
+        )
+        self.state_root = self.config_path.parent
 
     def create(
         self,
@@ -171,9 +186,8 @@ class WorkspaceService:
         try:
             slug = validate_workspace_id(workspace_id)
             workspace_path = self.manager.workspace_path(slug)
-            audit_path = (
-                self.project_root / ".supermedicine" / "policies" / "audit.jsonl"
-            )
+            policies_dir = self.state_root / "policies"
+            audit_path = policies_dir / "audit.jsonl"
             audit_logger = AuditLogger(audit_path)
             if confirm != slug:
                 audit_logger.log(
@@ -193,8 +207,7 @@ class WorkspaceService:
 
             self.manager.get_workspace(slug)
             safe_path = validate_destructive_path(workspace_path, self.project_root)
-            ensure_default_policy(self.project_root)
-            policies_dir = self.project_root / ".supermedicine" / "policies"
+            ensure_default_policy_in(policies_dir)
             authorization = authorize_dangerous_operation(
                 permission_engine=PermissionEngine(policies_dir, audit_path),
                 agent_id=agent_id,
@@ -299,9 +312,112 @@ class PaperRAGService:
     )
     _meta = staticmethod(partial(_result._service_meta, "paper_rag"))
 
-    def __init__(self, project_root: str | Path | None = None) -> None:
+    def __init__(
+        self,
+        project_root: str | Path | None = None,
+        *,
+        online_client: OnlinePaperClient | None = None,
+        config_path: str | Path | None = None,
+    ) -> None:
         self.importer = PaperImporter(project_root)
         self.project_root = self.importer.project_root
+        self.config_path = (
+            Path(config_path)
+            if config_path
+            else resolve_config_path(self.project_root)
+        )
+        self.online_client = online_client or OnlinePaperClient()
+
+    def search_online(
+        self,
+        query: str,
+        *,
+        source: str = "pubmed",
+        limit: int = 10,
+        request_id: str | None = None,
+    ) -> ServiceResult[list[dict[str, Any]]]:
+        return self._call(
+            "search_online",
+            request_id,
+            lambda: [
+                record.to_dict()
+                for record in self.online_client.search(
+                    query, source=source, limit=limit
+                )
+            ],
+            source=source,
+        )
+
+    def import_online(
+        self,
+        workspace_id: str,
+        source: str,
+        external_id: str,
+        *,
+        request_id: str | None = None,
+    ) -> ServiceResult[dict[str, Any]]:
+        def action() -> dict[str, Any]:
+            record = self.online_client.get(source, external_id)
+            cache = self.config_path.parent / "paper-import-cache"
+            cache.mkdir(parents=True, exist_ok=True)
+            cache_key = sha256(
+                f"{record.source}\0{record.external_id}".encode("utf-8")
+            ).hexdigest()
+            source_path = cache / f"{record.source}-{cache_key}.md"
+            temporary_path = source_path.with_suffix(".tmp")
+            content = "\n".join(
+                    [
+                        f"# {record.title}",
+                        "",
+                        f"- 来源：{record.source}",
+                        f"- 标识：{record.external_id}",
+                        f"- 作者：{', '.join(record.authors)}",
+                        f"- 期刊：{record.journal}",
+                        f"- 发表时间：{record.published}",
+                        f"- DOI：{record.doi or ''}",
+                        f"- PMID：{record.pmid or ''}",
+                        f"- 链接：{record.url}",
+                        "",
+                        "## 摘要",
+                        "",
+                        record.abstract or "该数据源未提供摘要。",
+                        "",
+                    ]
+                )
+            try:
+                temporary_path.write_text(content, encoding="utf-8")
+                temporary_path.replace(source_path)
+                imported = self.importer.import_file(
+                    workspace_id,
+                    source_path,
+                    {
+                        "title": record.title,
+                        "authors": list(record.authors),
+                        "doi": record.doi,
+                        "pmid": record.pmid,
+                        "notes": (
+                            f"从 {record.source} 在线检索并导入；"
+                            f"原始链接：{record.url}"
+                        ),
+                        "tags": ["online-import", record.source],
+                    },
+                )
+            except Exception:
+                temporary_path.unlink(missing_ok=True)
+                source_path.unlink(missing_ok=True)
+                raise
+            return {
+                **self.import_payload(imported),
+                "online_source": record.to_dict(),
+            }
+
+        return self._call(
+            "import_online",
+            request_id,
+            action,
+            workspace_id=workspace_id,
+            source=source,
+        )
 
     def import_paper(
         self,
@@ -382,6 +498,29 @@ class PaperRAGService:
             paper_id=paper_id,
         )
 
+    def delete_paper(
+        self,
+        workspace_id: str,
+        paper_id: str,
+        *,
+        confirm: str,
+        request_id: str | None = None,
+    ) -> ServiceResult[dict[str, Any]]:
+        if confirm != paper_id:
+            return ServiceResult.failure(
+                "confirmation_mismatch",
+                "confirm must exactly match the paper id",
+                request_id=request_id,
+                meta=self._meta("delete_paper"),
+            )
+        return self._call(
+            "delete_paper",
+            request_id,
+            lambda: self.importer.delete_paper(workspace_id, paper_id),
+            workspace_id=workspace_id,
+            paper_id=paper_id,
+        )
+
     def enrich_metadata(
         self,
         workspace_id: str,
@@ -436,8 +575,10 @@ class PaperRAGService:
             )
         except (
             PaperImportError,
+            OnlinePaperError,
             InvalidWorkspaceId,
             WorkspaceError,
+            ValueError,
             OSError,
         ) as exc:
             return self._expected_failure(
@@ -466,11 +607,16 @@ class PaperRAGService:
         elif isinstance(exc, MissingPaperSourceError):
             code = (
                 "paper_not_found"
-                if operation in {"show_paper", "edit_metadata", "enrich_metadata"}
+                if operation
+                in {"show_paper", "edit_metadata", "enrich_metadata", "delete_paper"}
                 else "paper_source_missing"
             )
         elif isinstance(exc, InvalidWorkspaceId):
             code = "invalid_workspace_id"
+        elif isinstance(exc, OnlinePaperError):
+            code = "online_paper_unavailable"
+        elif isinstance(exc, ValueError):
+            code = "invalid_paper_request"
         else:
             code = "paper_error"
         return ServiceResult.failure(
@@ -532,9 +678,20 @@ class ExperienceEvolutionService:
     )
     _meta = staticmethod(partial(_result._service_meta, "experience_evolution"))
 
-    def __init__(self, project_root: str | Path | None = None) -> None:
+    def __init__(
+        self,
+        project_root: str | Path | None = None,
+        *,
+        config_path: str | Path | None = None,
+    ) -> None:
         self.store = ExperienceStore(project_root)
         self.project_root = self.store.project_root
+        self.config_path = (
+            Path(config_path)
+            if config_path
+            else resolve_config_path(self.project_root)
+        )
+        self.state_root = self.config_path.parent
         self.evolution = SelfEvolutionService(self.project_root)
 
     def suggest_experience(
@@ -694,7 +851,7 @@ class ExperienceEvolutionService:
         acknowledge_risk: bool = False,
         metadata: dict[str, Any] | None = None,
     ) -> ServiceResult[dict[str, Any]]:
-        audit_path = self.project_root / ".supermedicine" / "policies" / "audit.jsonl"
+        audit_path = self.state_root / "policies" / "audit.jsonl"
         return self._call(
             "generate_evolution",
             lambda: self.evolution.generate(
@@ -713,9 +870,92 @@ class ExperienceEvolutionService:
             ),
         )
 
+    def recommend_evolution(
+        self,
+        instruction: str,
+        *,
+        artifact_type: str = "markdown",
+        workspace_id: str | None = None,
+        source: dict[str, Any] | None = None,
+    ) -> ServiceResult[dict[str, Any]]:
+        """Queue a safe preview recommendation for explicit human confirmation."""
+
+        def action() -> dict[str, Any]:
+            normalized = instruction.strip()
+            if not normalized:
+                raise ValueError("self-evolution recommendation is empty")
+            if artifact_type not in ARTIFACT_TYPE_WHITELIST:
+                raise ValueError("unsupported self-evolution artifact type")
+            digest = sha256(
+                f"{workspace_id or 'global'}\0{normalized}".encode("utf-8")
+            ).hexdigest()[:16]
+            artifact_id = f"recommendation-{digest}"
+            directory = self.state_root / "self-evolution" / "recommendations"
+            directory.mkdir(parents=True, exist_ok=True)
+            path = directory / f"{artifact_id}.json"
+            payload = {
+                "id": artifact_id,
+                "type": artifact_type,
+                "instruction": normalized,
+                "status": "pending",
+                "workspace_id": workspace_id,
+                "source": source or {"kind": "manual"},
+                "created_at": utc_now(),
+                "output": f"self_evolution/generated/{artifact_id}.md",
+            }
+            if path.is_file():
+                existing = json.loads(path.read_text(encoding="utf-8"))
+                if isinstance(existing, dict):
+                    return existing
+            path.write_text(
+                json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            return payload
+
+        return self._call("recommend_evolution", action)
+
+    def confirm_evolution(
+        self, artifact_id: str
+    ) -> ServiceResult[dict[str, Any]]:
+        """Generate one queued recommendation only after a human confirms it."""
+
+        def action() -> dict[str, Any]:
+            path = self._artifact_path(artifact_id)
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            if not isinstance(payload, dict):
+                raise ValueError("invalid self-evolution recommendation")
+            if payload.get("status") == "success":
+                return payload
+            result = self.evolution.generate(
+                user_intent=str(payload.get("instruction") or ""),
+                artifact_type=str(payload.get("type") or "markdown"),
+                output_path=str(payload.get("output") or ""),
+                workspace_id=(
+                    str(payload["workspace_id"])
+                    if payload.get("workspace_id")
+                    else None
+                ),
+                access_mode="sandbox",
+                confirmed=True,
+                audit_logger=AuditLogger(
+                    self.state_root / "policies" / "audit.jsonl"
+                ),
+            )
+            payload["status"] = result.get("status", "failed")
+            payload["result"] = result
+            payload["confirmed_at"] = utc_now()
+            path.write_text(
+                json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            return payload
+
+        return self._call("confirm_evolution", action)
+
     def list_evolution_artifacts(self) -> ServiceResult[list[dict[str, Any]]]:
         def action() -> list[dict[str, Any]]:
-            directory = self.project_root / "self_evolution"
+            directory = self.state_root / "self-evolution" / "recommendations"
             if not directory.is_dir():
                 return []
             artifacts = []
@@ -757,7 +997,12 @@ class ExperienceEvolutionService:
     def _artifact_path(self, artifact_id: str) -> Path:
         if not artifact_id or Path(artifact_id).name != artifact_id:
             raise ValueError("invalid self-evolution artifact id")
-        path = self.project_root / "self_evolution" / f"{artifact_id}.json"
+        path = (
+            self.state_root
+            / "self-evolution"
+            / "recommendations"
+            / f"{artifact_id}.json"
+        )
         if not path.is_file():
             raise FileNotFoundError(f"Artifact not found: {artifact_id}")
         return path

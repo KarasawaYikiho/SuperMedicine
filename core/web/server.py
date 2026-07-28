@@ -25,7 +25,11 @@ def _ensure_fastapi() -> None:
         import fastapi  # noqa: F401
         import uvicorn  # noqa: F401
     except ImportError as exc:
-        raise ImportError("Web GUI requires 'fastapi' and 'uvicorn'. Install them with: pip install supermedicine[web]") from exc
+        raise ImportError(
+            "Web GUI requires 'fastapi' and 'uvicorn'. Re-run the bundled "
+            "SuperMedicine installer, or from a source checkout run: "
+            'python -m pip install -e "."'
+        ) from exc
 
 
 def _install_web_security(app: Any, auth_token: str | None) -> None:
@@ -43,7 +47,10 @@ def _install_web_security(app: Any, auth_token: str | None) -> None:
         if encoded_path.startswith(artifact_prefix):
             from core.web.security import validate_artifact_id
             try:
-                validate_artifact_id(unquote(encoded_path[len(artifact_prefix) :]))
+                artifact_tail = encoded_path[len(artifact_prefix) :]
+                if artifact_tail.endswith("/confirm"):
+                    artifact_tail = artifact_tail[: -len("/confirm")]
+                validate_artifact_id(unquote(artifact_tail))
             except APIError as exc:
                 return api_error_response(exc, request_id=request_id)
         api_path = request.url.path == "/api/v1" or request.url.path.startswith("/api/v1/")
@@ -82,12 +89,26 @@ def create_app(*, auth_token: str | None = None, shutdown_callback: Any = None, 
     runtime = WebRuntime(
         {
             "agent_harness": AgentHarnessService,
-            "experiment_tool": ExperimentToolService,
-            "experience_evolution": ExperienceEvolutionService,
-            "llm": LLMService,
-            "paper_rag": PaperRAGService,
-            "permission_log_system": PermissionLogSystemService,
-            "workspace": WorkspaceService,
+            "experiment_tool": lambda project_root: ExperimentToolService(
+                project_root,
+                resource_root=resolved_paths.resource_root,
+                config_path=resolved_paths.config_path,
+            ),
+            "experience_evolution": lambda project_root: ExperienceEvolutionService(
+                project_root, config_path=resolved_paths.config_path
+            ),
+            "llm": lambda project_root: LLMService(
+                project_root, config_path=resolved_paths.config_path
+            ),
+            "paper_rag": lambda project_root: PaperRAGService(
+                project_root, config_path=resolved_paths.config_path
+            ),
+            "permission_log_system": lambda project_root: PermissionLogSystemService(
+                project_root, config_path=resolved_paths.config_path
+            ),
+            "workspace": lambda project_root: WorkspaceService(
+                project_root, config_path=resolved_paths.config_path
+            ),
         },
         project_root=resolved_paths.project_root if paths is not None else None,
         resource_root=resolved_paths.resource_root,

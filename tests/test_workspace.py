@@ -367,6 +367,9 @@ def test_workspace_delete_rejects_confirmation_mismatch_and_audits(
     tmp_path, monkeypatch
 ):
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(
+        "SM_CONFIG", str(tmp_path / ".supermedicine" / "config.yaml")
+    )
     _copy_default_policy(tmp_path)
     WorkspaceManager(tmp_path).initialize_workspace("trial-1")
 
@@ -387,6 +390,9 @@ def test_workspace_delete_rejects_confirmation_mismatch_and_audits(
 
 def test_workspace_delete_hard_deletes_after_permission_approval(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(
+        "SM_CONFIG", str(tmp_path / ".supermedicine" / "config.yaml")
+    )
     _copy_default_policy(tmp_path)
     workspace = WorkspaceManager(tmp_path).initialize_workspace("trial-1")
     (workspace.path / "notes" / "note.txt").write_text("content", encoding="utf-8")
@@ -412,6 +418,9 @@ def test_workspace_delete_denied_by_policy_keeps_workspace_and_audits(
     tmp_path, monkeypatch
 ):
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(
+        "SM_CONFIG", str(tmp_path / ".supermedicine" / "config.yaml")
+    )
     policies = tmp_path / ".supermedicine" / "policies"
     policies.mkdir(parents=True)
     (policies / PermissionEngine.DEFAULT_POLICY_FILENAME).write_text(
@@ -542,6 +551,32 @@ class TestWorkspaceToolSourceRoot:
 
         assert service.project_root == tmp_path.resolve()
         assert service.tool_source_root() == source_root.resolve()
+
+    def test_runtime_data_root_and_bundled_tool_resource_root_are_separate(
+        self, tmp_path: Path
+    ):
+        data_root = tmp_path / "data"
+        resource_root = tmp_path / "bundle"
+        _make_python_scan_tool(
+            resource_root / "plugins" / "tools",
+            "visible_tool",
+            {
+                "name": "visible-tool",
+                "version": "1.0",
+                "type": "tool",
+                "language": "python",
+                "entry": "main.py",
+            },
+        )
+
+        service = WorkspaceToolService(data_root, resource_root=resource_root)
+        grouped = service.scan_import_candidates("python")
+
+        assert service.project_root == data_root.resolve()
+        assert service.tool_source_root() == (
+            resource_root / "plugins" / "tools"
+        ).resolve()
+        assert [item["id"] for item in grouped["python"]] == ["visible-tool"]
 
 
 class TestWorkspaceToolScanning:
@@ -1359,6 +1394,9 @@ def test_cli_tool_add_selection_imports_scanned_tool_and_records_runtime_state(
     tmp_path, monkeypatch
 ):
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(
+        "SM_CONFIG", str(tmp_path / ".supermedicine" / "config.yaml")
+    )
     source = tmp_path / "plugins" / "tools" / "python_stats"
     source.mkdir(parents=True)
     (source / "plugin.yaml").write_text(

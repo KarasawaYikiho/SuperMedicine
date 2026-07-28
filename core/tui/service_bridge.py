@@ -150,9 +150,9 @@ def _present(route: str, records: list[Any]) -> list[dict[str, Any]]:
     return [_presentation_entry(route, record) for record in records]
 
 
-def catalog_snapshot(project_root: str | Path) -> dict[str, Any]:
+def catalog_snapshot(project_root: Any) -> dict[str, Any]:
     """Return all OpenTUI page records from shared application services."""
-    root = Path(project_root).resolve()
+    root, resource_root = _path_pair(project_root)
     system = PermissionLogSystemService(root)
     runtime = system.runtime_state()
     runtime_data = runtime.data if runtime.ok and isinstance(runtime.data, dict) else {}
@@ -160,7 +160,7 @@ def catalog_snapshot(project_root: str | Path) -> dict[str, Any]:
 
     workspaces = WorkspaceService(root).list()
     llm = LLMService(root).list_providers()
-    experiments = ExperimentToolService(root)
+    experiments = ExperimentToolService(root, resource_root=resource_root)
     capabilities = system.plugin_capabilities()
     capability_data = (
         capabilities.data
@@ -332,18 +332,32 @@ def _execute_chat(value: str, target: Any) -> dict[str, Any]:
 
 def perform_action(route: str, value: str, target: Any) -> dict[str, Any]:
     """Execute the primary business action exposed by each TUI page."""
-    project_root, _ = _path_pair(target)
+    project_root, resource_root = _path_pair(target)
     workspace_id = _runtime_workspace(project_root)
     if route == "dashboard":
         return PermissionLogSystemService(project_root).application_status().to_dict()
     if route == "workspace":
         return submit_value(route, value, project_root)
     if route == "paper":
-        if not workspace_id or not value:
+        if not workspace_id:
             return ServiceResult.failure(
                 "paper_input_required",
-                "请先选择工作区并输入论文文件路径。",
+                "请先选择工作区。",
                 meta={"service": "opentui", "route": route},
+            ).to_dict()
+        if value.startswith("search:"):
+            return PaperRAGService(project_root).search_online(
+                value.removeprefix("search:").strip()
+            ).to_dict()
+        for source in ("pubmed", "crossref"):
+            prefix = source + ":"
+            if value.lower().startswith(prefix):
+                return PaperRAGService(project_root).import_online(
+                    workspace_id, source, value[len(prefix) :].strip()
+                ).to_dict()
+        if not value:
+            return PaperRAGService(project_root).list_papers(
+                workspace_id
             ).to_dict()
         return PaperRAGService(project_root).import_paper(
             workspace_id, value
@@ -369,9 +383,15 @@ def perform_action(route: str, value: str, target: Any) -> dict[str, Any]:
                 "请先选择工作区。",
                 meta={"service": "opentui", "route": route},
             ).to_dict()
-        return ExperimentToolService(project_root).initialize_tools(
-            workspace_id
-        ).to_dict()
+        tools = ExperimentToolService(project_root, resource_root=resource_root)
+        if value.startswith("add:"):
+            selections = [
+                item.strip()
+                for item in value.removeprefix("add:").split(",")
+                if item.strip()
+            ]
+            return tools.import_tools(workspace_id, selections).to_dict()
+        return tools.scan_tools(value.strip() or None).to_dict()
     if route == "llm":
         return activate_record("llm", {"provider": value}, project_root)
     if route == "experiment":
@@ -450,7 +470,7 @@ def bridge_request(request: dict[str, Any], target: Any) -> dict[str, Any]:
     project_root, _ = _path_pair(target)
     operation = str(request.get("operation") or "")
     if operation == "catalog":
-        return catalog_snapshot(project_root)
+            return catalog_snapshot(target)
     if operation == "multi-agent":
         return multi_agent_operation(
             str(request.get("action") or "status"), project_root

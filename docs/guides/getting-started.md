@@ -56,6 +56,8 @@ recent TUI workspace for CLI operations.
 
 ```bash
 supermedicine paper import ./paper.pdf --workspace demo --title "Paper Title"
+supermedicine paper search "systematic review" --source pubmed
+supermedicine paper import-online pubmed 12345678 --workspace demo
 supermedicine paper list --workspace demo
 ```
 
@@ -86,12 +88,14 @@ supermedicine tool list --workspace demo
 
 Tools are imported into the workspace before use.
 
-## 7. Run the TUI
+## 7. Open the primary interfaces
 
 ```bash
 supermedicine tui --dry-run
 supermedicine tui
 ```
+
+Installed Windows releases also provide `SuperMedicineGUI.exe`.
 
 The interactive TUI requires Bun and the locked npm dependency installed by
 `npm ci`.

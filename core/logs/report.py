@@ -44,12 +44,15 @@ class LogReportStore:
         self,
         project_dir: str | Path,
         *,
+        data_root: str | Path | None = None,
         max_message_length: int = DEFAULT_MAX_MESSAGE_LENGTH,
         max_records_per_session: int = DEFAULT_MAX_RECORDS_PER_SESSION,
         max_file_bytes: int = DEFAULT_MAX_FILE_BYTES,
     ) -> None:
         self.project_dir = Path(project_dir).resolve()
-        self._locations = resolve_log_storage_locations(self.project_dir)
+        self._locations = resolve_log_storage_locations(
+            self.project_dir, data_root=data_root
+        )
         self.log_dir = self._locations.log_dir
         self.max_message_length = self._positive_int(
             max_message_length, "max_message_length"

@@ -9,11 +9,17 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 
 @pytest.fixture
-def client():
+def client(tmp_path):
     """Create test client."""
+    from core.runtime_paths import RuntimePaths
     from core.web.server import create_app
 
-    app = create_app()
+    app = create_app(
+        paths=RuntimePaths.resolve(
+            project_root=tmp_path,
+            config_path=tmp_path / ".supermedicine" / "config.yaml",
+        )
+    )
     return TestClient(app)
 
 
@@ -41,12 +47,21 @@ def test_self_evolution_generate_with_params(client):
         "/api/v1/self-evolution/generate",
         json={
             "instruction": "test instruction",
-            "type": "code",
-            "output": "/tmp/test_output.py",
+            "type": "markdown",
         },
     )
     assert response.status_code == 200
-    # Should return a result (may be error if self_evolve not fully implemented)
+    assert response.json()["status"] == "pending"
+
+
+def test_online_paper_validation_returns_http_400(client):
+    response = client.get(
+        "/api/v1/papers/search",
+        params={"q": "evidence", "source": "pubmed", "limit": 0},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "invalid_paper_request"
 
 
 def test_self_evolution_get_not_found(client):
@@ -240,7 +255,9 @@ def test_llm_provider_list_uses_frontend_provider_schema(monkeypatch):
     from core.services import ServiceResult
 
     class FakeLLMService:
-        def __init__(self, project_root):
+        def __init__(
+            self, project_root, *, resource_root=None, config_path=None
+        ):
             pass
 
         def list_providers(self):
@@ -309,7 +326,9 @@ def test_experiment_detail_endpoint_returns_persisted_session_details(monkeypatc
     from core.services import ServiceResult
 
     class FakeExperimentToolService:
-        def __init__(self, project_root):
+        def __init__(
+            self, project_root, *, resource_root=None, config_path=None
+        ):
             pass
 
         def show_experiment(self, session_file):
@@ -388,7 +407,7 @@ def test_paper_enrich_requires_explicit_confirmation(monkeypatch):
     captured: dict[str, object] = {}
 
     class FakePaperRAGService:
-        def __init__(self, project_root):
+        def __init__(self, project_root, *, config_path=None):
             pass
 
         def enrich_metadata(self, workspace_id, paper_id, *, confirm):

@@ -58,12 +58,22 @@ class Kernel:
         plugins_dir: Path | None = None,
         policies_dir: Path | None = None,
         *,
+        project_root: Path | None = None,
         allow_ephemeral: bool = False,
     ):
         if config_path is None:
             config_path = resolve_config_path()
 
         self._config_path = config_path or Path(".supermedicine/config.yaml")
+        self._project_root = (
+            Path(project_root).resolve()
+            if project_root is not None
+            else (
+                self._config_path.parent.parent.resolve()
+                if self._config_path.parent.name == ".supermedicine"
+                else self._config_path.parent.resolve()
+            )
+        )
         self._plugins_dir = plugins_dir or Path("plugins")
         self._policies_dir = policies_dir or DEFAULT_POLICY_RELATIVE_PATH.parent
 
@@ -137,6 +147,7 @@ class Kernel:
         self._rag_service = RAGService(
             self._config,
             self._config_path,
+            project_root=self._project_root,
             permission_engine=self._permission_engine,
         )
 
@@ -165,12 +176,7 @@ class Kernel:
             if self._config.get_multi_agent_config()["enabled"]
             else "single"
         )
-        project_root = (
-            self._config_path.parent.parent
-            if self._config_path.parent.name == ".supermedicine"
-            else self._config_path.parent
-        )
-        rag_index = str(project_root / ".supermedicine" / "rag" / "local")
+        rag_index = str(self._config_path.parent / "rag" / "local")
         self._runtime_capabilities = replace(
             self._runtime_capabilities,
             agent_mode=agent_mode,
@@ -223,7 +229,7 @@ class Kernel:
         task_dict: dict[str, Any] = {"task": task, "task_id": task_id}
 
         # Step 1: Delta routes the task
-        emit("status", "Delta agent routing task…")
+        emit("status", "正在规划任务路线…", agent="delta")
         delta_result = orch.dispatch("delta", task_dict)
         target = delta_result.get("target_agent", "alpha")
         context = delta_result.get("context", {})
@@ -233,19 +239,19 @@ class Kernel:
             context = {**context, "rag": rag_context.as_prompt_payload()}
 
         # Step 2: Alpha analysis
-        emit("status", "Alpha agent analysing task…")
+        emit("status", "正在分析任务…", agent="alpha")
         alpha_input = {**task_dict, "context": context}
         alpha_result = orch.dispatch(
             target if target == "alpha" else "alpha", alpha_input
         )
 
         # Step 3: Beta review
-        emit("status", "Beta agent reviewing analysis…")
+        emit("status", "正在复核分析…", agent="beta")
         beta_input = {**task_dict, **alpha_result, "context": context}
         beta_result = orch.dispatch("beta", beta_input)
 
         if not beta_result.get("approved", False):
-            emit("status", "Beta agent rejected the analysis; chain halted.")
+            emit("status", "复核未通过，Agent 链已停止。", agent="beta")
             # Persist agent states after chain execution
             self.save_agent_state("delta", delta_result)
             self.save_agent_state("alpha", alpha_result)
@@ -266,11 +272,11 @@ class Kernel:
             }
 
         # Step 4: Gamma content generation
-        emit("status", "Gamma agent generating content…")
+        emit("status", "正在生成最终内容…", agent="gamma")
         gamma_input = {**task_dict, **alpha_result, "context": context}
         gamma_result = orch.dispatch("gamma", gamma_input)
 
-        emit("status", "Agent chain completed successfully.")
+        emit("status", "Agent 链已完成。", agent="delta")
         # Persist agent states after chain execution
         self.save_agent_state("delta", delta_result)
         self.save_agent_state("alpha", alpha_result)

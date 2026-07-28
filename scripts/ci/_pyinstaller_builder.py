@@ -27,6 +27,7 @@ class PyInstallerTarget:
     icon: Path
     build_extras: str | None = None
     required_modules: tuple[str, ...] = ()
+    collect_submodules: tuple[str, ...] = ()
     windowed: bool = True
     include_version_info: bool = True
 
@@ -131,6 +132,7 @@ def build_executable(root: Path, target: PyInstallerTarget) -> Path | None:
         *version_args,
         *_add_data_args(root, target.data_items),
         *(f"--hidden-import={module}" for module in target.hidden_imports),
+        *(f"--collect-submodules={module}" for module in target.collect_submodules),
         str(entry),
     ]
     print(f"Running PyInstaller to build {target.output_name}.exe ...")
@@ -162,6 +164,12 @@ def build_executable(root: Path, target: PyInstallerTarget) -> Path | None:
 def build_application(root: Path) -> Path | None:
     """Build the standalone CLI application with all dynamic runtime resources."""
 
+    root_text = str(root.resolve())
+    if root_text not in sys.path:
+        sys.path.insert(0, root_text)
+    from cli.facade import _FORWARDED_COMMAND_GROUPS
+
+    forwarded_modules = tuple(_FORWARDED_COMMAND_GROUPS)
     return build_executable(
         root,
         PyInstallerTarget(
@@ -176,8 +184,19 @@ def build_application(root: Path) -> Path | None:
                 "assets",
                 ("node_modules", "node_modules"),
             ),
-            hidden_imports=("core", "permission", "plugins", "agents", "adapters"),
+            hidden_imports=(
+                "core",
+                "core.web.server",
+                "permission",
+                "plugins",
+                "agents",
+                "adapters",
+                *forwarded_modules,
+            ),
             icon=root / "assets" / "logo.ico",
+            build_extras=".[web]",
+            required_modules=("fastapi", "uvicorn", "websockets"),
+            collect_submodules=("fastapi", "uvicorn", "websockets"),
             windowed=False,
         ),
     )
