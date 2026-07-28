@@ -150,3 +150,13 @@ The repaired tree passed the following gates before commit:
 The remaining four pytest skips are the environment-bound cases documented
 above. Remote CI is not treated as complete until the pushed commit finishes
 its hosted workflows.
+
+### Remote Python 3.10 follow-up
+
+The first pushed commit exposed a Python 3.10-only test-fixture defect:
+`read_pyproject` used the standard-library `tomllib` on Python 3.11 and newer,
+but its 3.10 regex fallback did not parse the build-system or license tables.
+The release metadata contract therefore failed with `KeyError: build-system`
+even though the artifact build itself succeeded. The fixture now uses the
+installed `tomli` backport on Python 3.10 and retains the small regex parser only
+as a last-resort fallback.
