@@ -40,7 +40,7 @@ counts, function counts, or line counts.
 
 ```powershell
 python -m pip install -e ".[dev,web]"
-python -m pytest tests/test_web.py tests/test_web_artifacts.py tests/test_web_security.py -q
+python -m pytest tests/test_web_artifacts.py tests/test_web_security.py -q
 ```
 
 ## Optional OpenTUI Gate

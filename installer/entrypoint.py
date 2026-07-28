@@ -28,7 +28,11 @@ from urllib.parse import urlparse
 import yaml
 
 from core import PUBLIC_VERSION
-from core.llm_providers.config import LLMProviderConfig
+from core.llm_providers.config import (
+    LLMProviderConfig,
+    _PROVIDER_ENV_MAP,
+    _infer_api_format,
+)
 from permission.redaction import redact_sensitive
 from core.secure_files import secure_config_permissions
 from permission.policy import ensure_default_policy
@@ -104,18 +108,7 @@ class ExistingInstallDetection:
         return self.primary.kind if self.primary is not None else "none"
 
 
-_PROVIDER_ENV_MAP: dict[str, str] = {
-    "openai": "OPENAI_API_KEY",
-    "anthropic": "ANTHROPIC_API_KEY",
-    "openrouter": "OPENROUTER_API_KEY",
-}
-
-_PROVIDER_FORMAT_HINTS: dict[str, str] = {
-    "anthropic": "anthropic",
-    "claude": "anthropic",
-}
-
-PROVIDER_ENV_NAMES = _PROVIDER_ENV_MAP
+PROVIDER_ENV_NAMES = dict(_PROVIDER_ENV_MAP)
 
 INSTALL_ENV_NAMES = {
     "provider": "SM_LLM_PROVIDER",
@@ -198,15 +191,11 @@ def _optional_string(value: Any) -> str | None:
 
 
 def _provider_api_format(provider: str) -> str:
-    normalized = provider.strip().lower()
-    for hint, fmt in _PROVIDER_FORMAT_HINTS.items():
-        if hint in normalized:
-            return fmt
-    return "openai"
+    return _infer_api_format(provider)
 
 
 def _provider_api_key_env(provider: str) -> str:
-    return _PROVIDER_ENV_MAP.get(provider, f"{provider.upper()}_API_KEY")
+    return PROVIDER_ENV_NAMES.get(provider, f"{provider.upper()}_API_KEY")
 
 
 def _require_complete_llm_config(

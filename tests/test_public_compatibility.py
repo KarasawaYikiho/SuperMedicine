@@ -14,15 +14,12 @@ from core.kernel import Kernel
 from core.llm_client import create_llm_client
 from core.workspace import WorkspaceManager
 from permission.engine import PermissionEngine
-from permission.policy import PermissionResult, ensure_default_policy
+from permission.policy import PermissionResult
 from plugins.rag import main as rag_main
+from tests import copy_default_policy as _copy_default_policy
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-
-
-def _copy_default_policy(project_dir: Path) -> None:
-    ensure_default_policy(project_dir, source_root=REPO_ROOT)
 
 
 def _write_policy(project_dir: Path, policy: dict | list[dict]) -> Path:

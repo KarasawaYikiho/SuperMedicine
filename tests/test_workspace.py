@@ -35,14 +35,15 @@ from core.workspace_tools import (
 from core.workspace_tools.models import InvalidToolLanguage
 from permission.audit import AuditLogger
 from permission.engine import PermissionEngine
-from permission.policy import PermissionResult, ensure_default_policy
+from permission.policy import PermissionResult
+from tests import (
+    KernelDouble,
+    RecordingPermissionEngine,
+    copy_default_policy as _copy_default_policy,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-
-
-def _copy_default_policy(project_dir: Path) -> None:
-    ensure_default_policy(project_dir, source_root=REPO_ROOT)
 
 
 def _make_python_scan_tool(
@@ -455,21 +456,7 @@ def test_run_preserves_legacy_params_or_adds_explicit_workspace_context(
         WorkspaceManager(tmp_path).initialize_workspace(workspace_id)
     captured = {}
 
-    class FakeRegistry:
-        def discover(self):
-            return []
-
-    class FakeCheckpointManager:
-        base_dir = "checkpoints"
-
-    class FakeKernel:
-        def __init__(self, *args, **kwargs):
-            self._config_path = kwargs["config_path"]
-            self._plugins_dir = kwargs["plugins_dir"]
-            self._policies_dir = kwargs["policies_dir"]
-            self.plugin_registry = FakeRegistry()
-            self.checkpoint_manager = FakeCheckpointManager()
-
+    class FakeKernel(KernelDouble):
         def execute_task(self, task, plugin_name=None, action=None, params=None):
             captured["params"] = params
             return {
@@ -498,23 +485,6 @@ def test_run_preserves_legacy_params_or_adds_explicit_workspace_context(
 
 
 # ═══ Workspace Tools Tests ═══
-
-
-class RecordingPermissionEngine:
-    def __init__(self, result: PermissionResult):
-        self.result = result
-        self.calls: list[dict[str, Any]] = []
-
-    def check(self, agent_id, action, resource, context=None):
-        self.calls.append(
-            {
-                "agent_id": agent_id,
-                "action": action,
-                "resource": resource,
-                "context": context,
-            }
-        )
-        return self.result
 
 
 @pytest.mark.parametrize("language", ["python", "r"])
@@ -1679,21 +1649,7 @@ def test_legacy_cli_run_flags_still_work_without_workspace(monkeypatch, tmp_path
     _copy_default_policy(tmp_path)
     captured = {}
 
-    class FakeRegistry:
-        def discover(self):
-            return []
-
-    class FakeCheckpointManager:
-        base_dir = "checkpoints"
-
-    class FakeKernel:
-        def __init__(self, *args, **kwargs):
-            self.plugin_registry = FakeRegistry()
-            self.checkpoint_manager = FakeCheckpointManager()
-            self._config_path = kwargs["config_path"]
-            self._plugins_dir = kwargs["plugins_dir"]
-            self._policies_dir = kwargs["policies_dir"]
-
+    class FakeKernel(KernelDouble):
         def execute_task(self, task, plugin_name=None, action=None, params=None):
             captured["task"] = task
             captured["plugin_name"] = plugin_name

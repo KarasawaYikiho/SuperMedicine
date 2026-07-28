@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
 
 import pytest
 
@@ -11,26 +10,10 @@ from core.experience import ExperienceStore
 from core.self_evolution import SelfEvolutionService
 from core.workspace import WorkspaceManager
 from permission.policy import PermissionResult
+from tests import RecordingPermissionEngine
 
 
 # ═══ Self Evolution Tests ═══
-
-
-class RecordingPermissionEngine:
-    def __init__(self, result: PermissionResult):
-        self.result = result
-        self.calls: list[dict[str, Any]] = []
-
-    def check(self, agent_id, action, resource, context=None):
-        self.calls.append(
-            {
-                "agent_id": agent_id,
-                "action": action,
-                "resource": resource,
-                "context": context,
-            }
-        )
-        return self.result
 
 
 def _service(tmp_path: Path) -> SelfEvolutionService:

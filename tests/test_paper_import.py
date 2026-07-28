@@ -18,19 +18,12 @@ from core.workspace import WorkspaceManager
 from core.workspace import WorkspaceNotFoundError
 from permission.audit import AuditLogger
 from permission.engine import PermissionEngine
-from permission.policy import ensure_default_policy
 from plugins.rag.providers import LocalRAGProvider
 from core.services.rag import RAGService
-
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
+from tests import KernelDouble, copy_default_policy as _copy_default_policy
 
 
 SUPPORTED_EXTENSIONS = (".pdf", ".tex", ".bib", ".ris", ".txt", ".md")
-
-
-def _copy_default_policy(project_dir: Path) -> None:
-    ensure_default_policy(project_dir, source_root=REPO_ROOT)
 
 
 def _write_delta_policy(
@@ -329,21 +322,7 @@ def test_old_cli_commands_and_run_flags_still_present(tmp_path, monkeypatch):
     WorkspaceManager(tmp_path).initialize_workspace("trial-1")
     captured = {}
 
-    class FakeRegistry:
-        def discover(self):
-            return []
-
-    class FakeCheckpointManager:
-        base_dir = "checkpoints"
-
-    class FakeKernel:
-        def __init__(self, *args, **kwargs):
-            self._config_path = kwargs["config_path"]
-            self._plugins_dir = kwargs["plugins_dir"]
-            self._policies_dir = kwargs["policies_dir"]
-            self.plugin_registry = FakeRegistry()
-            self.checkpoint_manager = FakeCheckpointManager()
-
+    class FakeKernel(KernelDouble):
         def execute_task(self, task, plugin_name=None, action=None, params=None):
             captured["task"] = task
             captured["plugin"] = plugin_name

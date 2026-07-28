@@ -26,6 +26,7 @@ from permission.engine import PermissionEngine
 from permission.policy import PermissionResult, default_policy_path
 from plugins.tools.python_stats.main import descriptive, ttest, regression
 from plugins.standards.medical_writing.checklists import get_consort_checklist
+from tests import KernelDouble
 from typing import Any
 
 
@@ -470,21 +471,7 @@ class TestIntegration:
     def test_cli_run_passes_structured_params_to_citation_plugin(self, monkeypatch):
         captured = {}
 
-        class FakeRegistry:
-            def discover(self):
-                return []
-
-        class FakeCheckpointManager:
-            base_dir = "checkpoints"
-
-        class FakeKernel:
-            def __init__(self, *args, **kwargs):
-                self._config_path = kwargs["config_path"]
-                self._plugins_dir = kwargs["plugins_dir"]
-                self._policies_dir = kwargs["policies_dir"]
-                self.plugin_registry = FakeRegistry()
-                self.checkpoint_manager = FakeCheckpointManager()
-
+        class FakeKernel(KernelDouble):
             def execute_task(self, task, plugin_name=None, action=None, params=None):
                 captured.update(
                     {

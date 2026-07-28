@@ -1,30 +1,13 @@
 from __future__ import annotations
 
 import json
-from typing import Any
 
 import pytest
 
 from core.operation_guard import DangerousOperationDenied, authorize_dangerous_operation
 from permission.audit import AuditLogger
 from permission.policy import PermissionResult
-
-
-class RecordingPermissionEngine:
-    def __init__(self, result: PermissionResult):
-        self.result = result
-        self.calls: list[dict[str, Any]] = []
-
-    def check(self, agent_id, action, resource, context=None):
-        self.calls.append(
-            {
-                "agent_id": agent_id,
-                "action": action,
-                "resource": resource,
-                "context": context,
-            }
-        )
-        return self.result
+from tests import RecordingPermissionEngine
 
 
 def test_permission_engine_called_before_authorizing_dangerous_operation(tmp_path):
