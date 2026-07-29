@@ -63,11 +63,26 @@ def _write_minimal_import_stubs(workspace: Path) -> None:
     """Provide non-installer imports so tests isolate optional installer import behavior."""
 
     core_llm_dir = workspace / "core" / "llm_providers"
+    core_logs_dir = workspace / "core" / "logs"
     core_llm_dir.mkdir(parents=True)
+    core_logs_dir.mkdir()
     (workspace / "core" / "__init__.py").write_text(
         f"PUBLIC_VERSION = {PUBLIC_VERSION!r}\n", encoding="utf-8"
     )
     (core_llm_dir / "__init__.py").write_text("", encoding="utf-8")
+    (core_logs_dir / "__init__.py").write_text("", encoding="utf-8")
+    (core_logs_dir / "handler.py").write_text(
+        textwrap.dedent(
+            """
+            def configure_application_log_storage(*args, **kwargs):
+                return None
+
+            def stop_application_log_storage(*args, **kwargs):
+                return None
+            """
+        ),
+        encoding="utf-8",
+    )
     (core_llm_dir / "config.py").write_text(
         textwrap.dedent(
             """
