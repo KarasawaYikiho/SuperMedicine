@@ -1,6 +1,8 @@
 # Plot Recipes
 
-Use these as starting points. Confirm assumptions before publishing figures.
+Use these recipes as decision prompts, not automatic plotting rules. Confirm
+the data type, ordering, sample size, uncertainty, and statistical assumptions
+before publication.
 
 ## Distribution
 

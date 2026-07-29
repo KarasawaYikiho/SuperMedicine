@@ -1,10 +1,11 @@
 # Architecture
 
 SuperMedicine is a medical-research assistant centered on Desktop GUI and
-OpenTUI. Both interfaces provide the same research, configuration, permission,
-and diagnostic functions. CLI and Web endpoints provide automation access.
+OpenTUI. Both interfaces expose the maintained research, configuration,
+permission, and diagnostic capabilities. CLI and Web endpoints provide
+automation access.
 
-## System Shape
+## System Boundary
 
 ```text
 CLI / OpenTUI bridge / Web + Desktop
@@ -114,9 +115,10 @@ tests protect `SuperMedicineInstaller.exe`, `dist/SuperMedicine.exe`,
 
 ## Repository Hygiene
 
-Tracked content should be source, tests, CI, package metadata, docs, policies,
-and small assets. Generated output, local logs, runtime state, caches, secrets,
-desktop executables, and archive notes belong outside Git.
+Git should contain source, tests, CI configuration, package metadata, published
+documentation, policies, and small required assets. Generated output, local
+logs, runtime state, caches, secrets, executables, plans, and archive notes
+belong outside Git.
 
 `docs/archive/` is intentionally ignored. Local historical material may live in
 ignored `Temp/`.

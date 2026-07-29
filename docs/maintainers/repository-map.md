@@ -1,10 +1,10 @@
 # Repository Map
 
-This is the canonical navigation map for maintainers. It describes stable
-ownership and entrypoints without freezing file counts, function counts, or
-private module names.
+This is the canonical navigation map for maintainers. It records stable
+ownership and public entrypoints without turning file counts, function counts,
+or private module names into contracts.
 
-## Top-level ownership
+## Top-Level Ownership
 
 | Path | Responsibility |
 |---|---|
@@ -21,7 +21,7 @@ private module names.
 | `docs/` | User, architecture, maintainer, API, example, and reference documentation |
 | `.github/workflows/` | CI, runtime smoke, package smoke, nightly, and release orchestration |
 
-## Public entrypoints
+## Public Entrypoints
 
 | Surface | Authority |
 |---|---|
@@ -34,7 +34,7 @@ private module names.
 | Plugin actions | plugin manifests discovered by `PluginRegistry` |
 | Release files | `scripts/ci/` build and verification helpers |
 
-## Ownership boundaries
+## Ownership Boundaries
 
 - Public surfaces call application services instead of constructing internal
   stores, permission engines, or plugin registries.

@@ -1,40 +1,45 @@
 # RAG Provider Interface
 
-This page describes the minimum RAG provider contract used by SuperMedicine.
-Source files remain authoritative:
+This reference summarizes the maintained RAG provider boundary. The following
+source files are authoritative:
 
-- `plugins/rag/interface.py`
-- `plugins/rag/local_provider.py`
+- `plugins/rag/providers.py`
 - `plugins/rag/pubmed_provider.py`
+- `core/services/rag.py`
 
 RAG output is research-support context. It is not clinical advice, regulatory
 evidence, or a conclusion about evidence quality.
 
-## Methods
+## Provider Operations
 
-Implement the `RAGProvider` interface:
+Provider implementations extend `RAGProvider` and expose the applicable
+operations:
 
 ```python
-query(query: str, scope: str) -> dict
-store_context(key: str, value: Any) -> None
+connect() -> dict[str, Any]
+query(query_text: str, top_k: int = 5) -> dict[str, Any]
+store_context(key: str, data: Any) -> None
 retrieve_context(key: str) -> Any | None
 ```
 
-Scopes should be explicit, for example:
+Callers should provide an explicit storage directory or workspace context.
+The application service classifies tasks before retrieval and records whether
+RAG was required, used, or skipped.
 
-- `literature`
-- `knowledge_base`
-- `project_context`
+- `knowledge_generation`
+- `deterministic_plugin`
+- `control`
 
 ## Result Shape
 
-Providers should return stable structured fields:
+Providers return structured mappings with the fields required by the action,
+including:
 
 - `status`
 - `provider`
 - `items`
-- `errors`
-- metadata needed for diagnosis
+- `errors` when the operation cannot complete
+- diagnostic metadata that does not expose secrets
 
 Do not include API keys, private endpoints, raw request payloads, or unredacted
 logs.
@@ -45,4 +50,4 @@ logs.
 - External providers should label external resources.
 - Network/API access should use timeouts, redaction, and permission-aware call
   paths.
-- Missing configuration and external failures should return structured errors.
+- Missing configuration and external failures must return structured errors.

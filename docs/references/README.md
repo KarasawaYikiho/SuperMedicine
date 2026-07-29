@@ -1,9 +1,10 @@
 # References
 
-This directory contains stable reference material for plugins and research
-helpers.
+This directory contains maintained reference material for research helpers and
+plugin workflows. References support implementation and review; they do not
+establish clinical validity or replace current external standards.
 
-## Sections
+## Reference Areas
 
 - [figure](figure/chart_selection.md): figure selection, profiling, layout, and
   publication checks.

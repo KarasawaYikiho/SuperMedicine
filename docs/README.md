@@ -1,10 +1,13 @@
 # SuperMedicine Documentation
 
-Use this page as the entry point for maintained documentation.
+This page is the canonical index of published SuperMedicine documentation.
+Documents are organized by audience and purpose; local engineering records are
+intentionally excluded.
 
-Desktop GUI and OpenTUI are the primary interactive interfaces. Maintained
-functions are available from both interfaces. Harness and RAG run continuously;
-Multi-Agent and other extensions can be enabled or disabled.
+Desktop GUI and OpenTUI are the primary interactive interfaces. Stable
+user-facing capabilities are expected to remain available from both. Harness
+and RAG are required runtime services; Multi-Agent and platform adapters are
+optional.
 
 ## User guides
 
@@ -32,9 +35,8 @@ Multi-Agent and other extensions can be enabled or disabled.
 - [Repository map](maintainers/repository-map.md)
 - [Quality gates](maintainers/quality-gates.md)
 - [CI workflows](maintainers/ci-workflows.md)
-- [Project debug and repair record](maintainers/debugging.md)
 - [Feature parity](maintainers/feature-parity.md)
 
 Formal documents are indexed by `manifest.yaml`. Adapter skill and agent
-Markdown files are runtime resources and intentionally remain outside the
-formal-document manifest.
+Markdown files are executable runtime resources, not explanatory
+documentation, and intentionally remain outside the manifest.

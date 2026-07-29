@@ -1,8 +1,9 @@
 # Installation Guide
 
-This guide covers source installs, development installs, release archive layout,
-OpenTUI setup, LLM provider configuration, and uninstall behavior for
+This is the canonical installation reference for
 SuperMedicine **Beta0.5.0**.
+It covers source and development installs, release archive integrity, OpenTUI
+setup, LLM Provider configuration, upgrades, and removal.
 
 For a short overview, see [README.md](../../README.md). For security boundaries,
 see [SECURITY.md](../../SECURITY.md).
@@ -158,7 +159,7 @@ If the executable path is wrong, installer output may report:
 Exe source does not exist
 ```
 
-## Common Commands
+## Post-Install Verification
 
 ```bash
 supermedicine status
@@ -192,8 +193,8 @@ python uninstall_entry.py --force --preserve-user-data
 ```
 
 The uninstaller does not remove the source repository or uninstall the Python
-package by default. It targets project-owned runtime state and installer-recorded
-artifacts.
+package by default. It removes project-owned runtime state and artifacts
+recorded by the installer.
 
 ## Troubleshooting
 

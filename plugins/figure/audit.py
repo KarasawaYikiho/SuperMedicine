@@ -342,7 +342,6 @@ if sys.platform == "win32":
     except (AttributeError, ValueError):
         pass
 
-SEVERITY = {"INFO": 0, "WARN": 1, "FAIL": 2}
 _GLYPH_MARKERS = ("missing from", "Glyph", "findfont")
 
 

@@ -1,7 +1,8 @@
 # Quality Gates
 
-Use the smallest gate that proves the change, then run broader checks before
-release or risky refactors.
+Select the smallest gate that proves the change during development, then run
+the complete applicable gate before release or a broad refactor. A historical
+pass result is never evidence for the current tree.
 
 ## Documentation Gate
 

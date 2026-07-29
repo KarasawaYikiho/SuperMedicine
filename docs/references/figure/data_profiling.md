@@ -1,8 +1,8 @@
 # Data Profiling
 
-The figure profiling report describes columns, sample sizes, missing values,
-groups, correlations, and plotting warnings. Use it to choose a chart, then
-verify the decision manually.
+The profiling report summarizes column types, sample sizes, missingness,
+groups, correlations, and plotting warnings. Use it to narrow the chart choice,
+then verify the decision against the study design and raw data.
 
 ## Read the Report in This Order
 
@@ -24,7 +24,7 @@ verify the decision manually.
 | datetime | dates/times | time axis |
 | text | ids or notes | usually not plotted |
 
-## Warnings
+## Review Flags
 
 - Small groups need raw point display.
 - Highly skewed values may need median/IQR, box/violin, or a log axis.

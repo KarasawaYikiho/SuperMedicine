@@ -1,9 +1,10 @@
 # Journal Figure Specs
 
-Always check the target journal's current author instructions. This file is a
-starting reference only.
+Treat these values as planning defaults only. Verify dimensions, formats,
+fonts, and resolution against the target journal's current author instructions
+before submission.
 
-## Common Sizes
+## Common Planning Sizes
 
 | Venue | Single column | Double column | Typical font | Notes |
 | --- | --- | --- | --- | --- |
@@ -13,7 +14,7 @@ starting reference only.
 | Elsevier | 90 mm / 3.54 in | 190 mm / 7.48 in | 7-9 pt Helvetica/Arial | Check journal family rules. |
 | PNAS | 8.7 cm / 3.42 in | 17.8 cm / 7.0 in | 6-8 pt | PDF/EPS preferred. |
 
-## Export Defaults
+## Export Baseline
 
 - Prefer vector output (`PDF`, `EPS`, or journal-specific vector formats).
 - Use at least 300 DPI for color raster images.

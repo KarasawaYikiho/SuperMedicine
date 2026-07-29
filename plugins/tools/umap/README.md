@@ -1,14 +1,15 @@
 # Python UMAP Tool
 
-Workspace-local UMAP dimensionality-reduction helper using pandas, matplotlib,
-and `umap-learn`.
+This workspace-local tool produces exploratory UMAP embeddings with pandas,
+matplotlib, and `umap-learn`.
 
-## Commands
+## Usage
 
 ```bash
 python runner.py --check-deps
 python runner.py --input data.csv --output embedding.png
 ```
 
-Inputs and outputs should stay inside the workspace. Review generated embeddings
-before using them in reports or publications.
+Keep input and output paths inside the selected workspace. Record preprocessing,
+random-state, neighborhood, and distance settings, and validate interpretation
+before using an embedding in a report or publication.

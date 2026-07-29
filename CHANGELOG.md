@@ -1,8 +1,9 @@
 # Changelog
 
-All notable changes to SuperMedicine are documented here. The format follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
-[Semantic Versioning](https://semver.org/spec/v2.0.0.html) for package metadata.
+This file records user-visible changes by release. It follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/); Python distribution
+versions use the compatible subset of
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Public release labels and Python package versions may differ when the public label
 is not PEP 440-compatible. Current public/release label: **Beta0.5.0**. Current

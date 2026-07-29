@@ -1,12 +1,15 @@
 # CI Workflows
 
-## Required checks
+This reference defines workflow ownership, stable required-check names, and the
+permission boundary for publication.
+
+## Required Checks
 
 Branch protection should depend on the stable `CI / Required Gate` and
 `OpenTUI / Required Gate` summaries. Internal matrices may evolve without
 changing those public check names.
 
-## Workflow ownership
+## Workflow Ownership
 
 | Workflow | Responsibility |
 |---|---|
@@ -21,7 +24,7 @@ successful `CI` run on `master` automatically starts `release.yml`, and every
 release job checks out that exact CI source commit. Release validation and
 publication logic belongs in `scripts/ci/`.
 
-## Security and cost controls
+## Security and Cost Controls
 
 All workflows default to `contents: read`, set explicit timeouts, and use
 concurrency cancellation for replaceable PR runs. The publication job alone

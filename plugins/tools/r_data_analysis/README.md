@@ -1,7 +1,7 @@
 # R Data Analysis Tool
 
-Workspace-local R helper for common research-prototype analyses using base or
-recommended R functionality where possible.
+This workspace-local R tool provides common exploratory analyses for research
+prototypes, using base or recommended R functionality where possible.
 
 ## Baseline Actions
 
@@ -21,7 +21,7 @@ Optional random-forest and gradient-boosting actions report whether packages suc
 as `randomForest`, `xgboost`, and `lightgbm` are installed. They are not required
 for scanner discovery or baseline execution.
 
-## Boundary
+## Review Boundary
 
 This is research-support prototype tooling. It is not production-grade,
 clinical-grade, or regulatory-grade statistical software. Keep inputs and outputs

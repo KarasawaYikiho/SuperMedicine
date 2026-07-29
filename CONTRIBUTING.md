@@ -1,8 +1,8 @@
 # Contributing
 
-This repository is a Python medical-research assistant with optional adapter and
-OpenTUI surfaces. Keep changes small, testable, and honest about what is actually
-implemented.
+SuperMedicine is a Python medical-research assistant with OpenTUI, Web,
+Desktop, and optional adapter surfaces. Contributions must be focused,
+testable, and limited to behavior the repository can demonstrate.
 
 ## Setup
 
@@ -21,24 +21,24 @@ On Linux or macOS, activate the environment with:
 source .venv/bin/activate
 ```
 
-## Development Rules
+## Engineering Rules
 
 - Follow the existing package boundaries: CLI behavior in `cli/`, runtime
   services in `core/`, permissions in `permission/`, plugins in `plugins/`,
   installer behavior in `installer/`, and optional platform surfaces in
   `adapters/`.
-- Do not claim a capability in docs until code and tests support it.
+- Document a capability only after code and tests establish it.
 - Do not store secrets in docs, tests, manifests, logs, screenshots, or examples.
 - Keep workspace-scoped behavior explicit; commands that operate on workspaces
   should require `--workspace`.
-- Keep generated files, caches, release output, local archives, and runtime state
-  out of Git.
+- Keep generated files, caches, release output, engineering plans, local
+  archives, and runtime state out of Git.
 - Treat files under `adapters/**/agents/*.md`, `adapters/**/skills/*.md`, and
   `adapters/claude_code/SKILL.md` as runtime inputs, not ordinary prose.
 
-## Quality Gate
+## Validation
 
-Run targeted checks while developing, then run the relevant gate before commit:
+Run focused checks while developing and the applicable gate before commit:
 
 ```bash
 python scripts/maintainers/check_docs.py
@@ -47,7 +47,7 @@ python -m pytest tests/test_repository_policy.py tests/test_release.py tests/tes
 python -m ruff check .
 ```
 
-For release or broad changes:
+For release work or broad changes:
 
 ```bash
 python -m pytest tests/ -v
@@ -56,16 +56,17 @@ python -m pytest tests/ -v
 The repository supports Python 3.10 through 3.13. CI installs the `dev` extra and
 expects `pytest`, `ruff`, and `mypy` paths to remain usable.
 
-## Documentation
+## Documentation Standards
 
-- Keep root docs concise and current.
+- Use concise, direct language and identify the intended audience.
+- Keep commands executable and terminology consistent with current interfaces.
 - Keep `README.md` and `README.zh-CN.md` aligned through the generated release
   metadata block.
 - Keep release-package references to `SuperMedicineInstaller.exe`,
   `dist/SuperMedicine.exe`, `@opentui/core@0.4.3`, and
   `npm run opentui:smoke` when those contracts still apply.
-- Do not add new tracked archive notes under `docs/archive/`; use ignored
-  `Temp/` for local archive material.
+- Do not track plans, debug logs, task ledgers, or archive notes; use ignored
+  `Temp/` for local engineering material.
 - Run the markdown link checker after doc changes:
 
 ```bash

@@ -1,10 +1,10 @@
 # Feature Parity
 
-`feature_manifest.json` is the machine-readable inventory of stable product
-capabilities. It is intentionally independent of test filenames, pytest node
-names, private module paths, and historical structure metrics.
+`feature_manifest.json` is the machine-readable inventory of stable,
+user-observable capabilities. It deliberately avoids test filenames, pytest
+node names, private module paths, and historical structure metrics.
 
-## Manifest fields
+## Manifest Fields
 
 Every feature declares:
 
@@ -19,7 +19,7 @@ RAG and Harness records additionally declare `required=true`,
 `default_enabled=true`, and their fail-closed runtime contract. Alpha, Beta,
 Gamma, and Delta declare `preserved=true` and `optional_enabled=true`.
 
-## Preservation rule
+## Preservation Rule
 
 `baseline_feature_ids` is immutable. New capabilities may add IDs, but a
 refactor must not remove or repurpose a baseline ID. The current `features`
@@ -36,5 +36,5 @@ python -m pytest tests/test_feature_manifest.py tests/test_runtime_capabilities.
 
 For a broad rebuild, also run the complete quality gate from
 [quality-gates.md](quality-gates.md). Historical implementation metrics and
-past defect closures are frozen in
-[rebuild-0.4.2.md](history/rebuild-0.4.2.md); they are not current constraints.
+defect records are local engineering artifacts; they are not current product
+constraints.

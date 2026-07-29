@@ -1,8 +1,8 @@
 # Examples
 
-These examples use placeholders and local paths. Do not paste real API keys,
-patient identifiers, private endpoints, or unredacted logs into commands or
-issues.
+These examples demonstrate supported workflows with placeholder values and
+project-local paths. Never substitute real API keys, patient identifiers,
+private endpoints, or unredacted logs in public commands or issue reports.
 
 ## Create a Workspace
 

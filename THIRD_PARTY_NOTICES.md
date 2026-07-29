@@ -1,20 +1,22 @@
 # Third-Party Notices
 
-SuperMedicine uses the real OpenTUI runtime for the terminal interface.
+This document identifies third-party software distributed with or required by
+the SuperMedicine release artifacts. It does not replace the upstream license
+terms.
 
 ## @opentui/core
 
 - Package: `@opentui/core`
-- Version: `0.4.1`
+- Version: `0.4.3`
 - License: MIT
 - Source: <https://github.com/anomalyco/opentui>
 - Used for: terminal rendering, input handling, layout mounting, and cleanup in
   the SuperMedicine TUI runtime.
 
-SuperMedicine consumes OpenTUI as an npm dependency. The OpenTUI source tree is
-not vendored into this repository.
+SuperMedicine consumes OpenTUI through the locked npm dependency tree. The
+OpenTUI source tree is not vendored in this repository.
 
-## Lockfile Notes
+## Transitive Lockfile Entries
 
 The locked dependency tree also includes transitive packages such as:
 

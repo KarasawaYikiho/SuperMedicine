@@ -1,6 +1,7 @@
 # Publication Figure Checklist
 
-Use this checklist before exporting final figures.
+Complete this checklist at the final display size before exporting a figure for
+review or submission.
 
 ## Content
 

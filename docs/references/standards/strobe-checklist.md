@@ -1,11 +1,13 @@
 # STROBE 2007 Checklist
 
-STROBE (Strengthening the Reporting of Observational Studies in Epidemiology) provides reporting guidelines for observational studies, including cohort, case-control, and cross-sectional designs.
+STROBE (Strengthening the Reporting of Observational Studies in Epidemiology)
+provides a structured framework for reporting cohort, case-control, and
+cross-sectional studies transparently and completely.
 
-This reference preserves checklist item wording for implementation and manual
-review. Do not treat checklist completion as clinical, regulatory, or evidence
-quality validation. The reference contains no credentials, raw logs, private
-endpoints, or patient data; preserve that property when editing.
+This local reference preserves checklist wording for implementation and manual
+review. Completion does not establish clinical validity, regulatory compliance,
+or evidence quality. Keep the file free of credentials, raw logs, private
+endpoints, and patient data.
 
 ## Checklist Items
 

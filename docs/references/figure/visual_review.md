@@ -1,8 +1,8 @@
 # Visual Review
 
-Review figures at the size readers will see them.
+Review every figure at the size and medium in which readers will encounter it.
 
-## Questions
+## Review Questions
 
 - What is the one claim this figure supports?
 - Can a reader understand it without reading the methods first?
@@ -12,7 +12,7 @@ Review figures at the size readers will see them.
 - Would the figure still work in grayscale?
 - Does the chart type imply a relationship that the data do not support?
 
-## Fail Conditions
+## Rejection Criteria
 
 - unreadable text at final size;
 - overlapping labels or legends;

@@ -1,7 +1,8 @@
 # Getting Started
 
-This guide is the short path from a clean checkout to a usable local
-SuperMedicine workspace. For installer details, see [INSTALL.md](INSTALL.md).
+This guide takes a new contributor from a clean checkout to a working local
+workspace. For installation variants and release artifacts, see
+[INSTALL.md](INSTALL.md).
 
 ## 1. Install
 
@@ -88,7 +89,7 @@ supermedicine tool list --workspace demo
 
 Tools are imported into the workspace before use.
 
-## 7. Open the primary interfaces
+## 7. Open the Primary Interfaces
 
 ```bash
 supermedicine tui --dry-run
@@ -100,7 +101,7 @@ Installed Windows releases also provide `SuperMedicineGUI.exe`.
 The interactive TUI requires Bun and the locked npm dependency installed by
 `npm ci`.
 
-## Common Checks
+## Operational Checks
 
 ```bash
 supermedicine permission status

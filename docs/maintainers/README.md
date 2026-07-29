@@ -1,17 +1,17 @@
 # Maintainer Guide
 
-This directory is the starting point for repository maintenance.
+This index identifies the maintained repository contracts and the order in
+which they should be reviewed. Temporary investigations, implementation plans,
+debug transcripts, and historical rebuild notes belong in the ignored
+`Temp/` archive rather than in the published documentation set.
 
 ## Read Order
 
-1. [repository-map.md](repository-map.md)
-2. [entrypoints.md](entrypoints.md)
-3. [quality-gates.md](quality-gates.md)
-4. [ci-workflows.md](ci-workflows.md)
-5. [debugging.md](debugging.md)
-6. [maintenance-backlog.md](maintenance-backlog.md)
-7. [feature-parity.md](feature-parity.md)
-8. [rebuild-0.4.2.md](history/rebuild-0.4.2.md) (frozen history)
+1. [Repository map](repository-map.md)
+2. [Entrypoints](entrypoints.md)
+3. [Feature parity](feature-parity.md)
+4. [Quality gates](quality-gates.md)
+5. [CI workflows](ci-workflows.md)
 
 ## Sources of Truth
 
@@ -29,11 +29,12 @@ This directory is the starting point for repository maintenance.
 | User install docs | `docs/guides/INSTALL.md` |
 | CI structure | `docs/maintainers/ci-workflows.md` |
 
-## Archive Rule
+## Documentation Boundary
 
-Historical or generated notes belong under local-only `Temp/`, not in tracked
-`docs/archive/`. Do not use archive PASS claims as current release evidence
-without rerunning tests.
+Publish only durable guidance and current contracts. Store generated reports,
+plans, task ledgers, debug records, and historical implementation notes under
+local-only `Temp/`. Never cite an archived pass result as evidence for the
+current tree; rerun the applicable gate.
 
 ## Before Editing
 
@@ -43,5 +44,5 @@ git diff --name-status
 git diff --name-status --cached
 ```
 
-Do not overwrite unrelated user changes. If a file has both staged and unstaged
-changes, inspect it before editing.
+Preserve unrelated work. Inspect files that contain both staged and unstaged
+changes before editing, and keep each commit limited to its declared scope.

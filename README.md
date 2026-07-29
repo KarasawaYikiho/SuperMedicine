@@ -1,9 +1,8 @@
 # SuperMedicine
 
-SuperMedicine is a medical-research assistant whose primary interactive
-products are the Desktop GUI and OpenTUI. Both interfaces expose the stable
-research workflows; CLI and Web endpoints remain supported for automation,
-integration, and parity testing.
+SuperMedicine is a local-first assistant for medical-research workflows. The
+Desktop GUI and OpenTUI are the primary interactive products; the CLI and Web
+API provide supported automation, integration, and parity surfaces.
 
 <!-- BEGIN GENERATED: release-metadata -->
 Current release: **0.5.0b0**
@@ -16,11 +15,11 @@ Release series: **Beta0.5.0**
 <a id="product"></a>
 ## Product
 
-Desktop GUI and OpenTUI are the product focus. A stable user-facing capability
-is complete only when it is usable and visible in both interfaces. OpenCode,
-Claude Code, and Multi-Agent execution remain optional.
+Stable user-facing capabilities must be visible and operable in both the
+Desktop GUI and OpenTUI. OpenCode, Claude Code, and Multi-Agent execution are
+optional integration paths rather than prerequisites.
 
-Stable capabilities include:
+The supported capability set includes:
 
 - workspace, paper, experiment, experience, and log workflows;
 - local and configured-provider LLM execution;
@@ -36,22 +35,22 @@ The complete machine-readable capability inventory is
 <a id="safety"></a>
 ## Safety
 
-SuperMedicine assists research workflows; it does not provide clinical advice,
-diagnosis, or treatment decisions. Review generated claims, citations,
-statistics, figures, and code before use.
+SuperMedicine supports research work; it does not provide clinical advice,
+diagnoses, or treatment decisions. A qualified person must review generated
+claims, citations, statistics, figures, and code before use.
 
 Harness and RAG are mandatory, enabled by default, and fail closed when their
 required runtime state is missing, damaged, or unwritable. Multi-Agent is
 optional: disabled runs use the single-agent path; enabled runs preserve all
 four roles and checkpoint resume.
 
-Never commit API keys, patient data, private endpoints, permission audit logs,
+Do not commit API keys, patient data, private endpoints, permission audit logs,
 or user workspaces.
 
 <a id="install"></a>
 ## Install
 
-Requirements:
+Prerequisites:
 
 - Python 3.10–3.13;
 - Node.js/npm for OpenTUI dependencies;
@@ -64,13 +63,13 @@ python -m pip install -e .
 python install.py
 ```
 
-Ordinary users run `python install.py` with no flags, choose the installation
-directory, and installation continues automatically. LLM settings are
-configured later in the GUI or TUI. Advanced automation / CI can use explicit
-flags and a staged release payload. Full source, release archive, `SuperMedicineInstaller.exe`,
-`dist/SuperMedicine.exe`, `--extract-release-to`, `--release-exe`,
-`--exe-dry-run`, and failure recovery are documented in the
-[installation guide](docs/guides/INSTALL.md).
+Ordinary users run `python install.py` with no flags and select an installation
+directory; the installer completes the default setup automatically. Configure
+LLM providers later in the GUI or TUI. Advanced automation / CI may use
+explicit flags and a staged release payload. The
+[installation guide](docs/guides/INSTALL.md) documents source and archive
+installation, `SuperMedicineInstaller.exe`, `dist/SuperMedicine.exe`,
+`--extract-release-to`, `--release-exe`, `--exe-dry-run`, and recovery.
 
 Run `python uninstall_entry.py` from the installed directory for one-command
 uninstall.
@@ -98,14 +97,14 @@ supermedicine tui
 supermedicine web
 ```
 
-Provider configuration can also come from `SM_LLM_PROVIDER`,
+Provider configuration may also come from `SM_LLM_PROVIDER`,
 `SM_LLM_BASE_URL`, `SM_LLM_API_KEY`, `SM_LLM_MODEL`, or
 `.supermedicine/config.yaml`. Secret values are redacted from diagnostics and
 logs.
 
-Permission modes remain `strict`, `balanced`, and `permissive`; hard limits and
-explicit denies still apply in every mode. Use `supermedicine permission`,
-`authorize`, and `revoke` to inspect or change policy.
+Permission modes are `strict`, `balanced`, and `permissive`; hard limits and
+explicit deny rules apply in every mode. Use `supermedicine permission`,
+`authorize`, and `revoke` to inspect or update policy.
 
 <a id="documentation"></a>
 ## Documentation
@@ -123,7 +122,7 @@ explicit denies still apply in every mode. Use `supermedicine permission`,
 - [Contributing](CONTRIBUTING.md)
 - [Changelog](CHANGELOG.md)
 
-For local validation:
+Maintainers can run the following local validation:
 
 ```bash
 python scripts/maintainers/check_docs.py

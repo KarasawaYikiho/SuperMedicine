@@ -1,6 +1,8 @@
 # Entrypoints
 
-Prefer the canonical commands below in new documentation and tests.
+Use the canonical commands and ownership boundaries below in new
+documentation, packaging logic, and tests. Compatibility wrappers remain only
+where an existing public or release contract requires them.
 
 ## User Commands
 

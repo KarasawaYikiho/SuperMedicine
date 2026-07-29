@@ -1,8 +1,7 @@
 # SuperMedicine
 
-SuperMedicine 是医学科研助手，主要交互产品是桌面 GUI 与 OpenTUI。两者均须
-提供完整、清晰、可操作的稳定功能；CLI 与 Web API 用于自动化、集成和一致性
-验证。
+SuperMedicine 是面向医学科研工作流的本地优先助手。桌面 GUI 与 OpenTUI 是
+主要交互产品；CLI 与 Web API 提供受支持的自动化、集成和一致性验证接口。
 
 <!-- BEGIN GENERATED: release-metadata -->
 当前版本：**0.5.0b0**
@@ -15,10 +14,10 @@ English: [README.md](README.md)
 <a id="product"></a>
 ## 产品
 
-本项目注重桌面 GUI 与 OpenTUI。稳定的用户功能只有在两个界面均可见、可用时才
-算完成。OpenCode、Claude Code 和 Multi-Agent 等能力保持可选。
+稳定的用户功能必须在桌面 GUI 与 OpenTUI 中均可见、可操作。OpenCode、
+Claude Code 和 Multi-Agent 属于可选集成路径，不是运行前提。
 
-稳定能力包括：
+受支持的能力包括：
 
 - workspace、paper、experiment、experience 与日志工作流；
 - 本地检索与已配置 LLM Provider；
@@ -33,8 +32,8 @@ English: [README.md](README.md)
 <a id="safety"></a>
 ## 安全边界
 
-本项目仅辅助科研工作，不提供临床建议、诊断或治疗决策。使用前必须人工审查生成
-的论断、引用、统计、图表与代码。
+本项目仅支持科研工作，不提供临床建议、诊断或治疗决策。生成的论断、引用、
+统计、图表与代码在使用前必须由具备相应资质的人员审查。
 
 Harness 与 RAG 是必选能力，默认启用；所需存储或运行状态缺失、损坏、不可写时
 必须 fail closed。Multi-Agent 可选：关闭时走 single-agent，开启时保留四角色
@@ -45,7 +44,7 @@ Harness 与 RAG 是必选能力，默认启用；所需存储或运行状态缺�
 <a id="install"></a>
 ## 安装
 
-要求：
+前置要求：
 
 - Python 3.10–3.13；
 - OpenTUI 依赖需要 Node.js/npm；
@@ -58,9 +57,9 @@ python -m pip install -e .
 python install.py
 ```
 
-普通用户直接运行无参数 `python install.py`，只需选择安装目录，随后自动完成
-安装；LLM 设置可稍后在 GUI 或 TUI 中配置。自动化、Release 归档、三个 EXE、
-payload、失败恢复与卸载说明统一见
+普通用户运行无参数 `python install.py` 并选择安装目录，安装器随后自动完成
+默认设置；LLM Provider 可稍后在 GUI 或 TUI 中配置。自动化、Release 归档、
+三个 EXE、payload、失败恢复与卸载说明统一见
 [安装指南](docs/guides/INSTALL.md)。
 
 在安装目录运行 `python uninstall_entry.py` 即可一键卸载。
@@ -92,8 +91,9 @@ Provider 也可通过 `SM_LLM_PROVIDER`、`SM_LLM_BASE_URL`、
 `SM_LLM_API_KEY`、`SM_LLM_MODEL` 或 `.supermedicine/config.yaml`
 配置。诊断和日志必须脱敏密钥。
 
-权限模式为 `strict`、`balanced` 和 `permissive`；所有模式仍执行 hard
-limits 与显式 deny。使用 `permission`、`authorize`、`revoke` 查看或修改。
+权限模式为 `strict`、`balanced` 和 `permissive`；所有模式均执行 hard
+limits 与显式 deny 规则。使用 `permission`、`authorize`、`revoke` 查看或
+更新策略。
 
 <a id="documentation"></a>
 ## 文档

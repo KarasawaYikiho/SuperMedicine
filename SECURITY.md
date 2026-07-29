@@ -1,14 +1,14 @@
 # Security Policy
 
 SuperMedicine is local-first research-support software. It is not a clinical
-decision system, a regulated medical device, or a replacement for qualified human
-review.
+decision system, a regulated medical device, or a substitute for qualified
+human review.
 
 This policy applies to **Beta0.5.0**.
 
-## Supported Boundary
+## Supported Security Boundary
 
-The supported default path is the standalone Python runtime: CLI, Kernel,
+The supported default boundary is the standalone Python runtime: CLI, Kernel,
 permission engine, plugins, workspaces, installer, and TUI launcher. OpenCode and
 Claude Code files under `adapters/` are optional integration surfaces and must
 not be treated as proof of native platform runtime support unless code and tests
@@ -35,12 +35,12 @@ Denied rules take precedence over allowed rules. Full access only relaxes
 SuperMedicine's own checks after explicit confirmation; it does not elevate OS
 privileges, bypass UAC, bypass ACLs, or grant administrator rights.
 
-## Secrets
+## Credential Handling
 
 Use environment variables, private local config, secret managers, or CI secrets
 for real credentials.
 
-Preferred key sources:
+Supported key sources include:
 
 - `OPENAI_API_KEY`
 - `ANTHROPIC_API_KEY`
@@ -94,11 +94,11 @@ Before publishing docs, check that they:
 - do not claim native OpenCode or Claude Code runtime features unless tested;
 - do not link to ignored local archives as release evidence.
 
-## Reporting
+## Vulnerability Reporting
 
-Open a GitHub issue for security concerns and label it `security`. Include a
-minimal reproduction and affected version. Do not include real secrets, patient
-data, private endpoints, or unredacted logs.
+Open a GitHub issue labeled `security`. Include the affected version, impact,
+and a minimal reproduction. Do not include real secrets, patient data, private
+endpoints, or unredacted logs.
 
 Maintainers aim to acknowledge reports within 72 hours and prioritize critical
 fixes within 7 days.

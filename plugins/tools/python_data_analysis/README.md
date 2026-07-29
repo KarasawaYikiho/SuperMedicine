@@ -1,8 +1,9 @@
 # Python Data Analysis Tool
 
-Workspace-local data-analysis helper for lightweight research prototypes. The
-baseline actions use the Python standard library so the tool can be scanned and
-imported without NumPy, pandas, scikit-learn, XGBoost, or LightGBM.
+This workspace-local tool provides lightweight exploratory analyses for
+research prototypes. Baseline actions use the Python standard library so
+scanner discovery and import do not require NumPy, pandas, scikit-learn,
+XGBoost, or LightGBM.
 
 ## Baseline Actions
 
@@ -23,7 +24,7 @@ imported without NumPy, pandas, scikit-learn, XGBoost, or LightGBM.
 Optional random-forest and gradient-boosting actions report missing optional
 packages instead of importing them eagerly.
 
-## Boundary
+## Review Boundary
 
 This is research-support prototype tooling. It is not production-grade,
 clinical-grade, or regulatory-grade statistical software. Keep inputs and outputs

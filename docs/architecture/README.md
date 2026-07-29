@@ -1,7 +1,7 @@
-# Architecture Docs
+# Architecture Documentation
 
-This directory contains tracked architecture references for the current
-repository.
+This directory contains the current architecture contracts. Use these
+documents for design and review; local historical notes are not authoritative.
 
 ## Files
 
@@ -12,5 +12,5 @@ repository.
 - [Maintainer guide](../maintainers/README.md): repository ownership, entrypoints,
   and quality gates.
 
-Historical inventories and planning notes belong in ignored `Temp/`, not in
-`docs/archive/`.
+Plans, debug records, generated inventories, and historical implementation
+notes belong in ignored `Temp/`, not in the published architecture set.

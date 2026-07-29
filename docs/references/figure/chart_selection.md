@@ -1,8 +1,9 @@
 # Chart Selection
 
-Choose the chart from the question, not from the plotting library.
+Select a chart from the analytical question, data shape, and sample size—not
+from the plotting library's defaults.
 
-## Quick Guide
+## Selection Matrix
 
 | Data shape | Default chart | Avoid |
 | --- | --- | --- |
@@ -14,7 +15,7 @@ Choose the chart from the question, not from the plotting library.
 | Correlation matrix | Heatmap with centered diverging palette | Rainbow/jet |
 | Many variables | Clustered heatmap, PCA, or UMAP | Pairplot overload |
 
-## Sample Size Rules
+## Sample-Size Guidance
 
 - `n < 3`: show each point; do not draw box/violin/error bars.
 - `3 <= n < 10`: use dot/strip/beeswarm plots.
@@ -28,7 +29,7 @@ Choose the chart from the question, not from the plotting library.
 - the y-axis spans orders of magnitude and a log scale is unsuitable;
 - the figure is trying to make two different arguments.
 
-## Safety
+## Review Boundary
 
 Figure helpers provide research-support guidance. They do not validate study
 design, statistical correctness, clinical meaning, or journal acceptance.

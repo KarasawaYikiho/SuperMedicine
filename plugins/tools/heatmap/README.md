@@ -1,14 +1,15 @@
 # Python Heatmap Tool
 
-Workspace-local heatmap visualization helper using pandas, matplotlib, and
-seaborn.
+This workspace-local visualization tool renders heatmaps with pandas,
+matplotlib, and seaborn. It is intended for exploratory research output.
 
-## Commands
+## Usage
 
 ```bash
 python runner.py --check-deps
 python runner.py --input data.csv --output heatmap.png
 ```
 
-Inputs and outputs should stay inside the workspace. Review generated figures
-before using them in reports or publications.
+Keep input and output paths inside the selected workspace. Confirm matrix
+orientation, scaling, labels, missing-value handling, and color mapping before
+using a generated figure in a report or publication.

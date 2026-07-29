@@ -1,6 +1,7 @@
 # Visualization Pitfalls
 
-Avoid these common figure problems.
+Use this list during review to identify presentation choices that conceal data,
+overstate precision, or reduce readability.
 
 ## Misleading Summaries
 

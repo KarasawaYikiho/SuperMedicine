@@ -1,7 +1,8 @@
 # API Reference
 
-This is a compact map of the stable internal APIs most likely to matter to
-contributors. Treat direct imports as code contracts only when tests cover them.
+This reference maps the maintained internal APIs most relevant to contributors.
+An import path is a compatibility contract only when an explicit test protects
+it; otherwise, treat it as an implementation detail.
 
 ## Core
 
