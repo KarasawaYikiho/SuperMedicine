@@ -11,7 +11,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from adapters.base_adapter import ADAPTER_HOST_CONFIGS, BaseAdapter
+from adapters.base_adapter import (
+    ADAPTER_HOST_CONFIGS,
+    BaseAdapter,
+    _shared_ai_provider_support,
+)
 from permission.redaction import redact_sensitive
 
 
@@ -61,41 +65,9 @@ class OpenCodeAdapter(BaseAdapter):
     }
 
     AI_PROVIDER_SUPPORT = {
-        "config_sources": [
-            "Installer/runtime injection flags: install.py --provider <any-name> --base-url <url> --api-key <secret> --model <model>",
-            "Generic environment variables: SM_LLM_PROVIDER, SM_LLM_BASE_URL, SM_LLM_API_KEY, SM_LLM_MODEL",
-            "Provider environment variables: OPENAI_API_KEY, ANTHROPIC_API_KEY, or OPENROUTER_API_KEY",
-            "Project-local config: .supermedicine/config.yaml llm.provider and llm.providers.*",
-        ],
-        "supported_api_formats": {
-            "openai": {
-                "api_format": "openai",
-                "default_base_url": "https://api.openai.com/v1",
-                "provider_key_env": "OPENAI_API_KEY",
-                "generic_key_env": "SM_LLM_API_KEY",
-                "custom_base_url": True,
-            },
-            "anthropic": {
-                "api_format": "anthropic",
-                "default_base_url": "https://api.anthropic.com/v1",
-                "provider_key_env": "ANTHROPIC_API_KEY",
-                "generic_key_env": "SM_LLM_API_KEY",
-                "custom_base_url": True,
-            },
-            "openrouter": {
-                "api_format": "openai",
-                "default_base_url": "https://openrouter.ai/api/v1",
-                "provider_key_env": "OPENROUTER_API_KEY",
-                "generic_key_env": "SM_LLM_API_KEY",
-                "custom_base_url": True,
-            },
-        },
-        "custom_base_url": True,
-        "secret_redaction": {
-            "required": True,
-            "redacted_value": "<redacted>",
-            "plain_text_keys_in_manifest_or_docs": False,
-        },
+        **_shared_ai_provider_support(
+            "Installer/runtime injection flags: install.py --provider <any-name> --base-url <url> --api-key <secret> --model <model>"
+        ),
         "degraded_without_orchestrator": True,
         "boundary": "Optional add-on; provider config is supplied by installer/runtime/project config and is visible only through the SuperMedicine OpenCode agent surface.",
     }

@@ -17,6 +17,8 @@ from typing import Any
 
 import matplotlib.text as mtext
 
+from plugins.figure._paths import ensure_parent as _ensure_parent
+
 JPEG_FORMATS = {"jpg", "jpeg"}
 VECTOR_FORMATS = {"pdf", "svg", "eps"}
 RASTER_OK_FORMATS = {"png", "tiff", "tif"}
@@ -343,12 +345,6 @@ if sys.platform == "win32":
         pass
 
 _GLYPH_MARKERS = ("missing from", "Glyph", "findfont")
-
-
-def _ensure_parent(path: str) -> None:
-    parent = os.path.dirname(os.path.abspath(path))
-    if parent and not os.path.exists(parent):
-        os.makedirs(parent, exist_ok=True)
 
 
 class _GlyphLogHandler(logging.Handler):

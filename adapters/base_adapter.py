@@ -109,6 +109,47 @@ ADAPTER_HOST_CONFIGS = {
 }
 
 
+def _shared_ai_provider_support(installer_source: str) -> dict[str, Any]:
+    """Build independent provider metadata shared by optional adapters."""
+    return {
+        "config_sources": [
+            installer_source,
+            "Generic environment variables: SM_LLM_PROVIDER, SM_LLM_BASE_URL, SM_LLM_API_KEY, SM_LLM_MODEL",
+            "Provider environment variables: OPENAI_API_KEY, ANTHROPIC_API_KEY, or OPENROUTER_API_KEY",
+            "Project-local config: .supermedicine/config.yaml llm.provider and llm.providers.*",
+        ],
+        "supported_api_formats": {
+            "openai": {
+                "api_format": "openai",
+                "default_base_url": "https://api.openai.com/v1",
+                "provider_key_env": "OPENAI_API_KEY",
+                "generic_key_env": "SM_LLM_API_KEY",
+                "custom_base_url": True,
+            },
+            "anthropic": {
+                "api_format": "anthropic",
+                "default_base_url": "https://api.anthropic.com/v1",
+                "provider_key_env": "ANTHROPIC_API_KEY",
+                "generic_key_env": "SM_LLM_API_KEY",
+                "custom_base_url": True,
+            },
+            "openrouter": {
+                "api_format": "openai",
+                "default_base_url": "https://openrouter.ai/api/v1",
+                "provider_key_env": "OPENROUTER_API_KEY",
+                "generic_key_env": "SM_LLM_API_KEY",
+                "custom_base_url": True,
+            },
+        },
+        "custom_base_url": True,
+        "secret_redaction": {
+            "required": True,
+            "redacted_value": "<redacted>",
+            "plain_text_keys_in_manifest_or_docs": False,
+        },
+    }
+
+
 class BaseAdapter:
     """平台适配器基类 — 提供共享工具方法实现"""
 

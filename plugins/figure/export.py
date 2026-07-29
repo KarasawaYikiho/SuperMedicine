@@ -10,22 +10,17 @@ Unified figure export to multiple formats at exact final size.
 
 from __future__ import annotations
 
-import os
 import sys
 from typing import Any, Iterable
 
 import matplotlib.pyplot as plt
 
+from plugins.figure._paths import ensure_parent as _ensure_parent
+
 
 VECTOR_FORMATS = {"pdf", "svg", "eps"}
 RASTER_FORMATS = {"png", "tiff", "tif", "jpg", "jpeg"}
 SUPPORTED_FORMATS = VECTOR_FORMATS | RASTER_FORMATS
-
-
-def _ensure_parent(path: str) -> None:
-    parent = os.path.dirname(os.path.abspath(path))
-    if parent and not os.path.exists(parent):
-        os.makedirs(parent, exist_ok=True)
 
 
 def export_figure(
