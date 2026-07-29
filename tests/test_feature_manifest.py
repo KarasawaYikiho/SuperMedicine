@@ -54,3 +54,37 @@ def test_required_plugins_name_their_runtime_contract() -> None:
         "rag_local_query",
         "harness_checkpoint",
     }
+
+
+def test_feature_manifest_covers_every_live_web_route(tmp_path: Path) -> None:
+    from core.runtime_paths import RuntimePaths
+    from core.web.server import create_app
+
+    paths = RuntimePaths.resolve(
+        project_root=REPOSITORY_ROOT,
+        config_path=tmp_path / "config.yaml",
+    )
+    app = create_app(paths=paths)
+    live_routes: set[str] = set()
+    for route in app.routes:
+        path = getattr(route, "path", "")
+        if not path or (
+            not path.startswith("/api/v1") and path not in {"/", "/ws/chat"}
+        ):
+            continue
+        methods = getattr(route, "methods", None)
+        if methods:
+            live_routes.update(
+                f"web:{method} {path}"
+                for method in methods
+                if method not in {"HEAD", "OPTIONS"}
+            )
+        elif path == "/ws/chat":
+            live_routes.add("web:WEBSOCKET /ws/chat")
+
+    declared_routes = {
+        record["feature_id"]
+        for record in _manifest()["features"]
+        if record["category"] == "web"
+    }
+    assert declared_routes == live_routes

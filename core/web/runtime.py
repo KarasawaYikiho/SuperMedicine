@@ -121,17 +121,25 @@ def llm_provider_list_response(result: Any) -> Any:
 
 
 def experiment_session_path(
-    session_file: str, project_root: str | Path | None = None
+    session_file: str,
+    project_root: str | Path | None = None,
+    data_root: str | Path | None = None,
 ) -> Path:
     """Resolve a Web-selected experiment only inside managed storage."""
     root = Path(project_root or Path.cwd()).resolve()
-    storage = (root / ".supermedicine" / "experiments").resolve()
+    storage = (
+        Path(data_root).resolve()
+        if data_root is not None
+        else (root / ".supermedicine").resolve()
+    ) / "experiments"
+    storage = storage.resolve()
     requested = Path(session_file)
-    candidate = (
-        requested.resolve()
-        if requested.is_absolute()
-        else (root / requested).resolve()
-    )
+    if requested.is_absolute():
+        candidate = requested.resolve()
+    elif requested.parts[:2] == (".supermedicine", "experiments"):
+        candidate = (storage.joinpath(*requested.parts[2:])).resolve()
+    else:
+        candidate = (storage / requested).resolve()
     try:
         candidate.relative_to(storage)
     except ValueError as exc:
@@ -161,6 +169,13 @@ class WebRuntime:
             Path(resource_root).resolve() if resource_root is not None else None
         )
         self.application = application
+        self.data_root = (
+            Path(application.paths.data_root).resolve()
+            if application is not None and hasattr(application, "paths")
+            else (
+                (self.project_root or Path.cwd()) / ".supermedicine"
+            ).resolve()
+        )
         self.auth_token = auth_token
         self.shutdown_callback = shutdown_callback
 
@@ -233,6 +248,35 @@ class WebRuntime:
             progress_callback=progress_callback,
             use_agent_chain=None if agent_mode is None else agent_mode == "multi",
         )
+        if workspace_context is not None:
+            history = self.service("agent_harness")
+            history_metadata = {
+                "task_id": str(result.get("task_id") or result.get("run_id") or ""),
+                "agent": str(result.get("agent") or "alpha"),
+                "status": str(result.get("status") or "unknown"),
+            }
+            for event, summary in (
+                ("user_message", f"已提交用户请求（{len(message)} 字符）"),
+                (
+                    "assistant_message",
+                    "Agent 执行成功"
+                    if result.get("status") == "success"
+                    else f"Agent 执行结束：{result.get('status') or 'unknown'}",
+                ),
+            ):
+                appended = history.append_dialog_event(
+                    workspace_id,
+                    event=event,
+                    summary=summary,
+                    metadata=history_metadata,
+                )
+                if not appended.ok:
+                    logger.warning(
+                        "Dialog history event was not persisted: %s",
+                        appended.error.message
+                        if appended.error is not None
+                        else "unknown error",
+                    )
         if result.get("status") == "success":
             from core.services import ExperienceEvolutionService
 

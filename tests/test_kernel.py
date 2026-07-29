@@ -102,6 +102,38 @@ class TestKernel:
         assert result["metadata"]["beta_result"]["approved"] is True
         assert result["output"].startswith("# Task:")
 
+    def test_configured_multi_agent_pipeline_returns_llm_answer_without_internal_context(
+        self, tmp_path, monkeypatch
+    ):
+        kernel = self._create_kernel(tmp_path)
+        kernel.config.set_multi_agent_enabled(True)
+        monkeypatch.setattr(
+            kernel.config, "get_llm_runtime_provider_name", lambda: "fake"
+        )
+
+        class Client(LLMClient):
+            def chat(self, messages, **kwargs):
+                return {"content": "SUPERMEDICINE_MULTI_AGENT_OK"}
+
+            def complete(self, prompt, **kwargs):
+                return {"content": ""}
+
+        monkeypatch.setattr(kernel.llm_manager, "create_client", lambda: Client())
+        monkeypatch.setattr(
+            kernel.llm_manager,
+            "get_current_provider",
+            lambda redacted=True: {"provider": "fake", "api_key": "<redacted>"},
+        )
+        monkeypatch.setattr(kernel.llm_manager, "validate_provider", lambda *args: None)
+
+        result = kernel.execute_task("Return the requested final answer")
+
+        assert result["status"] == "success"
+        assert result["output"] == "SUPERMEDICINE_MULTI_AGENT_OK"
+        assert result["metadata"]["chain"] == ["delta", "alpha", "beta", "gamma"]
+        assert "routing_history" not in str(result)
+        assert "alpha_result" not in str(result)
+
     def test_kernel_permission_engine_is_runtime_gate_not_prompt_generator(
         self, tmp_path
     ):

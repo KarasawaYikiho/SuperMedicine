@@ -1,4 +1,5 @@
 export const ROUTES = Object.freeze([
+  { id: "settings", label: "设置", symbol: "○", shortcut: "S", capability: "settings" },
   { id: "chat", label: "对话", symbol: "●", shortcut: "1", capability: "chat" },
   { id: "dashboard", label: "状态看板", symbol: "○", shortcut: "2", capability: "status" },
   { id: "workspace", label: "工作区", symbol: "›", shortcut: "3", capability: "workspace" },

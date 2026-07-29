@@ -64,6 +64,45 @@ def test_online_paper_validation_returns_http_400(client):
     assert response.json()["error"]["code"] == "invalid_paper_request"
 
 
+def test_experience_export_writes_managed_file_and_returns_metadata(client, tmp_path):
+    assert (
+        client.post(
+            "/api/v1/workspaces",
+            json={"id": "export-study", "name": "Export Study"},
+        ).status_code
+        == 200
+    )
+    assert (
+        client.post(
+            "/api/v1/workspaces/export-study/experiences",
+            json={
+                "scope": "workspace",
+                "title": "Reusable method",
+                "summary": "Verified export content",
+                "tags": ["verified"],
+            },
+        ).status_code
+        == 200
+    )
+
+    response = client.post(
+        "/api/v1/workspaces/export-study/experiences/export",
+        json={"format": "json", "include_general": True},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "exported"
+    assert payload["format"] == "json"
+    output_path = Path(payload["path"])
+    assert output_path == tmp_path / ".supermedicine" / "exports" / (
+        "export-study-experiences.json"
+    )
+    assert output_path.is_file()
+    assert "Verified export content" in output_path.read_text(encoding="utf-8")
+    assert payload["size_bytes"] == output_path.stat().st_size
+
+
 def test_self_evolution_get_not_found(client):
     """Test GET /api/v1/self-evolution/{id} with invalid ID returns error."""
     response = client.get("/api/v1/self-evolution/nonexistent")
@@ -141,6 +180,31 @@ def test_multi_agent_api_views_and_toggles_persisted_state(
     assert "btn-set-multi-agent" in app_js
 
 
+def test_frontend_reloads_selected_workspace_pages_and_syncs_permission_mode():
+    frontend = Path(__file__).resolve().parents[1] / "core" / "web" / "frontend"
+    app_js = (frontend / "app.js").read_text(encoding="utf-8")
+
+    assert "if (wsId) loadPapers(wsId);" in app_js
+    assert "if (wsId) loadExperiences(wsId);" in app_js
+    assert "if (wsId) loadTools(wsId);" in app_js
+    assert "if (modeSelect && data.mode) modeSelect.value = data.mode;" in app_js
+
+
+def test_frontend_keeps_function_buttons_visible_and_readable():
+    frontend = Path(__file__).resolve().parents[1] / "core" / "web" / "frontend"
+    index_html = (frontend / "index.html").read_text(encoding="utf-8")
+    style_css = (frontend / "style.css").read_text(encoding="utf-8")
+
+    assert 'class="toolbar tools-toolbar"' in index_html
+    assert 'class="data-table self-evolution-table"' in index_html
+    assert "white-space: nowrap;" in style_css
+    assert ".form-group input[type=\"search\"]" in style_css
+    assert ".tools-toolbar" in style_css
+    assert ".self-evolution-table td:last-child .btn" in style_css
+    assert "#experiment-list .data-table td:last-child" in style_css
+    assert "@media (min-width: 769px) and (max-height: 760px)" in style_css
+
+
 def test_diagnose_all(client):
     """Test GET /api/v1/diagnose returns all diagnostics."""
     response = client.get("/api/v1/diagnose")
@@ -185,6 +249,52 @@ def test_diagnose_install(client):
     assert "audit" in data or "error" in data
     assert data["database"]["persistence"] == "required"
     assert data["database"]["ephemeral_fallback"] is False
+    assert data["checked_at"]
+    assert set(data["checks"]) == {
+        "entrypoints",
+        "runtime",
+        "data_root",
+        "installation",
+    }
+
+
+def test_diagnose_install_recognizes_frozen_standalone_runtime(client, monkeypatch):
+    monkeypatch.setattr("core.web.routes.sys.frozen", True, raising=False)
+
+    response = client.get("/api/v1/diagnose/install")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["mode"] == "release"
+    assert data["checks"]["entrypoints"]["ok"] is True
+    assert data["checks"]["installation"] == {
+        "ok": True,
+        "label": "安装记录或源码工作区",
+        "detail": "standalone executable",
+    }
+
+
+def test_central_settings_are_visible_and_log_limit_is_persisted(client):
+    response = client.get("/api/v1/settings")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["application_log"]["max_total_bytes"] == 1024**3
+    assert {
+        "application_log",
+        "agents",
+        "multi_agent",
+        "permission",
+        "rag",
+        "experiment_guide",
+        "llm",
+    } <= set(data)
+
+    updated = client.post(
+        "/api/v1/settings/application-log",
+        json={"max_total_bytes": 2 * 1024 * 1024},
+    )
+    assert updated.status_code == 200
+    assert updated.json()["max_total_bytes"] == 2 * 1024 * 1024
 
 
 def test_shutdown_requires_a_real_server_controller(client):

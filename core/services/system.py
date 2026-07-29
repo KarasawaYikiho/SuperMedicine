@@ -9,10 +9,11 @@ from typing import Any, Callable, Protocol
 
 from core.config_center import ConfigCenter, resolve_config_path
 from core.llm_manager import LLMConfigManager
-from core.logs.report import (
-    LogReportError,
-    LogReportStore,
-    resolve_log_storage_locations,
+from core.logs.report import LogReportError, resolve_log_storage_locations
+from core.logs.session import (
+    ACTIVE_LOG_SURFACE_ENV,
+    ApplicationLogError,
+    ApplicationLogManager,
 )
 from core.plugin_registry import PluginRegistry
 from core.runtime_capabilities import required_runtime_snapshot
@@ -51,8 +52,12 @@ class PermissionLogSystemService:
         self.config = ConfigCenter(
             Path(config_path) if config_path else resolve_config_path(self.project_root)
         )
-        self.logs = LogReportStore(
-            self.project_root, data_root=self.config.config_path.parent
+        self.logs = ApplicationLogManager(
+            self.project_root,
+            data_root=self.config.config_path.parent,
+            max_total_bytes=self.config.get_application_log_config()[
+                "max_total_bytes"
+            ],
         )
 
     def permission_status(self) -> ServiceResult[dict[str, Any]]:
@@ -181,7 +186,12 @@ class PermissionLogSystemService:
                     "exists": storage.audit_file.exists(),
                     "writable_parent": storage.audit_file.parent.exists(),
                 },
-                "log_storage": storage.to_dict(),
+                "log_storage": {
+                    **self.logs.storage_info(),
+                    "exists": self.logs.log_dir.is_dir(),
+                    "writable_parent": self.logs.log_dir.parent.is_dir()
+                    and os.access(self.logs.log_dir.parent, os.W_OK),
+                },
                 "database": {
                     "path": str(database_path),
                     "exists": database_path.is_file(),
@@ -241,11 +251,63 @@ class PermissionLogSystemService:
             lambda: self.config.set_multi_agent_enabled(enabled, save=True),
         )
 
+    def settings(self) -> ServiceResult[dict[str, Any]]:
+        """Return every persisted user-facing setting in one safe payload."""
+
+        def action() -> dict[str, Any]:
+            llm = LLMConfigManager(
+                self.config, restore_on_startup=False
+            ).diagnostics()
+            return {
+                "application_log": self.config.get_application_log_config(),
+                "agents": self.config.get_agents_config(),
+                "multi_agent": self.config.get_multi_agent_config(),
+                "permission": self.config.get_file_access_config(),
+                "rag": self.config.get_rag_config(),
+                "experiment_guide": self.config.get_experiment_guide_config(),
+                "llm": llm,
+            }
+
+        return self._call("settings", action)
+
+    def set_application_log_limit(
+        self, max_total_bytes: int
+    ) -> ServiceResult[dict[str, Any]]:
+        """Persist and immediately apply the readable-log directory cap."""
+
+        def action() -> dict[str, Any]:
+            config = self.config.set_application_log_max_total_bytes(
+                max_total_bytes,
+                save=True,
+            )
+            self.logs.max_total_bytes = config["max_total_bytes"]
+            removed = self.logs.prune()
+            return {
+                **config,
+                "removed_logs": removed,
+                "storage": self.logs.storage_info(),
+            }
+
+        return self._call("set_application_log_limit", action)
+
     def write_log(
         self, message: str, *, session_id: str | None = None
     ) -> ServiceResult[dict[str, Any]]:
+        del session_id
+        if not str(message).strip():
+            return ServiceResult.failure(
+                "system_error",
+                "log message must not be empty",
+                meta=self._meta("write_log"),
+            )
         return self._call(
-            "write_log", lambda: self.logs.write(message, session_id=session_id)
+            "write_log",
+            lambda: self.logs.append(
+                message,
+                severity="INFO",
+                surface=os.environ.get(ACTIVE_LOG_SURFACE_ENV) or "SERVICE",
+                module="manual",
+            ),
         )
 
     def list_logs(self) -> ServiceResult[list[dict[str, Any]]]:
@@ -257,17 +319,19 @@ class PermissionLogSystemService:
     def log_storage(
         self, *, file_name: str | None = None, session_id: str | None = None
     ) -> ServiceResult[dict[str, Any]]:
+        del session_id
         return self._call(
             "log_storage",
-            lambda: self.logs.storage_info(file_name=file_name, session_id=session_id),
+            lambda: self.logs.storage_info(file_name=file_name),
         )
 
     def list_log_entries(
         self, *, file_name: str | None = None, session_id: str | None = None
     ) -> ServiceResult[list[dict[str, Any]]]:
+        del session_id
         return self._call(
             "list_log_entries",
-            lambda: self.logs.list_entries(file_name=file_name, session_id=session_id),
+            lambda: self.logs.list_entries(file_name=file_name),
         )
 
     def log_statistics(
@@ -291,7 +355,7 @@ class PermissionLogSystemService:
                 str(exc),
                 meta=self._meta(operation),
             )
-        except (ValueError, OSError, LogReportError) as exc:
+        except (ValueError, OSError, LogReportError, ApplicationLogError) as exc:
             return ServiceResult.failure(
                 "system_error", str(exc), meta=self._meta(operation)
             )

@@ -4,6 +4,7 @@ import { THEME } from "./theme.ts"
 import { presentationRecord, safeUiText, userFacingError } from "./ui_safety.ts"
 
 const PAGE_CONTENT = Object.freeze({
+  settings: ["暂无设置摘要", "集中查看日志、LLM、Agent、权限、RAG 与实验引导设置。"],
   chat: ["开始新的科研对话", "选择工作区后在下方输入问题。"],
   dashboard: ["暂无运行状态", "刷新以读取工作区、模型与插件状态。"],
   workspace: ["暂无工作区", "输入名称后可创建工作区。"],
@@ -20,6 +21,7 @@ const PAGE_CONTENT = Object.freeze({
 })
 
 const FORM_ROUTES = Object.freeze({
+  settings: ["日志总上限（字节）", "输入正整数，例如 1073741824"],
   workspace: ["工作区名称", "输入工作区名称"],
   paper: ["论文文件", "输入本地论文文件路径"],
   experience: ["经验摘要", "输入可复用的研究经验"],
@@ -28,6 +30,7 @@ const FORM_ROUTES = Object.freeze({
   log: ["日志内容", "输入脱敏日志内容"],
 })
 const ACTION_LABELS = Object.freeze({
+  settings: "应用日志上限",
   dashboard: "刷新状态",
   workspace: "创建工作区",
   paper: "导入论文",

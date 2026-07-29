@@ -234,13 +234,7 @@ def read_pyproject() -> dict:
 
 @pytest.fixture
 def tracked_files() -> list[str]:
-    """Return paths currently present in the Git index."""
-    import subprocess
-    result = subprocess.run(
-        ["git", "ls-files"],
-        cwd=Path(__file__).resolve().parents[1],
-        check=True,
-        text=True,
-        capture_output=True,
-    )
-    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    """Return Git-index paths or the equivalent source-archive paths."""
+    from scripts.maintainers.repository_files import repository_files
+
+    return repository_files(Path(__file__).resolve().parents[1])

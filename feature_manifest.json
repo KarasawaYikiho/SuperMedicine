@@ -411,6 +411,12 @@
       "expected_result": "Preserves declared cli entrypoint."
     },
     {
+      "feature_id": "cli:settings",
+      "category": "cli",
+      "entrypoint": "cli:settings",
+      "expected_result": "Shows all persistent settings and updates the readable log size limit."
+    },
+    {
       "feature_id": "cli:submit",
       "category": "cli",
       "entrypoint": "cli:submit",
@@ -897,6 +903,12 @@
       "expected_result": "Preserves the OpenTUI page contract."
     },
     {
+      "feature_id": "opentui:page:settings",
+      "category": "opentui",
+      "entrypoint": "opentui:page:settings",
+      "expected_result": "Centralizes persistent settings and applies the log size limit."
+    },
+    {
       "feature_id": "opentui:page:llm",
       "category": "opentui",
       "entrypoint": "opentui:page:llm",
@@ -1065,6 +1077,12 @@
       "expected_result": "Reports desktop backend readiness before opening the native window."
     },
     {
+      "feature_id": "web:DELETE /api/v1/llm/providers/{name}",
+      "category": "web",
+      "entrypoint": "web:DELETE /api/v1/llm/providers/{name}",
+      "expected_result": "Preserves declared web entrypoint."
+    },
+    {
       "feature_id": "web:DELETE /api/v1/self-evolution/{artifact_id}",
       "category": "web",
       "entrypoint": "web:DELETE /api/v1/self-evolution/{artifact_id}",
@@ -1080,6 +1098,12 @@
       "feature_id": "web:DELETE /api/v1/workspaces/{workspace_id}/experiences/{experience_id}",
       "category": "web",
       "entrypoint": "web:DELETE /api/v1/workspaces/{workspace_id}/experiences/{experience_id}",
+      "expected_result": "Preserves declared web entrypoint."
+    },
+    {
+      "feature_id": "web:DELETE /api/v1/workspaces/{workspace_id}/papers/{paper_id}",
+      "category": "web",
+      "entrypoint": "web:DELETE /api/v1/workspaces/{workspace_id}/papers/{paper_id}",
       "expected_result": "Preserves declared web entrypoint."
     },
     {
@@ -1125,6 +1149,12 @@
       "expected_result": "Preserves declared web entrypoint."
     },
     {
+      "feature_id": "web:GET /api/v1/experiments/context",
+      "category": "web",
+      "entrypoint": "web:GET /api/v1/experiments/context",
+      "expected_result": "Preserves declared web entrypoint."
+    },
+    {
       "feature_id": "web:GET /api/v1/llm/providers",
       "category": "web",
       "entrypoint": "web:GET /api/v1/llm/providers",
@@ -1146,6 +1176,12 @@
       "feature_id": "web:GET /api/v1/logs/{name}",
       "category": "web",
       "entrypoint": "web:GET /api/v1/logs/{name}",
+      "expected_result": "Preserves declared web entrypoint."
+    },
+    {
+      "feature_id": "web:GET /api/v1/papers/search",
+      "category": "web",
+      "entrypoint": "web:GET /api/v1/papers/search",
       "expected_result": "Preserves declared web entrypoint."
     },
     {
@@ -1171,6 +1207,12 @@
       "category": "web",
       "entrypoint": "web:GET /api/v1/status",
       "expected_result": "Preserves declared web entrypoint."
+    },
+    {
+      "feature_id": "web:GET /api/v1/settings",
+      "category": "web",
+      "entrypoint": "web:GET /api/v1/settings",
+      "expected_result": "Returns the centralized secret-safe persistent settings."
     },
     {
       "feature_id": "web:GET /api/v1/tools/scan",
@@ -1227,6 +1269,18 @@
       "expected_result": "Preserves declared web entrypoint."
     },
     {
+      "feature_id": "web:GET /api/v1/workspaces/{workspace_id}/tools/{language}/{tool_id}",
+      "category": "web",
+      "entrypoint": "web:GET /api/v1/workspaces/{workspace_id}/tools/{language}/{tool_id}",
+      "expected_result": "Preserves declared web entrypoint."
+    },
+    {
+      "feature_id": "web:PATCH /api/v1/workspaces/{workspace_id}/experiences/{experience_id}",
+      "category": "web",
+      "entrypoint": "web:PATCH /api/v1/workspaces/{workspace_id}/experiences/{experience_id}",
+      "expected_result": "Preserves declared web entrypoint."
+    },
+    {
       "feature_id": "web:PATCH /api/v1/workspaces/{workspace_id}/papers/{paper_id}",
       "category": "web",
       "entrypoint": "web:PATCH /api/v1/workspaces/{workspace_id}/papers/{paper_id}",
@@ -1242,6 +1296,12 @@
       "feature_id": "web:POST /api/v1/experiments",
       "category": "web",
       "entrypoint": "web:POST /api/v1/experiments",
+      "expected_result": "Preserves declared web entrypoint."
+    },
+    {
+      "feature_id": "web:POST /api/v1/experiments/configs",
+      "category": "web",
+      "entrypoint": "web:POST /api/v1/experiments/configs",
       "expected_result": "Preserves declared web entrypoint."
     },
     {
@@ -1281,9 +1341,21 @@
       "expected_result": "Preserves declared web entrypoint."
     },
     {
+      "feature_id": "web:POST /api/v1/settings/application-log",
+      "category": "web",
+      "entrypoint": "web:POST /api/v1/settings/application-log",
+      "expected_result": "Persists and enforces the total readable log size limit."
+    },
+    {
       "feature_id": "web:POST /api/v1/permissions/authorize",
       "category": "web",
       "entrypoint": "web:POST /api/v1/permissions/authorize",
+      "expected_result": "Preserves declared web entrypoint."
+    },
+    {
+      "feature_id": "web:POST /api/v1/permissions/check",
+      "category": "web",
+      "entrypoint": "web:POST /api/v1/permissions/check",
       "expected_result": "Preserves declared web entrypoint."
     },
     {
@@ -1296,6 +1368,12 @@
       "feature_id": "web:POST /api/v1/permissions/revoke",
       "category": "web",
       "entrypoint": "web:POST /api/v1/permissions/revoke",
+      "expected_result": "Preserves declared web entrypoint."
+    },
+    {
+      "feature_id": "web:POST /api/v1/self-evolution/{artifact_id}/confirm",
+      "category": "web",
+      "entrypoint": "web:POST /api/v1/self-evolution/{artifact_id}/confirm",
       "expected_result": "Preserves declared web entrypoint."
     },
     {
@@ -1323,9 +1401,27 @@
       "expected_result": "Preserves declared web entrypoint."
     },
     {
+      "feature_id": "web:POST /api/v1/workspaces/{workspace_id}/experiences/export",
+      "category": "web",
+      "entrypoint": "web:POST /api/v1/workspaces/{workspace_id}/experiences/export",
+      "expected_result": "Preserves declared web entrypoint."
+    },
+    {
+      "feature_id": "web:POST /api/v1/workspaces/{workspace_id}/experiences/suggest",
+      "category": "web",
+      "entrypoint": "web:POST /api/v1/workspaces/{workspace_id}/experiences/suggest",
+      "expected_result": "Preserves declared web entrypoint."
+    },
+    {
       "feature_id": "web:POST /api/v1/workspaces/{workspace_id}/papers",
       "category": "web",
       "entrypoint": "web:POST /api/v1/workspaces/{workspace_id}/papers",
+      "expected_result": "Preserves declared web entrypoint."
+    },
+    {
+      "feature_id": "web:POST /api/v1/workspaces/{workspace_id}/papers/import-online",
+      "category": "web",
+      "entrypoint": "web:POST /api/v1/workspaces/{workspace_id}/papers/import-online",
       "expected_result": "Preserves declared web entrypoint."
     },
     {
@@ -1338,6 +1434,18 @@
       "feature_id": "web:POST /api/v1/workspaces/{workspace_id}/tools",
       "category": "web",
       "entrypoint": "web:POST /api/v1/workspaces/{workspace_id}/tools",
+      "expected_result": "Preserves declared web entrypoint."
+    },
+    {
+      "feature_id": "web:POST /api/v1/workspaces/{workspace_id}/tools/initialize",
+      "category": "web",
+      "entrypoint": "web:POST /api/v1/workspaces/{workspace_id}/tools/initialize",
+      "expected_result": "Preserves declared web entrypoint."
+    },
+    {
+      "feature_id": "web:POST /api/v1/workspaces/{workspace_id}/tools/{language}/{tool_id}/prepare",
+      "category": "web",
+      "entrypoint": "web:POST /api/v1/workspaces/{workspace_id}/tools/{language}/{tool_id}/prepare",
       "expected_result": "Preserves declared web entrypoint."
     },
     {

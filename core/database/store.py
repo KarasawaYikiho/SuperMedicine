@@ -1,7 +1,7 @@
 """SQLite-based database class for persistent storage.
 
 This module provides a thread-safe SQLite database wrapper with context manager
-support and automatic table creation for sessions, agents, and plugins.
+support and automatic table creation for users, sessions, agents, and plugins.
 """
 
 from __future__ import annotations
@@ -32,6 +32,14 @@ class Database:
 
     # Schema for core tables
     SCHEMA_SQL = """
+    CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        username TEXT UNIQUE NOT NULL,
+        email TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE TABLE IF NOT EXISTS sessions (
         id TEXT PRIMARY KEY,
         data TEXT NOT NULL DEFAULT '{}',

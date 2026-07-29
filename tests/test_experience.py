@@ -396,6 +396,12 @@ def test_export_workspace_records_as_json_and_markdown(tmp_path, monkeypatch):
 
     exported_json = cli.experience_export("study-a", "json")
     exported_md = cli.experience_export("study-a", "md")
+    nested_output = tmp_path / "exports" / "nested" / "experiences.json"
+    written_json = cli.experience_export(
+        "study-a",
+        "json",
+        output=str(nested_output),
+    )
 
     parsed = json.loads(exported_json)
     assert [record["id"] for record in parsed] == [created["id"]]
@@ -403,6 +409,7 @@ def test_export_workspace_records_as_json_and_markdown(tmp_path, monkeypatch):
     assert "Exportable local rule" in exported_md
     assert created["id"] in exported_md
     assert "Workspace export content." in exported_md
+    assert nested_output.read_text(encoding="utf-8") == written_json
 
 
 def test_general_export_is_cross_workspace_and_rejects_project_details(

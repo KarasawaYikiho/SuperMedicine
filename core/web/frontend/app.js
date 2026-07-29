@@ -379,6 +379,7 @@
             method: method,
             headers: { "Content-Type": "application/json" },
         };
+        if (method === "GET") opts.cache = "no-store";
         if (body) opts.body = JSON.stringify(body);
 
         const resp = await authorizedFetch(url, opts);
@@ -452,13 +453,22 @@
                 loadWorkspaces();
                 break;
             case "papers":
-                loadWorkspaceSelectors();
+                loadWorkspaceSelectors().then(function () {
+                    var wsId = document.getElementById("paper-ws-select").value;
+                    if (wsId) loadPapers(wsId);
+                });
                 break;
             case "experiences":
-                loadWorkspaceSelectors();
+                loadWorkspaceSelectors().then(function () {
+                    var wsId = document.getElementById("exp-ws-select").value;
+                    if (wsId) loadExperiences(wsId);
+                });
                 break;
             case "tools":
-                loadWorkspaceSelectors();
+                loadWorkspaceSelectors().then(function () {
+                    var wsId = document.getElementById("tool-ws-select").value;
+                    if (wsId) loadTools(wsId);
+                });
                 break;
             case "experiments":
                 loadExperiments();
@@ -469,10 +479,9 @@
                     if (wsId) loadDialogHistory(wsId);
                 });
                 break;
-            case "llm":
+            case "settings":
+                loadSettings();
                 loadLLMProviders();
-                break;
-            case "permissions":
                 loadPermissions();
                 loadMultiAgent();
                 break;
@@ -1271,6 +1280,67 @@
 
     // ---- LLM 配置 ---------------------------------------------------------
 
+    async function loadSettings() {
+        try {
+            const data = await apiCall("GET", "/api/v1/settings");
+            const logSettings = data.application_log || {};
+            const maxBytes = Number(logSettings.max_total_bytes || 1073741824);
+            document.getElementById("settings-log-limit-gib").value =
+                String(Math.round((maxBytes / 1073741824) * 1000) / 1000);
+            document.getElementById("settings-log-info").textContent =
+                "当前上限：" + maxBytes + " 字节（" +
+                (maxBytes / 1073741824).toFixed(3) + " GiB）";
+            document.getElementById("settings-overview-info").innerHTML =
+                "<div><strong>Agent：</strong>" +
+                escapeHtml((data.agents || {}).mode || "single") + "</div>" +
+                "<div><strong>权限：</strong>" +
+                escapeHtml((data.permission || {}).mode || "conservative") + "</div>" +
+                "<div><strong>RAG：</strong>" +
+                escapeHtml((data.rag || {}).provider || "local") + "</div>" +
+                "<div><strong>实验引导：</strong>" +
+                ((data.experiment_guide || {}).enabled === false ? "关闭" : "开启") +
+                "</div>";
+        } catch (err) {
+            showToast("加载设置失败：" + err.message, "error");
+        }
+    }
+
+    function setupSettingsForm() {
+        document.getElementById("btn-refresh-settings").addEventListener(
+            "click",
+            function () {
+                loadSettings();
+                loadLLMProviders();
+                loadPermissions();
+                loadMultiAgent();
+            }
+        );
+        document.getElementById("btn-save-log-settings").addEventListener(
+            "click",
+            async function () {
+                const gib = Number(
+                    document.getElementById("settings-log-limit-gib").value
+                );
+                const maxBytes = Math.round(gib * 1073741824);
+                if (!Number.isFinite(gib) || gib <= 0 || maxBytes <= 0) {
+                    showToast("日志容量必须是正数。", "warning");
+                    return;
+                }
+                try {
+                    await apiCall(
+                        "POST",
+                        "/api/v1/settings/application-log",
+                        { max_total_bytes: maxBytes }
+                    );
+                    showToast("日志设置已应用。", "success");
+                    await loadSettings();
+                } catch (err) {
+                    showToast("保存日志设置失败：" + err.message, "error");
+                }
+            }
+        );
+    }
+
     async function loadLLMProviders() {
         try {
             const data = await apiCall("GET", "/api/v1/llm/providers");
@@ -1409,6 +1479,8 @@
     }
 
     function renderPermissions(data) {
+        var modeSelect = document.getElementById("permission-mode-select");
+        if (modeSelect && data.mode) modeSelect.value = data.mode;
         var modeInfo = document.getElementById("permission-mode-info");
         modeInfo.innerHTML =
             '<div><span class="text-muted">模式:</span> <strong>' + escapeHtml(data.mode || "未知") + "</strong></div>" +
@@ -1527,7 +1599,8 @@
             if (!name) return;
             try {
                 const data = await apiCall("GET", "/api/v1/logs/" + encodeURIComponent(name));
-                document.getElementById("log-content").textContent = typeof data === "string" ? data : JSON.stringify(data, null, 2);
+                document.getElementById("log-content").textContent =
+                    typeof data === "string" ? data : (data.content || JSON.stringify(data, null, 2));
             } catch (err) {
                 document.getElementById("log-content").textContent = "加载日志出错: " + err.message;
             }
@@ -1541,19 +1614,16 @@
         });
         document.getElementById("btn-save-log").addEventListener("click", async function () {
             var message = document.getElementById("log-message").value.trim();
-            var sessionId = document.getElementById("log-session-id").value.trim();
             if (!message) {
                 showToast("消息为必填项", "warning");
                 return;
             }
             try {
                 var body = { message: message };
-                if (sessionId) body.session_id = sessionId;
                 await apiCall("POST", "/api/v1/logs", body);
                 showToast("日志条目已写入", "success");
                 document.getElementById("log-write-form").classList.add("hidden");
                 document.getElementById("log-message").value = "";
-                document.getElementById("log-session-id").value = "";
             } catch (err) {
                 showToast("写入日志失败: " + err.message, "error");
             }
@@ -1687,11 +1757,22 @@
 
     async function loadDiagnostics() {
         try {
-            var data = await apiCall("GET", "/api/v1/diagnose");
+            const results = await Promise.all([
+                apiCall("GET", "/api/v1/diagnose/config"),
+                apiCall("GET", "/api/v1/diagnose/llm"),
+                apiCall("GET", "/api/v1/diagnose/install")
+            ]);
+            var data = {
+                config: results[0],
+                llm: results[1],
+                install: results[2]
+            };
             latestDiagnostics = data;
             renderDiagnostics(data);
+            return true;
         } catch (error) {
             showToast("加载诊断失败：" + error.message, "error");
+            return false;
         }
     }
 
@@ -1700,33 +1781,60 @@
         var llmInfo = document.getElementById('diagnose-llm-info');
         var installInfo = document.getElementById('diagnose-install-info');
 
+        var config = data.config || {};
+        var llm = data.llm || {};
+        var install = data.install || {};
         if (configInfo) {
-            configInfo.innerHTML = data.config ? (
-                '<p><strong>状态:</strong> ' + (data.config.exists ? '✓ 已初始化' : '✗ 未找到') + '</p>' +
-                '<p><strong>路径:</strong> ' + escapeHtml(data.config.path || '-') + '</p>'
-            ) : '<p>无配置数据</p>';
+            configInfo.innerHTML =
+                diagnosticStatus(config.ok, config.status === "missing" ? "未找到配置" : "配置可用") +
+                '<p><strong>配置文件：</strong>' + escapeHtml(config.path || config.config_path || "-") + '</p>' +
+                (config.load_error
+                    ? '<p class="text-error"><strong>读取错误：</strong>' + escapeHtml(config.load_error) + '</p>'
+                    : '') +
+                diagnosticCheckedAt(config.checked_at);
         }
 
         if (llmInfo) {
-            llmInfo.innerHTML = data.llm ? (
-                '<p><strong>状态:</strong> ' + (data.llm.ok ? '✓ 已配置' : '✗ 未配置') + '</p>' +
-                '<p><strong>提供商:</strong> ' + escapeHtml(data.llm.provider || '-') + '</p>'
-            ) : '<p>无LLM数据</p>';
+            var missing = Array.isArray(llm.missing) ? llm.missing : [];
+            llmInfo.innerHTML =
+                diagnosticStatus(Boolean(llm.ok), llm.ok ? "模型配置完整" : "模型配置不完整") +
+                '<p><strong>当前提供商：</strong>' + escapeHtml(llm.provider || "未选择") + '</p>' +
+                (missing.length
+                    ? '<p><strong>缺少：</strong>' + escapeHtml(missing.join("、")) + '</p>'
+                    : '') +
+                diagnosticCheckedAt(llm.checked_at);
         }
 
         if (installInfo) {
-            var runtime = data.required_runtime || {};
-            var harness = runtime.harness || {};
-            var rag = runtime.rag || {};
+            var checks = install.checks || {};
+            var checkRows = Object.keys(checks).map(function (key) {
+                var check = checks[key] || {};
+                return '<p><span class="diagnostic-mark ' +
+                    (check.ok ? 'success' : 'error') + '">' +
+                    (check.ok ? '✓' : '✗') + '</span> <strong>' +
+                    escapeHtml(check.label || key) + '：</strong>' +
+                    escapeHtml(check.detail || '-') + '</p>';
+            }).join("");
             installInfo.innerHTML =
-                '<p><strong>Harness:</strong> ' +
-                (harness.healthy ? '✓ 正常（强制）' : '✗ 异常') + '</p>' +
-                '<p><strong>RAG:</strong> ' +
-                (rag.healthy ? '✓ 正常（强制）' : '✗ 异常') + '</p>' +
-                '<p><strong>日志:</strong> ' +
-                ((data.log_storage || {}).log_dir_exists ? '✓ 可用' : '✗ 不可用') +
-                '</p>';
+                diagnosticStatus(Boolean(install.ok), install.ok ? "安装环境可用" : "安装环境不完整") +
+                '<p><strong>运行模式：</strong>' + escapeHtml(install.mode || "unknown") + '</p>' +
+                checkRows +
+                diagnosticCheckedAt(install.checked_at);
         }
+    }
+
+    function diagnosticStatus(ok, label) {
+        return '<p><span class="status-badge ' + (ok ? 'success' : 'error') + '">' +
+            (ok ? '正常' : '需处理') + '</span> ' + escapeHtml(label) + '</p>';
+    }
+
+    function diagnosticCheckedAt(value) {
+        var checked = value ? new Date(value) : null;
+        var display = checked && !Number.isNaN(checked.getTime())
+            ? checked.toLocaleString() + "." + String(checked.getMilliseconds()).padStart(3, "0")
+            : "尚未运行";
+        return '<p class="diagnostic-checked-at">本次检查：' +
+            escapeHtml(display) + '</p>';
     }
 
     function formatDiagnosticSummary(data) {
@@ -1742,39 +1850,68 @@
     }
 
     async function runConfigDiagnostics() {
-        try {
-            latestDiagnostics.config = await apiCall("GET", "/api/v1/diagnose/config");
-            renderDiagnostics(latestDiagnostics);
-            showToast("配置诊断已刷新", "success");
-        } catch (error) {
-            showToast("运行配置诊断失败：" + error.message, "error");
-        }
+        return runOneDiagnostic(
+            "btn-diagnose-config",
+            "运行配置",
+            async function () {
+                latestDiagnostics.config = await apiCall("GET", "/api/v1/diagnose/config");
+                renderDiagnostics(latestDiagnostics);
+                showToast("配置诊断已刷新", "success");
+            }
+        );
     }
 
     async function runLLMDiagnostics() {
-        try {
-            latestDiagnostics.llm = await apiCall("GET", "/api/v1/diagnose/llm");
-            renderDiagnostics(latestDiagnostics);
-            showToast("LLM 诊断已刷新", "success");
-        } catch (error) {
-            showToast("运行 LLM 诊断失败：" + error.message, "error");
-        }
+        return runOneDiagnostic(
+            "btn-diagnose-llm",
+            "运行 LLM",
+            async function () {
+                latestDiagnostics.llm = await apiCall("GET", "/api/v1/diagnose/llm");
+                renderDiagnostics(latestDiagnostics);
+                showToast("LLM 诊断已刷新", "success");
+            }
+        );
     }
 
     async function runInstallDiagnostics() {
-        try {
-            var data = await apiCall("GET", "/api/v1/diagnose/install");
-            latestDiagnostics = Object.assign(latestDiagnostics, data);
-            renderDiagnostics(latestDiagnostics);
-            showToast("运行时诊断已刷新", "success");
-        } catch (error) {
-            showToast("运行安装诊断失败：" + error.message, "error");
-        }
+        return runOneDiagnostic(
+            "btn-diagnose-install",
+            "运行安装",
+            async function () {
+                latestDiagnostics.install = await apiCall("GET", "/api/v1/diagnose/install");
+                renderDiagnostics(latestDiagnostics);
+                showToast("安装诊断已刷新", "success");
+            }
+        );
     }
 
     async function runAllDiagnostics() {
-        await loadDiagnostics();
-        showToast("全部诊断已刷新", "success");
+        var ok = await runOneDiagnostic(
+            "btn-run-all-diagnostics",
+            "运行全部",
+            loadDiagnostics
+        );
+        if (ok) showToast("全部诊断已刷新", "success");
+    }
+
+    async function runOneDiagnostic(buttonId, idleLabel, action) {
+        var button = document.getElementById(buttonId);
+        if (button) {
+            button.disabled = true;
+            button.textContent = "运行中…";
+        }
+        try {
+            var result = await action();
+            return result !== false;
+        } catch (error) {
+            showToast("诊断运行失败：" + error.message, "error");
+            return false;
+        } finally {
+            if (button) {
+                button.disabled = false;
+                button.textContent = idleLabel;
+            }
+        }
     }
 
     function setupDiagnoseForm() {
@@ -1783,7 +1920,9 @@
         var configBtn = document.getElementById('btn-diagnose-config');
         var llmBtn = document.getElementById('btn-diagnose-llm');
         var installBtn = document.getElementById('btn-diagnose-install');
-        if (refreshBtn) refreshBtn.addEventListener('click', loadDiagnostics);
+        if (refreshBtn) refreshBtn.addEventListener('click', function () {
+            runOneDiagnostic("btn-refresh-diagnose", "刷新", loadDiagnostics);
+        });
         if (runAllBtn) runAllBtn.addEventListener('click', runAllDiagnostics);
         if (configBtn) configBtn.addEventListener('click', runConfigDiagnostics);
         if (llmBtn) llmBtn.addEventListener('click', runLLMDiagnostics);
@@ -2146,7 +2285,7 @@
                     "/api/v1/workspaces/" + encodeURIComponent(workspaceId) + "/experiences/export",
                     { format: "json", include_general: true }
                 );
-                showToast("经验已导出到受管项目目录。", "success");
+                showToast("经验已导出到受管数据目录。", "success");
             } catch (error) {
                 showToast("导出失败：" + error.message, "error");
             }
@@ -2195,6 +2334,7 @@
     setupToolForm();
     setupExperimentForm();
     setupDialogHistoryForm();
+    setupSettingsForm();
     setupLLMForm();
     setupPermissionForm();
     setupLogForm();

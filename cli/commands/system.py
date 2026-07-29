@@ -17,6 +17,30 @@ from core.services import ExperienceEvolutionService, PermissionLogSystemService
 logger = logging.getLogger(__name__)
 
 
+def settings_show(cli) -> dict[str, Any]:
+    """Show the central, secret-safe persistent settings overview."""
+    service = PermissionLogSystemService(Path.cwd())
+    result = service.require_data(service.settings())
+    result["commands"] = {
+        "application_log": "supermedicine settings log-limit <bytes>",
+        "llm": "supermedicine llm --help",
+        "permission": "supermedicine permission --help",
+        "multi_agent": "supermedicine multi-agent --help",
+    }
+    _log_json(result)
+    return result
+
+
+def settings_log_limit(cli, max_total_bytes: int) -> dict[str, Any]:
+    """Persist and immediately enforce the application-log directory cap."""
+    service = PermissionLogSystemService(Path.cwd())
+    result = service.require_data(
+        service.set_application_log_limit(max_total_bytes)
+    )
+    _log_json(result)
+    return result
+
+
 def permission_status(cli) -> dict[str, Any]:
     """Show current CLI file access mode and authorized external roots."""
     service = PermissionLogSystemService(Path.cwd())

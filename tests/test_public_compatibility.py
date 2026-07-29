@@ -157,6 +157,19 @@ def test_cli_help_documents_workspace_tui_paper_and_experience_boundaries(capsys
             assert fragment in output
 
 
+def test_cli_run_returns_nonzero_process_status_for_structured_failure(monkeypatch):
+    class FailedCLI:
+        def run(self, *_args, **_kwargs):
+            return {"status": "llm_error", "error": {"code": "upstream_error"}}
+
+    monkeypatch.setattr("cli_entry.CLI", FailedCLI)
+
+    with pytest.raises(SystemExit) as failed:
+        main(["run", "trigger provider failure"])
+
+    assert failed.value.code == 1
+
+
 def test_cli_run_without_workspace_preserves_params_identity_and_ignores_tui_recent_state(
     monkeypatch, tmp_path
 ):

@@ -126,7 +126,10 @@ def _wait_until(predicate, timeout: float = 2.0) -> bool:
 
 @pytest.fixture
 def bridge(tmp_path):
-    server = TUIBridgeServer(_application(tmp_path), request_timeout=0.15)
+    # General facade/catalog tests exercise multiple real services and should
+    # not inherit the deliberately tiny timeout used by timeout-specific tests
+    # below.  Windows process scheduling can legitimately exceed 150 ms.
+    server = TUIBridgeServer(_application(tmp_path), request_timeout=2.0)
     server.start()
     try:
         yield server
@@ -165,7 +168,7 @@ def test_loopback_authentication_request_ids_and_workspace_facade(bridge) -> Non
     assert created["result"]["id"] == "bridge-one"
     assert listed["type"] == "result" and listed["id"] == "list"
     assert [item["id"] for item in listed["result"]] == ["bridge-one"]
-    assert catalog["type"] == "result"
+    assert catalog["type"] == "result", catalog
     assert catalog["result"]["ok"] is True
     assert "workspace" in catalog["result"]["data"]["pages"]
     peer.close()

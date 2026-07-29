@@ -134,6 +134,66 @@ def test_chat_success_survives_recommendation_queue_failure(
     assert "disk unavailable" in caplog.text
 
 
+def test_workspace_chat_persists_safe_shared_dialog_events(
+    tmp_path, monkeypatch
+) -> None:
+    from core.services import AgentHarnessService, ServiceResult, WorkspaceService
+    from core.web.runtime import WebRuntime
+
+    WorkspaceService(tmp_path).create("dialog-test")
+
+    class FakeConfig:
+        def set_runtime_state_value(self, *_args, **_kwargs) -> None:
+            return None
+
+    class FakeKernel:
+        _config = FakeConfig()
+        _config_path = tmp_path / ".supermedicine" / "config.yaml"
+
+        def execute_task(self, *_args, **_kwargs):
+            return {
+                "status": "success",
+                "output": "private assistant response",
+                "task_id": "task-dialog",
+                "agent": "alpha",
+            }
+
+    class NoopEvolution:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def recommend_evolution(self, *_args, **_kwargs):
+            return ServiceResult.success({"status": "queued"})
+
+    runtime = WebRuntime(
+        {
+            "agent_harness": AgentHarnessService,
+            "workspace": WorkspaceService,
+        },
+        project_root=tmp_path,
+    )
+    monkeypatch.setattr(runtime, "get_kernel", lambda: FakeKernel())
+    monkeypatch.setattr(
+        "core.services.ExperienceEvolutionService", NoopEvolution
+    )
+
+    result = runtime.execute_chat_message(
+        "private user request", workspace_id="dialog-test"
+    )
+    events = AgentHarnessService(tmp_path).require_data(
+        AgentHarnessService(tmp_path).list_dialog_events("dialog-test")
+    )
+
+    assert result["status"] == "success"
+    assert [event["event"] for event in events] == [
+        "user_message",
+        "assistant_message",
+    ]
+    assert "private user request" not in str(events)
+    assert "private assistant response" not in str(events)
+    assert all(event["metadata"]["task_id"] == "task-dialog" for event in events)
+
+
 def test_web_workspace_endpoint_consumes_injected_application_directly(
     tmp_path, monkeypatch
 ) -> None:

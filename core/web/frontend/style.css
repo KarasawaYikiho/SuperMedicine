@@ -26,7 +26,12 @@
 }
 
 .app-dialog {
+    position: fixed;
+    inset: 0;
+    margin: auto;
     width: min(34rem, calc(100vw - 2rem));
+    max-height: min(80vh, 44rem);
+    overflow: auto;
     padding: 0;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
@@ -436,7 +441,61 @@ section h2 {
     color: var(--color-text);
     display: inline-flex;
     align-items: center;
+    justify-content: center;
+    text-align: center;
+    line-height: 1.2;
+    min-height: 2.5rem;
     gap: 0.5rem;
+    white-space: nowrap;
+}
+
+button,
+input[type="button"],
+input[type="submit"] {
+    font-family: var(--font-sans);
+    border-radius: var(--radius);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    line-height: 1.2;
+}
+
+#tab-diagnose,
+#tab-diagnose .info-card,
+#tab-diagnose button {
+    font-family: var(--font-sans);
+}
+
+.diagnostic-run-button {
+    margin-top: 0.75rem;
+}
+
+.diagnostic-mark {
+    display: inline-block;
+    width: 1.1rem;
+    font-weight: 700;
+    text-align: center;
+}
+
+.diagnostic-mark.success {
+    color: var(--color-success);
+}
+
+.diagnostic-mark.error {
+    color: var(--color-error);
+}
+
+.diagnostic-checked-at {
+    color: var(--color-text-dim);
+    font-size: 0.8rem;
+    margin-top: 0.75rem;
+}
+
+.settings-divider {
+    border: 0;
+    border-top: 1px solid var(--color-border);
+    margin: 2rem 0;
 }
 
 .btn:hover {
@@ -518,6 +577,7 @@ section h2 {
 }
 
 .form-group input[type="text"],
+.form-group input[type="search"],
 .form-group textarea,
 .form-group select {
     width: 100%;
@@ -532,6 +592,7 @@ section h2 {
 }
 
 .form-group input[type="text"]:focus,
+.form-group input[type="search"]:focus,
 .form-group textarea:focus,
 .form-group select:focus {
     outline: none;
@@ -540,6 +601,7 @@ section h2 {
 }
 
 .form-group input[type="text"]::placeholder,
+.form-group input[type="search"]::placeholder,
 .form-group textarea::placeholder {
     color: var(--color-text-dim);
 }
@@ -821,6 +883,74 @@ section h2 {
     border-radius: var(--radius-lg);
     background: var(--color-surface);
     border: 1px solid var(--color-border);
+}
+
+#experiment-list .data-table th:last-child,
+#experiment-list .data-table td:last-child {
+    min-width: 4.75rem;
+}
+
+.self-evolution-table {
+    table-layout: fixed;
+}
+
+.self-evolution-table th:nth-child(1),
+.self-evolution-table td:nth-child(1) {
+    width: 24%;
+}
+
+.self-evolution-table th:nth-child(2),
+.self-evolution-table td:nth-child(2) {
+    width: 12%;
+}
+
+.self-evolution-table th:nth-child(3),
+.self-evolution-table td:nth-child(3) {
+    width: 25%;
+}
+
+.self-evolution-table th:nth-child(4),
+.self-evolution-table td:nth-child(4) {
+    width: 14%;
+}
+
+.self-evolution-table th:nth-child(5),
+.self-evolution-table td:nth-child(5) {
+    width: 25%;
+}
+
+.self-evolution-table td {
+    overflow-wrap: anywhere;
+}
+
+.self-evolution-table td:last-child .btn {
+    justify-content: center;
+    margin: 0.15rem 0;
+    width: 100%;
+}
+
+@media (min-width: 769px) and (max-width: 1100px) {
+    .tools-toolbar {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .tools-toolbar .select-input {
+        grid-column: span 2;
+        width: 100%;
+    }
+
+    .tools-toolbar .btn {
+        justify-content: center;
+        width: 100%;
+    }
+}
+
+@media (min-width: 769px) and (max-height: 760px) {
+    #messages {
+        min-height: 220px;
+        max-height: 38vh;
+    }
 }
 
 .message {
@@ -1459,4 +1589,17 @@ body {
         grid-template-columns: 1fr;
         align-items: start;
     }
+}
+
+/* All functional buttons share one rounded outline and centered label. */
+button,
+input[type="button"],
+input[type="submit"],
+.docs-shell .btn {
+    border-radius: var(--radius-lg);
+    font-family: var(--font-sans);
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    line-height: 1.2;
 }

@@ -160,11 +160,13 @@ def test_log_write_list_show_create_redacted_reports(tmp_path, monkeypatch):
     shown = CLI().log_show(written["file"])
 
     assert Path(written["path"]).is_file()
-    assert written["session_id"] == "wb-session"
-    assert "secret-token" not in written["message"]
-    assert "[REDACTED]" in written["message"]
+    assert written["file"].startswith("supermedicine-")
+    assert written["file"].endswith(".log")
+    assert "secret-token" not in written["content"]
+    assert "[REDACTED]" in written["content"]
     assert [item["file"] for item in listed] == [written["file"]]
-    assert shown["report_id"] == written["report_id"]
+    assert shown["file"] == written["file"]
+    assert shown["entries"][-1]["surface"] == "SERVICE"
     assert "secret-token" not in json.dumps(shown, ensure_ascii=False)
 
 
@@ -201,7 +203,7 @@ def test_log_write_empty_message_exits_with_argparse_error(
         main(["log", "write", "--message", "   "])
 
     assert excinfo.value.code == 2
-    assert "--message cannot be empty" in capsys.readouterr().err
+    assert "log message must not be empty" in capsys.readouterr().err
 
 
 def test_experiment_submit_wrong_step_exits_with_argparse_error(
@@ -640,7 +642,9 @@ def _submit_payload(step_id: str) -> dict[str, Any]:
     return payloads[step_id]
 
 
-def test_complete_wb_cli_flow_writes_structured_session_log(tmp_path, monkeypatch):
+def test_complete_wb_cli_flow_writes_structured_events_to_readable_logs(
+    tmp_path, monkeypatch
+):
     monkeypatch.chdir(tmp_path)
     session_id = "wb-complete-log"
     cli = CLI()
@@ -658,16 +662,22 @@ def test_complete_wb_cli_flow_writes_structured_session_log(tmp_path, monkeypatc
             calculate=bool(payload.get("calculation_params")),
         )
 
-    log_files = list(
-        (Path(os.environ["SM_CONFIG"]).parent / "logs").glob("session-*.json")
-    )
-    assert [path.name for path in log_files] == [f"session-{session_id}.json"]
+    from core.logs.session import ApplicationLogManager
 
-    report = json.loads(log_files[0].read_text(encoding="utf-8"))
-    messages = [_message(record) for record in report["records"]]
+    manager = ApplicationLogManager(
+        tmp_path, data_root=Path(os.environ["SM_CONFIG"]).parent
+    )
+    entries = manager.list_entries()
+    messages = []
+    for entry in entries:
+        try:
+            message = json.loads(entry["message"])
+        except json.JSONDecodeError:
+            continue
+        if message.get("session_id") == session_id:
+            messages.append(message)
     event_types = [message["event_type"] for message in messages]
 
-    assert report["session_id"] == session_id
     assert event_types.count("experiment_started") == 1
     assert event_types.count("step_input_submitted") == len(step_ids)
     assert event_types.count("plugin_result") == 2
@@ -685,8 +695,9 @@ def test_complete_wb_cli_flow_writes_structured_session_log(tmp_path, monkeypatc
         for message in messages
         if message["event_type"] == "step_input_submitted"
     )
-    assert "secret-token" not in json.dumps(report, ensure_ascii=False)
-    assert "[REDACTED]" in json.dumps(report, ensure_ascii=False)
+    serialized_messages = json.dumps(messages, ensure_ascii=False)
+    assert "secret-token" not in serialized_messages
+    assert "[REDACTED]" in serialized_messages
 
     plugin_events = [
         message for message in messages if message["event_type"] == "plugin_result"

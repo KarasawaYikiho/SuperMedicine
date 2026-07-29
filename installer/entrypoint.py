@@ -1391,6 +1391,11 @@ def _install_record_artifacts_from_results(
     }
     if payload_result and payload_result.get("status") in {"copied", "dry-run"}:
         artifacts["payload_dir"] = payload_result.get("target_dir")
+        payload_files = payload_result.get("payload_files")
+        if isinstance(payload_files, list):
+            artifacts["payload_files"] = [
+                str(path) for path in payload_files if str(path).strip()
+            ]
     binaries = [
         result.get("target_path")
         for result in (exe_result, gui_exe_result)

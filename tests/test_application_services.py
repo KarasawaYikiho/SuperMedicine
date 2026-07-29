@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 import json
+from pathlib import Path
 
 import pytest
 import yaml
@@ -350,7 +351,32 @@ def test_permission_log_system_service_owns_log_write_and_list(tmp_path):
     listed = service.list_logs()
 
     assert written.ok is True
-    assert listed.data[0]["session_id"] == "service-session"
+    assert listed.data[0]["file"].startswith("supermedicine-")
+    assert listed.data[0]["file"].endswith(".log")
+    shown = service.show_log(listed.data[0]["file"])
+    assert shown.ok is True
+    assert any(
+        entry["message"] == "service log"
+        for entry in shown.data["entries"]
+    )
+
+
+def test_service_log_write_keeps_the_active_interface_surface(tmp_path):
+    from core.logs.session import ApplicationLogManager
+    from core.services import PermissionLogSystemService
+
+    manager = ApplicationLogManager(tmp_path)
+    session = manager.start(surface="CLI", command="log", continuous=False)
+    try:
+        result = PermissionLogSystemService(tmp_path).write_log("from CLI")
+    finally:
+        session.stop()
+
+    assert result.ok is True
+    entry = next(
+        item for item in result.data["entries"] if item["message"] == "from CLI"
+    )
+    assert entry["surface"] == "CLI"
 
 
 def test_permission_log_system_service_owns_multi_agent_switch(tmp_path):
@@ -382,6 +408,22 @@ def test_services_share_sm_config_outside_project_tree(tmp_path, monkeypatch):
     assert PermissionLogSystemService(project).multi_agent_status().data == {
         "enabled": True
     }
+    written = PermissionLogSystemService(project).write_log(
+        "external runtime log", session_id="external-state"
+    )
+    started = ExperimentToolService(project).start_experiment(
+        "wb", session_id="external-state"
+    )
+    assert written.ok is True
+    assert started.ok is True
+    assert Path(started.data["session_file"]).is_relative_to(
+        external_config.parent / "experiments"
+    )
+    log_files = list((external_config.parent / "logs").glob("supermedicine-*.log"))
+    assert log_files
+    log_text = "\n".join(path.read_text(encoding="utf-8") for path in log_files)
+    assert "external runtime log" in log_text
+    assert '"session_id": "external-state"' in log_text
     assert not (project / ".supermedicine" / "config.yaml").exists()
 
 

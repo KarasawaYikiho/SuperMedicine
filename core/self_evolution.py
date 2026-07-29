@@ -16,8 +16,6 @@ import re
 from typing import Any, Literal, Sequence
 
 from core.experience import ExperienceRecord, ExperienceStore
-from core.logs.models import TUI_LOG_SESSION_ID
-from core.logs.report import LogReportStore
 from core.operation_guard import authorize_dangerous_operation
 from core.path_safety import (
     DangerousOverwriteError,
@@ -773,9 +771,16 @@ class SelfEvolutionService:
 
     def _write_log_event(self, event: dict[str, Any], *, severity: str) -> None:
         try:
-            LogReportStore(self.project_root).append(
+            from core.config_center import resolve_config_path
+            from core.logs.session import ApplicationEventLogAdapter
+
+            ApplicationEventLogAdapter(
+                self.project_root,
+                data_root=resolve_config_path(self.project_root).parent,
+                surface="SERVICE",
+            ).append(
                 json.dumps(event, ensure_ascii=False, sort_keys=True),
-                session_id=TUI_LOG_SESSION_ID,
+                session_id="self-evolution",
                 severity=severity,
             )
         except Exception:

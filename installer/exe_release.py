@@ -216,6 +216,7 @@ def release_payload_to_directory(
         "source_root": payload_root,
         "target_dir": install_dir,
         "file_count": len(files),
+        "payload_files": [relative.as_posix() for _, relative in files],
         "existing_count": len(existing),
         "overwrite": overwrite,
         "dry_run": dry_run,

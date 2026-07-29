@@ -482,7 +482,9 @@ class ExperienceStore:
         else:
             raise ExperienceValidationError("Export format must be 'json' or 'md'")
         if path is not None:
-            Path(path).write_text(rendered, encoding="utf-8")
+            output_path = Path(path)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(rendered, encoding="utf-8")
         return rendered
 
     def _append_jsonl(self, path: Path, record: ExperienceRecord) -> None:

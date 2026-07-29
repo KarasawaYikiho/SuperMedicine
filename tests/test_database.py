@@ -43,6 +43,7 @@ class TestDatabaseContextManager:
                 "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
             )
             table_names = [t["name"] for t in tables]
+            assert "users" in table_names
             assert "sessions" in table_names
             assert "agents" in table_names
             assert "plugins" in table_names

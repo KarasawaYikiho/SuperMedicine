@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import json
 import logging
+import re
 import sys
 
 import pytest
@@ -17,8 +18,71 @@ from core.logs.handler import (
     LogReportLoggingHandler,
     append_tui_stream_output,
     configure_tui_log_storage,
+    stop_application_log_storage,
+)
+from core.logs.session import (
+    ACTIVE_LOG_ENV,
+    ApplicationLogManager,
+    ReadableApplicationLogHandler,
 )
 from core.logs.models import TUI_LOG_SESSION_ID, format_log_message
+
+
+def test_readable_application_log_uses_required_names_and_shared_surface_cycle(
+    tmp_path, monkeypatch
+):
+    monkeypatch.delenv(ACTIVE_LOG_ENV, raising=False)
+    manager = ApplicationLogManager(tmp_path, data_root=tmp_path / "state")
+    gui = manager.start(surface="GUI", continuous=True)
+    web = manager.start(surface="WEB", continuous=True)
+
+    assert gui.owner is True
+    assert web.owner is False
+    assert gui.path == web.path
+    assert re.fullmatch(r"supermedicine-\d{8}-\d{6}\.log", gui.path.name)
+
+    web.write("WARNING", "web.test", "request warning", surface="WEB")
+    web.stop()
+    gui.stop()
+    content = gui.path.read_text(encoding="utf-8")
+
+    assert "[WARNING] [WEB] [web.test] request warning" in content
+    assert content.count("Application started") == 1
+    assert content.count("Application stopped") == 1
+    assert "Interface detached" in content
+
+
+def test_readable_application_log_one_shot_suffix_and_oldest_pruning(
+    tmp_path, monkeypatch
+):
+    monkeypatch.delenv(ACTIVE_LOG_ENV, raising=False)
+    manager = ApplicationLogManager(
+        tmp_path,
+        data_root=tmp_path / "state",
+        max_total_bytes=260,
+    )
+    first = manager.start(
+        surface="CLI",
+        command="status",
+        continuous=False,
+        attach_existing=False,
+    )
+    first.write("INFO", "test", "x" * 160)
+    first.stop()
+    second = manager.start(
+        surface="CLI",
+        command="diagnose",
+        continuous=False,
+        attach_existing=False,
+    )
+    second.stop()
+
+    assert re.fullmatch(
+        r"supermedicine-\d{8}-\d{6}-cli-status(?:-\d+)?\.log",
+        first.path.name,
+    )
+    assert second.path.is_file()
+    assert not first.path.exists()
 
 
 def test_log_directory_is_created_and_isolated_log_is_redacted(tmp_path):
@@ -350,35 +414,30 @@ def test_statistics_deduplicates_same_entry_identity(tmp_path):
 def test_tui_stream_output_routes_severity_session_and_redacts_before_persisting(
     tmp_path,
 ):
-    """TUI stream output keeps routing metadata while redacting stream payloads."""
+    """TUI stream output is readable, surface-tagged, and redacted."""
     secret = "sk-tui-stream-secret"
+    session = configure_tui_log_storage(tmp_path)
+    try:
+        append_tui_stream_output(
+            tmp_path,
+            "stdout",
+            f"Authorization: Bearer {secret} url=https://example.test?token={secret}",
+        )
+        append_tui_stream_output(tmp_path, "stderr", "password=tui-stream-password")
+        entries = ApplicationLogManager(
+            tmp_path, data_root=session.path.parent.parent
+        ).list_entries(file_name=session.path.name)
+        log_text = session.path.read_text(encoding="utf-8")
 
-    append_tui_stream_output(
-        tmp_path,
-        "stdout",
-        f"Authorization: Bearer {secret} url=https://example.test?token={secret}",
-    )
-    append_tui_stream_output(tmp_path, "stderr", "password=tui-stream-password")
-
-    entries = LogReportStore(tmp_path).list_entries(session_id=TUI_LOG_SESSION_ID)
-    log_text = "\n".join(
-        path.read_text(encoding="utf-8")
-        for path in (tmp_path / ".supermedicine" / "logs").glob("*.json")
-    )
-    entries_text = json.dumps(entries, ensure_ascii=False)
-
-    assert [entry["severity"] for entry in entries] == ["Info", "Error"]
-    assert all(entry["session_id"] == TUI_LOG_SESSION_ID for entry in entries)
-    assert entries[0]["source"] == "stream"
-    assert entries[0]["category"] == "stdout"
-    assert entries[1]["category"] == "stderr"
-    assert entries[0]["raw_message"].startswith("[stream:stdout:stdout]\n")
-    assert entries[1]["raw_message"].startswith("[stream:stderr:stderr]\n")
-    assert secret not in log_text
-    assert secret not in entries_text
-    assert "tui-stream-password" not in log_text
-    assert "tui-stream-password" not in entries_text
-    assert "[REDACTED]" in log_text
+        assert [entry["severity"] for entry in entries[-2:]] == ["INFO", "ERROR"]
+        assert all(entry["surface"] == "TUI" for entry in entries)
+        assert entries[-2]["module"] == "stdout"
+        assert entries[-1]["module"] == "stderr"
+        assert secret not in log_text
+        assert "tui-stream-password" not in log_text
+        assert "[REDACTED]" in log_text
+    finally:
+        stop_application_log_storage()
 
 
 def test_session_log_aggregation_and_statistics_match_entry_counts(tmp_path):
@@ -456,8 +515,7 @@ def test_follow_snapshot_returns_tail_entries_and_respects_line_limit(tmp_path):
 
 
 def test_log_handler_emits_chunked_messages_for_long_output(tmp_path):
-    """LogReportLoggingHandler chunks messages exceeding max length."""
-    store = LogReportStore(tmp_path)
+    """Readable logging preserves a long message without losing content."""
     handler = LogReportLoggingHandler(tmp_path, session_id="chunk-test")
     handler.setFormatter(logging.Formatter("%(message)s"))
     long_message = "x" * (DEFAULT_MAX_MESSAGE_LENGTH + 500)
@@ -468,15 +526,12 @@ def test_log_handler_emits_chunked_messages_for_long_output(tmp_path):
 
     handler.emit(record)
 
-    entries = store.list_entries(session_id="chunk-test")
-    assert len(entries) >= 2
-    reconstructed = "".join(e["raw_message"] for e in entries)
-    assert long_message in reconstructed
+    content = handler.session.path.read_text(encoding="utf-8")
+    assert long_message in content
 
 
 def test_log_handler_routes_severity_from_log_record(tmp_path):
     """LogReportLoggingHandler preserves logging level as severity."""
-    store = LogReportStore(tmp_path)
     handler = LogReportLoggingHandler(tmp_path, session_id="severity-route")
     handler.setFormatter(logging.Formatter("%(message)s"))
 
@@ -492,12 +547,14 @@ def test_log_handler_routes_severity_from_log_record(tmp_path):
         )
         handler.emit(record)
 
-    entries = store.list_entries(session_id="severity-route")
+    entries = ApplicationLogManager(
+        tmp_path, data_root=handler.session.path.parent.parent
+    ).list_entries(file_name=handler.session.path.name)
     severities = [e["severity"] for e in entries]
-    assert "Error" in severities
-    assert "Warning" in severities
-    assert "Debug" in severities
-    assert "Info" in severities
+    assert "ERROR" in severities
+    assert "WARNING" in severities
+    assert "DEBUG" in severities
+    assert "INFO" in severities
 
 
 def test_export_summary_matches_summary_for_session(tmp_path):
@@ -549,27 +606,31 @@ def test_configure_tui_log_storage_replaces_console_routing_with_log_handler(
     named_logger.propagate = False
 
     try:
-        configure_tui_log_storage(tmp_path)
+        session = configure_tui_log_storage(tmp_path)
         named_logger.error("console isolated failure")
 
         assert all(
-            isinstance(handler, LogReportLoggingHandler) for handler in root.handlers
+            isinstance(handler, ReadableApplicationLogHandler)
+            for handler in root.handlers
         )
         assert named_logger.handlers == []
         assert named_logger.propagate is True
         assert console_capture.getvalue() == ""
-        entries = LogReportStore(tmp_path).list_entries(session_id=TUI_LOG_SESSION_ID)
-        assert len(entries) == 1
-        assert entries[0]["severity"] == "Error"
-        assert entries[0]["source"] == "logging"
-        assert entries[0]["category"] == "ERROR"
-        assert "console isolated failure" in entries[0]["raw_message"]
+        entries = ApplicationLogManager(
+            tmp_path, data_root=session.path.parent.parent
+        ).list_entries(file_name=session.path.name)
+        assert entries[-1]["severity"] == "ERROR"
+        assert entries[-1]["surface"] == "TUI"
+        assert "console isolated failure" in entries[-1]["message"]
     finally:
+        stop_application_log_storage()
         for handler in list(root.handlers):
-            root.removeHandler(handler)
-            handler.close()
+            if handler not in original_handlers:
+                root.removeHandler(handler)
+                handler.close()
         for handler in original_handlers:
-            root.addHandler(handler)
+            if handler not in root.handlers:
+                root.addHandler(handler)
         root.setLevel(original_level)
         for handler in list(named_logger.handlers):
             named_logger.removeHandler(handler)
@@ -599,9 +660,10 @@ def test_log_report_stream_flushes_buffered_gui_output_into_single_session(tmp_p
     stream.write(" line\nnext line")
     stream.flush()
 
-    entries = LogReportStore(tmp_path).list_entries(session_id="gui-session")
-    assert len(entries) == 2
-    assert {entry["category"] for entry in entries} == {"stdout"}
-    assert len(list((tmp_path / ".supermedicine" / "logs").glob("*.json"))) == 1
-    assert entries[0]["raw_message"] == "[stream:stdout:stdout]\npartial line"
-    assert entries[1]["raw_message"] == "[stream:stdout:stdout]\nnext line"
+    entries = ApplicationLogManager(
+        tmp_path, data_root=stream.session.path.parent.parent
+    ).list_entries(file_name=stream.session.path.name)
+    assert len(entries) == 3
+    assert {entry["module"] for entry in entries[-2:]} == {"stdout"}
+    assert entries[-2]["message"] == "partial line"
+    assert entries[-1]["message"] == "next line"

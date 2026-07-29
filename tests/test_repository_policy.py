@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-import subprocess
 from pathlib import Path, PurePosixPath
 
 
@@ -71,14 +70,9 @@ SECRET_PATTERNS = (
 
 
 def _tracked_files() -> list[str]:
-    result = subprocess.run(
-        ["git", "ls-files"],
-        cwd=REPOSITORY_ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    return [line.strip().replace("\\", "/") for line in result.stdout.splitlines()]
+    from scripts.maintainers.repository_files import repository_files
+
+    return repository_files(REPOSITORY_ROOT)
 
 
 def _tracked_text() -> list[tuple[str, str]]:

@@ -607,6 +607,7 @@ def test_release_payload_to_directory_copies_unified_layout(tmp_path, caplog):
 
     assert result["status"] == "copied"
     assert result["reason"] == "created"
+    assert "dist/SuperMedicine.exe" in result["payload_files"]
     assert (target_dir / "install_entry.py").exists()
     assert (target_dir / "install_entry.py").read_text(encoding="utf-8") == (
         payload / "install_entry.py"
@@ -631,6 +632,35 @@ def test_release_payload_to_directory_dry_run_does_not_create_target(tmp_path):
     assert result["status"] == "dry-run"
     assert result["file_count"] >= 5
     assert not (tmp_path / "Installed").exists()
+
+
+def test_release_payload_install_record_drives_safe_payload_uninstall(tmp_path):
+    from installer.entrypoint import (
+        _install_record_artifacts_from_results,
+        write_install_record,
+    )
+    from installer.exe_release import release_payload_to_directory
+
+    payload = _make_release_payload(tmp_path)
+    install_path = tmp_path / "Installed"
+    copied = release_payload_to_directory(
+        source_root=payload, target_dir=install_path
+    )
+    artifacts = _install_record_artifacts_from_results(payload_result=copied)
+    write_install_record(install_path, artifacts=artifacts, mode="release-payload")
+    user_file = install_path / ".supermedicine" / "user-note.txt"
+    user_file.write_text("keep", encoding="utf-8")
+
+    result = uninstall(install_path, force=True, preserve_user_data=True)
+
+    assert result["status"] == "removed"
+    assert user_file.read_text(encoding="utf-8") == "keep"
+    assert not (install_path / "dist" / "SuperMedicine.exe").exists()
+    assert not (install_path / "install_entry.py").exists()
+    assert all(
+        not (install_path / relative).exists()
+        for relative in copied["payload_files"]
+    )
 
 
 def test_release_gui_exe_dry_run_uses_gui_desktop_target(tmp_path, caplog):
@@ -1005,6 +1035,28 @@ def test_recorded_and_explicit_targets_are_removed_only_inside_project(tmp_path)
     assert outside.exists()
     assert any(str(outside) in item for item in result["skipped"])
     outside.unlink()
+
+
+def test_uninstall_removes_only_recorded_payload_bytecode_caches(tmp_path):
+    recorded_source = tmp_path / "core" / "module.py"
+    recorded_cache = tmp_path / "core" / "__pycache__" / "module.cpython-313.pyc"
+    user_cache = tmp_path / "user-code" / "__pycache__" / "keep.pyc"
+    for path in (recorded_source, recorded_cache, user_cache):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"generated")
+    record = tmp_path / ".supermedicine" / "install-record.json"
+    record.parent.mkdir(parents=True)
+    record.write_text(
+        json.dumps({"payload_files": ["core/module.py"]}),
+        encoding="utf-8",
+    )
+
+    result = uninstall(tmp_path, force=True)
+
+    assert result["status"] == "removed"
+    assert not (tmp_path / "core").exists()
+    assert user_cache.is_file()
+    assert "core/__pycache__" in result["removed"]
 
 
 def test_nested_platform_install_records_are_removed_but_unrecorded_home_like_dirs_survive(

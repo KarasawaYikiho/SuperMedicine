@@ -42,8 +42,7 @@
             <button class="tab-btn" data-tab="tools">工具</button>
             <button class="tab-btn" data-tab="experiments">实验</button>
             <button class="tab-btn" data-tab="dialog">对话历史</button>
-            <button class="tab-btn" data-tab="llm">LLM 配置</button>
-            <button class="tab-btn" data-tab="permissions">权限</button>
+            <button class="tab-btn" data-tab="settings">设置</button>
             <button class="tab-btn" data-tab="logs">日志</button>
             <button class="tab-btn" data-tab="self-evolution">自进化</button>
             <button class="tab-btn" data-tab="diagnose">诊断</button>
@@ -252,7 +251,7 @@
         <!-- Tools Tab -->
         <section id="tab-tools" class="tab-content">
             <h2>工具管理</h2>
-            <div class="toolbar">
+            <div class="toolbar tools-toolbar">
                 <select id="tool-ws-select" class="select-input">
                     <option value="">选择工作区</option>
                 </select>
@@ -368,7 +367,26 @@
         </section>
 
         <!-- LLM Config Tab -->
-        <section id="tab-llm" class="tab-content">
+        <section id="tab-settings" class="tab-content">
+            <h2>设置</h2>
+            <p class="section-intro">在一个入口管理日志、LLM、Agent、权限及其他持久设置。</p>
+            <div class="form-container">
+                <h3>日志记录</h3>
+                <div id="settings-log-info" class="text-muted">加载中...</div>
+                <div class="form-group">
+                    <label for="settings-log-limit-gib">历史日志总容量上限（GiB）</label>
+                    <input id="settings-log-limit-gib" type="number" min="0.001" step="0.001" value="1">
+                </div>
+                <div class="form-actions">
+                    <button id="btn-save-log-settings" class="btn btn-primary">应用日志设置</button>
+                    <button id="btn-refresh-settings" class="btn btn-secondary">刷新全部设置</button>
+                </div>
+            </div>
+            <div id="settings-overview" class="info-card">
+                <h3>设置总览</h3>
+                <div id="settings-overview-info">加载中...</div>
+            </div>
+            <hr class="settings-divider">
             <h2>LLM 配置</h2>
             <div class="toolbar">
                 <button id="btn-refresh-llm" class="btn btn-secondary">刷新</button>
@@ -434,10 +452,10 @@
                     </tbody>
                 </table>
             </div>
-        </section>
+            <hr class="settings-divider">
 
         <!-- Permissions Tab -->
-        <section id="tab-permissions" class="tab-content">
+        <div id="settings-permissions">
             <h2>权限设置</h2>
             <div class="toolbar">
                 <button id="btn-refresh-permissions" class="btn btn-secondary">刷新</button>
@@ -493,6 +511,7 @@
                 <h3>已授权外部目录</h3>
                 <div id="permission-authorized-roots">加载中...</div>
             </div>
+        </div>
         </section>
 
         <!-- Logs Tab -->
@@ -509,9 +528,6 @@
                 <h3>写入日志条目</h3>
                 <div class="form-group">
                     <textarea id="log-message" rows="3" placeholder="日志消息..."></textarea>
-                </div>
-                <div class="form-group">
-                    <input type="text" id="log-session-id" placeholder="会话ID（可选）">
                 </div>
                 <div class="form-actions">
                     <button id="btn-save-log" class="btn btn-primary">写入</button>
@@ -551,7 +567,7 @@
                 </div>
             </div>
             <div id="self-evolution-list" class="data-table-container">
-                <table class="data-table">
+                <table class="data-table self-evolution-table">
                     <thead>
                         <tr>
                             <th>ID</th>
@@ -579,17 +595,17 @@
                 <div class="info-card">
                     <h3>配置诊断</h3>
                     <div id="diagnose-config-info">加载中...</div>
-                    <button id="btn-diagnose-config" class="btn btn-secondary btn-sm" style="margin-top: 0.5rem;">运行配置</button>
+                    <button id="btn-diagnose-config" class="btn btn-secondary btn-sm diagnostic-run-button">运行配置</button>
                 </div>
                 <div class="info-card">
                     <h3>LLM诊断</h3>
                     <div id="diagnose-llm-info">加载中...</div>
-                    <button id="btn-diagnose-llm" class="btn btn-secondary btn-sm" style="margin-top: 0.5rem;">运行LLM</button>
+                    <button id="btn-diagnose-llm" class="btn btn-secondary btn-sm diagnostic-run-button">运行 LLM</button>
                 </div>
                 <div class="info-card">
                     <h3>安装诊断</h3>
                     <div id="diagnose-install-info">加载中...</div>
-                    <button id="btn-diagnose-install" class="btn btn-secondary btn-sm" style="margin-top: 0.5rem;">运行安装</button>
+                    <button id="btn-diagnose-install" class="btn btn-secondary btn-sm diagnostic-run-button">运行安装</button>
                 </div>
             </div>
         </section>

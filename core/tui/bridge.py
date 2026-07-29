@@ -154,6 +154,8 @@ def _request_worker(
     max_frame_bytes: int,
 ) -> None:
     """Run one request outside the bridge parent so it can be terminated safely."""
+    log_session = None
+    log_reason = "normal"
 
     def emit(event: str, data: Any) -> None:
         try:
@@ -199,6 +201,15 @@ def _request_worker(
         pipe.send(("terminal", payload))
 
     try:
+        from core.logs.handler import configure_application_log_storage
+
+        log_session = configure_application_log_storage(
+            paths.project_root,
+            data_root=paths.data_root,
+            surface="TUI",
+            continuous=True,
+            keep_console=False,
+        )
         context = BridgeContext(emit, cancelled)
         application = ApplicationFacade(paths)
         if handler is None:
@@ -247,8 +258,10 @@ def _request_worker(
                 }
             )
     except _WorkerTerminal:
+        log_reason = "error"
         pass
     except BridgeCancelled:
+        log_reason = "cancelled"
         terminal(
             {
                 "version": PROTOCOL_VERSION,
@@ -258,6 +271,7 @@ def _request_worker(
             }
         )
     except Exception:
+        log_reason = "error"
         try:
             terminal(
                 {
@@ -273,6 +287,10 @@ def _request_worker(
         except Exception:
             pass
     finally:
+        if log_session is not None:
+            from core.logs.handler import stop_application_log_storage
+
+            stop_application_log_storage(reason=log_reason)
         pipe.close()
 
 

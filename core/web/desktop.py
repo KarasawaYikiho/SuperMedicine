@@ -269,13 +269,19 @@ def launch_desktop(*, timeout: float = 15.0) -> None:
     from core.logs.handler import (
         configure_application_log_storage,
         install_log_report_streams,
+        stop_application_log_storage,
     )
     from core.web.server import create_app
 
-    session_id = configure_application_log_storage(paths.data_dir)
-    install_log_report_streams(paths.data_dir, session_id=session_id)
+    session = configure_application_log_storage(
+        paths.data_dir,
+        surface="GUI",
+        continuous=True,
+    )
+    install_log_report_streams(paths.data_dir, session=session, surface="GUI")
     server = DesktopServer(create_app())
     server.start(timeout=timeout)
+    reason = "normal"
     try:
         try:
             import webview
@@ -285,7 +291,9 @@ def launch_desktop(*, timeout: float = 15.0) -> None:
         try:
             webview.start(gui="edgechromium" if sys.platform == "win32" else None)
         except Exception as exc:
+            reason = "error"
             action = webview_diagnostics().get("action", "Check the desktop runtime")
             raise RuntimeError(f"Unable to start the desktop WebView: {exc}. {action}") from exc
     finally:
         server.stop()
+        stop_application_log_storage(reason=reason)

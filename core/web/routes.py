@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
 import json
 import logging
+import os
+from pathlib import Path
+import sys
 from typing import Any
 
 from fastapi import WebSocket
@@ -285,15 +289,33 @@ def register_experience_tool_routes(app: Any, runtime: WebRuntime) -> None:
     async def experience_export(
         workspace_id: str, request: dict[str, Any]
     ) -> dict[str, Any]:
-        """Export experiences through the shared service contract."""
-        return service_data(
-            runtime.service("experience_evolution").export_experiences(
-                workspace_id,
-                str(request.get("format") or "json"),
-                include_general=bool(request.get("include_general", False)),
-                path=request.get("path"),
+        """Export experiences to managed data storage and return JSON metadata."""
+        export_format = str(request.get("format") or "json").strip().lower()
+        if export_format not in {"json", "md"}:
+            return web_error(
+                "导出格式必须是 json 或 md。",
+                400,
+                code="invalid_experience_export_format",
             )
+        output_path = (
+            runtime.data_root
+            / "exports"
+            / f"{workspace_id}-experiences.{export_format}"
         )
+        result = runtime.service("experience_evolution").export_experiences(
+            workspace_id,
+            export_format,
+            include_general=bool(request.get("include_general", False)),
+            path=output_path,
+        )
+        if not result.ok:
+            return service_data(result)
+        return {
+            "status": "exported",
+            "format": export_format,
+            "path": str(output_path),
+            "size_bytes": output_path.stat().st_size,
+        }
 
     @app.delete("/api/v1/workspaces/{workspace_id}/experiences/{experience_id}")
     async def experience_remove(
@@ -375,6 +397,27 @@ def register_experience_tool_routes(app: Any, runtime: WebRuntime) -> None:
 
 
 def register_llm_permission_routes(app: Any, runtime: WebRuntime) -> None:
+
+    @app.get("/api/v1/settings")
+    async def settings_get() -> Any:
+        """Return all persistent settings through one discoverable endpoint."""
+        return service_data(
+            runtime.service("permission_log_system").settings()
+        )
+
+    @app.post("/api/v1/settings/application-log")
+    async def settings_application_log(
+        request: dict[str, Any],
+    ) -> Any:
+        """Update the total historical application-log size limit."""
+        value = request.get("max_total_bytes")
+        if isinstance(value, bool) or not isinstance(value, int):
+            return web_error("max_total_bytes must be an integer", 400)
+        return service_data(
+            runtime.service(
+                "permission_log_system"
+            ).set_application_log_limit(value)
+        )
 
     @app.get("/api/v1/llm/providers")
     async def llm_providers() -> Any:
@@ -531,7 +574,9 @@ def register_log_experiment_routes(app: Any, runtime: WebRuntime) -> None:
         """List protocols or show one persisted experiment session in full."""
         try:
             if session_file:
-                path = experiment_session_path(session_file, runtime.project_root)
+                path = experiment_session_path(
+                    session_file, runtime.project_root, runtime.data_root
+                )
                 return service_data(
                     runtime.service("experiment_tool").show_experiment(path)
                 )
@@ -580,7 +625,9 @@ def register_log_experiment_routes(app: Any, runtime: WebRuntime) -> None:
         if not all([step_id, input_json]):
             return web_error("step_id and input_json are required", 400)
         try:
-            path = experiment_session_path(session_file, runtime.project_root)
+            path = experiment_session_path(
+                session_file, runtime.project_root, runtime.data_root
+            )
         except ValueError as exc:
             return web_error(str(exc), 400)
         return service_data(
@@ -655,6 +702,9 @@ def register_agent_evolution_routes(app: Any, runtime: WebRuntime) -> None:
 def register_diagnostic_routes(app: Any, runtime: WebRuntime) -> None:
     # ---- Diagnose endpoints ----------------------------------------------
 
+    def checked_at() -> str:
+        return datetime.now().astimezone().isoformat(timespec="milliseconds")
+
     @app.get("/api/v1/diagnose")
     async def diagnose_all() -> Any:
         """Get all diagnostics."""
@@ -671,13 +721,29 @@ def register_diagnostic_routes(app: Any, runtime: WebRuntime) -> None:
     async def diagnose_config() -> Any:
         """Get config diagnostics."""
         result = runtime.service("permission_log_system").system_diagnostics()
-        return result.data.get("config", {}) if result.ok else service_data(result)
+        if not result.ok:
+            return service_data(result)
+        data = dict(result.data.get("config", {}))
+        data["path"] = data.get("config_path", "")
+        data["ok"] = bool(data.get("exists")) and not bool(data.get("load_error"))
+        data["status"] = (
+            "ready"
+            if data["ok"]
+            else ("invalid" if data.get("load_error") else "missing")
+        )
+        data["checked_at"] = checked_at()
+        return data
 
     @app.get("/api/v1/diagnose/llm")
     async def diagnose_llm() -> Any:
         """Get LLM diagnostics."""
         result = runtime.service("permission_log_system").system_diagnostics()
-        return result.data.get("llm", {}) if result.ok else service_data(result)
+        if not result.ok:
+            return service_data(result)
+        data = dict(result.data.get("llm", {}))
+        data["status"] = "ready" if data.get("ok") else "incomplete"
+        data["checked_at"] = checked_at()
+        return data
 
     @app.get("/api/v1/diagnose/install")
     async def diagnose_install() -> Any:
@@ -685,12 +751,73 @@ def register_diagnostic_routes(app: Any, runtime: WebRuntime) -> None:
         result = runtime.service("permission_log_system").system_diagnostics()
         if not result.ok:
             return service_data(result)
+        project_root = (
+            Path(runtime.application.paths.project_root)
+            if runtime.application is not None
+            else Path(runtime.project_root or runtime.data_root.parent)
+        ).resolve()
+        resource_root = Path(runtime.resource_root or project_root).resolve()
+        data_root = Path(runtime.data_root).resolve()
+        install_record = data_root / "install-record.json"
+        frozen = bool(getattr(sys, "frozen", False))
+        executable = Path(sys.executable).resolve()
+        source_checkout = (resource_root / ".git").is_dir()
+        checks = {
+            "entrypoints": {
+                "ok": (frozen and executable.is_file())
+                or (
+                    (resource_root / "cli_entry.py").is_file()
+                    and (resource_root / "gui_entry.py").is_file()
+                ),
+                "label": "CLI 与 GUI 启动入口",
+                "detail": str(executable if frozen else resource_root),
+            },
+            "runtime": {
+                "ok": bool(
+                    result.data.get("required_runtime", {})
+                    .get("harness", {})
+                    .get("healthy")
+                )
+                and bool(
+                    result.data.get("required_runtime", {})
+                    .get("rag", {})
+                    .get("healthy")
+                ),
+                "label": "必需运行时",
+                "detail": "Harness + RAG",
+            },
+            "data_root": {
+                "ok": data_root.is_dir() and os.access(data_root, os.W_OK),
+                "label": "用户数据目录",
+                "detail": str(data_root),
+            },
+            "installation": {
+                "ok": frozen or install_record.is_file() or source_checkout,
+                "label": "安装记录或源码工作区",
+                "detail": (
+                    "standalone executable"
+                    if frozen
+                    else (
+                        str(install_record)
+                        if install_record.is_file()
+                        else ("source checkout" if source_checkout else "not found")
+                    )
+                ),
+            },
+        }
         return {
             "audit": result.data.get("audit", {}),
             "database": result.data.get("database", {}),
             "log_storage": result.data.get("log_storage", {}),
             "required_runtime": result.data.get("required_runtime", {}),
-            "ok": result.data.get("ok", False),
+            "mode": (
+                "release"
+                if frozen or install_record.is_file()
+                else ("source" if source_checkout else "unknown")
+            ),
+            "checks": checks,
+            "ok": all(bool(item["ok"]) for item in checks.values()),
+            "checked_at": checked_at(),
         }
 
 

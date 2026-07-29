@@ -59,12 +59,20 @@ def launch_tui(
         print(status.message)
         return status
 
-    from core.logs.handler import configure_tui_log_storage
+    from core.logs.handler import (
+        configure_tui_log_storage,
+        stop_application_log_storage,
+    )
 
     configure_tui_log_storage(root)
+    reason = "normal"
     try:
         return_code = launch_opentui_runtime(project_root=root)
+        if return_code:
+            reason = "error"
+            logger.error("OpenTUI exited with code %s for %s", return_code, root)
     except OpenTUIRuntimeError as exc:
+        reason = "error"
         logger.error("OpenTUI launch failed for %s: %s", root, exc)
         return TUIStatus(
             title=status.title,
@@ -74,8 +82,8 @@ def launch_tui(
             runtime_name=runtime.package,
             runtime_version=runtime.version,
         )
-    if return_code:
-        logger.error("OpenTUI exited with code %s for %s", return_code, root)
+    finally:
+        stop_application_log_storage(reason=reason)
     return status
 
 

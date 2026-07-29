@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import logging
 import sys
+from pathlib import Path
+from typing import Any
 
 from permission.redaction import redact_sensitive
 
@@ -47,9 +49,32 @@ class _RedactingFormatter(logging.Formatter):
         return str(redact_sensitive(super().formatException(ei)))
 
 
-def _configure_cli_logging() -> None:
-    """Configure default CLI logging with a secret-redacting formatter."""
+def _configure_cli_logging(
+    project_dir: str | Path = ".",
+    *,
+    command: str = "command",
+    continuous: bool = False,
+    surface: str = "CLI",
+) -> Any:
+    """Configure readable launch logging while retaining CLI console output."""
 
     handler = logging.StreamHandler()
     handler.setFormatter(_RedactingFormatter("%(message)s"))
-    logging.basicConfig(level=logging.INFO, handlers=[handler], force=True)
+    handler._supermedicine_cli_console = True  # type: ignore[attr-defined]
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+    root.addHandler(handler)
+    try:
+        from core.logs.handler import configure_application_log_storage
+    except ModuleNotFoundError as exc:
+        if exc.name not in {"core.logs", "core.logs.handler"}:
+            raise
+        return None
+
+    return configure_application_log_storage(
+        project_dir,
+        surface=surface,
+        command=command,
+        continuous=continuous,
+        keep_console=True,
+    )

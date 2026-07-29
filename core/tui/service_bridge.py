@@ -23,6 +23,7 @@ from permission.redaction import redact_sensitive
 
 _CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f]")
 _ROUTE_LABELS = {
+    "settings": "设置",
     "chat": "对话",
     "dashboard": "状态",
     "workspace": "工作区",
@@ -38,6 +39,7 @@ _ROUTE_LABELS = {
     "diagnose": "诊断",
 }
 _DISPLAY_KEYS = {
+    "settings": ("section", "value", "mode", "provider"),
     "chat": ("summary", "event", "title"),
     "workspace": ("name", "id"),
     "paper": ("title", "name", "id"),
@@ -150,6 +152,23 @@ def _present(route: str, records: list[Any]) -> list[dict[str, Any]]:
     return [_presentation_entry(route, record) for record in records]
 
 
+def _settings_records(result: ServiceResult[Any]) -> list[dict[str, str]]:
+    if not result.ok or not isinstance(result.data, dict):
+        return []
+    records: list[dict[str, str]] = []
+    for section, value in result.data.items():
+        if isinstance(value, dict):
+            summary = ", ".join(
+                f"{key}={redact_sensitive(str(item))}"
+                for key, item in value.items()
+                if not isinstance(item, (dict, list))
+            )
+        else:
+            summary = str(redact_sensitive(str(value)))
+        records.append({"section": str(section), "value": summary or "已配置"})
+    return records
+
+
 def catalog_snapshot(project_root: Any) -> dict[str, Any]:
     """Return all OpenTUI page records from shared application services."""
     root, resource_root = _path_pair(project_root)
@@ -192,9 +211,11 @@ def catalog_snapshot(project_root: Any) -> dict[str, Any]:
     log_records = system.list_logs()
     permission_status = system.permission_status()
     multi_agent_status = system.multi_agent_status()
+    settings = system.settings()
     evolution_records = ExperienceEvolutionService(root).list_evolution_artifacts()
     diagnostics = system.config_diagnostics()
     pages = {
+        "settings": _present("settings", _settings_records(settings)),
         "chat": _present("chat", _records(dialog)),
         "dashboard": [
             {"label": f"工作区：{len(workspaces.data or []) if workspaces.ok else 0} 个"},
@@ -216,6 +237,7 @@ def catalog_snapshot(project_root: Any) -> dict[str, Any]:
         "diagnose": _present("diagnose", _records(diagnostics)),
     }
     notice_results = {
+        "settings": (settings,),
         "chat": (dialog,),
         "dashboard": (runtime, workspaces, capabilities),
         "workspace": (workspaces,),
@@ -305,17 +327,6 @@ def _execute_chat(value: str, target: Any) -> dict[str, Any]:
             message = output.get("message") or output.get("text")
         else:
             message = output
-        workspace_id = _runtime_workspace(project_root)
-        if workspace_id:
-            history = AgentHarnessService(project_root)
-            history.append_dialog_event(
-                workspace_id, event="user_message", summary=value
-            )
-            history.append_dialog_event(
-                workspace_id,
-                event="assistant_message",
-                summary=_safe_label(message, "对话已完成"),
-            )
         return ServiceResult.success(
             {"message": _safe_label(message, "对话已完成")},
             meta={"service": "opentui", "operation": "chat"},
@@ -336,6 +347,19 @@ def perform_action(route: str, value: str, target: Any) -> dict[str, Any]:
     workspace_id = _runtime_workspace(project_root)
     if route == "dashboard":
         return PermissionLogSystemService(project_root).application_status().to_dict()
+    if route == "settings":
+        service = PermissionLogSystemService(project_root)
+        if not value.strip():
+            return service.settings().to_dict()
+        try:
+            max_total_bytes = int(value.strip())
+        except ValueError:
+            return ServiceResult.failure(
+                "invalid_log_limit",
+                "日志总上限必须是正整数（字节）。",
+                meta={"service": "opentui", "route": route},
+            ).to_dict()
+        return service.set_application_log_limit(max_total_bytes).to_dict()
     if route == "workspace":
         return submit_value(route, value, project_root)
     if route == "paper":

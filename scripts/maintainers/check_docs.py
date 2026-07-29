@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import re
-import subprocess
 import sys
 from collections import Counter
 from pathlib import Path
@@ -12,8 +11,13 @@ from urllib.parse import unquote
 
 import yaml
 
-
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+if str(REPOSITORY_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPOSITORY_ROOT))
+
+from scripts.maintainers.repository_files import repository_files  # noqa: E402
+
+
 MANIFEST_PATH = REPOSITORY_ROOT / "docs" / "manifest.yaml"
 LINK_RE = re.compile(r"!?\[[^\]]*]\(([^)]+)\)")
 HEADING_RE = re.compile(r"^#{1,6}\s+(.+?)\s*#*\s*$", re.MULTILINE)
@@ -27,14 +31,7 @@ def _manifest() -> dict:
 
 
 def _git_paths() -> dict[str, str]:
-    result = subprocess.run(
-        ["git", "ls-files"],
-        cwd=REPOSITORY_ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    paths = [line.strip().replace("\\", "/") for line in result.stdout.splitlines()]
+    paths = repository_files(REPOSITORY_ROOT)
     return {path.casefold(): path for path in paths}
 
 

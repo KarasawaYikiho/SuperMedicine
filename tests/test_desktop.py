@@ -143,6 +143,8 @@ def test_frontend_all_buttons_are_wired_and_packaged_for_offline_access():
     }
     assert required_buttons <= button_ids
     assert not {button_id for button_id in button_ids if button_id not in javascript}
-    assert html.count('data-tab="') == 13
+    assert html.count('data-tab="') == 12
+    assert 'data-tab="settings"' in html
+    assert 'id="tab-settings"' in html
     assert "https://fonts." not in html
     assert "prefers-reduced-motion" in styles

@@ -424,6 +424,29 @@ def _add_log_commands(subparsers):
     return {"log": log_parser}
 
 
+def _add_settings_commands(subparsers):
+    settings_parser = subparsers.add_parser(
+        "settings",
+        help="集中查看和修改全部持久设置",
+        description=(
+            "集中设置入口：日志容量、LLM、权限、Agent、RAG 与实验引导。"
+            "现有 llm/permission/multi-agent 命令继续作为兼容快捷入口。"
+        ),
+    )
+    settings_subparsers = settings_parser.add_subparsers(dest="settings_command")
+    settings_subparsers.add_parser("show", help="显示全部设置（敏感值已脱敏）")
+    log_limit_parser = settings_subparsers.add_parser(
+        "log-limit",
+        help="设置所有历史启动日志的总容量上限",
+    )
+    log_limit_parser.add_argument(
+        "max_total_bytes",
+        type=int,
+        help="正整数，单位字节；默认 1073741824（1 GiB）",
+    )
+    return {"settings": settings_parser}
+
+
 def _add_workspace_commands(subparsers):
     # Workspace 命令
     workspace_parser = subparsers.add_parser(
@@ -832,6 +855,7 @@ def _build_parser() -> tuple[
         _add_multi_agent_command,
         _add_experiment_commands,
         _add_log_commands,
+        _add_settings_commands,
         _add_workspace_commands,
         _add_tool_commands,
         _add_llm_commands,
@@ -941,7 +965,7 @@ def _dispatch_run_command(args, cli, parsers) -> bool:
             params = _resolve_run_params(args.params_json, args.params_file)
         except ValueError as exc:
             parsers["run"].error(str(exc))
-        cli.run(
+        result = cli.run(
             args.task,
             verbose=getattr(args, "verbose", False),
             plugin=args.plugin,
@@ -950,6 +974,8 @@ def _dispatch_run_command(args, cli, parsers) -> bool:
             workspace=args.workspace,
             agents=args.agents,
         )
+        if not isinstance(result, dict) or result.get("status") != "success":
+            raise SystemExit(1)
     elif args.command in {"self-evolve", "self-evolution"}:
         cli.self_evolve(
             instruction=args.instruction,
@@ -1036,6 +1062,20 @@ def _dispatch_log_command(args, cli, parsers) -> bool:
             ),
         },
         parsers["log"],
+    )
+    return True
+
+
+def _dispatch_settings_command(args, cli, parsers) -> bool:
+    if args.command != "settings":
+        return False
+    _dispatch_subcommand(
+        args.settings_command,
+        {
+            "show": cli.settings_show,
+            "log-limit": lambda: cli.settings_log_limit(args.max_total_bytes),
+        },
+        parsers["settings"],
     )
     return True
 
@@ -1200,6 +1240,7 @@ def _dispatch_command(args, cli, parser, parsers) -> None:
         _dispatch_multi_agent_command,
         _dispatch_experiment_command,
         _dispatch_log_command,
+        _dispatch_settings_command,
         _dispatch_workspace_command,
         _dispatch_tool_command,
         _dispatch_llm_command,
@@ -1214,9 +1255,36 @@ def main(argv: list[str] | None = None) -> None:
     _configure_stdio_errors()
     parser, command_parsers = _build_parser()
     args = parser.parse_args(argv)
-    if args.command != "tui":
-        _configure_cli_logging()
+    interactive_tui = args.command == "tui" and not bool(
+        getattr(args, "dry_run", False)
+    )
+    log_session = None
+    if not interactive_tui:
+        surface = "WEB" if args.command == "web" else (
+            "TUI" if args.command == "tui" else "CLI"
+        )
+        command = (
+            "dry-run"
+            if args.command == "tui"
+            else str(args.command or "help")
+        )
+        log_session = _configure_cli_logging(
+            Path.cwd(),
+            command=command,
+            continuous=args.command == "web",
+            surface=surface,
+        )
 
     from cli_entry import CLI
 
-    _dispatch_command(args, CLI(), parser, command_parsers)
+    reason = "normal"
+    try:
+        _dispatch_command(args, CLI(), parser, command_parsers)
+    except BaseException:
+        reason = "error"
+        raise
+    finally:
+        if log_session is not None:
+            from core.logs.handler import stop_application_log_storage
+
+            stop_application_log_storage(reason=reason)

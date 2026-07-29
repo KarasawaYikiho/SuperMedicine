@@ -22,7 +22,7 @@ from core.tui.opentui_runtime import (
     opentui_command,
     runtime_info,
 )
-from core.services import LLMService, WorkspaceService
+from core.services import AgentHarnessService, LLMService, WorkspaceService
 from core.tui.service_bridge import bridge_request, catalog_snapshot, multi_agent_operation
 
 
@@ -108,6 +108,7 @@ def test_opentui_catalog_uses_real_services_without_demo_records(tmp_path):
         "experience",
         "tool",
         "dialog",
+        "settings",
         "llm",
         "experiment",
         "log",
@@ -154,6 +155,7 @@ def test_opentui_feature_contract_covers_pages_and_interactions():
             "experience",
             "tool",
             "dialog",
+            "settings",
             "llm",
             "experiment",
             "log",
@@ -273,11 +275,23 @@ def test_opentui_activation_persists_workspace_and_provider_state(tmp_path):
 def test_opentui_submit_uses_real_workspace_chat_and_log_services(
     tmp_path, monkeypatch
 ):
+    def fake_chat(self, message, *, workspace_id=None, **kwargs):
+        history = AgentHarnessService(tmp_path)
+        history.append_dialog_event(
+            workspace_id,
+            event="user_message",
+            summary=f"已提交用户请求（{len(message)} 字符）",
+        )
+        history.append_dialog_event(
+            workspace_id,
+            event="assistant_message",
+            summary="Agent 执行成功",
+        )
+        return {"status": "success", "output": {"message": f"assistant: {message}"}}
+
     monkeypatch.setattr(
         "core.web.runtime.WebRuntime.execute_chat_message",
-        lambda self, message, **kwargs: {
-            "output": {"message": f"assistant: {message}"}
-        },
+        fake_chat,
     )
     created = bridge_request(
         {"operation": "submit", "route": "workspace", "value": "study-two"},
@@ -297,7 +311,8 @@ def test_opentui_submit_uses_real_workspace_chat_and_log_services(
     )
     assert log["ok"] is True
     refreshed = catalog_snapshot(tmp_path)["data"]["pages"]
-    assert any("summarize trial" in record["label"] for record in refreshed["chat"])
+    assert any("已提交用户请求" in record["label"] for record in refreshed["chat"])
+    assert all("summarize trial" not in record["label"] for record in refreshed["chat"])
     assert refreshed["log"]
     assert all("status" not in record for record in refreshed["log"])
 

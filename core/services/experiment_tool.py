@@ -24,7 +24,7 @@ from core.experiment_protocols import (
     list_protocols,
     save_experiment_config,
 )
-from core.logs.report import LogReportStore
+from core.logs.session import ApplicationEventLogAdapter
 from permission.redaction import redact_sensitive
 from core.serialization import json_ready
 from core.workspace import InvalidWorkspaceId, WorkspaceError, WorkspaceNotFoundError
@@ -71,7 +71,14 @@ class ExperimentToolService:
             else resolve_config_path(self.project_root)
         )
         self.data_root = self.config_path.parent
-        self.logs = LogReportStore(self.project_root, data_root=self.data_root)
+        self.logs = ApplicationEventLogAdapter(
+            self.project_root,
+            data_root=self.data_root,
+            surface="SERVICE",
+            max_total_bytes=ConfigCenter(
+                self.config_path
+            ).get_application_log_config()["max_total_bytes"],
+        )
 
     def start_experiment(
         self,

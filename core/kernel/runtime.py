@@ -648,6 +648,27 @@ class Kernel:
                 rag_context=rag_context,
                 progress_callback=progress_callback,
             )
+            if (
+                result.get("status") == "success"
+                and self._config.get_llm_runtime_provider_name()
+            ):
+                chain_metadata = result.get("metadata")
+                chain = (
+                    list(chain_metadata.get("chain", ()))
+                    if isinstance(chain_metadata, dict)
+                    else ["delta", "alpha", "beta", "gamma"]
+                )
+                result = self._execute_llm_chat(
+                    task,
+                    task_id=task_id,
+                    agent_id="gamma",
+                    progress_callback=progress_callback,
+                    workspace_path=workspace_path,
+                )
+                result["agent"] = "gamma"
+                finalized_metadata = result.setdefault("metadata", {})
+                finalized_metadata["chain"] = chain
+                finalized_metadata["role_review"] = {"approved": True}
             metadata = result.setdefault("metadata", {})
             metadata["rag"] = {
                 **rag_context.as_metadata(),

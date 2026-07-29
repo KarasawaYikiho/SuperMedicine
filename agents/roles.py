@@ -494,10 +494,17 @@ class GammaAgent(BaseAgent):
 
         # Context notes
         if context:
+            safe_context = {
+                key: value
+                for key, value in context.items()
+                if key not in {"requirements", "routing_history", "rag", "workspace"}
+                and isinstance(value, (str, int, float, bool))
+            }
+        else:
+            safe_context = {}
+        if safe_context:
             sections.append("## Context\n")
-            for key, value in context.items():
-                if key == "requirements":
-                    continue
+            for key, value in safe_context.items():
                 sections.append(f"- **{key}**: {value}")
             sections.append("")
 

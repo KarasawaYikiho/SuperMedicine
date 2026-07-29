@@ -101,6 +101,8 @@ _FORWARDED_COMMAND_GROUPS = {
     ),
     "cli.commands.execution": ("llm_add", "llm_list", "llm_show", "llm_switch"),
     "cli.commands.system": (
+        "settings_show",
+        "settings_log_limit",
         "permission_status",
         "permission_set_mode",
         "permission_authorize",

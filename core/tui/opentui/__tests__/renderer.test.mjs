@@ -482,7 +482,7 @@ test("destroy removes shell listeners and leaves no renderer work", async () => 
   expect(renderer.liveRequestCount).toBe(0)
 })
 
-test("all thirteen routes change route and captured frame through mockMouse.click", async () => {
+test("all fourteen routes change route and captured frame through mockMouse.click", async () => {
   const { renderer, mockMouse, renderOnce, captureCharFrame } = await createTestRenderer({ width: 120, height: 30 })
   try {
     const shell = mountShell(renderer)

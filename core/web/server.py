@@ -62,6 +62,13 @@ def _install_web_security(app: Any, auth_token: str | None) -> None:
             if not verify_bearer_header(authorization, auth_token):
                 return api_error_response(APIError(403, "invalid_authentication", "Bearer authentication failed"), request_id=request_id)
         response = await call_next(request)
+        logger.info(
+            "%s %s status=%s",
+            request.method,
+            request.url.path,
+            response.status_code,
+            extra={"surface": "WEB"},
+        )
         response.headers.setdefault("X-Request-ID", request_id)
         return response
 

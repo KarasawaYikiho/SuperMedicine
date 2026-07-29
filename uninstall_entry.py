@@ -49,6 +49,7 @@ RUNTIME_ARTIFACT_PATHS: tuple[str, ...] = (
 )
 INSTALL_RECORD_PATH_KEYS: tuple[str, ...] = (
     "created_paths",
+    "payload_files",
     "platform_target_paths",
     "installer_created_platform_target_paths",
     "binaries",
@@ -269,14 +270,40 @@ def collect_removal_candidates(
             RemovalCandidate(project_dir / relative, "canonical-project-owned")
         )
 
+    recorded_content_roots: set[Path] = set()
     for raw_path in _iter_recorded_paths(record):
+        recorded_path = _resolve_candidate(project_dir, raw_path)
         candidates.append(
             RemovalCandidate(
-                _resolve_candidate(project_dir, raw_path),
+                recorded_path,
                 "recorded-installer-created",
                 recorded=True,
             )
         )
+        if _is_within(recorded_path, project_dir):
+            recorded_content_roots.add(
+                recorded_path if recorded_path.is_dir() else recorded_path.parent
+            )
+
+    # Importing the installed Python entrypoints can create bytecode caches after
+    # the payload inventory was recorded.  Treat only caches beneath directories
+    # proven to contain recorded installer content as owned; never sweep
+    # unrelated user directories merely because they are inside the project.
+    for cache_dir in project_dir.rglob("__pycache__"):
+        if not cache_dir.is_dir() or cache_dir.is_symlink():
+            continue
+        cache_parent = cache_dir.parent.resolve()
+        if any(
+            cache_parent == root or _is_within(cache_parent, root)
+            for root in recorded_content_roots
+        ):
+            candidates.append(
+                RemovalCandidate(
+                    cache_dir,
+                    "recorded-installer-cache",
+                    recorded=True,
+                )
+            )
 
     for raw_path in _iter_user_data_paths(record):
         candidates.append(
@@ -381,6 +408,18 @@ def _delete_path(path: Path) -> None:
         shutil.rmtree(path)
     elif path.exists() or path.is_symlink():
         path.unlink()
+
+
+def _prune_empty_parent_directories(path: Path, project_dir: Path) -> None:
+    """Remove only empty parents of an owned file, never the install root."""
+    current = path.parent.resolve()
+    root = project_dir.resolve()
+    while current != root and _is_within(current, root):
+        try:
+            current.rmdir()
+        except OSError:
+            break
+        current = current.parent
 
 
 def _repair_suggestion(kind: str, target: str) -> str:
@@ -620,6 +659,7 @@ def uninstall(
                     candidate.reason,
                 )
                 _delete_path(candidate.path)
+                _prune_empty_parent_directories(candidate.path, project_dir)
                 removed.append(relative)
             except OSError as exc:
                 logger.error(

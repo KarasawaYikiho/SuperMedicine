@@ -667,14 +667,10 @@ def test_release_verification_scripts_use_runner_temp_for_pytest_temp_exhaustion
 def test_beta042_short_term_plan_records_deferred_gaps_with_tracking_owner():
     """Archived release planning notes are local-only cleanup artifacts."""
 
-    tracked = subprocess.run(
-        ["git", "ls-files", "--", "docs/archive"],
-        cwd=REPO_ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    assert tracked.stdout.strip() == ""
+    from scripts.maintainers.repository_files import repository_files
+
+    tracked = repository_files(REPO_ROOT)
+    assert not any(path.startswith("docs/archive/") for path in tracked)
     return
 
     plan = (REPO_ROOT / "docs" / "archive" / "Beta0.4.2ShortTermPlan.md").read_text(

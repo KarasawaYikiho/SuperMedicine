@@ -385,9 +385,8 @@ class LogReportStore:
         if not _SAFE_LOG_NAME.match(file_name):
             raise LogReportError("--file must be a safe log JSON file name")
         path = (self.log_dir / file_name).resolve()
-        project_root = self.project_dir.resolve()
         log_root = self.log_dir.resolve()
-        if path.parent != log_root or not path.is_relative_to(project_root):
+        if path.parent != log_root:
             raise LogReportError("unsafe log report path")
         return path
 

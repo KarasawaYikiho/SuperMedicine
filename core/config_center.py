@@ -62,6 +62,10 @@ DEFAULT_LOG_REPORT_CONFIG: dict[str, Any] = {
     "redact": True,
 }
 
+DEFAULT_APPLICATION_LOG_CONFIG: dict[str, Any] = {
+    "max_total_bytes": 1024 * 1024 * 1024,
+}
+
 
 DEFAULT_FILE_ACCESS_CONFIG: dict[str, Any] = {
     "mode": AccessMode.CONSERVATIVE.value,
@@ -296,6 +300,40 @@ class ConfigCenter:
     def get_log_report_config(self) -> dict[str, Any]:
         """获取日志报告配置，缺失用户配置时返回安全默认值。"""
         return self._merged_default_section("log_report", DEFAULT_LOG_REPORT_CONFIG)
+
+    def get_application_log_config(self) -> dict[str, int]:
+        """Return readable application-log settings with a 1 GiB default cap."""
+
+        config = self._merged_default_section(
+            "application_log", DEFAULT_APPLICATION_LOG_CONFIG
+        )
+        try:
+            max_total_bytes = int(config.get("max_total_bytes", 0))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("application_log.max_total_bytes must be an integer") from exc
+        if max_total_bytes <= 0:
+            raise ValueError("application_log.max_total_bytes must be positive")
+        return {"max_total_bytes": max_total_bytes}
+
+    def set_application_log_max_total_bytes(
+        self, value: int, *, save: bool = True
+    ) -> dict[str, int]:
+        """Persist the total historical readable-log size limit."""
+
+        try:
+            max_total_bytes = int(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("application log size limit must be an integer") from exc
+        if max_total_bytes <= 0:
+            raise ValueError("application log size limit must be positive")
+        config = self._config.setdefault("application_log", {})
+        if not isinstance(config, dict):
+            config = {}
+            self._config["application_log"] = config
+        config["max_total_bytes"] = max_total_bytes
+        if save:
+            self.save()
+        return self.get_application_log_config()
 
     def get_file_access_config(self) -> dict[str, Any]:
         """Return persisted file access-mode config with conservative defaults."""
